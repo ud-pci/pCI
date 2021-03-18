@@ -1,6 +1,6 @@
-module str_fmt
+Module str_fmt
 
-    implicit none
+    Implicit None
     
     Private
 
