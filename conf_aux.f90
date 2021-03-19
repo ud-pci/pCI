@@ -6,6 +6,64 @@ module conf_aux
 
     contains
 
+   subroutine Input
+        use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
+        implicit none
+        integer  :: i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
+        character(len=1) :: name(16)
+        character(len=32) :: strfmt
+
+        strfmt = '(4X,"Program Conf")'
+        write( 6,strfmt)
+        write(11,strfmt)
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Call ReadConfInp
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        if (dabs(C_is) < 1.d-6) K_is=0
+        if (K_is == 0) C_is=0.d0
+
+        open(unit=99,file='c.in',status='OLD')
+        read (99,*) Kl, Ksig, Kdsig
+        write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+        if (K_is == 2.OR.K_is == 4) then
+          read(99,*) K_sms
+          write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+          if ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) stop
+        end if
+        close(99)
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        call ReadConfigurations
+        ! - - - - - - -  case kl = 2  - - - - - - - - - - -
+        if (Kl == 2) then
+           write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
+           if (Ksig /= 0) then
+             write(*,'(1X," Energy dependence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
+           end if
+           write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+           Kecp=0
+           Kl=0
+        else
+           Ksig=0
+        end if
+        ! - - - - - - -  case kv = 1,3  - - - - - - - - - -
+        K_prj=0                    !# this key is fixed for kv=2,4
+        if (Kv == 1.OR.kv == 3) then
+           K_prj=1
+           write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
+           write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
+        end if
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        !if (Kl /= 1) then ! If Kl=1, continue from a previous calculation
+        !      open(unit=16,status='UNKNOWN',file='CONF.JJJ')
+        !      close(unit=16,status='DELETE')
+        !end if
+        open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
+        read(16) (In(i),i=1,IPgnt)
+        read(16) (Gnt(i),i=1,IPgnt)
+        close(unit=16)
+       return
+    end subroutine Input
+
     subroutine AllocateFormHArrays(mype, npes)
       use mpi
       Use str_fmt, Only : FormattedMemSize

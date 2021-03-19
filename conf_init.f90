@@ -6,67 +6,51 @@ module conf_init
 
     contains
 
-    subroutine Input
-        use hamiltonian_io, only : Hread
+    subroutine ReadConfInp
+        ! This subroutine reads input parameters from CONF.INP
         implicit none
-        integer  :: istr, i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
-        integer*8 :: i8
-        real(dp) :: x, t
-        character(len=1)  :: name(16), str2(2)*3, str4*5
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        data str2 /' NO','YES'/
-        open(unit=99,file='c.in',status='OLD')
-        read (99,*) Kl, Ksig, Kdsig
-        write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
-        close(99)
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        write( 6,'(4X,"Program Conf")')
-        write(11,'(4X,"Program Conf")')
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-!       input from the file 'CONF.INP'
+        integer :: istr
+        character(len=1) :: name(16)
+        ! - - - - - - - - - - - - - - - - - - - - - -
         open(unit=10,file='CONF.INP',status='OLD')
-        read (10,'(1X,16A1)') name
-        write( *,'(4X,16A1)') name
+        read(10,'(1X,16A1)') name
+        write(*,'(4X,16A1)') name
         write(11,'(4X,16A1)') name
-        read (10,'(5X,F5.1)') Z
-        read (10,'(5X,F5.1)') Am
-        read (10,'(5X,F5.1)') XJ_av
-        read (10,'(5X,F5.1)') Jm
-        read (10,'(5X,I6)') Nso
-        read (10,'(5X,I6)') Nc
-        read (10,'(5X,I6)') Kv
-        read (10,'(5X,I6)') Nlv
-        read (10,'(5X,I6)') Ne
-!    - - - - - - - - - - - - - - - - - - - - - - - - -
-        allocate(Qnl(100000000)) ! 1B = upper bound
-        IPlv=3*Nlv
-        K_is=0                     !#
-        Kbrt=0                     !#  Optional
-        Kout=1                     !#  parameters
-        Kecp=0                     !#
-        C_is=0.d0                  !#
-        Gj=0.d0                    !#
-        n_it=20                    !#
-100     call inpstr(istr)          !#
-        if (istr /= 1) goto 100    !#
-        if (dabs(C_is) < 1.d-6) K_is=0
-        if (K_is == 0) C_is=0.d0
-        if (K_is == 2.OR.K_is == 4) then
-          open(unit=99,file='c.in',status='OLD')
-          read (99,*) Kl, Ksig, Kdsig
-          read(99,*) K_sms
-          write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
-          close(99)
-          if ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) stop
-        end if
-!    - - - - - - - - - - - - - - - - - - - - - - - - -
+        read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
+        read(10,'(5X,I6)') Nso, Nc, Kv, Nlv, Ne
+        IPlv = 3*Nlv
+        K_is = 0                ! 
+        Kbrt = 0                !  
+        Kout = 1                !   Optional
+        Kecp = 0                !   parameters
+        C_is = 0.d0             !      
+        Gj   = 0.d0             !   
+        n_it = 20               !
+        Cut0 = 0.001            !       
+        Ncpt = 0                !  
+
+        istr = 0
+        do while (istr /= 1)
+          call inpstr(istr)  
+        end do        
+        Return
+    end subroutine ReadConfInp
+
+    subroutine ReadConfigurations
+        ! This subroutine reads configurations from CONF.INP
+        implicit none
+        integer  :: i, i1, i2, ic, ne0, nx, ny, nz
+        real(dp) :: x
+        ! - - - - - - - - - - - - - - - - - - - - - -
+        allocate(Qnl(100000000)) ! upper bound = 1 billion conf-s
         if (Nso /= 0) then
            read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso)
         end if
+        ! reading in configurations - - - - - - 
         i1=Nso+1
         do ic=1,Nc
            ne0=0
-200        i2=i1+5
+  200      i2=i1+5
            read (10,'(6(4X,F7.4))') (Qnl(i),i=i1,i2)
            do i=i1,i2
               x=dabs(Qnl(i))+1.d-9
@@ -86,36 +70,8 @@ module conf_init
         end do
         Nsp=i2
         close(unit=10)
-!     - - - - - - -  case kl = 2  - - - - - - - - - - -
-        if (Kl == 2) then
-           write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
-           if (Ksig /= 0) then
-             write(*,'(1X," Energy dependence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
-           end if
-           write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
-           Kecp=0
-           Kl=0
-        else
-           Ksig=0
-        end if
-!     - - - - - - -  case kv = 1,3  - - - - - - - - - -
-        K_prj=0                    !# this key is fixed for kv=2,4
-        if (Kv == 1.OR.kv == 3) then
-           K_prj=1
-           write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
-           write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
-        end if
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        !if (Kl /= 1) then ! If Kl=1, continue from a previous calculation
-        !      open(unit=16,status='UNKNOWN',file='CONF.JJJ')
-        !      close(unit=16,status='DELETE')
-        !end if
-        open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        read(16) (In(i),i=1,IPgnt)
-        read(16) (Gnt(i),i=1,IPgnt)
-        close(unit=16)
-       return
-    end subroutine Input
+        Return
+    end subroutine ReadConfigurations
 
     subroutine inpstr(istr)
         implicit none
@@ -306,24 +262,24 @@ module conf_init
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
              (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
         data Let/'s','p','d','f','g','h','i','k','l'/
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        c1=0.01d0
-        mj=2*dabs(Jm)+0.01d0
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        open (12,file='CONF.DAT',status='OLD', &
+    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        c1 = 0.01d0
+        mj = 2*abs(Jm)+0.01d0
+    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        open(12,file='CONF.DAT',status='OLD', &
               access='DIRECT',recl=2*IP6*IPmr,err=700)
-        read (12,rec=1) p
-        read (12,rec=2) q
-        read (12,rec=5) p1
-        read (12,rec=6) q1
+        read(12,rec=1) p
+        read(12,rec=2) q
+        read(12,rec=5) p1
+        read(12,rec=6) q1
+    ! - - - - - - - - - - - - - - - - - - - - - - - - -
         z1 = pq(1)
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (dabs(Z-z1) > 1.d-6) then
+        if (abs(Z-z1) > 1.d-6) then
            write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
            write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
            read(*,*)
         end if
-!     - - - - - - - - - - - - - - - - - - - - - - - - -
+    ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
         Ns = pq(2)+c1
         ii = pq(3)+c1
@@ -362,8 +318,8 @@ module conf_init
         end if
         Nsu=0
         do nj=1,Nsp
-           i=dsign(1.d0,Qnl(nj))
-           d=dabs(Qnl(nj))+1.d-14
+           i=sign(1.d0,Qnl(nj))
+           d=abs(Qnl(nj))+1.d-14
            d=10.0*d
            nnj=d
            d=10.0d0*(d-nnj)

@@ -9,7 +9,7 @@ module conf_pt_variables
     integer, parameter :: IPPT = 5000
     ! global variables for conf_pt
     integer     :: Nd1, Ncci, Nmax, Ncp0, Ncnr, Ncnrci, Ncnr0, Ncnew, &
-                   NcOld, n_is, KmaxScr, KsymScr, NsumScr, MaxScr
+                   NcOld, n_is, KmaxScr, KsymScr, NsumScr, MaxScr, ktf, kvar
     real(dp)    :: dvnrx, dvnrn
     logical     :: average_diag
 

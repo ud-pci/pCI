@@ -6,53 +6,41 @@ module conf_pt_aux
     contains
 
     subroutine Input
-        use conf_init, only : inpstr
+        use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         ! This subroutine reads in from CONF.INP the following variables
         ! name, Z, Am, XJ_av, Jm, Nso, Nc, Kv, Nlv
         ! K_is, Kbrt, Kout, Kecp, C_is, Gj, Cut0, Ncpt
         ! Qnl - atomic configurations
         ! Nsp, Kl
         implicit none
-        character(len=1) :: name(16)
         integer :: i, j, k, i1, i2, ic, icc, ne0, nx, ny, nz, istr
-        real(dp)  :: x
+        character(len=1) :: name(16)
+        character(len=512) :: strfmt
     ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        write( 6,5) 
-        write(11,5)
-    5   format(/4X,'Program CONF_PT', &
-               /4X,'PT corrections to binding energy', & 
-               /4X,'Zero approximation is taken from CONF.XIJ', &
-               /4X,'New vectors are in CONF_PT.XIJ and', &
-               /4X,'new input is in CONF_new.INP')
-    ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
-        open(unit=10, status='OLD',file='CONF.INP')
-        read(10,'(1X,16A1)') name
-        write(*,'(4X,16A1)') name
-        write(11,'(4X,16A1)') name
-        read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
-        read(10,'(5X,I6)') Nso, Nc, Kv, Nlv, Ne
-    ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        allocate(Qnl(100000000)) ! 1B = upper bound
-        IPlv=3*Nlv
-        K_is = 0                ! 
-        Kbrt = 0                !  
-        Kout = 1                !   Optional
-        Kecp = 0                !   parameters
-        C_is = 0.d0             !      
-        Gj   = 0.d0             !      
-        Cut0 = 0.001            !       
-        Ncpt = 0                !   
+        strfmt = '(/4X,"Program CONF_PT", &
+               /4X,"PT corrections to binding energy", & 
+               /4X,"Zero approximation is taken from CONF.XIJ", &
+               /4X,"New vectors are in CONF_PT.XIJ and", &
+               /4X,"new input is in CONF_new.INP")'
+        write( 6,strfmt) 
+        write(11,strfmt)
+        ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
         Ksig=0
         Kdsig=0
         average_diag=.true.      ! diagonal is averaged over relat. config.
-    100 call inpstr(istr)       !
-        if (istr /=  1) goto 100 !
+
+        Call ReadConfInp
+
         Ncci = Nc
         if (Ncpt < Ncci) then
             write (*,*) 'Nothing to do for NcPT =', Ncpt, ' & Nc = NcCI =', Ncci
             stop
         end if
         Nc = Ncpt
+
+        open(unit=21, file='cpt.in')
+        read(21,*) ktf,kvar
+        close (21)
     
         if (abs(C_is) < 1.d-6) K_is = 0
         if (K_is == 0) C_is = 0.d0
@@ -61,53 +49,22 @@ module conf_pt_aux
             read(*,*) K_sms
             if ((K_sms-1)*(K_sms-2)*(K_sms-3) /=  0) stop
         end if
-    ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (Nso /=  0) then
-            read(10,75) (Qnl(i),i=1,Nso)
-    75      format(6(4X,F7.4))
-        end if
-    ! - - - reading in configurations - - - - - - - - - - - - - - - - -
-        i1 = Nso + 1
-        do ic = 1, Nc
-            icc=ic
-            ne0=0
-    200     i2=i1+5
-            read(10,75,err=900,end=900) (Qnl(i),i=i1,i2)
-            do i = i1,i2
-                x = abs(Qnl(i))+1.d-9
-                if (x < 1.d-8) goto 210
-                nx=10000*x
-                ny=100*x
-                nz=(nx-100*ny)
-                ne0=ne0+nz
-            end do
-    210     i2=i-1
-            i1=i2+1
-            if (ne0 < Ne) goto 200
-            if (ne0 > Ne) then
-                write(6,'(I6)') 'INPUT: too many electrons for ic =', ic
-                Stop
-            end if
-        end do
-        Nsp=i2
-        close(unit=10)
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -  
+        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        call ReadConfigurations
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -  
         Kl = 3
         return
-    900 write (*,*) 'Error while reading configuration ', icc
-        write (*,*) 'Ncpt =', Ncpt, ' Ncci =', Ncci
-        Stop
     end subroutine Input
 
     subroutine Init
         use conf_init, only : inpstr
         implicit none
+        integer                    :: ii, ni, if, nj, i, nnj, llj, jlj, kkj, &
+                                     nec, imax, j, n, ic, i0, nmin, i1, n2, n1, & l
         real(dp)                     :: c1, c2, z1, d
         real(dp), dimension(IP6)     :: p, q, p1, q1
         real(dp), dimension(4*IP6)   :: pq
         real(dp), dimension(IPs)     :: Qq1
-        integer                    :: ii, ni, if, nj, i, nnj, llj, jlj, kkj, &
-                                     nec, imax, j, n, ic, i0, nmin, i1, n2, n1, & l
         integer, dimension(4*IPs)  :: IQN
         integer, dimension(33)     :: nnn, jjj, nqq
         character(len=1)           :: Let(9), lll(33)
@@ -129,9 +86,8 @@ module conf_pt_aux
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
         z1 = pq(1)
         if (abs(Z-z1) > 1.d-6) then
-           write( 6,5) Z,z1
-           write(11,5) Z,z1
-    5      format('nuc. charge is changed: Z =',F12.6,' ><',F12.6)
+           write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
+           write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
            read(*,*)
         end if
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -171,43 +127,40 @@ module conf_pt_aux
         end if
         Nsu=0
         do nj=1,Nsp
-            i=sign(1.d0,Qnl(nj))
-            d=abs(Qnl(nj))+1.d-14
-            d=10.0*d
-            nnj=d
-            d=10.0d0*(d-nnj)
-            llj=d
-            jlj=2*llj+i
-            kkj=-i*((jlj+1)/2)
-            d=100.0d0*(d-llj)
-            Nq(nj)=d+0.1d0
-            do ni=1,ns
-                if (nnj == Nn(ni) .and. Kk(ni) == kkj) goto 200
-            end do
-            write( 6,25) nj,nnj,llj,kkj
-            write(11,25) nj,nnj,llj,kkj
-    25      format(/2X,'no orbital for shell ',I3,': n,l,k=',3I4)
-            stop
-    200     Nip(nj)=ni
-            if (Nsu < ni) then
-                Nsu=ni
-            end if
+           i=sign(1.d0,Qnl(nj))
+           d=abs(Qnl(nj))+1.d-14
+           d=10.0*d
+           nnj=d
+           d=10.0d0*(d-nnj)
+           llj=d
+           jlj=2*llj+i
+           kkj=-i*((jlj+1)/2)
+           d=100.0d0*(d-llj)
+           Nq(nj)=d+0.1d0
+           do ni=1,ns
+              if (nnj == Nn(ni) .and. Kk(ni) == kkj) then
+                exit
+              else if (ni == ns) then
+                write( 6,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
+                write(11,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
+                stop
+              end if
+           end do
+           Nip(nj)=ni
+           if (Nsu < ni) Nsu=ni
         end do
         nec=0
-        if (Nso /=  0) then
-           do ni=1,Nso
-              nec=nec+Nq(ni)
-            end do
-        end if
+        if (Nso /= 0) nec=sum(Nq(1:Nso))
         do ni=1,Nsu
            imax=2*Jj(ni)+1
            do j=1,imax,2
               Nst=Nst+1
-          end do
+           end do
         end do
-        write( 6,35) Nsu,Ne,nec,Nst
-    35  format(4X,'Number of actually used orbitals: Nsu =',I3, &
-               /4X,'Ne  =',I3,7X,'nec =',I3,7X,'Nst =',I7)
+        write( 6,'(4X,"Number of actually used orbitals: Nsu =",I3, &
+             /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
+        write(11,'(4X,"Number of actually used orbitals: Nsu =",I3, &
+             /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
         n=0
         ic=0
         i0=0
@@ -217,41 +170,41 @@ module conf_pt_aux
            i=i+1
            n=n+Nq(ni)
            if (n >= Ne) then
-                ic=ic+1
-                if (n > Ne) then
-                    write( 6,45) ic
-                    write(11,45) ic
-    45              format(/2X,'wrong number of electrons'/ &
-                            2X,'for configuration ICONF =',I4/)
-                    stop
-                end if
-                Nvc(ic)=i
-                Nc0(ic)=Nso+i0
-                i0=i0+i
-                n=0
-                i=0
+              ic=ic+1
+              if (n > Ne) then
+                 write( 6,'(/2X,"wrong number of electrons", &
+                      /2X,"for configuration ICONF =",I6)') ic
+                 write(11,'(/2X,"wrong number of electrons", &
+                      /2X,"for configuration ICONF =",I6)') ic
+                stop
+              end if
+              Nvc(ic)=i
+              Nc0(ic)=Nso+i0
+              i0=i0+i
+              n=0
+              i=0
            end if
         end do
-    !     - - - - - - - - - - - - - - - - - - - - - - - - -
-        write( 6,55)
-        write(11,55)
-    55  format(1X,71('='))
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        write( 6,'(1X,71("="))')
+        write(11,'(1X,71("="))')
         do ni=1,Nso
            l =Ll(ni)+1
            lll(ni)=let(l)
         end do
         if (Kout > 1) then
-            write(11,65) (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
-    65      format (1X,'Core:',6(I2,A1,'(',I1,'/2)',I2,';'),&
-                           /6X,6(I2,A1,'(',I1,'/2)',I2,';'),&
-                           /6X,6(I2,A1,'(',I1,'/2)',I2,';'),&
-                           /6X,6(I2,A1,'(',I1,'/2)',I2,';'),&
-                           /6X,6(I2,A1,'(',I1,'/2)',I2,';'),&
-                           /6X,6(I2,A1,'(',I1,'/2)',I2,';'))
+        write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
+                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
+                        (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
+        write(11,'(1X,71("="))')
         end if
-    !   write( 6,55)
+        ! write( 6,55)
         if (Kout > 1) then
-            write(11,55)
+            write(11,'(1X,71("="))')
         end if
         do ic=1,Nc
             n1=Nc0(ic)+1
@@ -265,23 +218,23 @@ module conf_pt_aux
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
                 if (Nq(i) > jjj(i1)+1) then
-                    write(11,75) ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
-     75             format(/2X,'wrong number of electrons'/ &
-                            2X,'for the shell:',I3,3X,I2,A1,I2,'/2', &
-                            ' (',F6.3,')')
+                    write(11,'(/2X,"wrong number of electrons"/ &
+                      2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
+                      " (",I2,")")') ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
                     Stop
                 end if
             end do
             n=n2-n1+1
             if (Kout > 1) then
-                write(11,85) ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
-     85         format(I5,'#',6(I2,A1,'(',I1,'/2)',I2,';'), &
-                    /6X,6(I2,A1,'(',I1,'/2)',I2,';'), &
-                    /6X,6(I2,A1,'(',I1,'/2)',I2,';'))
+                write(11,'(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
+                /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                /8X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
+                ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
             end if
         end do
         if (Kout > 1) then
-            write(11,55)
+            write(11,'(1X,71("="))')
         end if
         do ni=Nso+1,Nsu
             read(12,rec=2*ni+7) p
@@ -295,7 +248,7 @@ module conf_pt_aux
         read(16) (Gnt(i),i=1,IPgnt)
         close(unit=16)
         Return
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
     700 write( 6,105)
         write(11,105)
     105 format(/2X,'file CONF.DAT is absent'/)
@@ -935,7 +888,7 @@ module conf_pt_aux
     ! =============================================================================
     subroutine Cutoff(Nc_0)
         implicit none
-        integer  :: izer, icc, icnr, k, ii, ic, iinr, kvar, ktf, last, i, &
+        integer  :: izer, icc, icnr, k, ii, ic, iinr, last, i, &
                     Nc_0
         integer, dimension(15)  :: Nconf, Mconf
         real(dp)  :: wx, wl, xx, dlx, dln, ctf, xcc
@@ -976,10 +929,6 @@ module conf_pt_aux
         write(*,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
         write(11,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
     15  format(/(4x,i6,' weights above ',d12.3,'/2**',i2,' = ',e11.3))
-
-        open(unit=21, file='cpt.in')
-        read(21,*) ktf,kvar
-        close (21)
 
         write(*,*) ' Give cutoff value of k (0-9):'
         dlx=dlog(dvnrx)*0.4342945d0
