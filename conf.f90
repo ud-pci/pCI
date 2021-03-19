@@ -52,19 +52,17 @@ Program conf
     use conf_init, only : Init
     use formj2, only : FormJ, J_av
     Use str_fmt, Only : FormattedTime
-    !use conffilepaths
+    !Use conffilepaths
 
-    implicit none
+    Implicit None
 
-    integer   :: mype, npes, mpierr
+    Integer   :: n, k, ierr, i, j, nerr, mype, npes, mpierr
     Integer(kind=int64) :: clock_rate
     Integer(kind=int64) :: start_time, stop_time, start_time_tot, stop_time_tot, start1, end1
     Real :: ttime
-    INTEGER, ALLOCATABLE :: data(:,:) 
-    integer   :: n, k, ierr, i, j, nerr
-    real(dp)  :: t
-    character(len=1024) :: strFromEnv
-    character(len=255) :: eValue
+    Real(dp)  :: t
+    Character(Len=1024) :: strFromEnv
+    Character(Len=255) :: eValue
     Character(Len=16)     :: memStr, timeStr
 !   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     ! Initialize MPI
@@ -155,7 +153,7 @@ Program conf
     end do
     if (mype==0) then
         close(unit=16)
-        call Print   !#   Output of the results
+        call PrintResults   !#   Output of the results
         close(unit=6)
         close(unit=11)
         call system_clock(stop_time_tot)

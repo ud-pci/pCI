@@ -1,167 +1,170 @@
-module conf_aux
+Module conf_aux
 
-    use conf_variables
+    Use conf_variables
 
-    implicit none
+    Implicit None
 
-    contains
+    Public
 
-   subroutine Input
-        use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
-        implicit none
-        integer  :: i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
-        character(len=1) :: name(16)
-        character(len=32) :: strfmt
+  Contains
 
+    Subroutine Input
+        ! This subroutine Reads in parameters and configurations from CONF.INP
+        Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
+        Implicit None
+        Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
+        Character(Len=1) :: name(16)
+        Character(Len=32) :: strfmt
+        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         strfmt = '(4X,"Program Conf")'
-        write( 6,strfmt)
-        write(11,strfmt)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Write( 6,strfmt)
+        Write(11,strfmt)
+        ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
         Call ReadConfInp
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (dabs(C_is) < 1.d-6) K_is=0
-        if (K_is == 0) C_is=0.d0
+        If (dabs(C_is) < 1.d-6) K_is=0
+        If (K_is == 0) C_is=0.d0
 
-        open(unit=99,file='c.in',status='OLD')
-        read (99,*) Kl, Ksig, Kdsig
-        write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
-        if (K_is == 2.OR.K_is == 4) then
-          read(99,*) K_sms
-          write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
-          if ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) stop
-        end if
+        Open(unit=99,file='c.in',status='OLD')
+        Read (99,*) Kl, Ksig, Kdsig
+        Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+        If (K_is == 2.OR.K_is == 4) Then
+            Read(99,*) K_sms
+            Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+            If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
+        End If
         close(99)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        call ReadConfigurations
+        Call ReadConfigurations
         ! - - - - - - -  case kl = 2  - - - - - - - - - - -
-        if (Kl == 2) then
-           write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
-           if (Ksig /= 0) then
-             write(*,'(1X," Energy dependence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
-           end if
-           write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
-           Kecp=0
-           Kl=0
-        else
-           Ksig=0
-        end if
+        If (Kl == 2) Then
+            Write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
+            If (Ksig /= 0) Then
+                Write(*,'(1X," Energy depEndence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
+            End If
+            Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+            Kecp=0
+            Kl=0
+        Else
+            Ksig=0
+        End If
         ! - - - - - - -  case kv = 1,3  - - - - - - - - - -
         K_prj=0                    !# this key is fixed for kv=2,4
-        if (Kv == 1.OR.kv == 3) then
-           K_prj=1
-           write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
-           write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
-        end if
+        If (Kv == 1.OR.kv == 3) Then
+            K_prj=1
+            Write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
+            Write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
+        End If
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        !if (Kl /= 1) then ! If Kl=1, continue from a previous calculation
-        !      open(unit=16,status='UNKNOWN',file='CONF.JJJ')
+        !If (Kl /= 1) Then ! If Kl=1, continue from a previous calculation
+        !      Open(unit=16,status='UNKNOWN',file='CONF.JJJ')
         !      close(unit=16,status='DELETE')
-        !end if
-        open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        read(16) (In(i),i=1,IPgnt)
-        read(16) (Gnt(i),i=1,IPgnt)
+        !End If
+        Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
+        Read(16) (In(i),i=1,IPgnt)
+        Read(16) (Gnt(i),i=1,IPgnt)
         close(unit=16)
-       return
-    end subroutine Input
+        Return
+    End Subroutine Input
 
-    subroutine AllocateFormHArrays(mype, npes)
-      use mpi
+    Subroutine AllocateFormHArrays(mype, npes)
+      Use mpi
       Use str_fmt, Only : FormattedMemSize
-      implicit none
-      integer :: mpierr, mype, npes
-      character(len=16) :: memStr
-      if (mype==0) deallocate(Qnl)
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      if (.not. allocated(Nvc)) allocate(Nvc(Nc))
-      if (.not. allocated(Nc0)) allocate(Nc0(Nc))
-      if (.not. allocated(Ndc)) allocate(Ndc(Nc))
-      if (.not. allocated(Jz)) allocate(Jz(Nst))
-      if (.not. allocated(Nh)) allocate(Nh(Nst))
-      if (.not. allocated(Diag)) allocate(Diag(Nd))
-      if (.not. allocated(Rint1)) allocate(Rint1(Nhint))
-      if (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
-      if (.not. allocated(Iint1)) allocate(Iint1(Nhint))
-      if (.not. allocated(Iint2)) allocate(Iint2(Ngint))
-      if (.not. allocated(Iint3)) allocate(Iint3(Ngint))
-      if (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
-      if (Ksig /= 0) then
-        if (.not. allocated(Rsig)) allocate(Rsig(NhintS))
-        if (.not. allocated(Dsig)) allocate(Dsig(NhintS))
-        if (.not. allocated(Esig)) allocate(Esig(NhintS)) 
-        if (.not. allocated(R_is)) allocate(R_is(num_is))
-        if (.not. allocated(I_is)) allocate(I_is(num_is))
-        if (.not. allocated(Rint2S)) allocate(Rint2S(NgintS))
-        if (.not. allocated(Dint2S)) allocate(Dint2S(NgintS))
-        if (.not. allocated(Eint2S)) allocate(Eint2S(NgintS))
-        if (.not. allocated(Iint1S)) allocate(Iint1S(NhintS))
-        if (.not. allocated(Iint2S)) allocate(Iint2S(NgintS))
-        if (.not. allocated(Iint3S)) allocate(Iint3S(NgintS))
-        if (.not. allocated(IntOrdS)) allocate(IntOrdS(nrd))
-      end if
-      if (mype==0) then
+      Implicit None
+      Integer :: mpierr, mype, npes
+      Character(Len=16) :: memStr
+      If (mype==0) Deallocate(Qnl)
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
+      If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
+      If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
+      If (.not. Allocated(Jz)) Allocate(Jz(Nst))
+      If (.not. Allocated(Nh)) Allocate(Nh(Nst))
+      If (.not. Allocated(Diag)) Allocate(Diag(Nd))
+      If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
+      If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
+      If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
+      If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
+      If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
+      If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
+      If (Ksig /= 0) Then
+        If (.not. Allocated(Rsig)) Allocate(Rsig(NhintS))
+        If (.not. Allocated(Dsig)) Allocate(Dsig(NhintS))
+        If (.not. Allocated(Esig)) Allocate(Esig(NhintS)) 
+        If (.not. Allocated(R_is)) Allocate(R_is(num_is))
+        If (.not. Allocated(I_is)) Allocate(I_is(num_is))
+        If (.not. Allocated(Rint2S)) Allocate(Rint2S(NgintS))
+        If (.not. Allocated(Dint2S)) Allocate(Dint2S(NgintS))
+        If (.not. Allocated(Eint2S)) Allocate(Eint2S(NgintS))
+        If (.not. Allocated(Iint1S)) Allocate(Iint1S(NhintS))
+        If (.not. Allocated(Iint2S)) Allocate(Iint2S(NgintS))
+        If (.not. Allocated(Iint3S)) Allocate(Iint3S(NgintS))
+        If (.not. Allocated(IntOrdS)) Allocate(IntOrdS(nrd))
+      End If
+      If (mype==0) Then
         memFormH = 0_int64
         memFormH = sizeof(Nvc)+sizeof(Nc0) &
             + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr)&
             + sizeof(IntOrd)
-        if (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
+        If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
             + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
             + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(R_is)+sizeof(I_is)+sizeof(IntOrdS)
         Call FormattedMemSize(memFormH, memStr)
         Write(*,'(A,A,A)') 'Allocating arrays for FormH requires ',Trim(memStr),' of memory per core' 
-      end if   
-      return
-    end subroutine AllocateFormHArrays
+      End If   
+      Return
+    End Subroutine AllocateFormHArrays
 
-    subroutine DeAllocateFormHArrays(mype, npes)
-      use mpi
+    Subroutine DeAllocateFormHArrays(mype, npes)
+      Use mpi
       Use str_fmt, Only : FormattedMemSize
-      implicit none
-      integer :: mpierr, mype, npes
-      character(len=16) :: memStr
-      integer(kind=8) :: mem 
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      Implicit None
+      Integer :: mpierr, mype, npes
+      Character(Len=16) :: memStr
+      Integer(kind=8) :: mem 
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-      if (mype==0) then
+      If (mype==0) Then
         Call FormattedMemSize(memFormH, memStr)
         Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' of memory per core from arrays for FormH'  
-      end if
+      End If
 
-      if (allocated(Nvc)) deallocate(Nvc)
-      if (allocated(Nc0)) deallocate(Nc0)
-      if (allocated(Rint1)) deallocate(Rint1)
-      if (allocated(Rint2)) deallocate(Rint2)
-      if (allocated(Iint1)) deallocate(Iint1)
-      if (allocated(Iint2)) deallocate(Iint2)
-      if (allocated(Iint3)) deallocate(Iint3)
-      if (allocated(Rint2S)) deallocate(Rint2S)
-      if (allocated(Dint2S)) deallocate(Dint2S)
-      if (allocated(Eint2S)) deallocate(Eint2S)
-      if (allocated(Iint1S)) deallocate(Iint1S)
-      if (allocated(Iint2S)) deallocate(Iint2S)
-      if (allocated(Iint3S)) deallocate(Iint3S)
-      if (allocated(Rsig)) deallocate(Rsig)
-      if (allocated(Dsig)) deallocate(Dsig)
-      if (allocated(Esig)) deallocate(Esig) 
-      if (allocated(R_is)) deallocate(R_is)
-      if (allocated(I_is)) deallocate(I_is)
-      if (allocated(IntOrd)) deallocate(IntOrd)
-      if (allocated(IntOrdS)) deallocate(IntOrdS)
-      if (allocated(Iarr)) deallocate(Iarr)
+      If (Allocated(Nvc)) Deallocate(Nvc)
+      If (Allocated(Nc0)) Deallocate(Nc0)
+      If (Allocated(Rint1)) Deallocate(Rint1)
+      If (Allocated(Rint2)) Deallocate(Rint2)
+      If (Allocated(Iint1)) Deallocate(Iint1)
+      If (Allocated(Iint2)) Deallocate(Iint2)
+      If (Allocated(Iint3)) Deallocate(Iint3)
+      If (Allocated(Rint2S)) Deallocate(Rint2S)
+      If (Allocated(Dint2S)) Deallocate(Dint2S)
+      If (Allocated(Eint2S)) Deallocate(Eint2S)
+      If (Allocated(Iint1S)) Deallocate(Iint1S)
+      If (Allocated(Iint2S)) Deallocate(Iint2S)
+      If (Allocated(Iint3S)) Deallocate(Iint3S)
+      If (Allocated(Rsig)) Deallocate(Rsig)
+      If (Allocated(Dsig)) Deallocate(Dsig)
+      If (Allocated(Esig)) Deallocate(Esig) 
+      If (Allocated(R_is)) Deallocate(R_is)
+      If (Allocated(I_is)) Deallocate(I_is)
+      If (Allocated(IntOrd)) Deallocate(IntOrd)
+      If (Allocated(IntOrdS)) Deallocate(IntOrdS)
+      If (Allocated(Iarr)) Deallocate(Iarr)
 
-      !if (mype==0) then
+      !If (mype==0) Then
       !  print*,'Nvc',sizeof(Nvc)
       !  print*,'Nc0',sizeof(Nc0)
       !  print*,'Rint1',sizeof(Rint1)
@@ -183,31 +186,31 @@ module conf_aux
       !  print*,'IntOrd',sizeof(IntOrd)
       !  print*,'IntOrdS',sizeof(IntOrdS)
       !  print*,'Iarr',sizeof(Iarr)
-      !end if
-     return
-    end subroutine DeAllocateFormHArrays
+      !End If
+     Return
+    End Subroutine DeAllocateFormHArrays
 
-    subroutine AllocateDvdsnArrays(mype, npes)
-      use mpi
+    Subroutine AllocateDvdsnArrays(mype, npes)
+      Use mpi
       Use str_fmt, Only : FormattedMemSize
-      implicit none
-      integer :: mpierr, mype, npes
-      character(len=16) :: memStr
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-      call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-      if (.not. allocated(ArrB)) allocate(ArrB(Nd,IPlv))
-      if (.not. allocated(Tk)) allocate(Tk(Nlv))
-      if (.not. allocated(Tj)) allocate(Tj(Nlv))
-      if (.not. allocated(P)) allocate(P(IPlv,IPlv))
-      if (.not. allocated(D)) allocate(D(IPlv))
-      if (.not. allocated(E)) allocate(E(IPlv))
-      if (.not. allocated(Iconverge)) allocate(Iconverge(IPlv))
-      if (.not. allocated(B1)) allocate(B1(Nd))
-      if (.not. allocated(B2)) allocate(B2(Nd))
-      if (.not. allocated(Z1)) allocate(Z1(Nd0,Nd0))
-      if (.not. allocated(D1)) allocate(D1(Nd0))
-      if (.not. allocated(E1)) allocate(E1(Nd0))
-      if (mype==0) then
+      Implicit None
+      Integer :: mpierr, mype, npes
+      Character(Len=16) :: memStr
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+      If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
+      If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
+      If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
+      If (.not. Allocated(P)) Allocate(P(IPlv,IPlv))
+      If (.not. Allocated(D)) Allocate(D(IPlv))
+      If (.not. Allocated(E)) Allocate(E(IPlv))
+      If (.not. Allocated(Iconverge)) Allocate(Iconverge(IPlv))
+      If (.not. Allocated(B1)) Allocate(B1(Nd))
+      If (.not. Allocated(B2)) Allocate(B2(Nd))
+      If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
+      If (.not. Allocated(D1)) Allocate(D1(Nd0))
+      If (.not. Allocated(E1)) Allocate(E1(Nd0))
+      If (mype==0) Then
         memDvdsn = 0_int64
         memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(D)+sizeof(E) &
             + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(D1)+sizeof(E1)
@@ -232,14 +235,14 @@ module conf_aux
         memEstimate = memEstimate - memFormH + memDvdsn
         Call FormattedMemSize(memEstimate, memStr)
         Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' of memory per core' 
-      end if   
-      return
-    end subroutine AllocateDvdsnArrays
+      End If   
+      Return
+    End Subroutine AllocateDvdsnArrays
 
-    subroutine calcMemStaticArrays
+    Subroutine calcMemStaticArrays
       Use str_fmt, Only : FormattedMemSize
-      implicit none
-      character(len=16) :: memStr
+      Implicit None
+      Character(Len=16) :: memStr
 
       memStaticArrays = 0_int64
       memStaticArrays = sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0)+sizeof(Jt)+sizeof(Njt) &
@@ -264,20 +267,20 @@ module conf_aux
       !print*,'Er',sizeof(Er)
       Call FormattedMemSize(memStaticArrays, memStr)
       Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays requires ',Trim(memStr),' of memory per core' 
-    end subroutine calcMemStaticArrays
+    End Subroutine calcMemStaticArrays
 
-    subroutine calcMemReqs
+    Subroutine calcMemReqs
       Use str_fmt, Only : FormattedMemSize
-      implicit none
-      integer(kind=int64) :: mem
-      integer :: bytesInteger, bytesDP, bytesReal
-      character(len=16) :: memStr
+      Implicit None
+      Integer(kind=int64) :: mem
+      Integer :: bytesInteger, bytesDP, bytesReal
+      Character(Len=16) :: memStr
 
       bytesInteger = 4
       bytesReal = 4
       bytesDP = 8
 
-      call calcMemStaticArrays
+      Call calcMemStaticArrays
       memEstimate = memFormH + memStaticArrays
       Call FormattedMemSize(memEstimate, memStr)
       Write(*,'(A,A,A)') 'calcMemReqs: Total memory estimate before FormH is ',Trim(memStr),' of memory per core' 
@@ -296,98 +299,98 @@ module conf_aux
       Call FormattedMemSize(memTotalPerCPU, memStr)
       Write(*,'(A,A,A)') 'calcMemReqs: Total memory available to the job is ',Trim(memStr),' of memory per core' 
 
-    end subroutine calcMemReqs
+    End Subroutine calcMemReqs
 
-    subroutine FormH(npes, mype)
-      use mpi
+    Subroutine FormH(npes, mype)
+      Use mpi
       Use str_fmt, Only : FormattedMemSize, FormattedTime
-      use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
-      use conf_init, Only : InitFormH, InitMxmpy ! intialization subroutines for FormH and Mxmpy
-      use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
-      use hamiltonian_io
-      use vaccumulator
-      implicit none
-      integer :: npes, mype, mpierr, interval, remainder, Hlim, numBins, cnt, bincnt, npes_read
-      integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ierr, n1, n2, int, split_type, key, disp_unit, win, &
-                 n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
-      integer :: nn, kk
+      Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
+      Use conf_init, Only : InitFormH, InitMxmpy ! intialization Subroutines for FormH and Mxmpy
+      Use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
+      Use hamiltonian_io
+      Use vaccumulator
+      Implicit None
+      Integer :: npes, mype, mpierr, interval, remainder, Hlim, numBins, cnt, bincnt, npes_Read
+      Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ierr, n1, n2, int, split_type, key, disp_unit, win, &
+                 n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, dIff, k2, totsize
+      Integer :: nn, kk
       logical :: finished
-      integer, allocatable, dimension(:) :: idet1, idet2, mepd
-      integer, dimension(npes) :: avgs, start1, end1
-      integer, dimension(npes) :: sizes, disps
-      Integer(kind=int64)     :: start_time, end_time, s1, e1, s2, e2, clock_rate
+      Integer, allocatable, dimension(:) :: idet1, idet2, mepd
+      Integer, dimension(npes) :: avgs, start1, End1
+      Integer, dimension(npes) :: sizes, disps
+      Integer(kind=int64)     :: start_time, End_time, s1, e1, s2, e2, clock_rate
       real :: ttime
       real(dp)  :: t
-      integer(kind=int64) :: ih8, i8, l8, sumd, mem, memsum, ih, cntr, maxme, avgme, numme, size8
-      integer, allocatable, dimension(:) :: nk
+      Integer(kind=int64) :: ih8, i8, l8, sumd, mem, memsum, ih, cntr, maxme, avgme, numme, size8
+      Integer, allocatable, dimension(:) :: nk
       Character(Len=16)     :: memStr, memStr2, npesStr, counterStr
-      integer :: iSign, iIndexes(3), jIndexes(3)
+      Integer :: iSign, iIndexes(3), jIndexes(3)
       Type(IVAccumulator)   :: iva1, iva2
       Type(RVAccumulator)   :: rva1
-      integer, Parameter    :: vaGrowBy = 10000000
-      integer(kind=MPI_ADDRESS_KIND) :: size
+      Integer, Parameter    :: vaGrowBy = 10000000
+      Integer(kind=MPI_ADDRESS_KIND) :: size
       TYPE(C_PTR) :: baseptr
-      integer,allocatable :: arrayshape(:)
-      integer :: shmrank, shmsize, shmcomm, zerokey, zerocomm, zerorank, zerosize
-      integer :: fh
-      integer(kind=MPI_OFFSET_KIND) :: disp       
+      Integer,allocatable :: arrayshape(:)
+      Integer :: shmrank, shmsize, shmcomm, zerokey, zerocomm, zerorank, zerosize
+      Integer :: fh
+      Integer(kind=MPI_OFFSET_KIND) :: disp       
       Character(Len=16) :: filename
 !     - - - - - - - - - - - - - - - - - - - - - - - -
-      call system_clock(count_rate=clock_rate)
+      Call system_clock(count_rate=clock_rate)
 
-      call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
+      Call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
                          MPI_INFO_NULL, shmcomm, mpierr)
-      call MPI_COMM_rank(shmcomm, shmrank, mpierr)
-      call MPI_COMM_size(shmcomm, shmsize, mpierr)
-      ! if core of each node, set zerokey to be true (=1)
-      if (shmrank==0) then
+      Call MPI_COMM_rank(shmcomm, shmrank, mpierr)
+      Call MPI_COMM_size(shmcomm, shmsize, mpierr)
+      ! If core of each node, set zerokey to be true (=1)
+      If (shmrank==0) Then
         zerokey=1
-      else
+      Else
         zerokey=0
-      end if
+      End If
       ! create zerocomm for master cores to communicate
-      call MPI_COMM_split(MPI_COMM_WORLD,zerokey,0,zerocomm,mpierr)
-      call MPI_COMM_rank(zerocomm, zerorank, mpierr)
-      call MPI_COMM_size(zerocomm, zerosize, mpierr)
-      if (shmrank == 0 .and. (.not. allocated(Iarr))) then
-        allocate(Iarr(Ne,Nd)) 
-      end if
-      if (shmrank == 0) then
+      Call MPI_COMM_split(MPI_COMM_WORLD,zerokey,0,zerocomm,mpierr)
+      Call MPI_COMM_rank(zerocomm, zerorank, mpierr)
+      Call MPI_COMM_size(zerocomm, zerosize, mpierr)
+      If (shmrank == 0 .and. (.not. Allocated(Iarr))) Then
+        Allocate(Iarr(Ne,Nd)) 
+      End If
+      If (shmrank == 0) Then
         do i=1,Ne
-            call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, zerocomm, mpierr)
-        end do   
-      end if
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-      allocate(arrayshape(2))
+            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, zerocomm, mpierr)
+        End do   
+      End If
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      Allocate(arrayshape(2))
       arrayshape=(/ Ne, Nd /)
       size = 0_MPI_ADDRESS_KIND
-      if (shmrank == 0) then
+      If (shmrank == 0) Then
          size8 = Ne
          size8 = size8*Nd
          size = int(size8,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND !*8 for double ! Put the actual data size here                                                                                                                                                                
-      else
+      Else
          size = 0_MPI_ADDRESS_KIND
-      end if
+      End If
       disp_unit = 1
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-      call MPI_Win_allocate_shared(size, disp_unit, MPI_INFO_NULL, shmcomm, baseptr, win, mpierr)
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      Call MPI_Win_allocate_shared(size, disp_unit, MPI_INFO_NULL, shmcomm, baseptr, win, mpierr)
       ! Obtain the location of the memory segment
-      if (shmrank /= 0) then
-        call MPI_Win_shared_query(win, 0, size, disp_unit, baseptr, mpierr)
-      end if
+      If (shmrank /= 0) Then
+        Call MPI_Win_shared_query(win, 0, size, disp_unit, baseptr, mpierr)
+      End If
       ! baseptr can now be associated with a Fortran pointer
-      ! and thus used to access the shared data
-      call C_F_POINTER(baseptr, Iarr_win,arrayshape)
-      if (shmrank == 0) then
+      ! and thus Used to access the shared data
+      Call C_F_POINTER(baseptr, Iarr_win,arrayshape)
+      If (shmrank == 0) Then
          Iarr_win=Iarr
-      end if
-      call MPI_Win_Fence(0, win, mpierr)
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      End If
+      Call MPI_Win_Fence(0, win, mpierr)
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-      i8=0_int64  ! integer*8
+      i8=0_int64  ! Integer*8
       ih8=0_int64
       ih8H=0_int64
-      call InitFormH(npes,mype) ! initialize all variables required for constructing H_IJ
+      Call InitFormH(npes,mype) ! initialize all variables required for constructing H_IJ
       
       NumH=0
       Kherr=0
@@ -395,31 +398,31 @@ module conf_aux
       n0=1
       Hmin=0.d0
       t=0.d0
-      if (Ksig == 2) then
+      If (Ksig == 2) Then
         iscr=0
         xscr=0
-        if (mype == 0) write(*,*) 'Screening is included'
-      end if
+        If (mype == 0) Write(*,*) 'Screening is included'
+      End If
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
-!     reading/forming of the file CONF.HIJ
+!     Reading/forming of the file CONF.HIJ
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
 
       ih8=NumH
-      allocate(idet1(Ne),idet2(Ne),ic1(Ne),ic2(Ne),nk(Nd))
+      Allocate(idet1(Ne),idet2(Ne),ic1(Ne),ic2(Ne),nk(Nd))
       nk=0
       ! comparison stage - - - - - - - - - - - - - - - - - - - - - - - - -
-      if (mype==0) then
+      If (mype==0) Then
         Nd0=IP1+1
         n1=0
         ic1=0
         n2=Nd0-1
         do ic=1,Nc4
             n1=n1+Ndc(ic)
-            if (n1 < Nd0) then
+            If (n1 < Nd0) Then
                 n2=n1
                 ic1=ic
-            end if
-        end do
+            End If
+        End do
         Nd0=n2
         counter1=1
         counter2=1
@@ -431,90 +434,90 @@ module conf_aux
         Call RVAccumulatorInit(rva1, vaGrowBy)
         
         do n=1,Nd0+1
-          call Gdet(n,idet1)
+          Call Gdet(n,idet1)
           k=0
           do ic=1,Nc 
             kx=Ndc(ic)
-            if (k+kx > n) kx=n-k
-            if (kx /= 0) then
-              call Gdet(k+1,idet2)
-              call CompCD(idet1,idet2,icomp)
-              if (icomp > 2) then
+            If (k+kx > n) kx=n-k
+            If (kx /= 0) Then
+              Call Gdet(k+1,idet2)
+              Call CompCD(idet1,idet2,icomp)
+              If (icomp > 2) Then
                 k=k+kx
-              else
+              Else
                 do k1=1,kx
                   k=k+1
-                  call Gdet(k,idet2)
-                  call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                  if (diff <= 2) then
-                    call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                    t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                    if (t /= 0) then
+                  Call Gdet(k,idet2)
+                  Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+                  If (dIff <= 2) Then
+                    Call Rspq_phase2(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+                    t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                    If (t /= 0) Then
                       nn=n
                       kk=k
                       Call IVAccumulatorAdd(iva1, nn)
                       Call IVAccumulatorAdd(iva2, kk)
                       Call RVAccumulatorAdd(rva1, t)
-                    end if
-                  end if
-                end do
-              end if
-            end if
-          end do
-        end do
+                    End If
+                  End If
+                End do
+              End If
+            End If
+          End do
+        End do
         Call IVAccumulatorCopy(iva1, H_n0, counter1)
         Call IVAccumulatorCopy(iva2, H_k0, counter2)
         Call RVAccumulatorCopy(rva1, H_t0, counter3)
-      end if
-      call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+      End If
+      Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-      if (Kl /= 1) then ! if continuing calculation and CONF.HIJ is available, skip FormH
+      If (Kl /= 1) Then ! If continuing calculation and CONF.HIJ is available, skip FormH
 
-        if (mype==0) then
-          call calcMemReqs
+        If (mype==0) Then
+          Call calcMemReqs
           print*, 'chunk_size=', vaGrowBy
           print*, '===== starting FormH comparison stage ====='
-        end if
+        End If
   
         counter1=1
         counter2=1
         counter3=1
   
-        ! Get accumulator vectors setup (or re-setup if this is rank 0):
+        ! Get accumulator vectors setup (or re-setup If this is rank 0):
         Call IVAccumulatorInit(iva1, vaGrowBy)
         Call IVAccumulatorInit(iva2, vaGrowBy)
         !Call RVAccumulatorInit(rva1, vaGrowBy)
   
-        call system_clock(s1)
+        Call system_clock(s1)
         ! each core loops through their assigned determinants and stores the number of nonzero matrix elements per det
         do n=mype+1,Nd,npes
-          call Gdet_win(n,idet1)
+          Call Gdet_win(n,idet1)
           k=0
           do ic=1,Nc 
             kx=Ndc(ic)
-            if (k+kx > n) kx=n-k
-            if (kx /= 0) then
-              call Gdet_win(k+1,idet2)
-              call CompCD(idet1,idet2,icomp)
-              if (icomp > 2) then
+            If (k+kx > n) kx=n-k
+            If (kx /= 0) Then
+              Call Gdet_win(k+1,idet2)
+              Call CompCD(idet1,idet2,icomp)
+              If (icomp > 2) Then
                 k=k+kx
-              else
+              Else
                 do k1=1,kx
                   k=k+1
-                  call Gdet_win(k,idet2)
-                  call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                  if (diff <= 2) then
+                  Call Gdet_win(k,idet2)
+                  Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+                  If (dIff <= 2) Then
                       nk(n)=nk(n)+1
                       nn=n
                       kk=k
                       Call IVAccumulatorAdd(iva1, nn)
                       Call IVAccumulatorAdd(iva2, kk)
-                  end if
-                end do
-              end if
-            end if
-          end do
-        end do
+                  End If
+                End do
+              End If
+            End If
+          End do
+        End do
 
         Call IVAccumulatorCopy(iva1, H_n, counter1)
         Call IVAccumulatorCopy(iva2, H_k, counter2)
@@ -522,32 +525,32 @@ module conf_aux
         Call IVAccumulatorReset(iva1)
         Call IVAccumulatorReset(iva2)
         
-        call system_clock(e1)
+        Call system_clock(e1)
         ttime=Real((e1-s1)/clock_rate)
 
         Write(counterStr,fmt='(I12)') counter1
         Call FormattedTime(ttime, memStr)
-        write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' with num_me = ' // trim(AdjustL(counterStr))
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' with num_me = ' // trim(AdjustL(counterStr))
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
   
         ih8=counter1
-        call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
   
-        if (mype==0) then
-          call MPI_Reduce(MPI_IN_PLACE, nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
+        If (mype==0) Then
+          Call MPI_Reduce(MPI_IN_PLACE, nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
                               MPI_COMM_WORLD, mpierr)
-        else
-          call MPI_Reduce(nk(1:Nd), nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
+        Else
+          Call MPI_Reduce(nk(1:Nd), nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
                               MPI_COMM_WORLD, mpierr)
-        end if
-        deallocate(nk)
+        End If
+        Deallocate(nk)
   
         mem=sizeof(H_n)*4
         ! Sum all the mem sizes to get a total...
-        call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         ! ...before overwriting mem with the maximum value across all workers:
-        call MPI_AllReduce(mem, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
-        if (mype==0) then
+        Call MPI_AllReduce(mem, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+        If (mype==0) Then
           Write(npesStr,fmt='(I16)') npes
           Call FormattedMemSize(memsum, memStr)
           Write(*,'(A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory'
@@ -556,283 +559,283 @@ module conf_aux
           memEstimate = memEstimate + mem
           Call FormattedMemSize(memEstimate, memStr)
           Call FormattedMemSize(memTotalPerCPU, memStr2)
-          if (memTotalPerCPU /= 0) then
-            if (memEstimate > memTotalPerCPU) then
+          If (memTotalPerCPU /= 0) Then
+            If (memEstimate > memTotalPerCPU) Then
               Write(*,'(A,A,A,A)'), Trim(memStr), ' required to finish conf, but only ' , Trim(memStr2) ,' is available.'
-              stop
-            else if (memEstimate < memTotalPerCPU) then
+              Stop
+            Else If (memEstimate < memTotalPerCPU) Then
               Write(*,'(A,A,A,A)'), Trim(memStr), ' required to finish conf, and ' , Trim(memStr2) ,' is available.'
-            end if
-          else
+            End If
+          Else
             Write(*,'(2X,A,A,A,A)'), Trim(memStr), ' required to finish conf, but available memory was not saved to environment'
-          end if
-        end if
+          End If
+        End If
   
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        if (mype==0) print*, '===== starting FormH calculation stage ====='
-        allocate(H_t(counter1))
-        call system_clock(s1)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (mype==0) print*, '===== starting FormH calculation stage ====='
+        Allocate(H_t(counter1))
+        Call system_clock(s1)
         do n=1,counter1
           nn=H_n(n)
           kk=H_k(n)
-          call Gdet_win(nn,idet1)
-          call Gdet_win(kk,idet2)
-          call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-          call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-          t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+          Call Gdet_win(nn,idet1)
+          Call Gdet_win(kk,idet2)
+          Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+          Call Rspq_phase2(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+          t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
           H_t(n)=t
-        end do
+        End do
   
-        call system_clock(e1)
+        Call system_clock(e1)
         ttime=Real((e1-s1)/clock_rate)
         Call FormattedTime(ttime, memStr)
-        write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' to complete calculations'
+        Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' to complete calculations'
   
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        call MPI_Win_Fence(0, win, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Win_Fence(0, win, mpierr)
   
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        call MPI_Win_Free(win, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Win_Free(win, mpierr)
   
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
   
         ! Compute NumH, the total number of non-zero matrix elements
-        call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        deallocate(idet1, idet2, ic1, ic2)
+        Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Deallocate(idet1, idet2, ic1, ic2)
   
-        if (mype==0) then
+        If (mype==0) Then
           print*, '===== FormH calculation stage completed ====='
-        end if
+        End If
         ! TEST - Write CONF.HIJs in serial
-        !call dclock()
-        !if (Kw == 1) call Hwrite_s(mype,npes,counter1)
-        !call dclock()
-        !if (mype == 0) print*, 'writing CONF.HIJ in serial took ', e1-s1, 'sec'
-        if (Kl /= 1 .and. Kw == 1) then
+        !Call dclock()
+        !If (Kw == 1) Call HWrite_s(mype,npes,counter1)
+        !Call dclock()
+        !If (mype == 0) print*, 'writing CONF.HIJ in serial took ', e1-s1, 'sec'
+        If (Kl /= 1 .and. Kw == 1) Then
           print*, 'Writing CONF.HIJ...'
-          call system_clock(s1)
-          if (Kw == 1) call Hwrite(mype,npes,counter1)
-          call system_clock(e1)
-          if (mype == 0) print*, 'Writing CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
-        end if
-      else
-        if (mype==0) then
+          Call system_clock(s1)
+          If (Kw == 1) Call HWrite(mype,npes,counter1)
+          Call system_clock(e1)
+          If (mype == 0) print*, 'Writing CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
+        End If
+      Else
+        If (mype==0) Then
           print*, 'Reading CONF.HIJ...'
-        end if
-        call system_clock(s1)
-        if (Kl == 1) then
-          call Hread(mype,npes,counter1)
-        end if
-        call system_clock(e1)
-        if (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
-      end if
+        End If
+        Call system_clock(s1)
+        If (Kl == 1) Then
+          Call HRead(mype,npes,counter1)
+        End If
+        Call system_clock(e1)
+        If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
+      End If
 
       ! give all cores Hmin, the minimum matrix element value
-      call MPI_AllReduce(H_t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
+      Call MPI_AllReduce(H_t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
 
       ih8H = counter1 ! global variable for total number of matrix elements for each core
 
-      if (mype==0) then
-        write( 6,'(4X,"NumH =",I12)') NumH
-        write(11,'(4X,"NumH =",I12)') NumH
+      If (mype==0) Then
+        Write( 6,'(4X,"NumH =",I12)') NumH
+        Write(11,'(4X,"NumH =",I12)') NumH
 !       - - - - - - - - - - - - - - - - - - - - - - - -
-        if (Ksig == 2 .and. iscr > 0) then
+        If (Ksig == 2 .and. iscr > 0) Then
             xscr=xscr/iscr
-            write ( 6,'(5X,"For ",I12," integrals averaged screening ",F8.5)') iscr,xscr
-            write (11,'(5X,"For ",I12," integrals averaged screening ",F8.5)') iscr,xscr
-            if (Kherr+Kgerr > 0) then
-                write ( 6,'(4X,"Extrapolation warning: small denominators.", &
+            Write ( 6,'(5X,"For ",I12," integrals averaged screening ",F8.5)') iscr,xscr
+            Write (11,'(5X,"For ",I12," integrals averaged screening ",F8.5)') iscr,xscr
+            If (Kherr+Kgerr > 0) Then
+                Write ( 6,'(4X,"Extrapolation warning: small denominators.", &
                     /4X,"HintS: ",I6,"; GintS: ",I7)') Kherr,Kgerr
-                write (11,'(4X,"Extrapolation warning: small denominators.", &
+                Write (11,'(4X,"Extrapolation warning: small denominators.", &
                     /4X,"HintS: ",I6,"; GintS: ",I7)') Kherr,Kgerr
-           end if
-        end if
+           End If
+        End If
 !       - - - - - - - - - - - - - - - - - - - - - - - -
-      end if
+      End If
 
-      return
-    end subroutine FormH
+      Return
+    End Subroutine FormH
 
     real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
-        use determinants, Only : Rspq
-        use integrals, Only : Gint, Hint
-        use formj2, Only : F_J0
-        implicit none
-        integer, allocatable, dimension(:), intent(inout)   :: idet1, idet2
-        integer, intent(inout)                              :: is, nf, i1, i2, j1, j2
+        Use determinants, Only : Rspq
+        Use integrals, Only : Gint, Hint
+        Use formj2, Only : F_J0
+        Implicit None
+        Integer, allocatable, dimension(:), intent(inout)   :: idet1, idet2
+        Integer, intent(inout)                              :: is, nf, i1, i2, j1, j2
         
-        integer     :: iq, jq, jq0, k
+        Integer     :: iq, jq, jq0, k
         real(dp)    :: t
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         
         t=0.d0
-        if (Kdsig /= 0 .and. nf <= 2) E_k=Diag(k)
+        If (Kdsig /= 0 .and. nf <= 2) E_k=Diag(k)
         select case(nf)
-          case(2) ! determinants differ by two functions
+          case(2) ! determinants dIffer by two functions
             t=t+Gint(i2,j2,i1,j1)*is 
-          case(1) ! determinants differ by one function
+          case(1) ! determinants dIffer by one function
             do iq=1,Ne
                 i1=idet1(iq)
-                if (i1 /= j1) t=t+Gint(j2,i1,j1,i1)*is
-            end do
+                If (i1 /= j1) t=t+Gint(j2,i1,j1,i1)*is
+            End do
             t=t+Hint(j2,j1)*is
           case(0) ! determinants are equal
             do iq=1,Ne
                 i1=idet1(iq)
                 jq0=iq+1
-                if (jq0 <= Ne) then
+                If (jq0 <= Ne) Then
                     do jq=jq0,Ne
                         j1=idet1(jq)
                         t=t+Gint(i1,j1,i1,j1)*is
-                    end do
-                end if
+                    End do
+                End If
                 t=t+Hint(i1,i1)*is
-            end do
+            End do
             t=t+Gj*F_J0(idet1)
-        end select
+        End select
         Hmltn=t
-        return
-    end function Hmltn
+        Return
+    End function Hmltn
 
-    subroutine Diag4(mype, npes)
-      ! this subroutine executes the Davidson procedure for diagonalization
-      ! the subroutine Mxmpy is a computational bottleneck and was the only subroutine to be parallelized
-      ! all other subroutines are performed by the master core
-      use mpi
-      use davidson
-      implicit none
-      integer  :: k1, k, i, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
+    Subroutine Diag4(mype, npes)
+      ! this Subroutine executes the Davidson procedure for diagonalization
+      ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
+      ! all other Subroutines are performed by the master core
+      Use mpi
+      Use davidson
+      Implicit None
+      Integer  :: k1, k, i, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
                   kx, i1, it, ierr, mype, npes, mpierr
-      real(dp)     :: start_time, end_time
+      real(dp)     :: start_time, End_time
       real(dp) :: crit, ax, x, xx, ss
       logical :: lsym
  !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         crit=1.d-6
-        if (mype == 0) then
-            if (Kl4 == 0) Return
-            if (Nc4 > Nc) Nc4=Nc
-            write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
+        If (mype == 0) Then
+            If (Kl4 == 0) Return
+            If (Nc4 > Nc) Nc4=Nc
+            Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
             ! Starting vectors of dim. < Nd0 :
             Nd0=IP1+1
-            call Init4
-            call Hould(Nd0,IP1,D1,E1,Z1)
+            Call Init4
+            Call Hould(Nd0,IP1,D1,E1,Z1)
             do while (Ifail /= 0)
                Write(6,'(4X,"Starting approximation of dim ",I4," failed")') Nd0
-               call Init4
-               call Hould(Nd0,IP1,D1,E1,Z1)
-            end do
-            write( 6,'(1X,"Hmin =",F14.8)') Hmin
-            write(11,'(1X,"Hmin =",F14.8)') Hmin
-        end if
+               Call Init4
+               Call Hould(Nd0,IP1,D1,E1,Z1)
+            End do
+            Write( 6,'(1X,"Hmin =",F14.8)') Hmin
+            Write(11,'(1X,"Hmin =",F14.8)') Hmin
+        End If
         select case(Kv)
           case(4)
-            call FormB0(mype,npes)
+            Call FormB0(mype,npes)
           case(3)
-            if (mype==0) call FormB0(mype,npes)
-        end select
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        if (Nd0 == Nd) return
+            If (mype==0) Call FormB0(mype,npes)
+        End select
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (Nd0 == Nd) Return
         ! Davidson loop:
         iter = 0
         kdavidson = 0
-        if (mype==0) write(*,*) 'Start with kdavidson =', kdavidson
+        If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
         ax = 1
         cnx = 1
-        call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         do it=1,N_it
             iter=iter+1
-            call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            if (ax > crit .and. iter <= n_it) then
-              if (mype == 0) write( 6,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
-              if (mype == 0) write(11,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            If (ax > crit .and. iter <= n_it) Then
+              If (mype == 0) Write( 6,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+              If (mype == 0) Write(11,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
               ! Orthonormalization of Nlv probe vectors:
-              if (mype==0) then
+              If (mype==0) Then
                 do i=1,Nlv
-                   call Ortn(i)
-                   if (Ifail /= 0) then
-                      write(*,*)' Fail of orthogonalization for ',i
+                   Call Ortn(i)
+                   If (Ifail /= 0) Then
+                      Write(*,*)' Fail of orthogonalization for ',i
                       Stop
-                   end if
-                end do
-              end if
+                   End If
+                End do
+              End If
               ! Formation of the left-upper block of the energy matrix P:
-              call Mxmpy(1, mype, npes)
-              call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-              if (mype==0) then ! start master core only block
-                call FormP(1)
+              Call Mxmpy(1, mype, npes)
+              Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+              If (mype==0) Then ! start master core only block
+                Call FormP(1)
                 lsym=K_prj == 1.OR.kskp == 1.OR.kskp == 3
-                if (iter == 1 .and. lsym) then    !# averaging diagonal over confs
+                If (iter == 1 .and. lsym) Then    !# averaging diagonal over confs
                   id0=1
                   do ic=1,Nc
                     id1=Ndc(ic)
                     id2=id0+id1-1
-                    if (id1 > 0) then
+                    If (id1 > 0) Then
                       ss=0.d0
                       do id=id0,id2
                         ss=ss+Diag(id)
-                      end do
+                      End do
                       ss=ss/id1
                       Diag(id0:id2)=ss
                       id0=id0+id1
-                    end if
-                  end do
-                  if (id2 == Nd) then
-                    write(*,*) ' Diagonal averaged over rel. configurations'
-                  else
-                    write(*,*) ' Error: id2=',id2,' Nc=',Nc
-                    stop
-                  end if
-                end if 
+                    End If
+                  End do
+                  If (id2 == Nd) Then
+                    Write(*,*) ' Diagonal averaged over rel. configurations'
+                  Else
+                    Write(*,*) ' Error: id2=',id2,' Nc=',Nc
+                    Stop
+                  End If
+                End If 
                 ! Formation of Nlv additional probe vectors:
                 cnx=0.d0
                 do i=1,Nlv
                   i1=i+Nlv
-                  call Dvdsn(i)
-                  if (Iconverge(i)==0) then
-                    call Ortn(i1)
-                    if (Ifail /= 0) then
-                      write(*,*)' Fail of orthogonalization for ',i1
-                      stop
-                    end if
-                  end if
-                end do
-                if (K_prj == 1) then
-                  call Prj_J(Nlv+1,Nlv,2*Nlv+1,ierr,1.d-5)
-                  if (ierr /= 0) then
-                    write(*,*) ' Wrong J values for Probe vectors '
-                  end if
+                  Call Dvdsn(i)
+                  If (Iconverge(i)==0) Then
+                    Call Ortn(i1)
+                    If (Ifail /= 0) Then
+                      Write(*,*)' Fail of orthogonalization for ',i1
+                      Stop
+                    End If
+                  End If
+                End do
+                If (K_prj == 1) Then
+                  Call Prj_J(Nlv+1,Nlv,2*Nlv+1,ierr,1.d-5)
+                  If (ierr /= 0) Then
+                    Write(*,*) ' Wrong J values for Probe vectors '
+                  End If
                   do i=Nlv+1,2*Nlv
-                    if (Iconverge(i-Nlv)==0) then
-                      call Ortn(i)
-                      if (Ifail /= 0) then
-                        write(*,*)' Fail of orthogonalization 2 for ',i1
-                        if (kdavidson==1) then
-                          stop
-                        else
+                    If (Iconverge(i-Nlv)==0) Then
+                      Call Ortn(i)
+                      If (Ifail /= 0) Then
+                        Write(*,*)' Fail of orthogonalization 2 for ',i1
+                        If (kdavidson==1) Then
+                          Stop
+                        Else
                           kdavidson=1
-                          write(*,*) ' change kdavidson to ', kdavidson
+                          Write(*,*) ' change kdavidson to ', kdavidson
                           Ifail=0
                           exit
-                        end if
-                      end if
-                    end if
-                  end do
-                end if
-              end if ! end master core only block
-              call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-              call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-              if (cnx > Crt4) then
+                        End If
+                      End If
+                    End If
+                  End do
+                End If
+              End If ! End master core only block
+              Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+              Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+              If (cnx > Crt4) Then
                 ! Formation of other three blocks of the matrix P:
-                call Mxmpy(2, mype, npes)
-                if (mype==0) then
-                  call FormP(2)
+                Call Mxmpy(2, mype, npes)
+                If (mype==0) Then
+                  Call FormP(2)
                   n1=2*Nlv
                   ! Evaluation of Nlv eigenvectors:
-                  call Hould(n1,IPlv,D,E,P)
+                  Call Hould(n1,IPlv,D,E,P)
                   ax=0.d0
                   vmax=-1.d10
                   do i=1,Nlv
@@ -840,65 +843,65 @@ module conf_aux
                     do k=1,Nlv
                       k1=k+Nlv
                       x=dabs(P(k1,i))
-                      if (xx <= x) then
+                      If (xx <= x) Then
                         xx=x
                         kx=k
-                      end if
-                    end do
-                    if (ax < xx) ax=xx
-                    if (vmax < E(i)) vmax=E(i)
-                    if (mype == 0) then
-                      write( 6,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
+                      End If
+                    End do
+                    If (ax < xx) ax=xx
+                    If (vmax < E(i)) vmax=E(i)
+                    If (mype == 0) Then
+                      Write( 6,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
                              I2,": ",F10.7)') i,-(E(i)+Hmin),kx,xx
-                      write(11,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
+                      Write(11,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
                              I2,": ",F10.7)') i,-(E(i)+Hmin),kx,xx
-                    end if
-                  end do
-                  if (kXIJ > 0) then ! write intermediate CONF.XIJ
-                    if (mod(iter,kXIJ) == 0) then
-                      call FormB
-                    else
-                      call FormBskip
-                    end if
-                  else
-                    call FormBskip
-                  end if
-                end if
-              else
-                if (mype == 0) then
+                    End If
+                  End do
+                  If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
+                    If (mod(iter,kXIJ) == 0) Then
+                      Call FormB
+                    Else
+                      Call FormBskip
+                    End If
+                  Else
+                    Call FormBskip
+                  End If
+                End If
+              Else
+                If (mype == 0) Then
                   Write( 6,'(1X,"Davidson procedure converged")')
                   Write(11,'(1X,"Davidson procedure converged")')
-                end if
-                return
-              end if
-            end if
-            call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        end do
-        return
-    end subroutine Diag4
+                End If
+                Return
+              End If
+            End If
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        End do
+        Return
+    End Subroutine Diag4
 
-    subroutine Print
-       implicit none
-       integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
+    Subroutine PrintResults
+       Implicit None
+       Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
                   j3
        real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
        real(dp), allocatable, dimension(:)  :: Cc, Dd
-       character(len=1), dimension(11) :: st1, st2 
-       character(len=1), dimension(7)  :: stecp*7
-       character(len=1), dimension(2)  :: st3*3
-       character(len=1), dimension(4)  :: strsms*6
-       character(len=1), dimension(3)  :: strms*3
+       Character(Len=1), dimension(11) :: st1, st2 
+       Character(Len=1), dimension(7)  :: stecp*7
+       Character(Len=1), dimension(2)  :: st3*3
+       Character(Len=1), dimension(4)  :: strsms*6
+       Character(Len=1), dimension(3)  :: strms*3
         data st1/11*'='/,st2/11*'-'/,st3/' NO','YES'/
         data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
                    'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
-        allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv))
-        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is used for output
-        if (K_is == 3) K_sms=4       !### used for output
-        if (Kecp == 1) ist=7
-        open(unit=16,file='CONF.XIJ', &
+        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv))
+        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
+        If (K_is == 3) K_sms=4       !### Used for output
+        If (Kecp == 1) ist=7
+        Open(unit=16,file='CONF.XIJ', &
              status='UNKNOWN',form='unformatted')
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
 !      printing eigenvalues in increasing order
@@ -906,34 +909,34 @@ module conf_aux
         WRITE( 6,5)
         WRITE(11,5)
   5     FORMAT(4X,63('='))
-        if (Ksig*Kdsig == 0) then
+        If (Ksig*Kdsig == 0) Then
            WRITE( 6,15) stecp(ist),Nc,Nd,Gj
            WRITE(11,15) stecp(ist),Nc,Nd,Gj
  15        FORMAT(4X,'Energy levels (',A7,' Nc=',I6,' Nd=',I9, &
                  ');  Gj =',F7.4,/4X,'N',6X,'JTOT',12X, &
                  'EV',16X,'ET',9X,'DEL(CM**-1)')
-        else
+        Else
            WRITE( 6,25) stecp(ist),E_0,Kexn,Nc,Nd,Gj
            WRITE(11,25) stecp(ist),E_0,Kexn,Nc,Nd,Gj
  25        FORMAT(4X,'Energy levels ',A7,', Sigma(E =', &
                  F10.4,') extrapolation var.',I2,/4X,'(Nc=',I6, &
                  ' Nd=',I9,');  Gj =',F7.4,/4X,'N',6X,'JTOT',12X, &
                  'EV',16X,'ET',9X,'DEL(CM**-1)')
-        end if
-        if (C_is /= 0.d0) then
-          if (K_is == 1) then
-            write( *,251) C_is,Rnuc
-            write(11,251) C_is,Rnuc
- 251        format(4X,'Volume shift: dR_N/R_N=',F9.5,' Rnuc=',F10.7)
-          else
-            write( *,253) strms(K_is-1),C_is,strsms(K_sms),Klow
-            write(11,253) strms(K_is-1),C_is,strsms(K_sms),Klow
+        End If
+        If (C_is /= 0.d0) Then
+          If (K_is == 1) Then
+            Write( *,251) C_is,Rnuc
+            Write(11,251) C_is,Rnuc
+ 251        format(4X,'Volume shIft: dR_N/R_N=',F9.5,' Rnuc=',F10.7)
+          Else
+            Write( *,253) strms(K_is-1),C_is,strsms(K_sms),Klow
+            Write(11,253) strms(K_is-1),C_is,strsms(K_sms),Klow
  253        format(4X,A3,':',E9.2,'*(P_i dot P_k) ',A6, &
                    ' Lower component key =',I2)
-          end if
-        end if
-        write( 6,255)
-        write(11,255)
+          End If
+        End If
+        Write( 6,255)
+        Write(11,255)
  255    format(4X,63('-'))
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
         JMAX=min(Nlv,Nd)
@@ -955,7 +958,7 @@ module conf_aux
            DEL=(ER(1)-ER(J))*2*DPRy
            WRITE( 6,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,xj,E,DT,DEL
            WRITE(11,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,xj,E,DT,DEL
-        end do
+        End do
         WRITE( 6,45)
         WRITE(11,45)
  45     FORMAT(4X,63('='))
@@ -1006,7 +1009,7 @@ module conf_aux
  130    CONTINUE
         CLOSE(unit=16)
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
-       deallocate(Cc,Dd,W)
+       Deallocate(Cc,Dd,W)
  1000  RETURN
-      end subroutine Print
-end module conf_aux
+      End Subroutine PrintResults
+End Module conf_aux

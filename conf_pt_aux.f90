@@ -1,29 +1,28 @@
-module conf_pt_aux
+Module conf_pt_aux
 
-    use conf_pt_variables
-    implicit none
+    Use conf_pt_variables
+    
+    Implicit None
 
-    contains
+    Public
 
-    subroutine Input
-        use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
-        ! This subroutine reads in from CONF.INP the following variables
-        ! name, Z, Am, XJ_av, Jm, Nso, Nc, Kv, Nlv
-        ! K_is, Kbrt, Kout, Kecp, C_is, Gj, Cut0, Ncpt
-        ! Qnl - atomic configurations
-        ! Nsp, Kl
-        implicit none
-        integer :: i, j, k, i1, i2, ic, icc, ne0, nx, ny, nz, istr
-        character(len=1) :: name(16)
-        character(len=512) :: strfmt
-    ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  Contains
+
+    Subroutine Input
+        ! This subroutine Reads in parameters and configurations from CONF.INP
+        Use conf_init, Only : inpstr, ReadConfInp, ReadConfigurations
+        Implicit None
+        Integer :: i, j, k, i1, i2, ic, icc, ne0, nx, ny, nz, istr
+        Character(Len=1) :: name(16)
+        Character(Len=512) :: strfmt
+        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         strfmt = '(/4X,"Program CONF_PT", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
-        write( 6,strfmt) 
-        write(11,strfmt)
+        Write( 6,strfmt) 
+        Write(11,strfmt)
         ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
         Ksig=0
         Kdsig=0
@@ -32,184 +31,184 @@ module conf_pt_aux
         Call ReadConfInp
 
         Ncci = Nc
-        if (Ncpt < Ncci) then
-            write (*,*) 'Nothing to do for NcPT =', Ncpt, ' & Nc = NcCI =', Ncci
-            stop
-        end if
+        If (Ncpt < Ncci) Then
+            Write (*,*) 'Nothing to Do for NcPT =', Ncpt, ' & Nc = NcCI =', Ncci
+            Stop
+        End If
         Nc = Ncpt
 
-        open(unit=21, file='cpt.in')
-        read(21,*) ktf,kvar
-        close (21)
+        Open(unit=21, file='cpt.in')
+        Read(21,*) ktf,kvar
+        Close (21)
     
-        if (abs(C_is) < 1.d-6) K_is = 0
-        if (K_is == 0) C_is = 0.d0
-        if (K_is == 2  .or.  K_is == 4) then
-            write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): '
-            read(*,*) K_sms
-            if ((K_sms-1)*(K_sms-2)*(K_sms-3) /=  0) stop
-        end if
+        If (abs(C_is) < 1.d-6) K_is = 0
+        If (K_is == 0) C_is = 0.d0
+        If (K_is == 2  .or.  K_is == 4) Then
+            Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): '
+            Read(*,*) K_sms
+            If ((K_sms-1)*(K_sms-2)*(K_sms-3) /=  0) Stop
+        End If
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        call ReadConfigurations
+        Call ReadConfigurations
         ! - - - - - - - - - - - - - - - - - - - - - - - - -  
         Kl = 3
-        return
-    end subroutine Input
+        Return
+    End Subroutine Input
 
-    subroutine Init
-        use conf_init, only : inpstr
-        implicit none
-        integer                    :: ii, ni, if, nj, i, nnj, llj, jlj, kkj, &
-                                     nec, imax, j, n, ic, i0, nmin, i1, n2, n1, & l
-        real(dp)                     :: c1, c2, z1, d
-        real(dp), dimension(IP6)     :: p, q, p1, q1
-        real(dp), dimension(4*IP6)   :: pq
-        real(dp), dimension(IPs)     :: Qq1
-        integer, dimension(4*IPs)  :: IQN
-        integer, dimension(33)     :: nnn, jjj, nqq
-        character(len=1)           :: Let(9), lll(33)
-        logical                    :: longbasis
+    Subroutine Init
+        Use conf_init, Only : inpstr
+        Implicit None
+        Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, &
+                                       nec, imax, j, n, ic, i0, nmin, i1, n2, n1, & l
+        Real(dp)                    :: c1, c2, z1, d
+        Real(dp), Dimension(IP6)    :: p, q, p1, q1
+        Real(dp), Dimension(4*IP6)  :: pq
+        Real(dp), Dimension(IPs)    :: Qq1
+        Integer, Dimension(4*IPs)   :: IQN
+        Integer, Dimension(33)      :: nnn, jjj, nqq
+        Character(Len=1)            :: Let(9), lll(33)
+        Logical                     :: longbasis
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                     (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
         data Let/'s','p','d','f','g','h','i','k','l'/
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        open(12,file='CONF.DAT',status='OLD', &
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Open(12,file='CONF.DAT',status='OLD', &
               access='DIRECT',recl=2*IP6*IPmr,err=700)
-        read(12,rec=1) p
-        read(12,rec=2) q
-        read(12,rec=5) p1
-        read(12,rec=6) q1
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Read(12,rec=1) p
+        Read(12,rec=2) q
+        Read(12,rec=5) p1
+        Read(12,rec=6) q1
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         z1 = pq(1)
-        if (abs(Z-z1) > 1.d-6) then
-           write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
-           write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
-           read(*,*)
-        end if
-    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (abs(Z-z1) > 1.d-6) Then
+            Write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
+            Write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
+            Read(*,*)
+        End If
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
         Ns = pq(2)+c1
         ii = pq(3)+c1
         longbasis=abs(PQ(20)-0.98765d0) < 1.d-6
-        write( 6,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
-        write(11,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
+        Write( 6,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
+        Write(11,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
     15  format (4X,'Kl  =',I3,7X,'Kv  =',I3, &
                     7X,'Z   =',F6.2,4X,'Jm  =',F6.2, &
                    /4X,'Nsp =',I6,4X,'Ns  =',I3,7X,'Nso =',I3, &
                     7X,'Nc =',I6)
-        if (longbasis) then
-            write( *,*) ' Using variant for long basis '
-            write(11,*) ' Using variant for long basis '
-            do ni=1,Ns
+        If (longbasis) Then
+            Write( *,*) ' Using variant for long basis '
+            Write(11,*) ' Using variant for long basis '
+            Do ni=1,Ns
                 Nn(ni)=IQN(4*ni-3)
                 Ll(ni)=IQN(4*ni-2)
                 Kk(ni)=IQN(4*ni-1)
                 Jj(ni)=IQN(4*ni)
-            end do
+            End Do
         else
-            if=20
-            do ni=1,Ns
-                if=if+1
-                Nn(ni)=pq(if)+c1
-                if=if+1
-                Ll(ni)=pq(if)+c1
-                if=if+3
-                c2=dsign(c1,pq(if))
-                Kk(ni)=pq(if)+c2
-                if=if+1
-                c2=dsign(c1,pq(if))
-                Jj(ni)=pq(if)+c2
-            end do
-        end if
+            If=20
+            Do ni=1,Ns
+                If=If+1
+                Nn(ni)=pq(If)+c1
+                If=If+1
+                Ll(ni)=pq(If)+c1
+                If=If+3
+                c2=dsign(c1,pq(If))
+                Kk(ni)=pq(If)+c2
+                If=If+1
+                c2=dsign(c1,pq(If))
+                Jj(ni)=pq(If)+c2
+            End Do
+        End If
         Nsu=0
-        do nj=1,Nsp
-           i=sign(1.d0,Qnl(nj))
-           d=abs(Qnl(nj))+1.d-14
-           d=10.0*d
-           nnj=d
-           d=10.0d0*(d-nnj)
-           llj=d
-           jlj=2*llj+i
-           kkj=-i*((jlj+1)/2)
-           d=100.0d0*(d-llj)
-           Nq(nj)=d+0.1d0
-           do ni=1,ns
-              if (nnj == Nn(ni) .and. Kk(ni) == kkj) then
-                exit
-              else if (ni == ns) then
-                write( 6,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
-                write(11,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
-                stop
-              end if
-           end do
-           Nip(nj)=ni
-           if (Nsu < ni) Nsu=ni
-        end do
+        Do nj=1,Nsp
+            i=sign(1.d0,Qnl(nj))
+            d=abs(Qnl(nj))+1.d-14
+            d=10.0*d
+            nnj=d
+            d=10.0d0*(d-nnj)
+            llj=d
+            jlj=2*llj+i
+            kkj=-i*((jlj+1)/2)
+            d=100.0d0*(d-llj)
+            Nq(nj)=d+0.1d0
+            Do ni=1,ns
+                If (nnj == Nn(ni) .and. Kk(ni) == kkj) Then
+                    Exit
+                else If (ni == ns) Then
+                    Write( 6,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
+                    Write(11,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
+                    Stop
+                End If
+            End Do
+            Nip(nj)=ni
+            If (Nsu < ni) Nsu=ni
+        End Do
         nec=0
-        if (Nso /= 0) nec=sum(Nq(1:Nso))
-        do ni=1,Nsu
-           imax=2*Jj(ni)+1
-           do j=1,imax,2
-              Nst=Nst+1
-           end do
-        end do
-        write( 6,'(4X,"Number of actually used orbitals: Nsu =",I3, &
+        If (Nso /= 0) nec=sum(Nq(1:Nso))
+        Do ni=1,Nsu
+            imax=2*Jj(ni)+1
+            Do j=1,imax,2
+                Nst=Nst+1
+            End Do
+        End Do
+        Write( 6,'(4X,"Number of actually Used orbitals: Nsu =",I3, &
              /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
-        write(11,'(4X,"Number of actually used orbitals: Nsu =",I3, &
+        Write(11,'(4X,"Number of actually Used orbitals: Nsu =",I3, &
              /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
         n=0
         ic=0
         i0=0
         i=0
         nmin=Nso+1
-        do ni=nmin,Nsp
-           i=i+1
-           n=n+Nq(ni)
-           if (n >= Ne) then
-              ic=ic+1
-              if (n > Ne) then
-                 write( 6,'(/2X,"wrong number of electrons", &
-                      /2X,"for configuration ICONF =",I6)') ic
-                 write(11,'(/2X,"wrong number of electrons", &
-                      /2X,"for configuration ICONF =",I6)') ic
-                stop
-              end if
-              Nvc(ic)=i
-              Nc0(ic)=Nso+i0
-              i0=i0+i
-              n=0
-              i=0
-           end if
-        end do
+        Do ni=nmin,Nsp
+            i=i+1
+            n=n+Nq(ni)
+            If (n >= Ne) Then
+                ic=ic+1
+                If (n > Ne) Then
+                    Write( 6,'(/2X,"wrong number of electrons", &
+                         /2X,"for configuration ICONF =",I6)') ic
+                    Write(11,'(/2X,"wrong number of electrons", &
+                         /2X,"for configuration ICONF =",I6)') ic
+                    Stop
+                End If
+                Nvc(ic)=i
+                Nc0(ic)=Nso+i0
+                i0=i0+i
+                n=0
+                i=0
+            End If
+        End Do
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        write( 6,'(1X,71("="))')
-        write(11,'(1X,71("="))')
-        do ni=1,Nso
-           l =Ll(ni)+1
-           lll(ni)=let(l)
-        end do
-        if (Kout > 1) then
-        write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
-                        (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
-        write(11,'(1X,71("="))')
-        end if
-        ! write( 6,55)
-        if (Kout > 1) then
-            write(11,'(1X,71("="))')
-        end if
-        do ic=1,Nc
+        Write( 6,'(1X,71("="))')
+        Write(11,'(1X,71("="))')
+        Do ni=1,Nso
+            l =Ll(ni)+1
+            lll(ni)=let(l)
+        End Do
+        If (Kout > 1) Then
+        Write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
+                    /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                    /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                    /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                    /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                    /6X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
+                    (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
+        Write(11,'(1X,71("="))')
+        End If
+        ! Write( 6,55)
+        If (Kout > 1) Then
+            Write(11,'(1X,71("="))')
+        End If
+        Do ic=1,Nc
             n1=Nc0(ic)+1
             n2=Nc0(ic)+Nvc(ic)
-            do i=n1,n2
+            Do i=n1,n2
                 i1=i-n1+1
                 ni=Nip(i)
                 l=Ll(ni)+1
@@ -217,167 +216,167 @@ module conf_pt_aux
                 jjj(i1)=Jj(ni)
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
-                if (Nq(i) > jjj(i1)+1) then
-                    write(11,'(/2X,"wrong number of electrons"/ &
-                      2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
-                      " (",I2,")")') ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
+                If (Nq(i) > jjj(i1)+1) Then
+                    Write(11,'(/2X,"wrong number of electrons"/ &
+                        2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
+                        " (",I2,")")') ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
                     Stop
-                end if
-            end do
+                End If
+            End Do
             n=n2-n1+1
-            if (Kout > 1) then
-                write(11,'(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
+            If (Kout > 1) Then
+                Write(11,'(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
                 ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
-            end if
-        end do
-        if (Kout > 1) then
-            write(11,'(1X,71("="))')
-        end if
-        do ni=Nso+1,Nsu
-            read(12,rec=2*ni+7) p
+            End If
+        End Do
+        If (Kout > 1) Then
+            Write(11,'(1X,71("="))')
+        End If
+        Do ni=Nso+1,Nsu
+            Read(12,rec=2*ni+7) p
             Eps(ni)=-p(ii+1)
-        end do
-        write(11,95) (i,Eps(i),i=Nso+1,Nsu)
-     95 format(' HF energies are read from DAT file', /5(I5,F10.6))
-        close(unit=12)
-        open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        read(16) (In(i),i=1,IPgnt)
-        read(16) (Gnt(i),i=1,IPgnt)
-        close(unit=16)
+        End Do
+        Write(11,95) (i,Eps(i),i=Nso+1,Nsu)
+     95 format(' HF energies are Read from DAT file', /5(I5,F10.6))
+        Close(unit=12)
+        Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
+        Read(16) (In(i),i=1,IPgnt)
+        Read(16) (Gnt(i),i=1,IPgnt)
+        Close(unit=16)
         Return
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-    700 write( 6,105)
-        write(11,105)
+    700 Write( 6,105)
+        Write(11,105)
     105 format(/2X,'file CONF.DAT is absent'/)
-        stop
-    end subroutine Init
+        Stop
+    End Subroutine Init
 
-    subroutine BcastParams(mype,npes)
-        use mpi
-        implicit none
-        integer :: mype, npes, mpierr
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Z, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Am, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Jm, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kout, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Cut0, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ncpt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nsp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Lmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+    Subroutine BcastParams(mype,npes)
+        Use mpi
+        Implicit None
+        Integer :: mype, npes, mpierr
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Z, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Am, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jm, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kout, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Cut0, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ncpt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Lmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
-        call MPI_Barrier(MPI_COMM_WORLD,mpierr)
-        return
-    end subroutine BcastParams
+        Call MPI_Barrier(MPI_COMM_WORLD,mpierr)
+        Return
+    End Subroutine BcastParams
 
-    subroutine AllocatePTArrays(mype,npes)
-        use mpi
-        implicit none
-        integer :: i, mpierr, mype, npes
+    Subroutine AllocatePTArrays(mype,npes)
+        Use mpi
+        Implicit None
+        Integer :: i, mpierr, mype, npes
         
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-        if (.not. allocated(Nvc)) allocate(Nvc(Nc))
-        if (.not. allocated(Nc0)) allocate(Nc0(Nc))
-        if (.not. allocated(Ndc)) allocate(Ndc(Nc))
-        if (.not. allocated(Ndcnr)) allocate(Ndcnr(Nc))
-        if (.not. allocated(Jz)) allocate(Jz(Nst))
-        if (.not. allocated(Nh)) allocate(Nh(Nst))
-        if (.not. allocated(Diag)) allocate(Diag(Nd))
-        if (.not. allocated(Rint1)) allocate(Rint1(Nhint))
-        if (.not. allocated(Iint1)) allocate(Iint1(Nhint))
-        if (.not. allocated(Iint2)) allocate(Iint2(Ngint))
-        if (.not. allocated(Iint3)) allocate(Iint3(Ngint))
-        if (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
-        if (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
-        if (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
-        if (.not. allocated(DVnr)) allocate(DVnr(Nc))
+        If (.not. allocated(Nvc)) allocate(Nvc(Nc))
+        If (.not. allocated(Nc0)) allocate(Nc0(Nc))
+        If (.not. allocated(Ndc)) allocate(Ndc(Nc))
+        If (.not. allocated(Ndcnr)) allocate(Ndcnr(Nc))
+        If (.not. allocated(Jz)) allocate(Jz(Nst))
+        If (.not. allocated(Nh)) allocate(Nh(Nst))
+        If (.not. allocated(Diag)) allocate(Diag(Nd))
+        If (.not. allocated(Rint1)) allocate(Rint1(Nhint))
+        If (.not. allocated(Iint1)) allocate(Iint1(Nhint))
+        If (.not. allocated(Iint2)) allocate(Iint2(Ngint))
+        If (.not. allocated(Iint3)) allocate(Iint3(Ngint))
+        If (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
+        If (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
+        If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
+        If (.not. allocated(DVnr)) allocate(DVnr(Nc))
 
-        if (Ksig /= 0) then
-            if (.not. allocated(R_is)) allocate(R_is(Nhint))
-            if (.not. allocated(I_is)) allocate(I_is(Nhint))
-        end if
+        If (Ksig /= 0) Then
+            If (.not. allocated(R_is)) allocate(R_is(Nhint))
+            If (.not. allocated(I_is)) allocate(I_is(Nhint))
+        End If
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        return
-    end subroutine AllocatePTArrays
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Return
+    End Subroutine AllocatePTArrays
 
-    subroutine BcastPTArrays(mype,npes)
-        use mpi
-    	implicit none
-        integer :: i, mype, npes, mpierr
+    Subroutine BcastPTArrays(mype,npes)
+        Use mpi
+    	Implicit None
+        Integer :: i, mype, npes, mpierr
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-        do i=1,Ne
-            call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        end do
-        call MPI_Bcast(In, IPgnt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Gnt, IPgnt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+        Do i=1,Ne
+            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End Do
+        Call MPI_Bcast(In, IPgnt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt, IPgnt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        if (Ksig /= 0) then
-            call MPI_Bcast(R_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        end if
+        If (Ksig /= 0) Then
+            Call MPI_Bcast(R_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End If
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-        return
-    end subroutine BcastPTArrays
+        Return
+    End Subroutine BcastPTArrays
 
-    subroutine NR_Init
-        implicit none
-        integer  :: inr, nrel, ndet, nshell, k, ier, knr1, knr2, ic, inq
-        real(dp)     :: x
-        logical  :: dif
-        integer, dimension(20)   ::  inl1, inl2, inq1, inq2
+    Subroutine NR_Init
+        Implicit None
+        Integer  :: inr, nrel, ndet, nshell, k, ier, knr1, knr2, ic, inq
+        Real(dp)     :: x
+        Logical  :: dIf
+        Integer, Dimension(20)   ::  inl1, inl2, inq1, inq2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(Ndcnr(Nc),Nvcnr(Nc),NRR(Nc),NRN(Nc))
-        inr=1                          ! NR config
+        inr=1  ! NR config
         nrel=0
         ndet=0
         nshell=0
@@ -388,68 +387,68 @@ module conf_pt_aux
         Nvcnr=0
         NRR=0
         NRN=0
-        call Squeeze(1,knr1,inl1,inq1)
+        Call Squeeze(1,knr1,inl1,inq1)
         NRR(1)=1
-        do ic=1,Nc
+        Do ic=1,Nc
             nrel=nrel+1                   ! number of r.configs in nr.config
             Ndcnr(inr)=Ndcnr(inr)+Ndc(ic)
             ndet=ndet+Ndc(ic)
             nshell=nshell+Nvc(ic)
-            dif=.true.
-            if (ic < Nc) then
-                call Squeeze(ic+1,knr2,inl2,inq2)
-                if (knr1 == knr2) then
-                    do k=1,knr1
+            dIf=.true.
+            If (ic < Nc) Then
+                Call Squeeze(ic+1,knr2,inl2,inq2)
+                If (knr1 == knr2) Then
+                    Do k=1,knr1
                         ier=abs(inl1(k)-inl2(k))+abs(inq1(k)-inq2(k))
-                        dif=ier /=  0
-                        if (dif) goto 100
-                    end do
-                end if
-            end if
-    100     if (dif) then
+                        dIf=ier /=  0
+                        If (dIf) goto 100
+                    End Do
+                End If
+            End If
+    100     If (dIf) Then
                 NRN(inr)=nrel
                 Nvcnr(inr)=nshell
-                if (Kout >= 1) write (11,5) inr,nrel,NDCnr(inr),Nvcnr(inr)
+                If (Kout >= 1) Write (11,5) inr,nrel,NDCnr(inr),Nvcnr(inr)
     5           format(4X,'NR con-n',i5,':',i3, &
                        ' R con-ns,',i5,' det-ns &',i4,' shells')
                 nrel=0
                 nshell=0
-                if (ic == Ncci) then
+                If (ic == Ncci) Then
                     Ncnrci=inr
-                end if
-                if (ic > Ncci  .and.  Ncnrci == 0) then
-                    write (*,*) ' NR_init error: Ncci=',Ncci
-                    write (*,*) ' NR config ends at ic=',ic
-                    stop             
-                end if 
-                if (ic /=  Nc) then
+                End If
+                If (ic > Ncci  .and.  Ncnrci == 0) Then
+                    Write (*,*) ' NR_init error: Ncci=',Ncci
+                    Write (*,*) ' NR config Ends at ic=',ic
+                    Stop             
+                End If 
+                If (ic /=  Nc) Then
                     inr=inr+1
                     NRR(inr)=ic+1
-                end if
-            end if
+                End If
+            End If
             knr1=knr2
-            do k=1,knr1
+            Do k=1,knr1
                 inl1(k)=inl2(k)
                 inq1(k)=inq2(k)
-            end do
-        end do
+            End Do
+        End Do
         Ncnr=inr
-        write ( *,*) ' PT space:',Ncnr,' non-rel. configurations'
-        write (11,*) ' PT space:',Ncnr,' non-rel. configurations'
-        write ( *,*) ' CI space:',Ncnrci,' non-rel. configurations'
-        write (11,*) ' CI space:',Ncnrci,' non-rel. configurations'
-        return
-    end subroutine NR_Init
+        Write ( *,*) ' PT space:',Ncnr,' non-rel. configurations'
+        Write (11,*) ' PT space:',Ncnr,' non-rel. configurations'
+        Write ( *,*) ' CI space:',Ncnrci,' non-rel. configurations'
+        Write (11,*) ' CI space:',Ncnrci,' non-rel. configurations'
+        Return
+    End Subroutine NR_Init
 
     ! =============================================================================
-    subroutine Weight_CI
-        implicit none
-        logical :: tail
-        integer :: i, ic, kcnr, ndk, k, j, kc, icnr, ncnr0, nc0, icci, nc0j, &
+    Subroutine Weight_CI
+        Implicit None
+        Integer  :: i, ic, kcnr, ndk, k, j, kc, icnr, ncnr0, nc0, icci, nc0j, &
                    ncnr0j, nd0j, ndci
-        real(dp)  :: wj, wmax, d, dvnrn, dvnrx, dummy, wj0
+        Real(dp) :: wj, wmax, d, dvnrn, dvnrx, dummy, wj0
+        Logical  :: tail
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        open(unit=17,file='CONF.XIJ', &
+        Open(unit=17,file='CONF.XIJ', &
                  status='OLD',form='UNFORMATTED',err=900)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(DVnr(Nc),B1h(Nd))
@@ -457,535 +456,535 @@ module conf_pt_aux
         nc0=0    
         ncnr0=0  
         wmax=0.d0
-        do j=1,Nlv
-            read (17) d,dummy,ndci,(B1h(i),i=1,ndci)
+        Do j=1,Nlv
+            Read (17) d,dummy,ndci,(B1h(i),i=1,ndci)
             wj=1.d0                 ! norm of WF
             i=0
             ic=0
             tail=.false.
-            do icnr=1,Ncnrci    !### loop over NR conf-ns
+            Do icnr=1,Ncnrci    !### loop over NR conf-ns
                 kcnr=NRN(icnr)
                 d=0.d0
                 ndk=0
-                do kc=1,kcnr          !### loop over R conf-ns
+                Do kc=1,kcnr          !### loop over R conf-ns
                     ic=ic+1
                     ndk=ndk+Ndc(ic)     !### ndk= number of det-s in NR con-n
-                end do
-                do k=1,ndk
+                End Do
+                Do k=1,ndk
                     i=i+1
                     d=d+B1h(i)**2
-                end do
-                if (j == 1) then
+                End Do
+                If (j == 1) Then
                     DVnr(icnr)=d
                 else
                     DVnr(icnr)=DVnr(icnr)+d
-                end if
+                End If
                 wj=wj-d                ! norm of the remaining tail of WF
-                if ((.not.tail)  .and.  i < IPPT) then
+                If ((.not.tail)  .and.  i < IPPT) Then
                     nd0j=i
                     nc0j=ic  
                     ncnr0j=icnr
                     wj0=wj
-                end if
+                End If
                 tail=wj < Cut0
-            end do
-            write(*,5) j,nd0j,nc0j,ncnr0j,wj0
+            End Do
+            Write(*,5) j,nd0j,nc0j,ncnr0j,wj0
     5       format(4x,'WF ',i2,' Nd0=',i6,' Nc0=',i5,' Ncnr0=',i5, &
                  ' wj=',f9.6)
-            if (wj0 > wmax) wmax=wj0
+            If (wj0 > wmax) wmax=wj0
      
-            if (Nd0 < nd0j) then
+            If (Nd0 < nd0j) Then
                 Nd0=nd0j
                 nc0=nc0j  
                 ncnr0=ncnr0j
-            end if            
-        end do
-        close(unit=17)
+            End If            
+        End Do
+        Close(unit=17)
         Ncp0=nc0
-        write( *,15) Nd0,Ncp0,ncnr0,wmax,Cut0
-        write(11,15) Nd0,Ncp0,ncnr0,wmax,Cut0
+        Write( *,15) Nd0,Ncp0,ncnr0,wmax,Cut0
+        Write(11,15) Nd0,Ncp0,ncnr0,wmax,Cut0
     15  format(/4x,'PT block: Nd0=',i6,' Nc0=',i5,' Ncnr0=',i5, &
                /4x,'Actual Cutoff=',f9.6,' Cut0=',f9.6)
         
-        if (Kout >= 1) write(11,*) ' Weights of all NR configurations:'
+        If (Kout >= 1) Write(11,*) ' Weights of all NR configurations:'
         icci=0
         dvnrn=11.d1
-        do ic=1,Ncnr
-            if (ic <= Ncnrci  .and.  DVnr(ic) < dvnrx) icci=icci+1
-            if (ic <= Ncnrci  .and.  DVnr(ic) < dvnrn) dvnrn=DVnr(ic)
-            if (Kout >= 1) then
-                write(11,25) ic,DVnr(ic)
+        Do ic=1,Ncnr
+            If (ic <= Ncnrci  .and.  DVnr(ic) < dvnrx) icci=icci+1
+            If (ic <= Ncnrci  .and.  DVnr(ic) < dvnrn) dvnrn=DVnr(ic)
+            If (Kout >= 1) Then
+                Write(11,25) ic,DVnr(ic)
     25          format(4x,'NR conf ',i4,' weight ',f10.7)
-                if (ic == Ncnrci) &
-                  write(11,*) '   ---- End of CI space ---------'
-            end if
-        end do
-        return
-    900 write (*,*) ' CONF.XIJ file with WFs is absent'
-        stop
-    end subroutine Weight_CI
+                If (ic == Ncnrci) &
+                  Write(11,*) '   ---- End of CI space ---------'
+            End If
+        End Do
+        Return
+    900 Write (*,*) ' CONF.XIJ file with WFs is absent'
+        Stop
+    End Subroutine Weight_CI
     ! =============================================================================
-    subroutine PT_Init(npes, mype)
-    	use mpi
-        implicit none
-        integer  :: i, ni, j, n, k, kx, ic, kd, ndci
-        integer :: npes, mype, mpierr
-        real(dp)   :: sd, x
+    Subroutine PT_Init(npes, mype)
+    	Use mpi
+        Implicit None
+        Integer  :: i, ni, j, n, k, kx, ic, kd, ndci
+        Integer :: npes, mype, mpierr
+        Real(dp)   :: sd, x
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (mype==0) then ! master pe only
-            write ( *,5)
-            write (11,5)
+        If (mype==0) Then ! master pe Only
+            Write ( *,5)
+            Write (11,5)
     5       format(/4X,'PT_init')
             ! - - - - - - - - - - - - - - - - - - - - - - - - -
-            open(unit=16,file='CONF.XIJ',status='OLD', &
+            Open(unit=16,file='CONF.XIJ',status='OLD', &
                  form='UNFORMATTED',err=900)
-            read(16) x,x,Nd1
+            Read(16) x,x,Nd1
             kd=0
             Nd0=0
-            do i=1,Nc
+            Do i=1,Nc
               kd=kd+Ndc(i)
-              if (i == Ncci) ndci=kd
-              if (i == Ncp0) Nd0=kd
-            end do
-            if (ndci /=  Nd1) then
-              write (*,*) ' Wrong length of vectors in CONF.XIJ:'
-              write (*,*) ' Nd1 =',Nd1,'; expected ',ndci
-              stop
-            end if
+              If (i == Ncci) ndci=kd
+              If (i == Ncp0) Nd0=kd
+            End Do
+            If (ndci /=  Nd1) Then
+              Write (*,*) ' Wrong length of vectors in CONF.XIJ:'
+              Write (*,*) ' Nd1 =',Nd1,'; expected ',ndci
+              Stop
+            End If
         
-            write ( *,25) Ncci,Nd1,Ncp0,Nd0,Nc,Nd
-            write (11,25) Ncci,Nd1,Ncp0,Nd0,Nc,Nd
+            Write ( *,25) Ncci,Nd1,Ncp0,Nd0,Nc,Nd
+            Write (11,25) Ncci,Nd1,Ncp0,Nd0,Nc,Nd
     25      format(4X,'CI block: Ncci=',I6,' Nd1=',I8,/4X, &
                   'PT block: (Ncp0=',I6,' Nd0=',I8,')*(Nc=',I7,' Nd=',I9,')')
-            if (Nd0 > Nd1) then
-              write (*,*) ' can not work with Nd0 > Nd1'
+            If (Nd0 > Nd1) Then
+              Write (*,*) ' can not work with Nd0 > Nd1'
               Stop
-            end if
-            if (Nd0 > IPPT) then
-              write (*,*) ' can not work with Nd0 > IPPT =',IPPT
+            End If
+            If (Nd0 > IPPT) Then
+              Write (*,*) ' can not work with Nd0 > IPPT =',IPPT
               Stop
-            end if
-            if (Nd0 == 0) then
-              write (*,*) ' Nothing to do for Nd0=0 (Ncp0=',Ncp0,')'
+            End If
+            If (Nd0 == 0) Then
+              Write (*,*) ' Nothing to Do for Nd0=0 (Ncp0=',Ncp0,')'
               Stop
-            end if
+            End If
         
             Nlv=min(Nlv,Nd0)
-        end if ! end master pe only
+        End If ! End master pe Only
 
-        call MPI_Bcast(Nd1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         allocate(X0(Nd,Nlv), En(Nlv), EnG(Nlv), Xj(Nlv))
 
-        call DiagH(Nd1,npes,mype)      !# forms array Diag(i)=H(i,i)
+        Call DiagH(Nd1,npes,mype)      !# forms array Diag(i)=H(i,i)
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        if (mype==0) then ! master pe only
-            if (average_diag) then
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (mype==0) Then ! master pe Only
+            If (average_diag) Then
               n=Nd1
-              do ic=Ncci+1,Nc      !# averagin diagonal for each configuration
+              Do ic=Ncci+1,Nc      !# averagin diagonal for each configuration
                 kx=Ndc(ic)
                 sd=0.d0
-                if (kx /=  0) then
-                  do k=1,kx
+                If (kx /=  0) Then
+                  Do k=1,kx
                     sd=sd+Diag(n+k)
-                  end do
+                  End Do
                   sd=sd/kx
-                  do k=1,kx
+                  Do k=1,kx
                     Diag(n+kx)=sd
-                  end do
+                  End Do
                   n=n+kx
-                end if
-              end do
-              if (n /=  Nd) then
-                write(*,*) 'PT_init error: n=',n,' must be equal to Nd=',Nd
-                stop
+                End If
+              End Do
+              If (n /=  Nd) Then
+                Write(*,*) 'PT_init error: n=',n,' must be equal to Nd=',Nd
+                Stop
               else
-                write( *,*) ' Diagonal averaged over relat. config.'
-                write(11,*) ' Diagonal averaged over relat. config.'
-              end if
-            end if
+                Write( *,*) ' Diagonal averaged over relat. config.'
+                Write(11,*) ' Diagonal averaged over relat. config.'
+              End If
+            End If
             rewind(16)           !## starting from Nd1+1 to Nd
-            do n=1,Nlv
-              read(16,err=220,end=220) EnG(n),Xj(n),Nd1,(X0(j,n),j=1,Nd1)
+            Do n=1,Nlv
+              Read(16,err=220,End=220) EnG(n),Xj(n),Nd1,(X0(j,n),j=1,Nd1)
               En(n)=EnG(n)+4.d0*Gj*Xj(n)*(Xj(n)+1.d0)
               ni=n
-            end do
-    220     close(16)
-            write (*,35) ni
-    35      format (4X,i5,' vectors read from file CONF.XIJ.')
+            End Do
+    220     Close(16)
+            Write (*,35) ni
+    35      format (4X,i5,' vectors Read from file CONF.XIJ.')
             Nlv=ni
-        end if
-        return
-    900 write(*,*)' File CONF.XIJ is absent.'
-        stop
-    end subroutine PT_Init
+        End If
+        Return
+    900 Write(*,*)' File CONF.XIJ is absent.'
+        Stop
+    End Subroutine PT_Init
     ! =============================================================================
-    subroutine PTE(npes,mype)
-        use mpi
-        implicit none
-        integer  :: n, ic, l, i, k, ncoef, ifrac, ix, j
-        integer, dimension(Nc)  :: Ndic
-        integer  :: npes, mype, mpierr, interval, remainder, start, end, size, xstart
-        integer  :: xend, xsize, Ndcount, istart, iend, disp, lastsize
-        real  :: start_time, stop_time
-        real(dp)  :: ei, x, e0, del, ci, x2, des, des0, dEx, dVs
-        real(dp), dimension(IPPT)  :: E1
-        real(dp), dimension(Nlv,Nc) :: dE, dV, dE1, dV1
-        integer, dimension(2,Nc) :: sizeNcNd
-        integer     :: totalNcNd, pecounter, counter
-        integer, dimension(npes) :: sizes, sizes1, idisp
-        logical     :: first
+    Subroutine PTE(npes,mype)
+        Use mpi
+        Implicit None
+        Integer  :: n, ic, l, i, k, ncoef, Ifrac, ix, j
+        Integer, Dimension(Nc)  :: Ndic
+        Integer  :: npes, mype, mpierr, interval, remainder, start, End, size, xstart
+        Integer  :: xEnd, xsize, Ndcount, istart, iEnd, disp, lastsize
+        Real  :: start_time, Stop_time
+        Real(dp)  :: ei, x, e0, del, ci, x2, des, des0, dEx, dVs
+        Real(dp), Dimension(IPPT)  :: E1
+        Real(dp), Dimension(Nlv,Nc) :: dE, dV, dE1, dV1
+        Integer, Dimension(2,Nc) :: sizeNcNd
+        Integer     :: totalNcNd, pecounter, counter
+        Integer, Dimension(npes) :: sizes, sizes1, idisp
+        Logical     :: first
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(Ey(Nlv),Ndirc(Nc),DEnr(Nc))
 
-        if (mype == 0) then
-        write ( *,5)
-        write (11,5)
+        If (mype == 0) Then
+        Write ( *,5)
+        Write (11,5)
     5   format(/4X,'Second order corrections to the energies', &
                   ' & first order eigenvectors')
         
         E1=0.d0
-        do n=1,Nlv
+        Do n=1,Nlv
             Ey(n)=0.d0
-        end do
+        End Do
         
-        do ic=Ncnrci+1,Ncnr
+        Do ic=Ncnrci+1,Ncnr
             DEnr(ic)=0.d0
             DVnr(ic)=0.d0
-        end do
+        End Do
 
         Ndirc(1)= 0
-        do ic= 2,Nc
+        Do ic= 2,Nc
             Ndirc(ic) = Ndirc(ic-1) + Ndc(ic-1)
-        end do
+        End Do
     
         Ndic=0
-        do ic= 1,Ncnr
-            if (ic == 1) Then
+        Do ic= 1,Ncnr
+            If (ic == 1) Then
                 Ndic(1)= 0
             else
                 Ndic(ic)= Ndic(ic-1)+Ndcnr(ic-1)
-            end If
-            do n=1,Nlv
+            End If
+            Do n=1,Nlv
                 dE(n,ic)=0.e0
                 dV(n,ic)=0.e0
-            end do
-        end do
-        end if
+            End Do
+        End Do
+        End If
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Nd1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ncnr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ncnrci, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ndcnr, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ey, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(En, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ndirc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Ndic, Ncnr, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(X0(1:Nd1,1:Nlv), Nd1*Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ncnr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ncnrci, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndcnr, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ey, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(En, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndirc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndic, Ncnr, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(X0(1:Nd1,1:Nlv), Nd1*Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         totalNcNd = 0
 
-        do ic=Ncnrci+1,Ncnr
-            do l=1,Ndcnr(ic)
+        Do ic=Ncnrci+1,Ncnr
+            Do l=1,Ndcnr(ic)
                 totalNcNd = totalNcNd + 1
                 sizeNcNd(1, ic) = ic
                 sizeNcNd(2, ic) = Ndcnr(ic) ! size of each config
-            end do
-        end do
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        do ic=Ncnrci+1,Ncnr ! loop over configs in PT space
+            End Do
+        End Do
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Do ic=Ncnrci+1,Ncnr ! loop over configs in PT space
 
             interval = sizeNcNd(2,ic)/npes
             remainder = mod(sizeNcNd(2,ic),npes)
             !print*, 'starting ic=', ic, 'of ', Ncnr
-            do i=0,npes-1
-                if (mype == npes-1) then
+            Do i=0,npes-1
+                If (mype == npes-1) Then
                     start = 1+mype*interval
-                    end = (mype+1)*interval+remainder
+                    End = (mype+1)*interval+remainder
                     istart = Ndic(ic)+start
-                    iend = Ndic(ic)+end
-                    lastsize= end - start + 1
-                    !print*,ic,mype,start,end,sizeNcNd(2,ic)
-                else if (mype /= npes-1) then
+                    iEnd = Ndic(ic)+End
+                    lastsize= End - start + 1
+                    !print*,ic,mype,start,End,sizeNcNd(2,ic)
+                else If (mype /= npes-1) Then
                     start = 1+mype*interval
-                    end = (mype+1)*interval
+                    End = (mype+1)*interval
                     istart = Ndic(ic)+start
-                    iend = Ndic(ic)+end
-                    !print*,ic,mype,start,end,sizeNcNd(2,ic)
-                    !print*, 'rank ', mype, 'has istart=', istart, 'iend=', iend, 'and size = ', size
-                end if
-                size = end - start + 1
-            end do  
+                    iEnd = Ndic(ic)+End
+                    !print*,ic,mype,start,End,sizeNcNd(2,ic)
+                    !print*, 'rank ', mype, 'has istart=', istart, 'iEnd=', iEnd, 'and size = ', size
+                End If
+                size = End - start + 1
+            End Do  
 
-            do i=1,npes-1
+            Do i=1,npes-1
                 sizes(i) = interval
-            end do
+            End Do
             
             sizes(npes) = interval + remainder
 
             idisp(1)=0
-            do i=2, npes
+            Do i=2, npes
                 idisp(i) = (i-1)*sizes(1)
-            end do
-            do l=start, end  ! loop over dets in configs in PT space
+            End Do
+            Do l=start, End  ! loop over dets in configs in PT space
                 i= Ndic(ic)+l
                 ei= -Diag(i)
-                call FormH(i,Nd0,E1)    !# evalulation of i-th MEs of ALL
-                do n=1,Nlv              !## first order correction vectors
+                Call FormH(i,Nd0,E1)    !# evalulation of i-th MEs of ALL
+                Do n=1,Nlv              !## first order correction vectors
                     x=0.d0                !### and writing them to VEC.TMP,
                     e0=En(n)
-                    do k=1,Nd0
+                    Do k=1,Nd0
                         x=x+E1(k)*X0(k,n)
-                    end do
+                    End Do
                     x2=x*x
                     del=e0-ei
                     ci=x/del
                     dE(n,ic)= dE(n,ic)+x2/del    ! contribution of one NR config.
                     dV(n,ic)= dV(n,ic)+(ci)**2
                     X0(i,n)=ci                   ! first order eigenvector
-                end do
-            end do
-            call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            do n=1,Nlv
-                call MPI_Allreduce(dE(n,ic),dE1(n,ic), 1, MPI_DOUBLE_PRECISION, &
+                End Do
+            End Do
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Do n=1,Nlv
+                Call MPI_Allreduce(dE(n,ic),dE1(n,ic), 1, MPI_DOUBLE_PRECISION, &
                     MPI_SUM, MPI_COMM_WORLD, mpierr)
-                call MPI_Allreduce(dV(n,ic),dV1(n,ic), 1, MPI_DOUBLE_PRECISION, &
+                Call MPI_Allreduce(dV(n,ic),dV1(n,ic), 1, MPI_DOUBLE_PRECISION, &
                     MPI_SUM, MPI_COMM_WORLD, mpierr)
-                call MPI_Gatherv(X0(istart:iend,n), size, MPI_DOUBLE_PRECISION, &
+                Call MPI_Gatherv(X0(istart:iEnd,n), size, MPI_DOUBLE_PRECISION, &
                                X0(Ndic(ic)+1:Ndic(ic)+Ndcnr(ic),n), &
                                sizes, idisp, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            end do
+            End Do
 
             dEx=0.d0
             dVs=0.d0
             dE=dE1
             dV=dV1
-            do n=1,Nlv
+            Do n=1,Nlv
                 Ey(n)= Ey(n)+ dE(n,ic)    ! sum of all contributions to n's energy
-                if (dE(n,ic) > dEx) then
+                If (dE(n,ic) > dEx) Then
                     dEx= dE(n,ic)
-                end if
+                End If
                 dVs= dVs+dV(n,ic)
-            end do
+            End Do
             DEnr(ic)= dEx
             DVnr(ic)= dVs
-            if (mype==0) then
+            If (mype==0) Then
                 print*, 'finished ', ic, 'of ', Ncnr
-            end if
+            End If
 
-        end do
+        End Do
     
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-        if (mype == 0) then
-        write ( *,25) NcCI,Nd1,Ncp0,Nd0,Nc,Nd
-        write (11,25) NcCI,Nd1,Ncp0,Nd0,Nc,Nd
+        If (mype == 0) Then
+        Write ( *,25) NcCI,Nd1,Ncp0,Nd0,Nc,Nd
+        Write (11,25) NcCI,Nd1,Ncp0,Nd0,Nc,Nd
     25  format(/82('='), &
              /' CI space [',i6,'/',i8,']; PT space [',i5,'/',i6, &
              '] * [',i7,'/',i9,']' &
              /' N',6X,'J',12X,'Ev0',6X,'DEL(CM**-1)',7X,'dE(PT2)', &
              6X,'Ev(PT2)',3X,'DEL(CM**-1)',/82('-'))
     
-        do n=1,Nlv
+        Do n=1,Nlv
             des0=(En(1)-En(n))*2*DPRy
             des =des0 + (Ey(1)-Ey(n))*2*DPRy
-            write ( *,55) n,Xj(n),En(n),des0,Ey(n),En(n)+Ey(n),des
-            write (11,55) n,Xj(n),En(n),des0,Ey(n),En(n)+Ey(n),des
+            Write ( *,55) n,Xj(n),En(n),des0,Ey(n),En(n)+Ey(n),des
+            Write (11,55) n,Xj(n),En(n),des0,Ey(n),En(n)+Ey(n),des
     55      format(I2,F12.8,F14.8,F13.2,2F14.8,F13.2)
-        end do
-        write ( *,65)
-        write (11,65)
+        End Do
+        Write ( *,65)
+        Write (11,65)
     65  format(82('='))
     
-        if (Kout >= 1) write (11,75)
+        If (Kout >= 1) Write (11,75)
     75  format(/4x,'PT contributions of non-relat. configurations', &
                /4x,'ic     max dE   Full weight',/4x,27('-'))
     
         dvnrx=0.d0
         ix=0
-        do ic=Ncnrci+1,Ncnr
-            if (DVnr(ic) > dvnrx) then
+        Do ic=Ncnrci+1,Ncnr
+            If (DVnr(ic) > dvnrx) Then
                 dvnrx=DVnr(ic)
                 ix=ic
-            end if
-            if (Kout >= 1) write(11,85) ic,DEnr(ic),DVnr(ic)
+            End If
+            If (Kout >= 1) Write(11,85) ic,DEnr(ic),DVnr(ic)
     85      format(i6,2f12.7)
-        end do
+        End Do
 
-        if (Kout >= 1) write (11,95)
+        If (Kout >= 1) Write (11,95)
     95  format(4x,27('-'))
-        write ( *,105) dvnrx,ix
-        write (11,105) dvnrx,ix
+        Write ( *,105) dvnrx,ix
+        Write (11,105) dvnrx,ix
     105 format('Max PT weight ',e11.3,' of config. ',i6)
-        end if
+        End If
 
-        return
-    end subroutine PTE
+        Return
+    End Subroutine PTE
     ! =============================================================================
-    subroutine SaveVectors
-        implicit none
-        integer  :: n, i, j
-        real(dp)   :: s
+    Subroutine SaveVectors
+        Implicit None
+        Integer  :: n, i, j
+        Real(dp)   :: s
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        write ( *,5)
-        write (11,5)
+        Write ( *,5)
+        Write (11,5)
     5   format(/4X,'Normalizing & saving vectors')
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        open(unit=16,file='CONF_PT.XIJ',status='UNKNOWN', &
+        Open(unit=16,file='CONF_PT.XIJ',status='UNKNOWN', &
              form='UNFORMATTED')
-        close(unit=16,status='DELETE')
-        open(unit=16,file='CONF_PT.XIJ',status='NEW', &
+        Close(unit=16,status='DELETE')
+        Open(unit=16,file='CONF_PT.XIJ',status='NEW', &
              form='UNFORMATTED')
-        do n=1,Nlv
+        Do n=1,Nlv
             s=0.d0
-            do i=1,Nd
+            Do i=1,Nd
                 s=s+X0(i,n)**2
-            end do
+            End Do
             s=1.d0/sqrt(s)
-            do i=1,Nd
+            Do i=1,Nd
                 !print*,i,s,X0(i,n)
                 X0(i,n)=s*X0(i,n)
-            end do
+            End Do
             EnG(n)=En(n)-4.d0*Gj*Xj(n)*(Xj(n)+1.d0)
-            write (16) EnG(n),Xj(n),Nd,(X0(j,n),j=1,Nd)
-            write( *,15) n,EnG(n),Xj(n),s
-            write(11,15) n,EnG(n),Xj(n),s
+            Write (16) EnG(n),Xj(n),Nd,(X0(j,n),j=1,Nd)
+            Write( *,15) n,EnG(n),Xj(n),s
+            Write(11,15) n,EnG(n),Xj(n),s
     15      format(4x,'vector ',i2,' E_G=',f13.8,' J=',f8.5,' S_norm=', &
                  f8.5,' saved')
-        end do
-        close(16)
-        write (*,35) 
+        End Do
+        Close(16)
+        Write (*,35) 
     35  format (4X,' vectors saved to file CONF_PT.XIJ.')
-        return
-    end subroutine SaveVectors
+        Return
+    End Subroutine SaveVectors
     ! =============================================================================
-    subroutine Weight_PT
-        implicit none
-        integer  :: icci, ic, icpt
+    Subroutine Weight_PT
+        Implicit None
+        Integer  :: icci, ic, icpt
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         icci=0
         dvnrn=11.d1
-        do ic=1,Ncnrci
-          if (DVnr(ic) < dvnrx) icci=icci+1
-          if (DVnr(ic) < dvnrn) dvnrn=DVnr(ic)
-        end do
+        Do ic=1,Ncnrci
+          If (DVnr(ic) < dvnrx) icci=icci+1
+          If (DVnr(ic) < dvnrn) dvnrn=DVnr(ic)
+        End Do
     
         icpt=0
-        do ic=Ncnrci+1,Ncnr
-          if (DVnr(ic) > dvnrn) icpt=icpt+1
-        end do
-        write ( *,15) icci,Ncnrci,dvnrx,icpt,Ncnr,dvnrn
-        write (11,15) icci,Ncnrci,dvnrx,icpt,Ncnr,dvnrn
+        Do ic=Ncnrci+1,Ncnr
+          If (DVnr(ic) > dvnrn) icpt=icpt+1
+        End Do
+        Write ( *,15) icci,Ncnrci,dvnrx,icpt,Ncnr,dvnrn
+        Write (11,15) icci,Ncnrci,dvnrx,icpt,Ncnr,dvnrn
     15  format('Weights of ',i6,' (from ',i6, &
              ') NR config-s in CI below max PT w-t',e11.3, &
              /'Weights of ',i6,' (from ',i6, &
              ') config-s in PT space above min CI w-t',e11.3)
-        return
-    end subroutine Weight_PT
+        Return
+    End Subroutine Weight_PT
     ! =============================================================================
-    subroutine Cutoff(Nc_0)
-        implicit none
-        integer  :: izer, icc, icnr, k, ii, ic, iinr, last, i, &
+    Subroutine Cutoff(Nc_0)
+        Implicit None
+        Integer  :: izer, icc, icnr, k, ii, ic, iinr, last, i, &
                     Nc_0
-        integer, dimension(15)  :: Nconf, Mconf
-        real(dp)  :: wx, wl, xx, dlx, dln, ctf, xcc
+        Integer, Dimension(15)  :: Nconf, Mconf
+        Real(dp)  :: wx, wl, xx, dlx, dln, ctf, xcc
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(W(Nc,2))
         izer=0
-        do icc=1,15
+        Do icc=1,15
            Nconf(icc)=0
            Mconf(icc)=0
-        end do
-        do icnr=1,Ncnr                     !### transforms weights to
+        End Do
+        Do icnr=1,Ncnr                     !### transforms weights to
           wx=DVnr(icnr)                    !###  log scale
-          if (wx > 0.d0) then
+          If (wx > 0.d0) Then
             wl=dlog(wx)*0.4342945d0        !### (factor = lg e)
           else
             izer=izer+1
             wl=-99.d0
-          end if
+          End If
           W(icnr,1)=wl
-          do icc=1,15
+          Do icc=1,15
             xcc=2-icc
-            if (wl < xcc) Nconf(icc)=Nconf(icc)+1
-          end do
+            If (wl < xcc) Nconf(icc)=Nconf(icc)+1
+          End Do
           xx=dvnrx
-          do k=1,10
-            if (wx > xx) Mconf(k)=Mconf(k)+1
+          Do k=1,10
+            If (wx > xx) Mconf(k)=Mconf(k)+1
             xx=0.5d0*xx
-          end do
-        end do
-        do icc=1,15
-          if (Nconf(icc) /= 0) last=icc
-        end do
-        if (Kout >= 1) write(11,5) izer, &
+          End Do
+        End Do
+        Do icc=1,15
+          If (Nconf(icc) /= 0) last=icc
+        End Do
+        If (Kout >= 1) Write(11,5) izer, &
             (Ncnr-Nconf(i),Nconf(i),2-i,i=1,last)
     5   format(4X,I6,' nonrel. conf-s with zero weight', &
               /(4X,I6,' weight above and ',I6,' below 10**(',I3,')'))
     
-        write(*,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
-        write(11,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
+        Write(*,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
+        Write(11,15) (Mconf(k),dvnrx,k-1,dvnrx/2**(k-1),k=1,10)
     15  format(/(4x,i6,' weights above ',d12.3,'/2**',i2,' = ',e11.3))
 
-        write(*,*) ' Give cutoff value of k (0-9):'
+        Write(*,*) ' Give cutoff value of k (0-9):'
         dlx=dlog(dvnrx)*0.4342945d0
         dln=dlog(dvnrn)*0.4342945d0
         ctf=dlx - 0.301029996d0*ktf
     
-        write(*,*) 'Choose reordering variant:'
-        write(*,*) '(1) - all; (2) - keep PT block; (3) - keep CI space'
+        Write(*,*) 'Choose reordering variant:'
+        Write(*,*) '(1) - all; (2) - keep PT block; (3) - keep CI space'
         Nc_0=0
-        if (kvar == 2) Nc_0=Ncnr0
-        if (kvar == 3) Nc_0=Ncnrci
+        If (kvar == 2) Nc_0=Ncnr0
+        If (kvar == 3) Nc_0=Ncnrci
     
         ii=0
         ic=0
         iinr=0
-        do icnr=1,Ncnr
+        Do icnr=1,Ncnr
           ic=ic+NRN(icnr)
-          if (W(icnr,1) > ctf .or. icnr <= Nc_0) then
+          If (W(icnr,1) > ctf .or. icnr <= Nc_0) Then
             iinr=iinr+1
             ii=ii+NRN(icnr)
             W(icnr,2)=1.d0
           else
             W(icnr,2)=0.d0
-          end if
-        end do
-        if (ic /= Nc) then
-          write(*,*) ' Cutoff: ic=',ic,' is not equal Nc=',Nc
-        end if
+          End If
+        End Do
+        If (ic /= Nc) Then
+          Write(*,*) ' Cutoff: ic=',ic,' is not equal Nc=',Nc
+        End If
         Ncnew=ii
-        write ( *,105) 10.d0**ctf,iinr,Ncnrci,Ncnew,Ncci
+        Write ( *,105) 10.d0**ctf,iinr,Ncnrci,Ncnew,Ncci
     105 format(4X,'For cutoff ',E10.3,' CI: Ncnr=',I6,' (was ',I6, &
              ') and Nc =',I6,' was(',I6,')')
-        return
-    end subroutine Cutoff
+        Return
+    End Subroutine Cutoff
     ! =============================================================================
-    subroutine Sort(Nc_0)
-        implicit none
-        integer  :: ic, i1, irpl, mm, k, kc, Nc_0
-        real(dp)  :: x, y
+    Subroutine Sort(Nc_0)
+        Implicit None
+        Integer  :: ic, i1, irpl, mm, k, kc, Nc_0
+        Real(dp)  :: x, y
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         irpl=0                    !### counts replacements
-        do ic=Nc_0+1,Ncnr-1
+        Do ic=Nc_0+1,Ncnr-1
           x=-100.d0
-          do kc=ic,Ncnr           !### search for max from the rest
+          Do kc=ic,Ncnr           !### search for max from the rest
             y=W(kc,1)
-            if (y > x) then
+            If (y > x) Then
               i1=kc
               x=y
-            end if
-          end do
-          if (ic /= i1) then      !### placing max in front
+            End If
+          End Do
+          If (ic /= i1) Then      !### placing max in front
             irpl=irpl+1
-            do k=1,2
+            Do k=1,2
               x=W(i1,k)
               W(i1,k)=W(ic,k)
               W(ic,k)=x
-            end do
+            End Do
             mm=NRN(i1)
             NRN(i1)=NRN(ic)
             NRN(ic)=mm
@@ -995,99 +994,99 @@ module conf_pt_aux
             mm=Nvcnr(i1)
             Nvcnr(i1)=Nvcnr(ic)
             Nvcnr(ic)=mm
-          end if
-        end do
-        write(*,*) irpl,' replacements first'
-        return
-    end subroutine Sort
+          End If
+        End Do
+        Write(*,*) irpl,' replacements first'
+        Return
+    End Subroutine Sort
     ! =============================================================================
-    subroutine NewConfList(Nc_0)
-        implicit none
-        character(len=1), dimension(16)  :: name
-        character(len=1), dimension(5)   :: ch1
-        character(len=1)  :: str*70
-        integer  :: Nc_0, icnr, ic0, ic1, kd, kd4, i, num, numt, nci, nrci, &
+    Subroutine NewConfList(Nc_0)
+        Implicit None
+        Character(Len=1), Dimension(16)  :: name
+        Character(Len=1), Dimension(5)   :: ch1
+        Character(Len=1)  :: str*70
+        Integer  :: Nc_0, icnr, ic0, ic1, kd, kd4, i, num, numt, nci, nrci, &
                     icnr1, num1, n, n1, n2, kc, kcnr, kc4, ic
-        logical  :: inci
+        Logical  :: inci
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        write( *,*) ' Forming new list of configurations...'
-        close(11)
-        open(unit=11,file='CONF_new.INP',status='UNKNOWN')
-        close(11,status='DELETE')
-        open(unit=11,file='CONF_new.INP',status='NEW')
+        Write( *,*) ' Forming new list of configurations...'
+        Close(11)
+        Open(unit=11,file='CONF_new.INP',status='UNKNOWN')
+        Close(11,status='DELETE')
+        Open(unit=11,file='CONF_new.INP',status='NEW')
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (Nc_0 < Nc4) then           ! we need to find new Nc4 
+        If (Nc_0 < Nc4) Then           ! we need to find new Nc4 
           kd4=0
           kc4=0
-          do icnr=1,Ncnr
+          Do icnr=1,Ncnr
             ic0=NRR(icnr)
             ic1=ic0+NRN(icnr)-1
             kd=0
-            do ic=ic0,ic1
+            Do ic=ic0,ic1
               kd=kd+Ndc(ic)
-            end do
-            if (kd4+kd > IP1) goto 100
+            End Do
+            If (kd4+kd > IP1) goto 100
             kd4=kd4+kd
             kc4=kc4+NRN(icnr)
-          end do
-    100   if (kc4 > 0) then 
+          End Do
+    100   If (kc4 > 0) Then 
             Nc4=kc4
             else
             Nc4=NRN(1)
-          end if
-          write(*,*)' New Nc4=',Nc4,' (Nd4=',kd4,')'         
-        end if
+          End If
+          Write(*,*)' New Nc4=',Nc4,' (Nd4=',kd4,')'         
+        End If
     
     !   input from the file 'CONF.INP'
-        open(unit=10,file='CONF.INP',status='OLD')
-        read (10,5) name
+        Open(unit=10,file='CONF.INP',status='OLD')
+        Read (10,5) name
     5   format(1X,16A1)
-        write(11,'(1X,16A1,A12)') name,' (reordered)'
-        read (10,15) (ch1(i),i=1,5),Z
-        write(11,15) (ch1(i),i=1,5),Z
-        read (10,15) (ch1(i),i=1,5),Am
-        write(11,15) (ch1(i),i=1,5),Am
-        read (10,15) (ch1(i),i=1,5),XJ_av
-        write(11,15) (ch1(i),i=1,5),XJ_av
-        read (10,15) (ch1(i),i=1,5),Jm
-        write(11,15) (ch1(i),i=1,5),Jm
+        Write(11,'(1X,16A1,A12)') name,' (reordered)'
+        Read (10,15) (ch1(i),i=1,5),Z
+        Write(11,15) (ch1(i),i=1,5),Z
+        Read (10,15) (ch1(i),i=1,5),Am
+        Write(11,15) (ch1(i),i=1,5),Am
+        Read (10,15) (ch1(i),i=1,5),XJ_av
+        Write(11,15) (ch1(i),i=1,5),XJ_av
+        Read (10,15) (ch1(i),i=1,5),Jm
+        Write(11,15) (ch1(i),i=1,5),Jm
     15  format (5A1,F5.1)
-        read (10,25) (ch1(i),i=1,5),Nso
-        write(11,25) (ch1(i),i=1,5),Nso
-        read (10,25) (ch1(i),i=1,5),Nc
-        write(11,25) (ch1(i),i=1,5),Ncnew
-        read (10,25) (ch1(i),i=1,5),Kv
-        write(11,25) (ch1(i),i=1,5),Kv
-        read (10,25) (ch1(i),i=1,5),Nlv
-        write(11,25) (ch1(i),i=1,5),Nlv
-        read (10,25) (ch1(i),i=1,5),Ne
-        write(11,25) (ch1(i),i=1,5),Ne
+        Read (10,25) (ch1(i),i=1,5),Nso
+        Write(11,25) (ch1(i),i=1,5),Nso
+        Read (10,25) (ch1(i),i=1,5),Nc
+        Write(11,25) (ch1(i),i=1,5),Ncnew
+        Read (10,25) (ch1(i),i=1,5),Kv
+        Write(11,25) (ch1(i),i=1,5),Kv
+        Read (10,25) (ch1(i),i=1,5),Nlv
+        Write(11,25) (ch1(i),i=1,5),Nlv
+        Read (10,25) (ch1(i),i=1,5),Ne
+        Write(11,25) (ch1(i),i=1,5),Ne
     25  format (5A1,I6)
     
-    200 read (10,35) (ch1(i),i=1,5),str
+    200 Read (10,35) (ch1(i),i=1,5),str
     35  format(5A1,A)
-        if (ch1(2) /= 'K'.AND.ch1(2) /= 'k') goto 300
-        if (ch1(3) /= 'L'.AND.ch1(3) /= 'l') goto 300
-        if (ch1(4) /= '4') goto 300
-        if (Nc_0 == Ncnrci) then
+        If (ch1(2) /= 'K'.AND.ch1(2) /= 'k') goto 300
+        If (ch1(3) /= 'L'.AND.ch1(3) /= 'l') goto 300
+        If (ch1(4) /= '4') goto 300
+        If (Nc_0 == Ncnrci) Then
           kl4=2            ! initial approximation from disk
         else
           kl4=1
-        end if
-        write(11,25) (ch1(i),i=1,5),kl4
+        End If
+        Write(11,25) (ch1(i),i=1,5),kl4
         goto 200    
     
-    300 if (ch1(2) /= 'N'.AND.ch1(2) /= 'n') goto 400
-        if (ch1(3) /= 'C'.AND.ch1(3) /= 'c') goto 400
-        if (ch1(4) /= '4') goto 400
-        write(11,25) (ch1(i),i=1,5),Nc4
+    300 If (ch1(2) /= 'N'.AND.ch1(2) /= 'n') goto 400
+        If (ch1(3) /= 'C'.AND.ch1(3) /= 'c') goto 400
+        If (ch1(4) /= '4') goto 400
+        Write(11,25) (ch1(i),i=1,5),Nc4
         goto 200
         
-    400 if(ch1(1) == ' '.AND.ch1(2) == ' ') goto 500
-        write(11,35) (ch1(i),i=1,5),str
+    400 If(ch1(1) == ' '.AND.ch1(2) == ' ') goto 500
+        Write(11,35) (ch1(i),i=1,5),str
         goto 200
-    500 close(10)
-        write(11,45) (Qnl(i),i=1,Nso)
+    500 Close(10)
+        Write(11,45) (Qnl(i),i=1,Nso)
     45  format (6(4X,F7.4))
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         num=0
@@ -1095,54 +1094,54 @@ module conf_pt_aux
         nci=0
         nrci=0
         inci=.TRUE.
-        do icnr=1,Ncnr
+        Do icnr=1,Ncnr
           kcnr=NRN(icnr)
           numt=numt+kcnr
-          if (W(icnr,2) /= 0.d0) then
+          If (W(icnr,2) /= 0.d0) Then
             nrci=nrci+1
           else
-            if (inci) then
-              write(11,55)
+            If (inci) Then
+              Write(11,55)
     55        format('<CI<')
               inci=.FALSE.
-            end if
-          end if
+            End If
+          End If
           ic=NRR(icnr)-1
           icnr1=mod(icnr,10000)
-          write(11,65) icnr1,10**W(icnr,1),Nvcnr(icnr)
+          Write(11,65) icnr1,10**W(icnr,1),Nvcnr(icnr)
     65    format(I4,62X,E9.2,i6)
-          do kc=1,kcnr
+          Do kc=1,kcnr
             ic=ic+1        !### old index of current configuration
             num=num+1      !### new index of current configuration
-            if (inci) nci=nci+1
+            If (inci) nci=nci+1
             num1=mod(num,10000)
             n1=Nc0(ic)+1
             n2=Nc0(ic)+Nvc(ic)
-            write(11,75) num1,(Qnl(n),n=n1,n2)
+            Write(11,75) num1,(Qnl(n),n=n1,n2)
     75      format(I4,6(F7.4,4X),/6(4X,F7.4))
-          end do
-        end do
-        if (nci == Ncnew) then
-          write(11,85)
+          End Do
+        End Do
+        If (nci == Ncnew) Then
+          Write(11,85)
     85    format(1X,'>>>>>>>>>> END <<<<<<<<<<')
-          close(11)
-          write(*,*)' CONF_new.INP is formed.'
-          write(*,*)' New CI space:',nci,' PT space:',num,' config.'
+          Close(11)
+          Write(*,*)' CONF_new.INP is formed.'
+          Write(*,*)' New CI space:',nci,' PT space:',num,' config.'
         else
-          write(*,95) nci,Ncnew
+          Write(*,95) nci,Ncnew
     95    format(' Error: nci=',I6,' not equal to Ncnew=',I6)
-          read(*,*)
-          return
-        end if
-        return
-    end subroutine NewConfList
+          Read(*,*)
+          Return
+        End If
+        Return
+    End Subroutine NewConfList
 
-    subroutine Squeeze(ic,knr,inl,inq)
-        implicit none
-        integer  :: i1, i2, knr, i, ic, nl, mq, nl0, mq0
-        logical :: dif
-        real(dp)  :: x
-        integer, dimension(20)  :: inl, inq
+    Subroutine Squeeze(ic,knr,inl,inq)
+        Implicit None
+        Integer  :: i1, i2, knr, i, ic, nl, mq, nl0, mq0
+        Logical :: dIf
+        Real(dp)  :: x
+        Integer, Dimension(20)  :: inl, inq
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         i1=Nc0(ic)
         i2=i1+Nvc(ic)
@@ -1154,30 +1153,30 @@ module conf_pt_aux
         nl=x+1.d-5
         mq=100*(x-nl)+1.d-5
     
-    100 if (knr >= 20) then
-            write (*,*) ' Squeeze error for ic=',ic
-            write (*,*) ' array overflow. knr=',knr
-            read (*,*)
-        end if
-        if (nl == nl0) then
+    100 If (knr >= 20) Then
+            Write (*,*) ' Squeeze error for ic=',ic
+            Write (*,*) ' array overflow. knr=',knr
+            Read (*,*)
+        End If
+        If (nl == nl0) Then
             knr=knr+1
             inl(knr)=nl0
             inq(knr)=mq0+mq
             nl=0
-            if (i == i2) goto 200
+            If (i == i2) goto 200
         else
-            if (nl0 /= 0) then
+            If (nl0 /= 0) Then
                 knr=knr+1
                 inl(knr)=nl0
                 inq(knr)=mq0
-            end if
-        end if
-        if (i == i2) then
+            End If
+        End If
+        If (i == i2) Then
             knr=knr+1
             inl(knr)=nl
             inq(knr)=mq
             goto 200
-        end if
+        End If
     
         nl0=nl
         mq0=mq
@@ -1188,173 +1187,173 @@ module conf_pt_aux
         goto 100
     
     200 continue
-        return
-    end subroutine Squeeze
+        Return
+    End Subroutine Squeeze
 
-    subroutine FormH(n,nd0,E1)
-        use determinants, only : CompC, Gdet
-        implicit none
-        integer  :: ic, kx, k, n, nd0, icomp
-        integer, allocatable, dimension(:) :: idet1, idet2
-        real(dp), dimension(IPPT)  :: E1
+    Subroutine FormH(n,nd0,E1)
+        Use determinants, Only : CompC, Gdet
+        Implicit None
+        Integer  :: ic, kx, k, n, nd0, icomp
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Real(dp), Dimension(IPPT)  :: E1
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (.not. allocated(idet1)) allocate(idet1(Ne))
-        if (.not. allocated(idet2)) allocate(idet2(Ne))
-        if (.not. allocated(ic1)) allocate(ic1(Ne))
-        if (.not. allocated(ic2)) allocate(ic2(Ne))
+        If (.not. allocated(idet1)) allocate(idet1(Ne))
+        If (.not. allocated(idet2)) allocate(idet2(Ne))
+        If (.not. allocated(ic1)) allocate(ic1(Ne))
+        If (.not. allocated(ic2)) allocate(ic2(Ne))
 
         E1=0.d0
         ! calculation of the matrix elements
-        call Gdet(n,idet1)
-        do ic=1,Nc
+        Call Gdet(n,idet1)
+        Do ic=1,Nc
             kx= Ndc(ic)
             k = Ndirc(ic)
-            if (k+kx > nd0) kx=nd0-k
-            if (kx /= 0) then
-                call Gdet(k+1,idet2)
-                call CompC(idet1,idet2,icomp)
-                if (icomp <= 2) then
-                    do k= Ndirc(ic)+1,Ndirc(ic)+kx
-                        call Gdet(k,idet2)
+            If (k+kx > nd0) kx=nd0-k
+            If (kx /= 0) Then
+                Call Gdet(k+1,idet2)
+                Call CompC(idet1,idet2,icomp)
+                If (icomp <= 2) Then
+                    Do k= Ndirc(ic)+1,Ndirc(ic)+kx
+                        Call Gdet(k,idet2)
                         E1(k)= Hmltn(idet1,idet2)
-                    end do
-                end if
-            end if
-        end do
+                    End Do
+                End If
+            End If
+        End Do
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        return
-    end subroutine FormH
+        Return
+    End Subroutine FormH
 
-    real(dp) function Hmltn(idet1,idet2)
-        use integrals, only : Gint, Hint
-        use determinants, only : Rspq
-        implicit none
-        integer  :: nf, iq, i1, i2, j1, j2, is, jq, jq0
-        integer, allocatable, dimension(:)  :: idet1, idet2
-        real(dp)  :: t
+    Real(dp) function Hmltn(idet1,idet2)
+        Use integrals, Only : Gint, Hint
+        Use determinants, Only : Rspq
+        Implicit None
+        Integer  :: nf, iq, i1, i2, j1, j2, is, jq, jq0
+        Integer, Allocatable, Dimension(:)  :: idet1, idet2
+        Real(dp)  :: t
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        call Rspq(idet1,idet2,is,nf,i1,i2,j1,j2)
+        Call Rspq(idet1,idet2,is,nf,i1,i2,j1,j2)
         t=0.d0
-        if (nf <= 2) then
-            if (nf == 2) then
+        If (nf <= 2) Then
+            If (nf == 2) Then
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! determinants differ by two functions
+        ! determinants dIffer by two functions
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
                 t=t+Gint(i2,j2,i1,j1)*is !### det_k goes first!
-            else if (nf == 1) then
+            else If (nf == 1) Then
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! determinants differ by one function
+        ! determinants dIffer by one function
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-                do iq=1,Ne
+                Do iq=1,Ne
                     i1=idet1(iq)
-                    if (i1 /= j1) then
+                    If (i1 /= j1) Then
                         t=t+Gint(j2,i1,j1,i1)*is
-                    end if
-                end do
+                    End If
+                End Do
                 t=t+Hint(j2,j1)*is
             else
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! determinants are equal
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-                do iq=1,Ne
+                Do iq=1,Ne
                     i1=idet1(iq)
                     jq0=iq+1
-                    if (jq0 <= Ne) then
-                        do jq=jq0,Ne
+                    If (jq0 <= Ne) Then
+                        Do jq=jq0,Ne
                             j1=idet1(jq)
                             t=t+Gint(i1,j1,i1,j1)*is
-                        end do
-                    end if
+                        End Do
+                    End If
                     t=t+Hint(i1,i1)*is
-                end do
-            end if
-        end if
+                End Do
+            End If
+        End If
         Hmltn=t
-        return
-    end function Hmltn
+        Return
+    End function Hmltn
 
-    subroutine DiagH(nd0,npes,mype)
-    	use mpi
-        use determinants, only : Gdet
-        implicit none
-        integer   :: n, i, nd0, start, end, pe, j
-        integer   :: npes, mype, interval, remainder, mpierr, size, count
-        integer, allocatable, dimension(:)  :: idet1, idet2
-        integer, dimension(npes) :: disp, sizes, ends
+    Subroutine DiagH(nd0,npes,mype)
+    	Use mpi
+        Use determinants, Only : Gdet
+        Implicit None
+        Integer   :: n, i, nd0, start, End, pe, j
+        Integer   :: npes, mype, interval, remainder, mpierr, size, count
+        Integer, Allocatable, Dimension(:)  :: idet1, idet2
+        Integer, Dimension(npes) :: disp, sizes, Ends
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (.not.allocated(idet1)) allocate(idet1(Ne))
-        if (.not.allocated(idet2)) allocate(idet2(Ne))
-        do n=1,Nd
+        If (.not.allocated(idet1)) allocate(idet1(Ne))
+        If (.not.allocated(idet2)) allocate(idet2(Ne))
+        Do n=1,Nd
             Diag(n)=0.d0
-        end do
-        call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End Do
+        Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         interval = (Nd-(nd0+1))/npes
         remainder = mod(Nd-(nd0+1),npes)
         count = 0
         ! setting up sizes and displacements for MPI
-        do i=0,npes-1
-            if (i == npes-1) then
+        Do i=0,npes-1
+            If (i == npes-1) Then
                 start = nd0+1+i*interval
-                end = nd0+1+(i+1)*interval+remainder
+                End = nd0+1+(i+1)*interval+remainder
             else
                 start = nd0+1+i*interval
-                end = nd0+(i+1)*interval
-            end if
-            size = end - start + 1
+                End = nd0+(i+1)*interval
+            End If
+            size = End - start + 1
             sizes(i+1) = size
-            ends(i+1) = end
-        end do
-        do i=0,npes-1
-            if (mype == npes-1) then
+            Ends(i+1) = End
+        End Do
+        Do i=0,npes-1
+            If (mype == npes-1) Then
                 start = nd0+1+mype*interval
-                end = nd0+1+(mype+1)*interval+remainder
-            else if (mype /= npes-1) then
+                End = nd0+1+(mype+1)*interval+remainder
+            else If (mype /= npes-1) Then
                 start = nd0+1+mype*interval
-                end = nd0+(mype+1)*interval
-            end if
-            size = end - start + 1
+                End = nd0+(mype+1)*interval
+            End If
+            size = End - start + 1
             sizes(mype+1) = size
-            ends(mype+1) = end
-        end do        
+            Ends(mype+1) = End
+        End Do        
         disp(1)=0
-        do i=2, npes
-            disp(i) = ends(i-1) - nd0
-        end do
+        Do i=2, npes
+            disp(i) = Ends(i-1) - nd0
+        End Do
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         !   calculation of the matrix elements
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (mype == 0) write (*,*) ' Formation of diagonal'
+        If (mype == 0) Write (*,*) ' Formation of diagonal'
 
-        do n=start, end
-            call Gdet(n,idet1)
-            do i=1,Ne
+        Do n=start, End
+            Call Gdet(n,idet1)
+            Do i=1,Ne
                 idet2(i)=idet1(i)
-            end do
+            End Do
             Diag(n)=Hmltn(idet1,idet2)
             count=count+1
-            if (mype==0) then
-                do j=1,10
-                    if (count==size/j) then
-                        print*, 'diag is', (10-j)*10, '% done'
-                    end if
-                end do
-            end if
-        end do
+            If (mype==0) Then
+                Do j=1,10
+                    If (count==size/j) Then
+                        print*, 'diag is', (10-j)*10, '% Done'
+                    End If
+                End Do
+            End If
+        End Do
         
         !print*,'pe=',mype,'has finished working with count=', count
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         
-        call MPI_Gatherv(Diag(start:end), size, MPI_DOUBLE_PRECISION, Diag(nd0+1:Nd), &
+        Call MPI_Gatherv(Diag(start:End), size, MPI_DOUBLE_PRECISION, Diag(nd0+1:Nd), &
                            sizes, disp, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-        if (mype==0) then
-        write (*,*) ' Diagonal formed'
-    	end if
+        If (mype==0) Then
+        Write (*,*) ' Diagonal formed'
+    	End If
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        return
-    end subroutine DiagH
+        Return
+    End Subroutine DiagH
 
-end module conf_pt_aux
+End Module conf_pt_aux
