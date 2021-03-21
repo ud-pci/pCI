@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.3] - 2021-03-21
+- dtm now uses conf_init module for reading CONF.INP
+- revamped dtm's Input subroutine 
+- moved one-electron operator functions to a separate module amp_ops
+- several minor text edits
+
 ## [0.0.2] - 2021-03-20
 - dtm now uses determinants module for determinant-based subroutines
 - made arrays storing configurations (iconf1, iconf2) consistent between all programs

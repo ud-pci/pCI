@@ -67,6 +67,7 @@ Module conf_pt_aux
         Integer, Dimension(4*IPs)   :: IQN
         Integer, Dimension(33)      :: nnn, jjj, nqq
         Character(Len=1)            :: Let(9), lll(33)
+        Character(Len=512)          :: strfmt
         Logical                     :: longbasis
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
@@ -94,12 +95,12 @@ Module conf_pt_aux
         Ns = pq(2)+c1
         ii = pq(3)+c1
         longbasis=abs(PQ(20)-0.98765d0) < 1.d-6
-        Write( 6,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
-        Write(11,15) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
-    15  format (4X,'Kl  =',I3,7X,'Kv  =',I3, &
-                    7X,'Z   =',F6.2,4X,'Jm  =',F6.2, &
-                   /4X,'Nsp =',I6,4X,'Ns  =',I3,7X,'Nso =',I3, &
-                    7X,'Nc =',I6)
+        strfmt='(4X,"Kl  =",I3,7X,"Kv  =",I3, &
+                    7X,"Z   =",F6.2,4X,"Jm  =",F6.2, &
+                   /4X,"Nsp =",I6,4X,"Ns  =",I3,7X,"Nso =",I3, &
+                    7X,"Nc =",I6)'
+        Write( 6,strfmt) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
+        Write(11,strfmt) Kl,Kv,Z,Jm,Nsp,Ns,Nso,Nc
         If (longbasis) Then
             Write( *,*) ' Using variant for long basis '
             Write(11,*) ' Using variant for long basis '
@@ -239,8 +240,7 @@ Module conf_pt_aux
             Read(12,rec=2*ni+7) p
             Eps(ni)=-p(ii+1)
         End Do
-        Write(11,95) (i,Eps(i),i=Nso+1,Nsu)
-     95 format(' HF energies are Read from DAT file', /5(I5,F10.6))
+        Write(11,'(" HF energies are Read from DAT file", /5(I5,F10.6))') (i,Eps(i),i=Nso+1,Nsu)
         Close(unit=12)
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
         Read(16) (In(i),i=1,IPgnt)
@@ -248,9 +248,8 @@ Module conf_pt_aux
         Close(unit=16)
         Return
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-    700 Write( 6,105)
-        Write(11,105)
-    105 format(/2X,'file CONF.DAT is absent'/)
+    700 Write( 6,'(/2X,"file CONF.DAT is absent"/)')
+        Write(11,'(/2X,"file CONF.DAT is absent"/)')
         Stop
     End Subroutine Init
 
