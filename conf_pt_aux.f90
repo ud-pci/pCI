@@ -1199,8 +1199,8 @@ Module conf_pt_aux
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         If (.not. allocated(idet1)) allocate(idet1(Ne))
         If (.not. allocated(idet2)) allocate(idet2(Ne))
-        If (.not. allocated(ic1)) allocate(ic1(Ne))
-        If (.not. allocated(ic2)) allocate(ic2(Ne))
+        If (.not. allocated(iconf1)) allocate(iconf1(Ne))
+        If (.not. allocated(iconf2)) allocate(iconf2(Ne))
 
         E1=0.d0
         ! calculation of the matrix elements

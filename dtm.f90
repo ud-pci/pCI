@@ -1,6 +1,7 @@
 program dtm 
     use mpi_f08
     use dtm_aux
+    Use determinants, Only : Dinit, Jterm
     implicit none
     integer :: nsu2, mpierr, mype, npes
     real :: start_time_total, end_time_total

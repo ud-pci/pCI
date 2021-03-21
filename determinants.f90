@@ -92,7 +92,7 @@ Module determinants
     Subroutine Jterm
         Implicit None
 
-        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, ic1
+        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1
         Real(dp)        :: d
         Integer, allocatable, dimension(:) :: idet
         Integer, dimension(6) :: nmj
@@ -102,9 +102,9 @@ Module determinants
         Njd=0
         Nd=0
         ! Calculate Nd
-        Do ic1=1,Nc
+        Do iconf1=1,Nc
             ndi=0
-            iconf=ic1
+            iconf=iconf1
             fin=.true.
             Call Ndet(iconf,fin,idet)
             Do While (.not. fin)
@@ -114,14 +114,14 @@ Module determinants
             Nd=Nd+Ndi
         End Do
 
-        allocate(Iarr(Ne,Nd))
+        if (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
 
         Njd=0
         Nd=0
-        Do ic1=1,Nc
+        Do iconf1=1,Nc
             ndi=0
             ndi1=0
-            iconf=ic1
+            iconf=iconf1
             imax=1
             fin=.true.
             Call Ndet(iconf,fin,idet)
@@ -569,9 +569,9 @@ Module determinants
         Integer  :: i, i1, i2, icomp, m
         Integer, allocatable, dimension(:)  :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ic1(1:Ne)=Nh(idet1(1:Ne))   ! ic1(i) = No of the orbital occupied by the electron i
-        ic2(1:Ne)=Nh(idet2(1:Ne))    
-        Call CompD(ic1,ic2,icomp)
+        iconf1(1:Ne)=Nh(idet1(1:Ne))   ! iconf1(i) = No of the orbital occupied by the electron i
+        iconf2(1:Ne)=Nh(idet2(1:Ne))    
+        Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompCD
 
@@ -615,9 +615,9 @@ Module determinants
         Integer  :: i, i1, i2, j1, j2, icomp, is, m
         Integer, allocatable, dimension(:)  :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ic1(1:Ne)=Nh(idet1(1:Ne))   !### ic1(i) = No of the orbital occupied
-        ic2(1:Ne)=Nh(idet2(1:Ne))    !#### by the electron i
-        Call Rspq(ic1,ic2,is,icomp,i1,j1,i2,j2)
+        iconf1(1:Ne)=Nh(idet1(1:Ne))   !### iconf1(i) = No of the orbital occupied
+        iconf2(1:Ne)=Nh(idet2(1:Ne))    !#### by the electron i
+        Call Rspq(iconf1,iconf2,is,icomp,i1,j1,i2,j2)
         Return
     End Subroutine CompC
 

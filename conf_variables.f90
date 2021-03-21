@@ -19,7 +19,7 @@ Module conf_variables
 
     integer, POINTER :: Iarr_win(:,:)
 
-    integer, allocatable, dimension(:)     :: IntOrd, IntOrdS, Iconverge, ic1, ic2
+    integer, allocatable, dimension(:)     :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2
     integer, allocatable, dimension(:)     :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     integer, allocatable, dimension(:)     :: H_nsizes, H_ndisps, H_n0, H_n, H_k0, H_k, J_n, J_k
     real, allocatable, dimension(:)        :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is

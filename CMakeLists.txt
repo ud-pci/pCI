@@ -9,7 +9,7 @@ PROJECT(conf_new LANGUAGES Fortran)
 INCLUDE(GNUInstallDirs)
 
 ADD_LIBRARY(conf_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 hamiltonian_io.f90 davidson.f90 vaccumulator.f90 progress.f90)
-ADD_LIBRARY(dtm_common params.f90 str_fmt.f90 dtm_variables.f90 wigner.f90)
+ADD_LIBRARY(dtm_common params.f90 str_fmt.f90 conf_variables.f90 dtm_variables.f90 wigner.f90 determinants.f90)
 ADD_LIBRARY(conf_pt_common params.f90 conf_variables.f90 conf_pt_variables.f90 conf_init.f90 integrals.f90 determinants.f90)
 
 ADD_EXECUTABLE(conf conf_aux.f90 conf_init.f90 conf.f90)

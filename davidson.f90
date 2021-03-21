@@ -1,4 +1,5 @@
 Module davidson
+    ! This module contains main subroutines required for the Davidson procedure.
 
     Use conf_variables
 
@@ -11,6 +12,12 @@ Module davidson
   Contains
     
     Subroutine Init4
+        ! This subroutine constructs the initial approximation 
+        ! by selecting configurations specified by parameter Nc4.
+        ! The initial approximation Hamiltonian is stored in the 
+        ! matrix Z1 and is constructed by selecting the top-left 
+        ! block of the full Hamiltonian matrix H.
+        ! The diagonal elements of H are stored in the array Diag.
         Implicit None
         Integer  :: k, ierr, n, n1, n2, ic, ic1
         Real(dp) :: t
@@ -52,14 +59,15 @@ Module davidson
 
 !     =================================================
     Subroutine Hould(n,ndim,Ee,Dd,Zz)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! HoUseholder's method of diagonalization
-        ! D-array of eigenvalues
-        ! Z-matrix of eigenvectors
-        ! n-dimension  of matrix z
+        ! This subroutine diagonalizes the matrix Zz using 
+        ! Householder's method of diagonalization.
+        ! Dd-array of eigenvalues
+        ! Zz-matrix of eigenvectors
+        ! n-dimension of matrix z
         ! eps-criteria of diagonalization
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Implicit None
+
         Integer :: n, ii, k, j, l, i, jj, m1, ndim, im, im1, li, k1, l1
         Real(dp) :: tol, f, g, b, r, em, h, hh, c, ei, s, p, di, eps
         Real(dp), dimension(:), allocatable :: Ee, Dd
@@ -239,6 +247,9 @@ Module davidson
     End Subroutine Hould
 
     Subroutine FormB0(mype,npes)
+        ! This subroutine constructs the initial eigenvectors for the Davidson iteration
+        ! and stores them in the first block of ArrB.
+        ! Eigenvectors are written to CONF.XIJ 
         Use mpi
         Use formj2, Only : J_av
         Implicit None
@@ -304,6 +315,9 @@ Module davidson
     End Subroutine FormB0
 
     Subroutine FormBskip
+        ! This subroutine forms eigenvectors for next Davidson iteration
+        ! and stores them in the first block of ArrB.
+        ! Eigenvectors are not written to CONF.XIJ.
         Implicit None
         Integer :: i, idum, k, l
         Real(dp) :: t, tjk, ek
@@ -325,6 +339,9 @@ Module davidson
     End Subroutine FormBskip
 
     Subroutine FormB
+        ! This subroutine forms eigenvectors for next Davidson iteration
+        ! and stores them in the first block of ArrB.
+        ! Eigenvectors are written to CONF.XIJ.
         Implicit None
         Integer :: i, idum, k, l
         Real(dp) :: t, tjk, ek
@@ -407,7 +424,8 @@ Module davidson
     
     Subroutine Dvdsn (j)
         ! Main part of the Davidson algorithm. 
-        ! Formation of the J-th residual vector and the corresponding new probe vector
+        ! Formation of the J-th residual vector and the corresponding new probe vector.
+        ! New probe vectors are stored in the second block of ArrB.
         Implicit None
         Integer :: j1, i, j, l, k, n01
         Real(dp) :: val, t, cnorm, s
@@ -472,6 +490,8 @@ Module davidson
 
     Subroutine Mxmpy(ip,mype,npes)
         ! This subroutine evaluates the products Q_i = H_ij * B_j
+        ! if ip=1, products are stored in the second block of ArrB
+        ! if ip=2, products are stored in the third block of ArrB
         Use mpi
         Implicit None
         Integer :: i, i1, i2, k, ierr, ip, nlp, n, mype, npes, mpierr, &

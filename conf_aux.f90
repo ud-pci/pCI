@@ -9,7 +9,7 @@ Module conf_aux
   Contains
 
     Subroutine Input
-        ! This subroutine Reads in parameters and configurations from CONF.INP
+        ! This subroutine reads in parameters and configurations from CONF.INP
         Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
         Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
@@ -305,7 +305,7 @@ Module conf_aux
       Use mpi
       Use str_fmt, Only : FormattedMemSize, FormattedTime
       Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
-      Use conf_init, Only : InitFormH, InitMxmpy ! intialization Subroutines for FormH and Mxmpy
+      Use conf_init, Only : InitFormH, InitMxmpy ! initialization subroutines for FormH and Mxmpy
       Use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
       Use hamiltonian_io
       Use vaccumulator
@@ -408,19 +408,17 @@ Module conf_aux
 !     - - - - - - - - - - - - - - - - - - - - - - - - -
 
       ih8=NumH
-      Allocate(idet1(Ne),idet2(Ne),ic1(Ne),ic2(Ne),nk(Nd))
+      Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),nk(Nd))
       nk=0
       ! comparison stage - - - - - - - - - - - - - - - - - - - - - - - - -
       If (mype==0) Then
         Nd0=IP1+1
         n1=0
-        ic1=0
         n2=Nd0-1
         do ic=1,Nc4
             n1=n1+Ndc(ic)
             If (n1 < Nd0) Then
                 n2=n1
-                ic1=ic
             End If
         End do
         Nd0=n2
@@ -602,7 +600,7 @@ Module conf_aux
         ! Compute NumH, the total number of non-zero matrix elements
         Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Deallocate(idet1, idet2, ic1, ic2)
+        Deallocate(idet1, idet2, iconf1, iconf2)
   
         If (mype==0) Then
           print*, '===== FormH calculation stage completed ====='
