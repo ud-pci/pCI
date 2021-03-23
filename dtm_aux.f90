@@ -61,15 +61,15 @@ Module dtm_aux
 
         ! NTYPE = 0 - OLD; NTYPE = 1 - NEW, UNKNOWN
         Do i=1,inam
-           fname(i)=nam(i)
+            fname(i)=nam(i)
         End Do
         Do i=inam+1,12
-           fname(i)=space
+            fname(i)=space
         End Do
         imax=12
         If (ntype /= 0) Then
-          If (iform == 0) Open(unit=kan,file=fnam,status='unknown',err=710)
-          If (iform == 1) Open(unit=kan,file=fnam,status='unknown', &
+            If (iform == 0) Open(unit=kan,file=fnam,status='unknown',err=710)
+            If (iform == 1) Open(unit=kan,file=fnam,status='unknown', &
                                     form='unformatted',err=710)
         Else
             If (iform == 0) Open(unit=kan,file=fnam,status='old',err=700)
@@ -144,6 +144,7 @@ Module dtm_aux
     Subroutine Init   
         ! This subroutine reads the head of the file CONF.DAT
         Implicit None
+        
         Integer :: i, ni, n0, nmin, imax, kkj, jjj, llj, nnj, nj, klag, &
                    If, n1, n2, l, j, n, k, ic, i0, qi, nsu2
         Real(dp) :: C1, C2, Z1, r1, r2, rmax, Bt, Al, d

@@ -14,9 +14,9 @@ Module davidson
     Subroutine Init4
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
-        ! The initial approximation Hamiltonian is stored in the 
+        ! The initial approximation Hamil is stored in the 
         ! matrix Z1 and is constructed by selecting the top-left 
-        ! block of the full Hamiltonian matrix H.
+        ! block of the full Hamil matrix H.
         ! The diagonal elements of H are stored in the array Diag.
         Implicit None
         Integer  :: k, ierr, n, n1, n2, ic, ic1
@@ -39,13 +39,13 @@ Module davidson
              I4," det.")') ic1,Nd0
         Write(11,'(3X,"Starting approx. includes ",I3," conf.,", &
              I4," det.")') ic1,Nd0
-        ! Construct the Hamiltonian in the initial approximation:
+        ! Construct the Hamil in the initial approximation:
         Diag=0.d0
         Z1=0.d0
         Do l8=1,NumH
-            n=H_n0(l8)
-            k=H_k0(l8)
-            t=H_t0(l8)
+            n=Hamil0%n(l8)
+            k=Hamil0%k(l8)
+            t=Hamil0%t(l8)
             If (n == k) t=t-Hmin
             If (n <= Nd0) Then
                 Z1(n,k)=t
@@ -263,7 +263,7 @@ Module davidson
 
         If (Kv == 4) Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
 
-        If (iabs(Kl4) /= 2) Then
+        If (abs(Kl4) /= 2) Then
             Do j=1,Nd0
                 Do i=1,Nd
                     If (j == 1)   B1(i)=0.d0
@@ -518,9 +518,9 @@ Module davidson
         End Do
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8H
-            n=H_n(l8)
-            k=H_k(l8)
-            t=H_t(l8)
+            n=Hamil%n(l8)
+            k=Hamil%k(l8)
+            t=Hamil%t(l8)
             If (n == k) Then
                 t=t-Hmin
                 If (kd == 1) Diag(n)=t
@@ -599,7 +599,7 @@ Module davidson
         Return
     End Subroutine Ortn
 
-    Subroutine Prj_J (lin, num, lout, ierr, trsd, mype, npes) 
+    Subroutine Prj_J (lin, num, lout, trsd, mype, npes) 
         Use mpi
         Use formj2, Only : F_J2
         Use determinants, Only : Gdet
@@ -639,9 +639,9 @@ Module davidson
                 Do j=1,NumJ
                     Select Case(Kv)
                     Case(4)
-                        n=J_n(j)
-                        k=J_k(j)
-                        t=J_t(j)
+                        n=Jsq%n(j)
+                        k=Jsq%k(j)
+                        t=Jsq%t(j)
                     Case(3)
                         Read(18) nj,k,n,t
                     End Select
@@ -707,10 +707,14 @@ Module davidson
         If (Kv == 3) close(18)
         Write( *,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
         Write(11,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
+        If (ierr /= 0) Then
+            Write(*,*) ' Wrong J values for Probe vectors '
+        End If
         Return
     End Subroutine Prj_J
 
     Subroutine Vread (b,j)
+        ! This subroutine reads eigenvector j from ArrB(:,j)
         Implicit None
         Integer :: i, j
         Real(dp), dimension(Nd) :: b
@@ -720,6 +724,7 @@ Module davidson
     End Subroutine Vread
 
     Subroutine VWrite (b,j)
+        ! This subroutine writes eigenvector j to ArrB(:,j)
         Implicit None
         Integer :: i, j
         Real(dp), dimension(Nd) :: b

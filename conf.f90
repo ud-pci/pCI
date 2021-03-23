@@ -25,11 +25,10 @@ Program conf
     !   INPUT/OUTPUT channels:
     !   10 - 'CONF.INP'   input file.
     !   11 - 'CONF.RES'   text file with results.
-    !   12 - 'CONF.DAT'   radial functions after
-    !                     ortogonalization
+    !   12 - 'CONF.DAT'   radial functions after orthogonalization
     !   13 - 'CONF.INT'   radial integrals
     !   15 - 'CONF.HIJ'   Hamiltonian matrix
-    !   17 - 'CONF.XIJ'   eigenvectors in basis of dets
+    !   17 - 'CONF.XIJ'   eigenvectors in basis of determinants
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   main variables:
     !   Ns      - number of orbitals (different)
@@ -56,111 +55,91 @@ Program conf
 
     Implicit None
 
-    Integer   :: n, k, ierr, i, j, nerr, mype, npes, mpierr
+    Integer   :: n, k, i, j, ierr, mype, npes, mpierr
     Integer(kind=int64) :: clock_rate
-    Integer(kind=int64) :: start_time, stop_time, start_time_tot, stop_time_tot, start1, end1
-    Real :: ttime
+    Integer(kind=int64) :: start_time, end_time
+    Real :: total_time
     Real(dp)  :: t
     Character(Len=1024) :: strFromEnv
-    Character(Len=255) :: eValue
-    Character(Len=16)     :: memStr, timeStr
+    Character(Len=255)  :: eValue
+    Character(Len=16)   :: memStr, timeStr
 !   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     ! Initialize MPI
-    call MPI_Init(mpierr)
+    Call MPI_Init(mpierr)
     ! Get process id
-    call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
+    Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
-    call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+    Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
-    call system_clock(count_rate=clock_rate)
-    if (mype==0) call system_clock(start_time_tot)
+    Call system_clock(count_rate=clock_rate)
+    If (mype==0) Call system_clock(start_time)
     
     ! Give ConfFilePaths a chance to decide what filenames/paths to use:
     !Call ConfFileInit()
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
-    call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU",eValue)
+    Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU",eValue)
     read(eValue,'(I12)') memTotalPerCPU
 
-    Kw=0 ! if Kw=0, CONF.HIJ files are not written
-         ! if Kw=1, CONF.HIJ files are written
-    kXIJ=10     ! kXIJ sets the interval in which CONF.XIJ is written
+    Kw=0 ! If Kw=0, CONF.HIJ files are not written
+         ! If Kw=1, CONF.HIJ files are written
+    kXIJ=10    ! kXIJ sets the interval in which CONF.XIJ is written
                ! e.g. kXIJ=5 => CONF.XIJ written every 5 davidson iterations
-               ! if kXIJ=0, then no intermediate CONF.XIJ will be written
+               ! If kXIJ=0, then no intermediate CONF.XIJ will be written
+
     ! Only the master core needs to initialize the conf program
-    if (mype == 0) then
+    If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF.RES')
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        call Input ! reads list of configurations from CONF.INP
-        call Init ! reads basis set information from CONF.DAT
-        call Rint ! reads radial integrals from CONF.INT
-        if (Ksig /= 0) call RintS 
-        call Dinit      ! forms list of determinants
-        call Jterm      ! prints table with numbers of levels with given J
-        call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
-        if (Ksig*Kdsig /= 0) call FormD
-        call system_clock(start_time)
-    end if
+        Call Input ! reads list of configurations from CONF.INP
+        Call Init ! reads basis set information from CONF.DAT
+        Call Rint ! reads radial integrals from CONF.INT
+        If (Ksig /= 0) Call RintS ! reads in radial integrals from SGC.CON and SCRC.CON
+        Call Dinit      ! forms list of determinants
+        Call Jterm      ! prints table with numbers of levels with given J
+        Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
+        If (Ksig*Kdsig /= 0) Call FormD
+    End If
 
-    call AllocateFormHArrays(mype,npes)
+    Call AllocateFormHArrays(mype,npes)
     
     ! Evaluation of Hamiltonian
-    if (Kl <= 2 .or. Kl4 == 0) call FormH(npes,mype)
+    If (Kl <= 2 .or. Kl4 == 0) Call FormH(npes,mype)
+
+    Call FormJ(mype, npes)   ! calculates matrix J^2 and writes it to CONF.JJJ
     
-    if (mype == 0) then
-        call system_clock(stop_time)
-        ttime=Real((stop_time-start_time)/clock_rate)
-        Call FormattedTime(ttime, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> FormH took '// trim(timeStr) // ' to complete'
-        call system_clock(start_time)
-    end if
+    Call DeAllocateFormHArrays(mype,npes)
+    Call AllocateDvdsnArrays(mype,npes)
 
-    call FormJ(mype, npes)   ! calculates matrix J^2 and writes it to CONF.JJJ
+    If (Kv == 3 .or. Kv == 4) Call Diag4(mype, npes) ! Davidson diagonalization
     
-    if (mype == 0) then
-        call system_clock(stop_time)
-        ttime=Real((stop_time-start_time)/clock_rate)
-        Call FormattedTime(ttime, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
-    end if
-
-    call DeAllocateFormHArrays(mype,npes)
-    call AllocateDvdsnArrays(mype,npes)
-
-    if (mype==0) call system_clock(start_time)
-    if (Kv == 3 .or. Kv == 4) call Diag4(mype, npes) ! Davidson diagonalisation
-    deallocate(H_n, H_k, H_t)
-    
-    if (mype == 0) then
-        call system_clock(stop_time)
-        ttime=Real((stop_time-start_time)/clock_rate)
-        Call FormattedTime(ttime, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
-
+    If (mype == 0) Then
         D1(1:Nlv)=Tk(1:Nlv)
-        nerr=0
-        if (K_prj == 1) then
-            call Prj_J(1,Nlv,Nlv+1,ierr,1.d-8)
-            if (ierr == 0) nerr=nerr+1
-        end if
-        open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-    end if
-    do n=1,Nlv
-        call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
-        if (mype==0) write (16) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
-    end do
-    if (mype==0) then
-        close(unit=16)
-        call PrintResults   !#   Output of the results
+        If (K_prj == 1) Then
+            Call Prj_J(1,Nlv,Nlv+1,1.d-8)
+        End If
+        open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+    End If
+
+    Do n=1,Nlv
+        Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
+        If (mype==0) write(17) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
+    End Do
+
+    ! Print table of final results and total computation time
+    If (mype==0) Then
+        close(unit=17)
+        Call PrintResults   !#   Output of the results
         close(unit=6)
         close(unit=11)
-        call system_clock(stop_time_tot)
-        ttime=Real((stop_time_tot-start_time_tot)/clock_rate)
-        Call FormattedTime(ttime, timeStr)
+        Call system_clock(end_time)
+        total_time=Real((end_time-start_time)/clock_rate)
+        Call FormattedTime(total_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
-    end if
-    deallocate(ArrB, B1, B2, Diag, Tk, Ndc)
-    call MPI_Finalize(mpierr)
-End Program
+    End If
+
+    Call MPI_Finalize(mpierr)
+
+End Program conf

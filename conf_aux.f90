@@ -12,7 +12,7 @@ Module conf_aux
         ! This subroutine reads in parameters and configurations from CONF.INP
         Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
-        Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, ierr, n, k
+        Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, n, k
         Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -318,18 +318,19 @@ Module conf_aux
         Use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
         Use hamiltonian_io
         Use vaccumulator
+        Use mpi_wins
         Implicit None
 
         Integer :: npes, mype, mpierr, interval, remainder, Hlim, numBins, cnt, bincnt, npes_Read
-        Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ierr, n1, n2, int, split_type, key, disp_unit, win, &
-                   n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, dIff, k2, totsize
+        Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, n1, n2, int, split_type, key, disp_unit, win, &
+                   n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
         Integer :: nn, kk
         logical :: finished
         Integer, allocatable, dimension(:) :: idet1, idet2, mepd
-        Integer, dimension(npes) :: avgs, start1, End1
+        Integer, dimension(npes) :: avgs, start1, end1
         Integer, dimension(npes) :: sizes, disps
-        Integer(Kind=int64)     :: start_time, End_time, s1, e1, s2, e2, clock_rate
-        real :: ttime
+        Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate
+        real :: ttime, ttot
         real(dp)  :: t
         Integer(Kind=int64) :: ih8, i8, l8, sumd, mem, memsum, ih, cntr, maxme, avgme, numme, size8
         Integer, allocatable, dimension(:) :: nk
@@ -338,64 +339,14 @@ Module conf_aux
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer, Parameter    :: vaGrowBy = 10000000
-        Integer(Kind=MPI_ADDRESS_KIND) :: size
-        TYPE(C_PTR) :: baseptr
-        Integer,allocatable :: arrayshape(:)
-        Integer :: shmrank, shmsize, shmcomm, zerokey, zerocomm, zerorank, zerosize
         Integer :: fh
         Integer(Kind=MPI_OFFSET_KIND) :: disp       
-        Character(Len=16) :: filename
+        Character(Len=16) :: filename, timeStr
 !       - - - - - - - - - - - - - - - - - - - - - - - -
         Call system_clock(count_rate=clock_rate)
-    
-        Call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
-                           MPI_INFO_NULL, shmcomm, mpierr)
-        Call MPI_COMM_rank(shmcomm, shmrank, mpierr)
-        Call MPI_COMM_size(shmcomm, shmsize, mpierr)
-        ! If core of each node, set zerokey to be true (=1)
-        If (shmrank==0) Then
-            zerokey=1
-        Else
-            zerokey=0
-        End If
-        ! create zerocomm for master cores to communicate
-        Call MPI_COMM_split(MPI_COMM_WORLD,zerokey,0,zerocomm,mpierr)
-        Call MPI_COMM_rank(zerocomm, zerorank, mpierr)
-        Call MPI_COMM_size(zerocomm, zerosize, mpierr)
-        If (shmrank == 0 .and. (.not. Allocated(Iarr))) Then
-            Allocate(Iarr(Ne,Nd)) 
-        End If
-        If (shmrank == 0) Then
-            Do i=1,Ne
-                Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, zerocomm, mpierr)
-            End Do   
-        End If
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Allocate(arrayshape(2))
-        arrayshape=(/ Ne, Nd /)
-        size = 0_MPI_ADDRESS_KIND
-        If (shmrank == 0) Then
-            size8 = Ne
-            size8 = size8*Nd
-            size = int(size8,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND !*8 for Double ! Put the actual data size here                                                                                                                                                                
-        Else
-            size = 0_MPI_ADDRESS_KIND
-        End If
-        disp_unit = 1
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Win_allocate_shared(size, disp_unit, MPI_INFO_NULL, shmcomm, baseptr, win, mpierr)
-        ! Obtain the location of the memory segment
-        If (shmrank /= 0) Then
-            Call MPI_Win_shared_query(win, 0, size, disp_unit, baseptr, mpierr)
-        End If
-        ! baseptr can now be associated with a Fortran pointer
-        ! and thus Used to access the shared data
-        Call C_F_POINTER(baseptr, Iarr_win,arrayshape)
-        If (shmrank == 0) Then
-            Iarr_win=Iarr
-        End If
-        Call MPI_Win_Fence(0, win, mpierr)
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (mype==0) Call system_clock(stot)
+
+        Call CreateWindow(win, mpierr)
     
         i8=0_int64  ! Integer*8
         ih8=0_int64
@@ -473,9 +424,9 @@ Module conf_aux
                     End If
                 End Do
             End Do
-            Call IVAccumulatorCopy(iva1, H_n0, counter1)
-            Call IVAccumulatorCopy(iva2, H_k0, counter2)
-            Call RVAccumulatorCopy(rva1, H_t0, counter3)
+            Call IVAccumulatorCopy(iva1, Hamil0%n, counter1)
+            Call IVAccumulatorCopy(iva2, Hamil0%k, counter2)
+            Call RVAccumulatorCopy(rva1, Hamil0%t, counter3)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
     
@@ -526,8 +477,8 @@ Module conf_aux
                 End Do
             End Do
         
-            Call IVAccumulatorCopy(iva1, H_n, counter1)
-            Call IVAccumulatorCopy(iva2, H_k, counter2)
+            Call IVAccumulatorCopy(iva1, Hamil%n, counter1)
+            Call IVAccumulatorCopy(iva2, Hamil%k, counter2)
         
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
@@ -540,9 +491,6 @@ Module conf_aux
             Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' with num_me = ' // trim(AdjustL(counterStr))
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         
-            ih8=counter1
-            Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        
             If (mype==0) Then
                 Call MPI_Reduce(MPI_IN_PLACE, nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
@@ -552,7 +500,7 @@ Module conf_aux
             End If
             Deallocate(nk)
         
-            mem=sizeof(H_n)*4
+            mem=sizeof(Hamil%n)*4
             ! Sum all the mem sizes to get a total...
             Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
             ! ...before overwriting mem with the maximum value across all workers:
@@ -560,9 +508,9 @@ Module conf_aux
             If (mype==0) Then
                 Write(npesStr,fmt='(I16)') npes
                 Call FormattedMemSize(memsum, memStr)
-                Write(*,'(A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory'
+                Write(*,'(A,A,A)') 'FormH: Hamil matrix requires approximately ',Trim(memStr),' of memory'
                 Call FormattedMemSize(mem, memStr)
-                Write(*,'(A,A,A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
+                Write(*,'(A,A,A,A,A)') 'FormH: Hamil matrix requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
                 memEstimate = memEstimate + mem
                 Call FormattedMemSize(memEstimate, memStr)
                 Call FormattedMemSize(memTotalPerCPU, memStr2)
@@ -580,31 +528,32 @@ Module conf_aux
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (mype==0) print*, '===== starting FormH calculation stage ====='
-            Allocate(H_t(counter1))
+            Allocate(Hamil%t(counter1))
             Call system_clock(s1)
             Do n=1,counter1
-                nn=H_n(n)
-                kk=H_k(n)
+                nn=Hamil%n(n)
+                kk=Hamil%k(n)
                 Call Gdet_win(nn,idet1)
                 Call Gdet_win(kk,idet2)
                 Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
                 Call Rspq_phase2(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
                 t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                H_t(n)=t
+                Hamil%t(n)=t
             End Do
+            if (mype==0) print*,size(Hamil%t)
+            Hamil%n = PACK(Hamil%n, Hamil%t/=0)
+            Hamil%k = PACK(Hamil%k, Hamil%t/=0)
+            Hamil%t = PACK(Hamil%t, Hamil%t/=0)
+            if (mype==0) print*,size(Hamil%t)
+            ih8=size(Hamil%t)
+            Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
             Call system_clock(e1)
             ttime=Real((e1-s1)/clock_rate)
             Call FormattedTime(ttime, memStr)
             Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' to complete calculations'
         
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Win_Fence(0, win, mpierr)
-        
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Win_Free(win, mpierr)
-        
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Call CloseWindow(win, mpierr)
         
             ! Compute NumH, the total number of non-zero matrix elements
             Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -632,16 +581,16 @@ Module conf_aux
             End If
             Call system_clock(s1)
             If (Kl == 1) Then
-                Call HRead(mype,npes,counter1)
+                Call Hread(mype,npes,counter1)
             End If
             Call system_clock(e1)
             If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
         End If
     
         ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(H_t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
     
-        ih8H = counter1 ! global variable for total number of matrix elements for each core
+        ih8H = ih8 ! global variable for total number of matrix elements for each core
     
         If (mype==0) Then
             Write( 6,'(4X,"NumH =",I12)') NumH
@@ -659,6 +608,13 @@ Module conf_aux
             End If
         End If
     
+        If (mype == 0) Then
+            Call system_clock(etot)
+            ttot=Real((etot-stot)/clock_rate)
+            Call FormattedTime(ttot, timeStr)
+            write(*,'(2X,A)'), 'TIMING >>> FormH took '// trim(timeStr) // ' to complete'
+        End If
+
         Return
     End Subroutine FormH
 
@@ -708,15 +664,21 @@ Module conf_aux
         ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
         ! all other Subroutines are performed by the master core
         Use mpi
+        Use str_fmt, Only : FormattedTime
         Use davidson
         Implicit None
     
         Integer  :: k1, k, i, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
-                    kx, i1, it, ierr, mype, npes, mpierr
+                    kx, i1, it, mype, npes, mpierr
+        Integer(Kind=int64) :: stot, etot, clock_rate
+        Real :: ttot
         real(dp)     :: start_time, End_time
         real(dp) :: crit, ax, x, xx, ss
         logical :: lsym
+        Character(Len=16) :: timeStr
         !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        Call system_clock(count_rate=clock_rate)
+        If (mype==0) Call system_clock(stot)
         crit=1.d-6
         If (mype == 0) Then
             If (Kl4 == 0) Return
@@ -810,10 +772,8 @@ Module conf_aux
                     End If
                   End Do
                   If (K_prj == 1) Then
-                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,ierr,1.d-5)
-                    If (ierr /= 0) Then
-                      Write(*,*) ' Wrong J values for Probe vectors '
-                    End If
+                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5)
+                    
                     Do i=Nlv+1,2*Nlv
                       If (Iconverge(i-Nlv)==0) Then
                         Call Ortn(i)
@@ -883,6 +843,15 @@ Module conf_aux
             End If
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End Do
+
+        If (mype == 0) Then
+            Call system_clock(etot)
+            ttot=Real((etot-stot)/clock_rate)
+            Call FormattedTime(ttot, timeStr)
+            write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
+        End If
+
+        deallocate(Hamil%n, Hamil%k, Hamil%t)
         Return
     End Subroutine Diag4
 
@@ -908,8 +877,7 @@ Module conf_aux
         ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
         If (K_is == 3) K_sms=4       !### Used for output
         If (Kecp == 1) ist=7
-        Open(unit=16,file='CONF.XIJ', &
-             status='UNKNOWN',form='unformatted')
+        Open(unit=16,file='CONF.XIJ',status='UNKNOWN',form='unformatted')
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! printing eigenvalues in increasing order
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1010,7 +978,6 @@ Module conf_aux
             WRITE(11,65) (ST1,I=J1,J3)
  130    CONTINUE
         CLOSE(unit=16)
-        Deallocate(Cc,Dd,W)
         RETURN
     End Subroutine PrintResults
 

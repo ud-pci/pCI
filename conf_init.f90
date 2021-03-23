@@ -22,6 +22,7 @@ Module conf_init
         Write(11,'(4X,16A1)') name
         Read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
         Read(10,'(5X,I6)') Nso, Nc, Kv, Nlv, Ne
+
         IPlv = 3*Nlv
         K_is = 0                ! 
         Kbrt = 0                !  
@@ -38,7 +39,8 @@ Module conf_init
         istr = 0
         Do While (istr /= 1)
           Call inpstr(istr)  
-        End Do        
+        End Do    
+
         Return
     End subroutine ReadConfInp
 
@@ -49,30 +51,31 @@ Module conf_init
         Real(dp) :: x
         ! - - - - - - - - - - - - - - - - - - - - - -
         Allocate(Qnl(100000000)) ! upper bound = 1 billion conf-s
-        If (Nso /= 0) Then
-           Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso)
+        If (Nso /= 0) Then 
+            Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
         End If
         ! Reading in configurations - - - - - - 
         i1=Nso+1
         Do ic=1,Nc
-           ne0=0
-  200      i2=i1+5
-           Read (10,'(6(4X,F7.4))') (Qnl(i),i=i1,i2)
-           Do i=i1,i2
-              x=dabs(Qnl(i))+1.d-9
-              If (x < 1.d-8) Exit
-              nx=10000*x
-              ny=100*x
-              nz=(nx-100*ny)
-              ne0=ne0+nz
-           End Do
-           i2=i-1
-           i1=i2+1
-           If (ne0 < Ne) goto 200
-           If (ne0 > Ne) Then
-              Write(6,'(" INPUT: too many electrons for ic =",I6)') ic
-            Stop
-           End If
+            ne0=0
+            Do While (ne0 < Ne)
+                i2=i1+5
+                Read (10,'(6(4X,F7.4))') (Qnl(i),i=i1,i2)
+                Do i=i1,i2
+                   x=abs(Qnl(i))+1.d-9
+                   If (x < 1.d-8) Exit
+                   nx=10000*x
+                   ny=100*x
+                   nz=(nx-100*ny)
+                   ne0=ne0+nz
+                End Do
+                i2=i-1
+                i1=i2+1
+            End Do
+            If (ne0 > Ne) Then
+                Write(6,'(" INPUT: too many electrons for ic =",I6)') ic
+                Stop
+            End If
         End Do
         Nsp=i2
         Close(unit=10)
@@ -290,7 +293,7 @@ Module conf_init
         ii = pq(3)+c1
         Rnuc=pq(13)
         dR_N=pq(16)
-        longbasis=dabs(PQ(20)-0.98765d0) < 1.d-6
+        longbasis=abs(PQ(20)-0.98765d0) < 1.d-6
         Write( 6,'(4X,"Kl  =",I3,7X,"Z   =",F6.2,4X,"Jm  =",F6.2, &
                /4X,"Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3, &
                 5X,"Nc =",I6)') Kl,Z,Jm,Nsp,Ns,Nso,Nc
@@ -446,7 +449,7 @@ Module conf_init
     End subroutine Init
 
     Subroutine InitFormH(npes,mype)
-        ! this subroutine initializes variables Used for FormH and subsequent subroutines
+        ! this subroutine initializes variables used for FormH and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
         Use mpi_f08
         Implicit None

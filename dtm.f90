@@ -3,8 +3,9 @@ Program dtm
     Use dtm_aux
     Use determinants, Only : Dinit, Jterm
     Implicit None
+    
     Integer :: nsu2, mpierr, mype, npes
-    Real :: start_time_total, end_time_total
+    Real    :: start_time_total, end_time_total
 
     Call MPI_Init(mpierr)
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
@@ -23,9 +24,9 @@ Program dtm
 
     Select Case(Kl1)
         Case(1) 
-          Call FormDM(mype,npes)  ! calculates density matrix and expectation values
+            Call FormDM(mype,npes)  ! calculates density matrix and expectation values
         Case(2)
-          Call FormTM(mype,npes)  ! calculates transition matrix & amplitudes
+            Call FormTM(mype,npes)  ! calculates transition matrix & amplitudes
     End Select
   
     If (mype==0) Then  
@@ -41,4 +42,5 @@ Program dtm
         Print*, 'dtm took', (end_time_total-start_time_total)/60 , 'minutes.'
     End If
     Call MPI_Finalize(mpierr)
+
 End Program dtm

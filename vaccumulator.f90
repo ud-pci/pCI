@@ -84,8 +84,6 @@ Module vaccumulator
         this%vLen = 0
     End Subroutine
 
-
-
     Subroutine RVAccumulatorInit(this, growBy)
         Implicit None
         

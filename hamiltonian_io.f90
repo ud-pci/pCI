@@ -38,7 +38,7 @@ Module hamiltonian_io
             status='UNKNOWN',position='append',form='unformatted')
             write(30) counter
             do j=1,counter
-              write(30) H_n(j),H_k(j),H_t(j)
+              write(30) Hamil%n(j),Hamil%k(j),Hamil%t(j)
             end do
             close(30)
           end if
@@ -53,9 +53,9 @@ Module hamiltonian_io
         ! The structure of CONF.HIJ is as follows:
         ! =======================================================
         ! | number of processors  | counters for each processor | 
-        ! | H_n (core 0) | H_n (core 1) | ... | H_n (core npes) |
-        ! | H_k (core 0) | H_k (core 1) | ... | H_k (core npes) |
-        ! | H_t (core 0) | H_t (core 1) | ... | H_t (core npes) |
+        ! | Hamil%n (core 0) | Hamil%n (core 1) | ... | Hamil%n (core npes) |
+        ! | Hamil%k (core 0) | Hamil%k (core 1) | ... | Hamil%k (core npes) |
+        ! | Hamil%t (core 0) | Hamil%t (core 1) | ... | Hamil%t (core npes) |
         ! =======================================================
         !
         Use mpi
@@ -99,28 +99,28 @@ Module hamiltonian_io
 
         disp = npes * 4 + disps(mype+1) * 4 + 4
         
-        ! Write H_n
+        ! Write Hamil%n
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_n, counter, MPI_INTEGER, & 
+        Call MPI_FILE_WRITE(fh, Hamil%n, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
         disp = npes * 4 + NumH * 4 + disps(mype+1) * 4 + 4
 
-        ! Write H_k
+        ! Write Hamil%k
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_k, counter, MPI_INTEGER, & 
+        Call MPI_FILE_WRITE(fh, Hamil%k, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
-        ! Write H_t
+        ! Write Hamil%t
         disp = npes * 4 + 2 * NumH * 4 + disps(mype+1) * 8 + 4
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_t, counter, MPI_DOUBLE_PRECISION, & 
+        Call MPI_FILE_WRITE(fh, Hamil%t, counter, MPI_DOUBLE_PRECISION, & 
                             MPI_STATUS_IGNORE, mpierr) 
         
         Call MPI_FILE_CLOSE(fh, mpierr) 
@@ -162,9 +162,9 @@ Module hamiltonian_io
         Call MPI_FILE_READ_AT(fh, disp, counter, 1, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr)
 
-        if (.not. allocated(H_n)) allocate(H_n(counter))
-        if (.not. allocated(H_k)) allocate(H_k(counter))
-        if (.not. allocated(H_t)) allocate(H_t(counter))
+        if (.not. allocated(Hamil%n)) allocate(Hamil%n(counter))
+        if (.not. allocated(Hamil%k)) allocate(Hamil%k(counter))
+        if (.not. allocated(Hamil%t)) allocate(Hamil%t(counter))
         ! Calculate displacements
         sizes=0
         Call MPI_AllGather(counter, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
@@ -176,22 +176,22 @@ Module hamiltonian_io
           disps(i)=disps(i-1)+sizes(i-1)
         end do
 
-        ! Read H_n
+        ! Read Hamil%n
         disp = npes * 4 + disps(mype+1) * 4 + 4
 
-        Call MPI_FILE_READ_AT(fh, disp, H_n, counter, MPI_INTEGER, & 
+        Call MPI_FILE_READ_AT(fh, disp, Hamil%n, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
-        ! Read H_k
+        ! Read Hamil%k
         disp = npes * 4 + NumH * 4 + disps(mype+1) * 4 + 4
 
-        Call MPI_FILE_READ_AT(fh, disp, H_k, counter, MPI_INTEGER, & 
+        Call MPI_FILE_READ_AT(fh, disp, Hamil%k, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
-        ! Read H_t
+        ! Read Hamil%t
         disp = npes * 4 + 2 * NumH * 4 + disps(mype+1) * 8 + 4
 
-        Call MPI_FILE_READ_AT(fh, disp, H_t, counter, MPI_DOUBLE_PRECISION, & 
+        Call MPI_FILE_READ_AT(fh, disp, Hamil%t, counter, MPI_DOUBLE_PRECISION, & 
                             MPI_STATUS_IGNORE, mpierr) 
         
         Call MPI_FILE_CLOSE(fh, mpierr) 
@@ -251,28 +251,28 @@ Module hamiltonian_io
 
         disp = npes * 4 + disps(mype+1) * 4 + 4
         
-        ! Write H_n
+        ! Write Hamil%n
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_n, counter, MPI_INTEGER, & 
+        Call MPI_FILE_WRITE(fh, Hamil%n, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
         disp = npes * 4 + NumH * 4 + disps(mype+1) * 4 + 4
 
-        ! Write H_k
+        ! Write Hamil%k
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_k, counter, MPI_INTEGER, & 
+        Call MPI_FILE_WRITE(fh, Hamil%k, counter, MPI_INTEGER, & 
                             MPI_STATUS_IGNORE, mpierr) 
 
-        ! Write H_t
+        ! Write Hamil%t
         disp = npes * 4 + 2 * NumH * 4 + disps(mype+1) * 8 + 4
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, & 
                                MPI_INTEGER, 'native', & 
                                MPI_INFO_NULL, mpierr) 
-        Call MPI_FILE_WRITE(fh, H_t, counter, MPI_DOUBLE_PRECISION, & 
+        Call MPI_FILE_WRITE(fh, Hamil%t, counter, MPI_DOUBLE_PRECISION, & 
                             MPI_STATUS_IGNORE, mpierr) 
         
         Call MPI_FILE_CLOSE(fh, mpierr) 

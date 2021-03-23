@@ -6,10 +6,246 @@ Module integrals
 
     Private
 
-    Public :: Hint, HintS, Gint, GintS, Rint, RintS, Find_VS, Find_SMS, Gaunt
+    Public :: Rint, RintS, Hint, HintS, Gint, GintS, Find_VS, Find_SMS, Gaunt
 
   Contains
-    
+
+    subroutine Rint
+        Implicit None
+        Integer     :: i, nsh, nx, ns1, nso1, nsu1, Nsul, nsp1, Nlist, &
+                       k, mlow, m_is
+        Character*7 :: str(3),str1(4)*4
+        Data str /'Coulomb','Gaunt  ','Breit  '/
+        Data str1 /' VS','SMS','NMS',' MS'/
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        nsh=Nso+1
+        Nhint=0
+        Ngint=0
+        ! parameter for indexation of integrals:
+        If (Nsu > IPx+nsh-2) Then
+            Write (*,*) ' Rint: IPx is too small'
+            Stop
+        Else
+            nx = IPx
+        End If
+        Open(unit=13,file='CONF.INT',status='OLD', &
+             form='UNFORMATTED',err=700)
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Write(*,*)' Reading file CONF.INT...'
+        Read (13) ns1,nso1,nsp1,Nsu1,Ecore
+        If (ns1 /=  Ns) Then
+            Write(*,*)' Rint warning: Ns=',Ns,' <> ',Ns1,' push...'
+            Read(*,*)
+        End If
+        If (nso1 /=  Nso) Then
+            Write(*,*)' Rint warning: Nso=',Nso,' <> ',Nso1
+            Stop
+        End If
+        If (Nsu1 /=  Nsu) Then
+            Write(*,*)' Rint warning: Nsu=',Nsu,' <> ',Nsu1
+            If (Nsu1 < Nsu) Stop
+        End If
+        Write( 6,'(4X,"Total core energy:",F17.7)') Ecore
+        Write(11,'(4X,"Total core energy:",F17.7)') Ecore
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Read (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsu)
+        Read (13)
+        Read (13) Nhint,Kbrt
+        Allocate(Rint1(Nhint),Iint1(Nhint))
+        Read (13) (Rint1(i), i=1,Nhint)
+        Read (13) (Iint1(i), i=1,Nhint)
+        Read (13) Ngint,Nlist,nrd
+        Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
+        If (nrd /=  nx*nx) Then
+            Write(*,*)' Rint error: IPx was changed'
+            Stop
+        End If
+        Read (13) ((Rint2(k,i), k=1,IPbr), i=1,Ngint)
+        Read (13) (Iint2(i), i=1,Ngint)
+        Read (13) (Iint3(i), i=1,Ngint)
+        Read (13) (IntOrd(i), i=1,nrd)
+        If (K_is >= 1) Then
+            Read(13,End=800) m_is,mlow,num_is
+            Allocate(R_is(num_is),I_is(num_is))
+            If (m_is /=  K_is) Then
+                Write(*,*) 'IS Integrals are for K_is=',m_is
+                Read(*,*)
+                Stop
+            End If
+            If (K_is >= 2   .and.   mlow /=  Klow) Then
+                Write(*,*) 'SMS Integrals are for Klow=',mlow
+                Read(*,*)
+            End If
+            Read(13,End=800) (R_is(i),i=1,num_is)
+            Read(13,End=800) (I_is(i),i=1,num_is)
+        End If
+        Close(unit=13)
+        Write( *,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
+        Write(11,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
+        If (K_is >= 1) Then
+            Write( *,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
+            Write(11,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
+        End If
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (Nsp /=  nsp1) Then
+            Write ( 6,*) ' Nsp changed since integrals were calculated'
+            Write (11,*) ' Nsp changed since integrals were calculated'
+            End If
+        Return
+        !- - - - - - - - - - - - - - - - - - - - - - - - -
+  700   Write( 6,'(2X," Can not find file CONF.INT...")')
+        Write(11,'(2X," Can not find file CONF.INT...")')
+        Stop
+  800   Write( *,*) 'No SMS integrals in CONF.INT!'
+        Stop
+    End subroutine Rint
+
+    Subroutine RintS
+        ! Reading of files SGC.CON and SCRC.CON with the self-energy and
+        ! screening radial integrals.
+        Implicit None
+        Integer :: na, nb, ierr, k, nsh, nx, khot, la, lb, ja, jb, na1, nb1, ind, &
+                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy
+        Real :: x, y, z
+        !     - - - - - - - - - - - - - - - - - - - - - - - - -
+        NhintS=0
+        NgintS=0
+        If (Ksig == 0) Return
+        nsh=Nso+1
+        ! parameter for indexation of integrals:
+        nx = IPx
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        ! Reading matrix element of Sigma from SGC.CON
+        If (Kdsig /= 0) Then
+            Write(*,'(5X,"Give valence energy: ",$)')
+            Read(*,*) E_0
+            Kexn=1
+            Write(*,'(5X,"Extrapolation variant ","(1-normal,2-one side,3-nonlin.): ",I2)') Kexn
+        End If
+        Open(unit=18,file='SGC.CON',status='OLD',err=700)
+        Write(*,*)' Reading file SGC.CON ...'
+        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
+        Do na=nsh,NmaxS
+            la=Ll(na)
+            ja=Jj(na)
+            If (la > LmaxS) Cycle
+            Do nb=na,NmaxS
+                lb=Ll(nb)
+                jb=Jj(nb)
+                If (lb /= la .or. jb /= ja) Cycle
+                Read(18,*) idummy,na1,nb1,x,y,z
+                NhintS=NhintS+1
+                If (na1 /= na .or. nb1 /= nb) Then
+                    Write(*,*)' wrong indices for ',NhintS,' sigma:'
+                    Write(*,*)' expected ',na,nb,' got ',na1,nb1
+                    Stop
+                End If
+            End Do
+        End Do
+        rewind(18)
+        Allocate(Iint1S(NhintS),Rsig(NhintS),Dsig(NhintS),Esig(NhintS))
+        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
+        i=0
+        Do na=nsh,NmaxS
+            la=Ll(na)
+            ja=Jj(na)
+            If (la > LmaxS) Cycle
+            Do nb=na,NmaxS
+                lb=Ll(nb)
+                jb=Jj(nb)
+                If (lb /= la .or. jb /= ja) Cycle
+                Read(18,*) idummy,na1,nb1,x,y,z
+                i=i+1
+                If (na1 /= na .or. nb1 /= nb) Then
+                    Write(*,*)' wrong indeces for ',NhintS,' sigma:'
+                    Write(*,*)' expected ',na,nb,' got ',na1,nb1
+                    Stop
+                End If
+                ind=nx*(na-nsh)+(nb-nsh+1)
+                Iint1S(i)=ind
+                Rsig(i)=x
+                Dsig(i)=y
+                Esig(i)=z
+            End Do
+        End Do
+        xscr=10.d0
+        If (Ksig == 2) Then
+            xscr=0.d0
+            Read(18,'(5X,I2,5X,F8.5)')
+            Do k=1,10
+                Read(18,'(5X,I2,5X,F8.5)') k1,Scr(k)
+                If (k1 /= k-1) Then
+                    Write(*,*)' wrong order of screening coefficients'
+                    Stop
+                End If
+                xscr=xscr+Scr(k)
+            End Do
+        End If
+        Write(*,*)' Khot =',khot
+        Close(unit=18)
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (Ksig < 2) Return
+        ierr=0
+        Open (unit=13,file='SCRC.CON',status='OLD',form='UNFORMATTED',err=710)
+        Write(*,*)' Reading file SCRC.CON...'
+        Read (13) ns1,nso1,nsh,khot1,nsx1,nsx2,Ksym
+        Read (13) Nmax1,Lmax1,Kmax,nav,kbox
+        Write(11,'(4X,"Parameters from the file SCRC.CON:", &
+                /4X,"Ns=",I3," Nso=",I2," Nsh=",I2," Khot=",I1, &
+                " Nsx=",2I3,/4X," Ksym=",I1,"NmaxS=",I3," LmaxS=",I2, &
+                " Kmax=",I2," Nav=",I3," Kbox=",I1)') ns1,nso1,nsh, &
+                    khot1,nsx1,nsx2,Ksym,Nmax1,Lmax1,Kmax,nav,kbox
+        If (nso1 /= Nso) Then
+            Write(*,*)' RintS warning: Nso=',Nso,' <> ',Nso1
+            ierr=ierr+1
+        End If
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (NmaxS /= nmax1 .or. LmaxS /= lmax1 .or. khot /= khot1) Then
+            Write( *,'(3X,"DIfference between SGC.CON and SCRC.CON:", &
+                /3X,"nmaxS =",I3," (SGC) =",I3," (SCRC)", &
+                /3X,"lmaxS =",I3," (SGC) =",I3," (SCRC)", &
+                /3X,"khot =",I3," (SGC) =",I3," (SCRC)")') & 
+                NmaxS,Nmax1,LmaxS,Lmax1,khot,khot1
+            If (NmaxS < Nmax1 .or. LmaxS < Lmax1) ierr=ierr+1
+        End If
+        Read (13) NgintS,nrd
+        Allocate(Rint2S(NgintS),Iint2S(NgintS),Iint3S(NgintS),Dint2S(NgintS),Eint2S(NgintS),IntOrdS(nrd))
+        If (nrd /= nx*nx) Then
+            Write(*,*)' RintS: IPx was changed'
+            ierr=ierr+1
+        End If
+        If (ierr > 0) Then
+            Write(*,*) ierr,' error(s) detected'
+            Stop
+        End If
+        If (nsx2 == 0) Then ! Nsum is used to skip screening integrals
+            Nsum=4*nav
+        Else
+            Nsum=4*Nmax1
+        End If
+        Read (13) (Rint2S(i), i=1,NgintS)
+        Read (13) (Iint2S(i), i=1,NgintS)
+        Read (13) (Iint3S(i), i=1,NgintS)
+        Read (13) (IntOrdS(i), i=1,nrd)
+        Read (13) (Dint2S(i), i=1,NgintS)
+        Read (13) (Eint2S(i), i=1,NgintS)
+        Close(unit=13)
+        Write(*,*)' File SCRC.CON is Read'
+        If (dabs(xscr-10.d0) > 1.d-5) Then
+            Write(*,*) ' Note: Screening coefficients will be used'
+            Write(*,*) ' above NmaxS ',Nmax1,' and LmaxS',Lmax1
+            Read(*,*)
+        End If
+        Return
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+  700   Write(6, '(2X," Can not find file SGC.CON...")')
+        Write(11,'(2X," Can not find file SGC.CON...")')
+        Stop
+  710   Write(6, '(2X," Can not find file SCRC.CON...")')
+        Write(11,'(2X," Can not find file SCRC.CON...")')
+        Stop
+    End subroutine RintS
+
     Real(dp) Function Hint(ia,ib)
         Implicit None
         Integer  :: nx, n, na, nb, n0, ind, i, nab, ia, ib
@@ -549,239 +785,4 @@ Module integrals
         Return
     End Function Gaunt
 
-    subroutine Rint
-        Implicit None
-        Integer     :: i, nsh, nx, ns1, nso1, nsu1, Nsul, nsp1, Nlist, &
-                       k, mlow, m_is
-        Character*7 :: str(3),str1(4)*4
-        Data str /'Coulomb','Gaunt  ','Breit  '/
-        Data str1 /' VS','SMS','NMS',' MS'/
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        nsh=Nso+1
-        Nhint=0
-        Ngint=0
-        ! parameter for indexation of integrals:
-        If (Nsu > IPx+nsh-2) Then
-            Write (*,*) ' Rint: IPx is too small'
-            Stop
-        Else
-            nx = IPx
-        End If
-        Open(unit=13,file='CONF.INT',status='OLD', &
-             form='UNFORMATTED',err=700)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Write(*,*)' Reading file CONF.INT...'
-        Read (13) ns1,nso1,nsp1,Nsu1,Ecore
-        If (ns1 /=  Ns) Then
-            Write(*,*)' Rint warning: Ns=',Ns,' <> ',Ns1,' push...'
-            Read(*,*)
-        End If
-        If (nso1 /=  Nso) Then
-            Write(*,*)' Rint warning: Nso=',Nso,' <> ',Nso1
-            Stop
-        End If
-        If (Nsu1 /=  Nsu) Then
-            Write(*,*)' Rint warning: Nsu=',Nsu,' <> ',Nsu1
-            If (Nsu1 < Nsu) Stop
-        End If
-        Write( 6,'(4X,"Total core energy:",F17.7)') Ecore
-        Write(11,'(4X,"Total core energy:",F17.7)') Ecore
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Read (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsu)
-        Read (13)
-        Read (13) Nhint,Kbrt
-        Allocate(Rint1(Nhint),Iint1(Nhint))
-        Read (13) (Rint1(i), i=1,Nhint)
-        Read (13) (Iint1(i), i=1,Nhint)
-        Read (13) Ngint,Nlist,nrd
-        Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
-        If (nrd /=  nx*nx) Then
-            Write(*,*)' Rint error: IPx was changed'
-            Stop
-        End If
-        Read (13) ((Rint2(k,i), k=1,IPbr), i=1,Ngint)
-        Read (13) (Iint2(i), i=1,Ngint)
-        Read (13) (Iint3(i), i=1,Ngint)
-        Read (13) (IntOrd(i), i=1,nrd)
-        If (K_is >= 1) Then
-            Read(13,End=800) m_is,mlow,num_is
-            Allocate(R_is(num_is),I_is(num_is))
-            If (m_is /=  K_is) Then
-                Write(*,*) 'IS Integrals are for K_is=',m_is
-                Read(*,*)
-                Stop
-            End If
-            If (K_is >= 2   .and.   mlow /=  Klow) Then
-                Write(*,*) 'SMS Integrals are for Klow=',mlow
-                Read(*,*)
-            End If
-            Read(13,End=800) (R_is(i),i=1,num_is)
-            Read(13,End=800) (I_is(i),i=1,num_is)
-        End If
-        Close(unit=13)
-        Write( *,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
-        Write(11,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
-        If (K_is >= 1) Then
-            Write( *,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
-            Write(11,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
-        End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (Nsp /=  nsp1) Then
-            Write ( 6,*) ' Nsp changed since integrals were calculated'
-            Write (11,*) ' Nsp changed since integrals were calculated'
-            End If
-        Return
-        !- - - - - - - - - - - - - - - - - - - - - - - - -
-  700   Write( 6,'(2X," Can not find file CONF.INT...")')
-        Write(11,'(2X," Can not find file CONF.INT...")')
-        Stop
-  800   Write( *,*) 'No SMS integrals in CONF.INT!'
-        Stop
-    End subroutine Rint
-
-    Subroutine RintS
-        ! Reading of files SGC.CON and SCRC.CON with the self-energy and
-        ! screening radial integrals.
-        Implicit None
-        Integer :: na, nb, ierr, k, nsh, nx, khot, la, lb, ja, jb, na1, nb1, ind, &
-                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy
-        Real :: x, y, z
-        !     - - - - - - - - - - - - - - - - - - - - - - - - -
-        NhintS=0
-        NgintS=0
-        If (Ksig == 0) Return
-        nsh=Nso+1
-        ! parameter for indexation of integrals:
-        nx = IPx
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! Reading ME of Sigma from SGC.CON
-        If (Kdsig /= 0) Then
-            Write(*,'(5X,"Give valence energy: ",$)')
-            Read(*,*) E_0
-            Kexn=1
-            Write(*,'(5X,"Extrapolation variant ","(1-normal,2-one side,3-nonlin.): ",I2)') Kexn
-        End If
-        Open(unit=18,file='SGC.CON',status='OLD',err=700)
-        Write(*,*)' Reading file SGC.CON ...'
-        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
-        Do na=nsh,NmaxS
-            la=Ll(na)
-            ja=Jj(na)
-            If (la > LmaxS) Cycle
-            Do nb=na,NmaxS
-                lb=Ll(nb)
-                jb=Jj(nb)
-                If (lb /= la .or. jb /= ja) Cycle
-                Read(18,*) idummy,na1,nb1,x,y,z
-                NhintS=NhintS+1
-                If (na1 /= na .or. nb1 /= nb) Then
-                    Write(*,*)' wrong indices for ',NhintS,' sigma:'
-                    Write(*,*)' expected ',na,nb,' got ',na1,nb1
-                    Stop
-                End If
-            End Do
-        End Do
-        rewind(18)
-        Allocate(Iint1S(NhintS),Rsig(NhintS),Dsig(NhintS),Esig(NhintS))
-        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
-        i=0
-        Do na=nsh,NmaxS
-            la=Ll(na)
-            ja=Jj(na)
-            If (la > LmaxS) Cycle
-            Do nb=na,NmaxS
-                lb=Ll(nb)
-                jb=Jj(nb)
-                If (lb /= la .or. jb /= ja) Cycle
-                Read(18,*) idummy,na1,nb1,x,y,z
-                i=i+1
-                If (na1 /= na .or. nb1 /= nb) Then
-                    Write(*,*)' wrong indeces for ',NhintS,' sigma:'
-                    Write(*,*)' expected ',na,nb,' got ',na1,nb1
-                    Stop
-                End If
-                ind=nx*(na-nsh)+(nb-nsh+1)
-                Iint1S(i)=ind
-                Rsig(i)=x
-                Dsig(i)=y
-                Esig(i)=z
-            End Do
-        End Do
-        xscr=10.d0
-        If (Ksig == 2) Then
-            xscr=0.d0
-            Read(18,'(5X,I2,5X,F8.5)')
-            Do k=1,10
-                Read(18,'(5X,I2,5X,F8.5)') k1,Scr(k)
-                If (k1 /= k-1) Then
-                    Write(*,*)' wrong order of screening coefficients'
-                    Stop
-                End If
-                xscr=xscr+Scr(k)
-            End Do
-        End If
-        Write(*,*)' Khot =',khot
-        Close(unit=18)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (Ksig < 2) Return
-        ierr=0
-        Open (unit=13,file='SCRC.CON',status='OLD',form='UNFORMATTED',err=710)
-        Write(*,*)' Reading file SCRC.CON...'
-        Read (13) ns1,nso1,nsh,khot1,nsx1,nsx2,Ksym
-        Read (13) Nmax1,Lmax1,Kmax,nav,kbox
-        Write(11,'(4X,"Parameters from the file SCRC.CON:", &
-                /4X,"Ns=",I3," Nso=",I2," Nsh=",I2," Khot=",I1, &
-                " Nsx=",2I3,/4X," Ksym=",I1,"NmaxS=",I3," LmaxS=",I2, &
-                " Kmax=",I2," Nav=",I3," Kbox=",I1)') ns1,nso1,nsh, &
-                    khot1,nsx1,nsx2,Ksym,Nmax1,Lmax1,Kmax,nav,kbox
-        If (nso1 /= Nso) Then
-            Write(*,*)' RintS warning: Nso=',Nso,' <> ',Nso1
-            ierr=ierr+1
-        End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (NmaxS /= nmax1 .or. LmaxS /= lmax1 .or. khot /= khot1) Then
-            Write( *,'(3X,"DIfference between SGC.CON and SCRC.CON:", &
-                /3X,"nmaxS =",I3," (SGC) =",I3," (SCRC)", &
-                /3X,"lmaxS =",I3," (SGC) =",I3," (SCRC)", &
-                /3X,"khot =",I3," (SGC) =",I3," (SCRC)")') & 
-                NmaxS,Nmax1,LmaxS,Lmax1,khot,khot1
-            If (NmaxS < Nmax1 .or. LmaxS < Lmax1) ierr=ierr+1
-        End If
-        Read (13) NgintS,nrd
-        Allocate(Rint2S(NgintS),Iint2S(NgintS),Iint3S(NgintS),Dint2S(NgintS),Eint2S(NgintS),IntOrdS(nrd))
-        If (nrd /= nx*nx) Then
-            Write(*,*)' RintS: IPx was changed'
-            ierr=ierr+1
-        End If
-        If (ierr > 0) Then
-            Write(*,*) ierr,' error(s) detected'
-            Stop
-        End If
-        If (nsx2 == 0) Then ! Nsum is used to skip screening integrals
-            Nsum=4*nav
-        Else
-            Nsum=4*Nmax1
-        End If
-        Read (13) (Rint2S(i), i=1,NgintS)
-        Read (13) (Iint2S(i), i=1,NgintS)
-        Read (13) (Iint3S(i), i=1,NgintS)
-        Read (13) (IntOrdS(i), i=1,nrd)
-        Read (13) (Dint2S(i), i=1,NgintS)
-        Read (13) (Eint2S(i), i=1,NgintS)
-        Close(unit=13)
-        Write(*,*)' File SCRC.CON is Read'
-        If (dabs(xscr-10.d0) > 1.d-5) Then
-            Write(*,*) ' Note: Screening coefficients will be used'
-            Write(*,*) ' above NmaxS ',Nmax1,' and LmaxS',Lmax1
-            Read(*,*)
-        End If
-        Return
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-  700   Write(6, '(2X," Can not find file SGC.CON...")')
-        Write(11,'(2X," Can not find file SGC.CON...")')
-        Stop
-  710   Write(6, '(2X," Can not find file SCRC.CON...")')
-        Write(11,'(2X," Can not find file SCRC.CON...")')
-        Stop
-    End subroutine RintS
 End Module integrals

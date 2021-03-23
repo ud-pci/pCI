@@ -147,34 +147,28 @@ Module formj2
     Subroutine FormJ(mype, npes)
         Use mpi
         Use str_fmt, Only : FormattedTime
-        Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet_win, Rspq, Rspq_phase1, Rspq_phase2
+        Use mpi_wins
         Implicit None
 
         Integer :: k1, n1, ic1, ndn, numjj, i, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
-        Real :: ttime
+        Real :: ttime, ttot
         Real(dp) :: t
-        Integer(kind=int64) :: size8, ij8, s1, e1, clock_rate, jstart, jend, memsum
+        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum
         Integer(kind=int64), dimension(npes) :: ij8s
         Integer, allocatable, dimension(:) :: idet1, idet2, nk
-        Integer, allocatable, dimension(:) :: J_n0, J_k0
-        Real(dp), allocatable, dimension(:) :: J_t0
-        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter
-        Integer :: split_type, key, disp_unit, win
+        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer, Parameter    :: vaGrowBy = 1000000
         Integer :: iSign, iIndexes(3), jIndexes(3)
-        Integer(kind=MPI_ADDRESS_KIND) :: size
-        TYPE(C_PTR) :: baseptr
-        Integer, allocatable :: arrayshape(:)
-        Integer :: shmrank, shmsize, shmcomm, zerokey, zerocomm, zerorank, zerosize
         Integer :: fh
         Integer(kind=MPI_OFFSET_KIND) :: disp 
         Character(Len=16) :: filename, timeStr, memStr
 
         Call system_clock(count_rate=clock_rate)
+        If (mype==0) Call system_clock(stot)
         Allocate(idet1(Ne),idet2(Ne),nk(Nc))
         
         ij8=0_int64
@@ -211,46 +205,7 @@ Module formj2
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
    
-            Call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
-                               MPI_INFO_NULL, shmcomm, mpierr)
-            Call MPI_COMM_rank(shmcomm, shmrank, mpierr)
-            Call MPI_COMM_size(shmcomm, shmsize, mpierr)
-            ! If core of each node, set zerokey to be true (=1)
-            If (shmrank==0) Then
-              zerokey=1
-            Else
-              zerokey=0
-            End If
-            ! create zerocomm for master cores to communicate
-            Call MPI_COMM_split(MPI_COMM_WORLD,zerokey,0,zerocomm,mpierr)
-            Call MPI_COMM_rank(zerocomm, zerorank, mpierr)
-            Call MPI_COMM_size(zerocomm, zerosize, mpierr)
-   
-            Allocate(arrayshape(2))
-            arrayshape=(/ Ne, Nd /)
-            size = 0_MPI_ADDRESS_KIND
-            If (shmrank == 0) Then
-               size8 = Ne
-               size8 = size8*Nd
-               size = int(size8,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND !*8 for double ! Put the actual data size here                                                                                                                                                                
-            Else
-               size = 0_MPI_ADDRESS_KIND
-            End If
-            disp_unit = 1
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Win_allocate_shared(size, disp_unit, MPI_INFO_NULL, shmcomm, baseptr, win, mpierr)
-            ! Obtain the location of the memory segment
-            If (shmrank /= 0) Then
-              Call MPI_Win_shared_query(win, 0, size, disp_unit, baseptr, mpierr)
-            End If
-            ! baseptr can now be associated with a Fortran pointer
-            ! and thus used to access the shared data
-            Call C_F_POINTER(baseptr, Iarr_win,arrayshape)
-            If (shmrank == 0) Then
-               Iarr_win=Iarr
-            End If
-            Call MPI_Win_Fence(0, win, mpierr)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Call CreateWindow(win, mpierr)
    
             Call system_clock(s1)
    
@@ -262,11 +217,9 @@ Module formj2
             If (mype == npes-1) Then
               endNc=Nc
             End If
-            !Do ic1=startNc, endNc
             Do ic1=mype+1,Nc,npes
               ndn=Ndc(ic1)
               n=sum(Ndc(1:ic1-1))
-              !print*,mype,n
               Do n1=1,ndn
                 n=n+1
                 ndr=n
@@ -286,22 +239,26 @@ Module formj2
               End Do
             End Do
    
-            Call IVAccumulatorCopy(iva1, J_n, counter1)
-            Call IVAccumulatorCopy(iva2, J_k, counter2)
+            Call IVAccumulatorCopy(iva1, Jsq%n, counter1)
+            Call IVAccumulatorCopy(iva2, Jsq%k, counter2)
        
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
    
-            Allocate(J_t(counter1))
+            Allocate(Jsq%t(counter1))
             Do n=1,counter1
-              nn=J_n(n)
-              kk=J_k(n)
-              Call Gdet_win(nn,idet1)
-              Call Gdet_win(kk,idet2)
-              t=F_J2(idet1, idet2)
-              J_t(n)=t
+                nn=Jsq%n(n)
+                kk=Jsq%k(n)
+                Call Gdet_win(nn,idet1)
+                Call Gdet_win(kk,idet2)
+                t=F_J2(idet1, idet2)
+                Jsq%t(n)=t
             End Do
-   
+
+            Jsq%n = PACK(Jsq%n, Jsq%t/=0)
+            Jsq%k = PACK(Jsq%k, Jsq%t/=0)
+            Jsq%t = PACK(Jsq%t, Jsq%t/=0)
+
             Call system_clock(e1)
             ttime=Real((e1-s1)/clock_rate)
             Call FormattedTime(ttime, timeStr)
@@ -309,19 +266,13 @@ Module formj2
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
    
             ij8s=0_int64
-            ij8=counter1
+            ij8=size(Jsq%t)
             Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
             ij8J = ij8
 
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Win_Fence(0, win, mpierr)
-       
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Win_Free(win, mpierr)
-       
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Call CloseWindow(win, mpierr)
    
           Else If (Kv==3) Then
             If (mype == 0) Then
@@ -358,6 +309,13 @@ Module formj2
             Close(unit=18)
           End If
         End If
+
+        If (mype == 0) Then
+            Call system_clock(etot)
+            ttot=Real((etot-stot)/clock_rate)
+            Call FormattedTime(ttot, timeStr)
+            write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
+        End If
         Deallocate(idet1,idet2)
         Return
     End Subroutine FormJ
@@ -388,9 +346,9 @@ Module formj2
         Do i=1,nj
             Select Case(Kv)
             Case(4)
-                n=J_n(i)
-                k=J_k(i)
-                t=J_t(i)
+                n=Jsq%n(i)
+                k=Jsq%k(i)
+                t=Jsq%t(i)
             Case(3)
                 Read(18) mi,k,n,t
             End Select

@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4] - 2021-03-22
+- new type "Matrix": encapsulate indices and values of matrix elements (Hamil and Jsq)
+- new module "mpi_wins": implements creating and closing MPI windows/shared memory for basis set
+- new module "mpi_utils": used for DARWIN's no-ucx variant of intel-2020 to bypass 1GB MPI message limit
+- used intrinsic function PACK to remove all zero valued matrix elements from Hamiltonian and Jsquared
+- Fixed discrepancy of NumH and NumJ between serial and parallel versions
+- several minor text edits
+
 ## [0.0.3] - 2021-03-21
 - dtm now uses conf_init module for reading CONF.INP
 - revamped dtm's Input subroutine 
