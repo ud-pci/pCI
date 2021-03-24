@@ -150,6 +150,7 @@ Module formj2
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet_win, Rspq, Rspq_phase1, Rspq_phase2
         Use mpi_wins
+        Use matrix_io
         Implicit None
 
         Integer :: k1, n1, ic1, ndn, numjj, i, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
@@ -190,127 +191,125 @@ Module formj2
             End If
           End Do
         Else ! Else start new calculation
-          If (mype == 0) Then
-            Write( 6,'(4X,"Forming matrix J**2")')
-            Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
-            Close(unit=18,status='DELETE')
-            Open(unit=18,file='CONF.JJJ',status='NEW',form='UNFORMATTED')
-          End If
-   
-          If (Kv==4) Then
-            counter1=1
-            counter2=1
-            counter3=1
-   
-            Call IVAccumulatorInit(iva1, vaGrowBy)
-            Call IVAccumulatorInit(iva2, vaGrowBy)
-   
-            Call CreateWindow(win, mpierr)
-   
-            Call system_clock(s1)
-   
-            interval = Nc/npes
-            remainder = mod(Nc,npes)
-   
-            startNc = mype*interval+1
-            endNc = (mype+1)*interval
-            If (mype == npes-1) Then
-              endNc=Nc
-            End If
-            Do ic1=mype+1,Nc,npes
-              ndn=Ndc(ic1)
-              n=sum(Ndc(1:ic1-1))
-              Do n1=1,ndn
-                n=n+1
-                ndr=n
-                Call Gdet_win(n,idet1)
-                k=n-n1
-                Do k1=1,n1
-                  k=k+1
-                  Call Gdet_win(k,idet2)
-                  Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                  If (diff == 0 .or. diff == 2) Then
-                    nn=n
-                    kk=k
-                    Call IVAccumulatorAdd(iva1, nn)
-                    Call IVAccumulatorAdd(iva2, kk)
-                  End If
-                End Do
-              End Do
-            End Do
-   
-            Call IVAccumulatorCopy(iva1, Jsq%n, counter1)
-            Call IVAccumulatorCopy(iva2, Jsq%k, counter2)
-       
-            Call IVAccumulatorReset(iva1)
-            Call IVAccumulatorReset(iva2)
-   
-            Allocate(Jsq%t(counter1))
-            Do n=1,counter1
-                nn=Jsq%n(n)
-                kk=Jsq%k(n)
-                Call Gdet_win(nn,idet1)
-                Call Gdet_win(kk,idet2)
-                t=F_J2(idet1, idet2)
-                Jsq%t(n)=t
-            End Do
-
-            Jsq%n = PACK(Jsq%n, Jsq%t/=0)
-            Jsq%k = PACK(Jsq%k, Jsq%t/=0)
-            Jsq%t = PACK(Jsq%t, Jsq%t/=0)
-
-            Call system_clock(e1)
-            ttime=Real((e1-s1)/clock_rate)
-            Call FormattedTime(ttime, timeStr)
-            Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-   
-            ij8s=0_int64
-            ij8=size(Jsq%t)
-            Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
-            ij8J = ij8
-
-            Call CloseWindow(win, mpierr)
-   
-          Else If (Kv==3) Then
             If (mype == 0) Then
+              Write( 6,'(4X,"Forming matrix J**2")')
+              Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
+              Close(unit=18,status='DELETE')
+            End If
+    
+            If (Kv==4) Then
+              counter1=1
+              counter2=1
+              counter3=1
+    
+              Call IVAccumulatorInit(iva1, vaGrowBy)
+              Call IVAccumulatorInit(iva2, vaGrowBy)
+    
+              Call CreateIarrWindow(win, mpierr)
+    
               Call system_clock(s1)
-              n=0
-              Do ic1=1,Nc
+    
+              interval = Nc/npes
+              remainder = mod(Nc,npes)
+    
+              startNc = mype*interval+1
+              endNc = (mype+1)*interval
+              If (mype == npes-1) Then
+                endNc=Nc
+              End If
+              Do ic1=mype+1,Nc,npes
                 ndn=Ndc(ic1)
+                n=sum(Ndc(1:ic1-1))
                 Do n1=1,ndn
                   n=n+1
                   ndr=n
-                  Call Gdet(n,idet1)
+                  Call Gdet_win(n,idet1)
                   k=n-n1
                   Do k1=1,n1
                     k=k+1
-                    Call Gdet(k,idet2)
-                    t=F_J2(idet1,idet2)
-                    If (t /= 0.d0) Then
-                      NumJ=NumJ+1
-                      Write(18) NumJ,k,n,t
+                    Call Gdet_win(k,idet2)
+                    Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    If (diff == 0 .or. diff == 2) Then
+                      nn=n
+                      kk=k
+                      Call IVAccumulatorAdd(iva1, nn)
+                      Call IVAccumulatorAdd(iva2, kk)
                     End If
                   End Do
                 End Do
               End Do
-            End If
-          End If    
-   
-          If (mype == 0) Then  
-            Call system_clock(e1)
-            ttime=Real((e1-s1)/clock_rate)
-             Call FormattedTime(ttime, timeStr) 
-            Write(*,'(2X,A)'), 'TIMING >>> Writing CONF.JJJ took '// trim(timeStr) // ' to complete'
+    
+              Call IVAccumulatorCopy(iva1, Jsq%n, counter1)
+              Call IVAccumulatorCopy(iva2, Jsq%k, counter2)
+        
+              Call IVAccumulatorReset(iva1)
+              Call IVAccumulatorReset(iva2)
+    
+              Allocate(Jsq%t(counter1))
+              Do n=1,counter1
+                  nn=Jsq%n(n)
+                  kk=Jsq%k(n)
+                  Call Gdet_win(nn,idet1)
+                  Call Gdet_win(kk,idet2)
+                  t=F_J2(idet1, idet2)
+                  Jsq%t(n)=t
+              End Do
+    
+              Jsq%n = PACK(Jsq%n, Jsq%t/=0)
+              Jsq%k = PACK(Jsq%k, Jsq%t/=0)
+              Jsq%t = PACK(Jsq%t, Jsq%t/=0)
+    
+              Call system_clock(e1)
+              ttime=Real((e1-s1)/clock_rate)
+              Call FormattedTime(ttime, timeStr)
+              Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
+              Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+    
+              ij8s=0_int64
+              ij8=size(Jsq%t)
+              Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+              Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+              Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
+              ij8J = ij8
+              ij4 = ij8
+              Call CloseIarrWindow(win, mpierr)
+
+              Call WriteMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr)
+              !Call ReadMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr)
+            Else If (Kv==3) Then
+              If (mype == 0) Then
+                Open(unit=18,file='CONF.JJJ',status='NEW',form='UNFORMATTED')
+                Call system_clock(s1)
+                n=0
+                Do ic1=1,Nc
+                  ndn=Ndc(ic1)
+                  Do n1=1,ndn
+                    n=n+1
+                    ndr=n
+                    Call Gdet(n,idet1)
+                    k=n-n1
+                    Do k1=1,n1
+                      k=k+1
+                      Call Gdet(k,idet2)
+                      t=F_J2(idet1,idet2)
+                      If (t /= 0.d0) Then
+                        NumJ=NumJ+1
+                        Write(18) NumJ,k,n,t
+                      End If
+                    End Do
+                  End Do
+                End Do
+                Close(18)
+                Call system_clock(e1)
+                ttime=Real((e1-s1)/clock_rate)
+                Call FormattedTime(ttime, timeStr)
+                write(*,'(2X,A)'), 'TIMING >>> Writing CONF.JJJ took ' // trim(timeStr)
+              End If
+            End If    
+        End If
+        If (mype == 0) Then
             Write(11,'(4X,"NumJ =",I12)') NumJ
             Write( *,'(4X,"NumJ =",I12)') NumJ
-            Close(unit=18)
-          End If
-        End If
-
-        If (mype == 0) Then
             Call system_clock(etot)
             ttot=Real((etot-stot)/clock_rate)
             Call FormattedTime(ttot, timeStr)

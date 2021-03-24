@@ -611,7 +611,7 @@ Module davidson
         logical :: proceed
         Integer, allocatable, dimension(:) :: idet1, idet2
         !     - - - - - - - - - - - - - - - - - - - - - - - - -
-        allocate(idet1(Ne),idet2(Ne))
+        Allocate(idet1(Ne),idet2(Ne))
         ierr=1
         If (lout+num-1 > IPlv) Then
             Write( *,'(" Prj_J warning:", /," to project",I3," levels I need",I3, &

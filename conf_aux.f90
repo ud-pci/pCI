@@ -33,7 +33,7 @@ Module conf_aux
             Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
             If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
-        close(99)
+        Close(99)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Call ReadConfigurations
         ! - - - - - - -  Case kl = 2  - - - - - - - - - - -
@@ -58,12 +58,12 @@ Module conf_aux
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         !If (Kl /= 1) Then ! If Kl=1, continue from a previous calculation
         !      Open(unit=16,status='UNKNOWN',file='CONF.JJJ')
-        !      close(unit=16,status='DELETE')
+        !      Close(unit=16,status='DELETE')
         !End If
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
         Read(16) (In(i),i=1,IPgnt)
         Read(16) (Gnt(i),i=1,IPgnt)
-        close(unit=16)
+        Close(unit=16)
         Return
     End Subroutine Input
 
@@ -316,7 +316,7 @@ Module conf_aux
         Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
         Use conf_init, Only : InitFormH ! initialization subroutines for FormH 
         Use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
-        Use hamiltonian_io
+        Use matrix_io
         Use vaccumulator
         Use mpi_wins
         Implicit None
@@ -346,7 +346,7 @@ Module conf_aux
         Call system_clock(count_rate=clock_rate)
         If (mype==0) Call system_clock(stot)
 
-        Call CreateWindow(win, mpierr)
+        Call CreateIarrWindow(win, mpierr)
     
         i8=0_int64  ! Integer*8
         ih8=0_int64
@@ -416,7 +416,7 @@ Module conf_aux
                                         kk=k
                                         Call IVAccumulatorAdd(iva1, nn)
                                         Call IVAccumulatorAdd(iva2, kk)
-                                      Call RVAccumulatorAdd(rva1, t)
+                                        Call RVAccumulatorAdd(rva1, t)
                                     End If
                                 End If
                             End Do
@@ -508,9 +508,9 @@ Module conf_aux
             If (mype==0) Then
                 Write(npesStr,fmt='(I16)') npes
                 Call FormattedMemSize(memsum, memStr)
-                Write(*,'(A,A,A)') 'FormH: Hamil matrix requires approximately ',Trim(memStr),' of memory'
+                Write(*,'(A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory'
                 Call FormattedMemSize(mem, memStr)
-                Write(*,'(A,A,A,A,A)') 'FormH: Hamil matrix requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
+                Write(*,'(A,A,A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
                 memEstimate = memEstimate + mem
                 Call FormattedMemSize(memEstimate, memStr)
                 Call FormattedMemSize(memTotalPerCPU, memStr2)
@@ -535,17 +535,20 @@ Module conf_aux
                 kk=Hamil%k(n)
                 Call Gdet_win(nn,idet1)
                 Call Gdet_win(kk,idet2)
-                Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
-                Call Rspq_phase2(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
+                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                 t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                 Hamil%t(n)=t
             End Do
-            if (mype==0) print*,size(Hamil%t)
+
             Hamil%n = PACK(Hamil%n, Hamil%t/=0)
             Hamil%k = PACK(Hamil%k, Hamil%t/=0)
             Hamil%t = PACK(Hamil%t, Hamil%t/=0)
-            if (mype==0) print*,size(Hamil%t)
+
             ih8=size(Hamil%t)
+            ih4=ih8
+
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
             Call system_clock(e1)
@@ -553,7 +556,7 @@ Module conf_aux
             Call FormattedTime(ttime, memStr)
             Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' to complete calculations'
         
-            Call CloseWindow(win, mpierr)
+            Call CloseIarrWindow(win, mpierr)
         
             ! Compute NumH, the total number of non-zero matrix elements
             Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -562,26 +565,14 @@ Module conf_aux
         
             If (mype==0) print*, '===== FormH calculation stage completed ====='
 
-            ! TEST - Write CONF.HIJs in serial
-            !Call dclock()
-            !If (Kw == 1) Call HWrite_s(mype,npes,counter1)
-            !Call dclock()
-            !If (mype == 0) print*, 'writing CONF.HIJ in serial took ', e1-s1, 'sec'
-
-            If (Kl /= 1 .and. Kw == 1) Then
-                print*, 'Writing CONF.HIJ...'
-                Call system_clock(s1)
-                If (Kw == 1) Call HWrite(mype,npes,counter1)
-                Call system_clock(e1)
-                If (mype == 0) print*, 'Writing CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
-            End If
+            If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONF.HIJ',mype,npes,mpierr)
         Else
             If (mype==0) Then
                 print*, 'Reading CONF.HIJ...'
             End If
             Call system_clock(s1)
             If (Kl == 1) Then
-                Call Hread(mype,npes,counter1)
+                Call ReadMatrix(Hamil,ih4,NumH,'CONF.HIJ',mype,npes,mpierr)
             End If
             Call system_clock(e1)
             If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
@@ -855,6 +846,32 @@ Module conf_aux
         Return
     End Subroutine Diag4
 
+    Subroutine WriteFinalXIJ(mype,npes)
+        Use mpi
+        Use formj2, Only : J_av
+        Use davidson, Only : Prj_J
+        Implicit None
+        Integer :: i, n, ierr, mype, npes, mpierr
+
+        If (mype == 0) Then
+            D1(1:Nlv)=Tk(1:Nlv)
+            If (K_prj == 1) Then
+                Call Prj_J(1,Nlv,Nlv+1,1.d-8)
+            End If
+            open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+        End If
+    
+        Do n=1,Nlv
+            Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
+            If (mype==0) write(17) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
+        End Do
+
+        If (mype==0) close(unit=17)
+
+        Return
+    End Subroutine WriteFinalXIJ
+
     Subroutine PrintResults
         Implicit None
 
@@ -978,6 +995,8 @@ Module conf_aux
             WRITE(11,65) (ST1,I=J1,J3)
  130    CONTINUE
         CLOSE(unit=16)
+        close(unit=6)
+        close(unit=11)
         RETURN
     End Subroutine PrintResults
 

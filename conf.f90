@@ -87,7 +87,7 @@ Program conf
     kXIJ=10    ! kXIJ sets the interval in which CONF.XIJ is written
                ! e.g. kXIJ=5 => CONF.XIJ written every 5 davidson iterations
                ! If kXIJ=0, then no intermediate CONF.XIJ will be written
-
+    
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF.RES')
@@ -112,28 +112,14 @@ Program conf
     Call DeAllocateFormHArrays(mype,npes)
     Call AllocateDvdsnArrays(mype,npes)
 
-    If (Kv == 3 .or. Kv == 4) Call Diag4(mype, npes) ! Davidson diagonalization
+    Call Diag4(mype, npes) ! Davidson diagonalization
     
-    If (mype == 0) Then
-        D1(1:Nlv)=Tk(1:Nlv)
-        If (K_prj == 1) Then
-            Call Prj_J(1,Nlv,Nlv+1,1.d-8)
-        End If
-        open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-    End If
-
-    Do n=1,Nlv
-        Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
-        If (mype==0) write(17) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
-    End Do
+    Call WriteFinalXIJ(mype,npes)
 
     ! Print table of final results and total computation time
     If (mype==0) Then
-        close(unit=17)
         Call PrintResults   !#   Output of the results
-        close(unit=6)
-        close(unit=11)
+
         Call system_clock(end_time)
         total_time=Real((end_time-start_time)/clock_rate)
         Call FormattedTime(total_time, timeStr)

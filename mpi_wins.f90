@@ -1,5 +1,8 @@
 Module mpi_wins
-    
+    !
+    ! This module implements subroutines that create and close MPI windows
+    ! to allow all cores access to the basis set of determinants stored in Iarr
+    ! 
     Use conf_variables
     Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
 
@@ -7,19 +10,20 @@ Module mpi_wins
     
     Private
     
-    Public :: CreateWindow, CloseWindow
+    Public :: CreateIarrWindow, CloseIarrWindow
     
   Contains
 
-    Subroutine CreateWindow(win, mpierr)
+    Subroutine CreateIarrWindow(win, mpierr)
         Use mpi
         Implicit None
         Integer :: split_type, key, disp_unit, win, mpierr
-        Integer(kind=MPI_ADDRESS_KIND) :: size
-        Integer(kind=int64) :: size8
+        Integer(Kind=MPI_ADDRESS_KIND) :: size
+        Integer(Kind=Int64) :: size8
         TYPE(C_PTR) :: baseptr
         Integer, Allocatable :: arrayshape(:)
         Integer :: shmrank, shmsize, shmcomm, zerokey, zerocomm, zerorank, zerosize
+
         Call MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, &
                            MPI_INFO_NULL, shmcomm, mpierr)
         Call MPI_COMM_rank(shmcomm, shmrank, mpierr)
@@ -61,12 +65,13 @@ Module mpi_wins
         Call MPI_Win_Fence(0, win, mpierr)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
-    End Subroutine
+    End Subroutine CreateIarrWindow
   
-    Subroutine CloseWindow(win, mpierr)
+    Subroutine CloseIarrWindow(win, mpierr)
         Use mpi
         Implicit None
         Integer :: win, mpierr
+
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Win_Fence(0, win, mpierr)
        
@@ -74,6 +79,6 @@ Module mpi_wins
         Call MPI_Win_Free(win, mpierr)
        
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    End Subroutine
+    End Subroutine CloseIarrWindow
 End Module
         
