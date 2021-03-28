@@ -26,7 +26,7 @@ Module str_fmt
             unitIdx = unitIdx + 1
             calcBytes = calcBytes / 1024.0
         EndDo
-        If ( unitIdx == 1 ) then
+        If ( unitIdx == 1 ) Then
             Write(strBuffer, '(I8,A)') bytes,' B'
         Else
             Write(strBuffer, '(F8.1,A)') calcBytes,' '//units(unitIdx:unitIdx)//'iB'
@@ -51,6 +51,13 @@ Module str_fmt
         Data units /'dhms'/
 
         intSec = int(inpSec)
+
+        ! If time took 0 seconds, return immediately with output "0s"
+        If (intSec == 0) Then
+            outString = "0s"
+            Return
+        End If
+
         secMin = 60
         secHour = 60 * secMin
         secDay = 24 * secHour
@@ -82,21 +89,21 @@ Module str_fmt
 
         ! convert array of times into a string with units
         iskip = 0
-        do i=1,4
-            if (arrTime(i) /= 0) then
-                if (arrTime(i) < 10) then
+        Do i=1,4
+            If (arrTime(i) /= 0) Then
+                If (arrTime(i) < 10) Then
                     Write(charArrTime(i-iskip),'(A,I1,A)') '0',arrTime(i), units(i:i)
-                else
+                Else
                     Write(charArrTime(i-iskip),'(I2,A)') arrTime(i), units(i:i)
-                end if
-            else
+                End If
+            Else
                 iskip = iskip + 1
-            end if
-        end do
+            End If
+        End Do
 
         strBuffer = charArrTime(1) // " " // charArrTime(2) // " " //charArrTime(3) // " " // charArrTime(4)
         outString = AdjustL(Trim(strBuffer))
         Return
     End Subroutine FormattedTime
     
-end module
+End module

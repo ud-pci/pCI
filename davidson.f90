@@ -261,7 +261,7 @@ Module davidson
         
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
 
-        If (Kv == 4) Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
+        Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
 
         If (abs(Kl4) /= 2) Then
             Do j=1,Nd0
@@ -269,12 +269,12 @@ Module davidson
                     If (j == 1)   B1(i)=0.d0
                     If (i <= Nd0) B1(i)=Z1(i,j)
                 End Do
-                Select Case(Kv)
-                    Case(4)
+                !Select Case(Kv)
+                !    Case(4)
                         Call J_av(B1,Nd0,xj,ierr,mype,npes)
-                    Case(3)
-                        Call J_av(B1,Nd0,xj,ierr)
-                End Select
+                !    Case(3)
+                !        Call J_av(B1,Nd0,xj,ierr)
+                !End Select
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hmin)
@@ -297,7 +297,7 @@ Module davidson
                 ArrB(1:Nd,j)=B1(1:Nd)
             End Do
         End If
- 220    Rewind(17)
+ 220    if (mype==0) Rewind(17)
         Nlv=num
         If (mype == 0) Then
             Do j=1,Nlv
@@ -604,7 +604,7 @@ Module davidson
         Use formj2, Only : F_J2
         Use determinants, Only : Gdet
         Implicit None
-        Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, nsj, lout, num, lin, jav, j_av, mpierr
+        Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, nsj, lout, num, lin, jav, j_av, mpierr, imin, imax
         Integer, optional :: mype, npes
         Integer*8 :: nj
         Real(dp) :: err1, err, sj, t, f, s, s1, a, aj, trsd, start, end
@@ -613,7 +613,7 @@ Module davidson
         !     - - - - - - - - - - - - - - - - - - - - - - - - -
         Allocate(idet1(Ne),idet2(Ne))
         ierr=1
-        If (lout+num-1 > IPlv) Then
+        If (mype == 0 .and. lout+num-1 > IPlv) Then
             Write( *,'(" Prj_J warning:", /," to project",I3," levels I need",I3, &
                 " vectors & have Only",I3)') Nlv,lout+num-1,IPlv
             Write(11,'(" Prj_J warning:", /," to project",I3," levels I need",I3, &
@@ -621,9 +621,20 @@ Module davidson
             Stop
         End If
         jav=2*XJ_av+0.1d0
-        Write( *,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
-        Write(11,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
-        If (Kv == 3) Open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED')
+        If (mype == 0) Then
+            Write( *,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
+            Write(11,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
+        End If
+
+        Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jt, IPjd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iconverge, IPlv, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        call MPI_Barrier(MPI_COMM_WORLD, mpierr)        
+        imin=lin
+        imax=lout-1
+        Do j=imin,imax
+            Call MPI_Bcast(ArrB(1:Nd,j), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        End Do
         Do iter=1,Njd+1          !# each iteration eliminates one J
             it=Njd+1-iter        !## starting from J_max down to J_min
             If (it /= 0) Then
@@ -635,16 +646,10 @@ Module davidson
                     i2=lout+i-1
                     ArrB(1:Nd,i2)=0.d0
                 End Do
-                If (Kv == 3) Rewind(18)
-                Do j=1,NumJ
-                    Select Case(Kv)
-                    Case(4)
-                        n=Jsq%n(j)
-                        k=Jsq%k(j)
-                        t=Jsq%t(j)
-                    Case(3)
-                        Read(18) nj,k,n,t
-                    End Select
+                Do j=1,ij8J
+                    n=Jsq%n(j)
+                    k=Jsq%k(j)
+                    t=Jsq%t(j)
                     Do i=1,num
                         proceed=(lin-1)*Iconverge(i)==0
                         If (proceed) Then
@@ -655,18 +660,19 @@ Module davidson
                         End If
                     End Do
                 End Do
-                If (Kv == 4) Then
-                    Do i=lout,lout+num-1
-                        If (mype==0) Then
-                            Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, &
-                                MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, mpierr)
-                        Else
-                            Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, &
-                                MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, mpierr)
-                        End If
-                    End Do
-                End If
+
+                Do i=lout,lout+num-1
+                    If (mype==0) Then
+                        Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                                          MPI_COMM_WORLD, mpierr)
+                    Else
+                        Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                                          MPI_COMM_WORLD, mpierr)
+                    End If
+                    Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                End Do
                 err1=0.d0
+            
                 Do i=1,num
                     proceed=(lin-1)*Iconverge(i)==0
                     If (proceed) Then
@@ -702,13 +708,16 @@ Module davidson
                         End If
                     End Do
                 End If
+
             End If
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End Do
-        If (Kv == 3) close(18)
-        Write( *,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
-        Write(11,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
-        If (ierr /= 0) Then
-            Write(*,*) ' Wrong J values for Probe vectors '
+        If (mype == 0) Then
+            Write( *,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
+            Write(11,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
+            If (ierr /= 0) Then
+                Write(*,*) ' Wrong J values for Probe vectors '
+            End If
         End If
         Return
     End Subroutine Prj_J

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2021-03-28
+- kv=3 functionality fully parallelized
+
 ## [0.0.5] - 2021-03-23
 - new module "matrix_io": implements parallel reading and writing of matrices (Hamiltonian and J^2)
 

@@ -659,8 +659,8 @@ Module conf_aux
         Use davidson
         Implicit None
     
-        Integer  :: k1, k, i, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
-                    kx, i1, it, mype, npes, mpierr
+        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
+                    kx, i1, i2, it, mype, npes, mpierr
         Integer(Kind=int64) :: stot, etot, clock_rate
         Real :: ttot
         real(dp)     :: start_time, End_time
@@ -687,12 +687,7 @@ Module conf_aux
             Write( 6,'(1X,"Hmin =",F14.8)') Hmin
             Write(11,'(1X,"Hmin =",F14.8)') Hmin
         End If
-        Select Case(Kv)
-            Case(4)
-                Call FormB0(mype,npes)
-            Case(3)
-                If (mype==0) Call FormB0(mype,npes)
-        End Select
+        Call FormB0(mype,npes)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         If (Nd0 == Nd) Return
         ! Davidson loop:
@@ -762,27 +757,29 @@ Module conf_aux
                       End If
                     End If
                   End Do
-                  If (K_prj == 1) Then
-                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5)
-                    
-                    Do i=Nlv+1,2*Nlv
-                      If (Iconverge(i-Nlv)==0) Then
-                        Call Ortn(i)
-                        If (Ifail /= 0) Then
-                          Write(*,*)' Fail of orthogonalization 2 for ',i1
-                          If (kdavidson==1) Then
-                            Stop
-                          Else
-                            kdavidson=1
-                            Write(*,*) ' change kdavidson to ', kdavidson
-                            Ifail=0
-                            exit
+                End If
+
+                If (K_prj == 1) Then
+                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype,npes)
+                    If (mype == 0) Then
+                        Do i=Nlv+1,2*Nlv
+                          If (Iconverge(i-Nlv)==0) Then
+                            Call Ortn(i)
+                            If (Ifail /= 0) Then
+                              If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
+                              If (kdavidson==1) Then
+                                Stop
+                              Else
+                                kdavidson=1
+                                If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
+                                Ifail=0
+                                exit
+                              End If
+                            End If
                           End If
-                        End If
-                      End If
-                    End Do
-                  End If
-                End If ! End master core only block
+                        End Do
+                    End If
+                End If
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
@@ -853,11 +850,12 @@ Module conf_aux
         Implicit None
         Integer :: i, n, ierr, mype, npes, mpierr
 
+        Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        D1(1:Nlv)=Tk(1:Nlv)
+        If (K_prj == 1) Then
+            Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype,npes)
+        End If
         If (mype == 0) Then
-            D1(1:Nlv)=Tk(1:Nlv)
-            If (K_prj == 1) Then
-                Call Prj_J(1,Nlv,Nlv+1,1.d-8)
-            End If
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         End If
     
