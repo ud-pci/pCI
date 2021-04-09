@@ -1,11 +1,13 @@
 Module wigner
 
-    Use dtm_variables
+    Use params 
 
     Implicit None
 
     Private
 
+    Real(dp) :: ALL
+    
     Public :: FJ3, FJ6, FJ9, DELFJ, NGFJ, OBME, PORAD
 
   Contains

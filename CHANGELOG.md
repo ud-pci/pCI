@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2021-04-09
+- initial import of new modernized "basc" program
+- "basc" program has been modernized and included in the build process of the parallel package.
+- "basc" has been tested with serial version and all results are identical in output files
+- "basc" now utilizes dynamic memory allocation
+
 ## [0.1.0] - 2021-03-28
 - kv=3 functionality fully parallelized
 
