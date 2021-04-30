@@ -17,7 +17,7 @@ Module mpi_wins
     Subroutine CreateIarrWindow(win, mpierr)
         Use mpi
         Implicit None
-        Integer :: split_type, key, disp_unit, win, mpierr
+        Integer :: split_type, key, disp_unit, win, mpierr, i
         Integer(Kind=MPI_ADDRESS_KIND) :: size
         Integer(Kind=Int64) :: size8
         TYPE(C_PTR) :: baseptr
@@ -38,7 +38,14 @@ Module mpi_wins
         Call MPI_COMM_split(MPI_COMM_WORLD,zerokey,0,zerocomm,mpierr)
         Call MPI_COMM_rank(zerocomm, zerorank, mpierr)
         Call MPI_COMM_size(zerocomm, zerosize, mpierr)
-
+        if (shmrank == 0 .and. (.not. allocated(Iarr))) then
+          allocate(Iarr(Ne,Nd)) 
+        end if
+        if (shmrank == 0) then
+          do i=1,Ne
+              call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, zerocomm, mpierr)
+          end do   
+        end if
         Allocate(arrayshape(2))
         arrayshape=(/ Ne, Nd /)
         size = 0_MPI_ADDRESS_KIND

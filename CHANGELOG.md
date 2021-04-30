@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2021-04-23
+- "sint1" in dtm_aux.f90: bug fix
+
+## [0.2.1] - 2021-04-20
+- "mpi_wins" bug fix: added lines to allocate and broadcast Iarr for zero-cores 
+
 ## [0.2.0] - 2021-04-09
 - initial import of new modernized "basc" program
 - "basc" program has been modernized and included in the build process of the parallel package.

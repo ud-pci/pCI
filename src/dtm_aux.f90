@@ -791,21 +791,20 @@ Module dtm_aux
             G=GAM+1.d0
             T2=R1**G*(C0/G+C1/(G+1.d0)*R1+C2/(G+2.d0)*R1**2)
             T1=R2**G*(C0/G+C1/(G+1.d0)*R2+C2/(G+2.d0)*R2**2)
-        Else
-            Dint=t2
-            P1=C(I0)*V(I0)
-            P2=C( 1)*V( 1)
-            I1=I0+IH
-            Do I=I1,II,IH
-               Q=C(I)*V(I)
-               T=HH*(Q+4.d0*P1+P2)
-               T=T2+T
-               T2=T1
-               T1=T
-               P2=P1
-               P1=Q
-            End Do
         End if
+        Dint=t2
+        P1=C(I0)*V(I0)
+        P2=C( 1)*V( 1)
+        I1=I0+IH
+        Do I=I1,II,IH
+           Q=C(I)*V(I)
+           T=HH*(Q+4.d0*P1+P2)
+           T=T2+T
+           T2=T1
+           T1=T
+           P2=P1
+           P1=Q
+        End Do
         ds=t
         Return
     End Subroutine Sint1
