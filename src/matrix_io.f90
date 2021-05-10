@@ -24,18 +24,15 @@ Module matrix_io
         disp=0_int64
         ! Write counters
         if (mype==0) then
-          open(unit=30,file='CONF.HIJs', &
-              status='UNKNOWN',form='unformatted')
+          open(unit=30,file='CONF.HIJs',status='UNKNOWN',form='unformatted')
           close(30,status='delete')
-          open(unit=30,file='CONF.HIJs', &
-              status='NEW',form='unformatted')
+          open(unit=30,file='CONF.HIJs',status='NEW',form='unformatted')
           write(30) npes
         end if
         disp=disp+1
         do i=1,npes
           if (mype==i-1) then
-            open(unit=30,file='CONF.HIJs', &
-            status='UNKNOWN',position='append',form='unformatted')
+            open(unit=30,file='CONF.HIJs',status='UNKNOWN',position='append',form='unformatted')
             write(30) counter
             do j=1,counter
               write(30) Hamil%n(j),Hamil%k(j),Hamil%t(j)
@@ -149,7 +146,7 @@ Module matrix_io
         if (mype == 0) then
             Call MPI_FILE_READ_AT(fh, disp, npes_read, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
             if (npes /= npes_read) then
-                print*, 'Number of processors inconsistent. CONF.HIJ was written with ', npes_read, ' processors,', &
+                print*, 'Number of processors inconsistent. '// filename //' was written with ', npes_read, ' processors,', &
                         ' but', npes, ' is available.'
                 stop
             end if

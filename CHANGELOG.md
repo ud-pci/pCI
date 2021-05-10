@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2021-05-10
+- "matrix_io" bug fix: compatibility fix for sortJJJ.py and sortHIJ.py
+- new code "sort.py": python code that converts parallel CONF.JJJ or CONF.HIJ to serial format
+
 ## [0.2.2] - 2021-04-23
 - "sint1" in dtm_aux.f90: bug fix
 
