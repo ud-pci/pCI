@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2021-05-14
+- "Rspq" bug fix: added diagonistics for dets to make sure orbitals are in correct order
+
 ## [0.2.3] - 2021-05-10
 - "matrix_io" bug fix: compatibility fix for sortJJJ.py and sortHIJ.py
 - new code "sort.py": python code that converts parallel CONF.JJJ or CONF.HIJ to serial format

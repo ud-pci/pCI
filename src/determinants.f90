@@ -370,9 +370,11 @@ Module determinants
         ! this subroutine compares determinants and counts number of differences in orbitals
         !
         Implicit None
-        Integer  :: n, is, ni, nj, i2, j2, nf, i, j, l0, l1, l2, nn0, nn1, &
+        Integer  :: i, n, ic, is, ni, nj, i2, j2, nf, j, l0, l1, l2, nn0, nn1, &
                     ll0, ll1, jj0, jj1, ndi, k, iconf, i1, j1
-        Integer, allocatable, dimension(:)   :: id1, id2
+        Integer, Allocatable, dimension(:)   :: id1, id2
+        Character(Len=1), Dimension(5) :: let
+        data let/'s','p','d','f','g'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         is=1
         ni=0
@@ -382,10 +384,35 @@ Module determinants
         nf=3
         i=1
         j=1
+        l0=0
   
         Do While (i <= Ne .and. j <= Ne)
             l1=id1(i) ! id1(i) is the i-th element of determinant 1
             l2=id2(j) ! id1(j) is the j-th element of determinant 2
+            If (l1 < l0) Then   !### diagnostics for det1:
+                l1=Nh(l1)
+                l0=Nh(l0)
+                nn1=Nn(l1)
+                nn0=Nn(l0)
+                ll1=Ll(l1)
+                ll0=Ll(l0)
+                jj1=Jj(l1)
+                jj0=Jj(l0)
+                ndi=0
+                Do ic=1,Nc
+                    ndi=ndi+Ndc(ic)
+                    iconf=ic
+                    If (ndi >= Ndr) Then
+                        write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
+                                " and ",I2,A1,I2,"/2 in configuration ",I5)') &
+                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                        write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
+                        write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
+                        Stop
+                    End If
+                End Do
+            End If
+            l0=l1
             If (l1 == l2) Then
                 i=i+1
                 j=j+1
@@ -454,7 +481,10 @@ Module determinants
         Integer, intent(InOut)                            :: is, nf
         Integer, intent(InOut)                            :: i(3), j(3)
         
-        Integer                                           :: l1, l2, ni, nj
+        Integer                                           :: l0, l1, l2, ni, nj, n, ic, nn0, &
+                                                             nn1, ll0, ll1, jj0, jj1, ndi, iconf 
+        Character(Len=1), Dimension(5) :: let
+        data let/'s','p','d','f','g'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         is=1
         nf=3
@@ -467,10 +497,36 @@ Module determinants
         
         ni=0
         nj=0
+
+        l0=0
   
         Do While (i(1) <= Ne .and. j(1) <= Ne)
             l1 = id1(i(1)) ! id1(i) is the i-th element of determinant 1
             l2 = id2(j(1)) ! id2(j) is the j-th element of determinant 2
+            If (l1 < l0) Then   !### diagnostics for det1:
+                l1=Nh(l1)
+                l0=Nh(l0)
+                nn1=Nn(l1)
+                nn0=Nn(l0)
+                ll1=Ll(l1)
+                ll0=Ll(l0)
+                jj1=Jj(l1)
+                jj0=Jj(l0)
+                ndi=0
+                Do ic=1,Nc
+                    ndi=ndi+Ndc(ic)
+                    iconf=ic
+                    If (ndi >= Ndr) Then
+                        write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
+                                " and ",I2,A1,I2,"/2 in configuration ",I5)') &
+                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                        write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
+                        write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
+                        Stop
+                    End If
+                End Do
+            End If
+            l0=l1
             If (l1 == l2) Then
                 i(1) = i(1) + 1
                 j(1) = j(1) + 1
