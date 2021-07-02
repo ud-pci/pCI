@@ -57,7 +57,7 @@ Module integrals
         Read (13) Ngint,Nlist,nrd
         Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
         If (nrd /=  nx*nx) Then
-            Write(*,*)' Rint error: IPx was changed'
+            Write(*,*)' Rint error: IPx was changed', 'nrd=',nrd, 'nx*nx=', nx*nx
             Stop
         End If
         Read (13) ((Rint2(k,i), k=1,IPbr), i=1,Ngint)

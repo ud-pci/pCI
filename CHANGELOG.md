@@ -6,8 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2021-06-30
+- Bug fixes in FormH and FormJ new work schedulers
+- Implemented progress report at increments of 10% for FormH
+
+## [0.3.0] - 2021-06-23
+- Major parallelism revamp: FormH and FormJ subroutines now use a work scheduler to distribute workloads
+- Householder diagonalization parameters changed
+
 ## [0.2.4] - 2021-05-14
-- "Rspq" bug fix: added diagonistics for dets to make sure orbitals are in correct order
+- "Rspq" bug fix: added diagnostics for dets to make sure orbitals are in correct order
 
 ## [0.2.3] - 2021-05-10
 - "matrix_io" bug fix: compatibility fix for sortJJJ.py and sortHIJ.py

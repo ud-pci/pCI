@@ -324,21 +324,21 @@ Module conf_aux
         Integer :: npes, mype, mpierr, interval, remainder, Hlim, numBins, cnt, bincnt, npes_Read
         Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, n1, n2, int, split_type, key, disp_unit, win, &
                    n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
-        Integer :: nn, kk
+        Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd
         logical :: finished
         Integer, allocatable, dimension(:) :: idet1, idet2, mepd
         Integer, dimension(npes) :: avgs, start1, end1
         Integer, dimension(npes) :: sizes, disps
         Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate
         real :: ttime, ttot
-        real(dp)  :: t
+        real(dp)  :: t, tt
         Integer(Kind=int64) :: ih8, i8, l8, sumd, mem, memsum, ih, cntr, maxme, avgme, numme, size8
-        Integer, allocatable, dimension(:) :: nk
         Character(Len=16)     :: memStr, memStr2, npesStr, counterStr
-        Integer :: iSign, iIndexes(3), jIndexes(3)
+        Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer, Parameter    :: vaGrowBy = 10000000
+        Integer               :: growBy, vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer, Parameter    :: send_data_tag = 2001, return_data_tag = 2002
         Integer :: fh
         Integer(Kind=MPI_OFFSET_KIND) :: disp       
         Character(Len=16) :: filename, timeStr
@@ -367,10 +367,12 @@ Module conf_aux
 !       - - - - - - - - - - - - - - - - - - - - - - - - -
 !       Reading/forming of the file CONF.HIJ
 !       - - - - - - - - - - - - - - - - - - - - - - - - -
-    
+        growBy = log10(real(Nd/npes))
+        vaGrowBy = 10000000
+        ndGrowBy = 100
+        
         ih8=NumH
-        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),nk(Nd))
-        nk=0
+        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
         ! comparison stage - - - - - - - - - - - - - - - - - - - - - - - - -
         If (mype==0) Then
             Nd0=IP1+1
@@ -407,10 +409,10 @@ Module conf_aux
                             Do k1=1,kx
                                 k=k+1
                                 Call Gdet(k,idet2)
-                                Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
-                                If (dIff <= 2) Then
-                                    Call Rspq_phase2(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
-                                    t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                If (diff <= 2) Then
+                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                     If (t /= 0) Then
                                         nn=n
                                         kk=k
@@ -433,8 +435,8 @@ Module conf_aux
         If (Kl /= 1) Then ! If continuing calculation and CONF.HIJ is available, skip FormH
             If (mype==0) Then
                 Call calcMemReqs
-                print*, 'chunk_size=', vaGrowBy
-                print*, '===== starting FormH comparison stage ====='
+                print*,'vaGrowBy=',vaGrowBy,'ndGrowBy=',ndGrowBy
+                print*, '===== starting formation of Hamiltonian matrix ====='
             End If
         
             counter1=1
@@ -444,62 +446,143 @@ Module conf_aux
             ! Get accumulator vectors setup (or re-setup If this is rank 0):
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
-            !Call RVAccumulatorInit(rva1, vaGrowBy)
+            Call RVAccumulatorInit(rva1, vaGrowBy)
         
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call system_clock(s1)
-            ! each core loops through their assigned determinants and stores the number of nonzero matrix elements per det
-            Do n=mype+1,Nd,npes
-                Call Gdet_win(n,idet1)
-                k=0
-                Do ic=1,Nc 
-                    kx=Ndc(ic)
-                    If (k+kx > n) kx=n-k
-                    If (kx /= 0) Then
-                        Call Gdet_win(k+1,idet2)
-                        Call CompCD(idet1,idet2,icomp)
-                        If (icomp > 2) Then
-                            k=k+kx
-                        Else
-                            Do k1=1,kx
-                              k=k+1
-                              Call Gdet_win(k,idet2)
-                              Call Rspq_phase1(idet1, idet2, iSign, dIff, iIndexes, jIndexes)
-                              If (dIff <= 2) Then
-                                  nk(n)=nk(n)+1
-                                  nn=n
-                                  kk=k
-                                  Call IVAccumulatorAdd(iva1, nn)
-                                  Call IVAccumulatorAdd(iva2, kk)
-                              End If
-                            End Do
-                        End If
-                    End If
+
+            If (mype == 0) Then        
+                ! Distribute a portion of the workload of size ndGrowBy to each worker process
+                Do an_id = 1, npes - 1
+                   nnd = ndGrowBy*an_id + 1
+                   Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_data_tag, MPI_COMM_WORLD, mpierr)
                 End Do
-            End Do
-        
+
+                Do n=1,ndGrowBy
+                    Call Gdet_win(n,idet1)
+                    k=0
+                    Do ic=1,Nc 
+                        kx=Ndc(ic)
+                        If (k+kx > n) kx=n-k
+                        If (kx /= 0) Then
+                            Call Gdet_win(k+1,idet2)
+                            Call CompCD(idet1,idet2,icomp)
+                            If (icomp > 2) Then
+                                k=k+kx
+                            Else
+                                Do k1=1,kx
+                                    k=k+1
+                                    Call Gdet_win(k,idet2)
+                                    Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    If (diff <= 2) Then
+                                        nn=n
+                                        kk=k
+                                        Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                        tt=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                        Call IVAccumulatorAdd(iva1, nn)
+                                        Call IVAccumulatorAdd(iva2, kk)
+                                        Call RVAccumulatorAdd(rva1, tt)
+                                    End If
+                                End Do
+                            End If
+                        End If
+                    End Do
+                End Do
+    
+                num_done = 0
+                ndsplit = Nd/10
+                ndcnt = ndsplit
+                j=9
+                Do 
+                    Call MPI_RECV( return_msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                        MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    sender = status(MPI_SOURCE)
+             
+                    If (nnd + ndGrowBy <= Nd) Then
+                        nnd = nnd + ndGrowBy
+                        Call MPI_SEND( nnd, 1, MPI_INTEGER, &
+                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                    Else
+                        msg = -1
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, &
+                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+         
+                    If (nnd <= ndcnt + 50 .and. nnd >= ndcnt - 50) Then
+                        Call system_clock(e1)
+                        ttime=Real((e1-s1)/clock_rate)
+                        Call FormattedTime(ttime, memStr)
+                        Write(*,'(2X,A,1X,I3,1X,A)'), 'FormH is', (10-j)*10, '% done in '// trim(memStr)// '. '
+                        j=j-1
+                        ndcnt = ndcnt + ndsplit
+                    End If
+                    
+                    If (num_done == npes-1) Exit
+                End Do
+            Else
+                Do 
+                    Call MPI_RECV ( nnd, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    If (nnd == -1) Then
+                          Exit
+                    Else
+                        If (Nd - nnd < ndGrowBy) Then
+                            endnd = Nd
+                        Else
+                            endnd = nnd+ndGrowBy-1
+                        End If
+
+                        Do n=nnd,endnd
+                            Call Gdet_win(n,idet1)
+                            k=0
+                            Do ic=1,Nc 
+                                kx=Ndc(ic)
+                                If (k+kx > n) kx=n-k
+                                If (kx /= 0) Then
+                                    Call Gdet_win(k+1,idet2)
+                                    Call CompCD(idet1,idet2,icomp)
+                                    If (icomp > 2) Then
+                                        k=k+kx
+                                    Else
+                                        Do k1=1,kx
+                                            k=k+1
+                                            Call Gdet_win(k,idet2)
+                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            If (diff <= 2) Then
+                                                nn=n
+                                                kk=k
+                                                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                                tt=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                                Call IVAccumulatorAdd(iva1, nn)
+                                                Call IVAccumulatorAdd(iva2, kk)
+                                                Call RVAccumulatorAdd(rva1, tt)
+                                            End If
+                                        End Do
+                                    End If
+                                End If
+                            End Do
+                        End Do
+                    
+                        Call MPI_SEND( n, 1, MPI_INTEGER, 0, return_data_tag, MPI_COMM_WORLD, mpierr)
+                    End if
+                End do
+            End If
+
             Call IVAccumulatorCopy(iva1, Hamil%n, counter1)
             Call IVAccumulatorCopy(iva2, Hamil%k, counter2)
-        
+            Call RVAccumulatorCopy(rva1, Hamil%t, counter3)
+
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
-            
+            Call RVAccumulatorReset(rva1)
+
+            Write(counterStr,fmt='(I12)') counter1
             Call system_clock(e1)
             ttime=Real((e1-s1)/clock_rate)
-        
-            Write(counterStr,fmt='(I12)') counter1
             Call FormattedTime(ttime, memStr)
             Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' with num_me = ' // trim(AdjustL(counterStr))
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        
-            If (mype==0) Then
-                Call MPI_Reduce(MPI_IN_PLACE, nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
-                                  MPI_COMM_WORLD, mpierr)
-            Else
-                Call MPI_Reduce(nk(1:Nd), nk(1:Nd), Nd, MPI_INTEGER, MPI_SUM, 0, &
-                                  MPI_COMM_WORLD, mpierr)
-            End If
-            Deallocate(nk)
-        
+            
             mem=sizeof(Hamil%n)*4
             ! Sum all the mem sizes to get a total...
             Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -508,9 +591,9 @@ Module conf_aux
             If (mype==0) Then
                 Write(npesStr,fmt='(I16)') npes
                 Call FormattedMemSize(memsum, memStr)
-                Write(*,'(A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory'
+                Write(*,'(A,A,A)') 'FormH: The total amount of memory required to store the Hamiltonian matrix is ',Trim(memStr),'.'
                 Call FormattedMemSize(mem, memStr)
-                Write(*,'(A,A,A,A,A)') 'FormH: Hamiltonian matrix requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
+                Write(*,'(A,A,A)') 'FormH: The maximum amount of memory required by a single core is ',Trim(memStr),'.'
                 memEstimate = memEstimate + mem
                 Call FormattedMemSize(memEstimate, memStr)
                 Call FormattedMemSize(memTotalPerCPU, memStr2)
@@ -527,19 +610,6 @@ Module conf_aux
             End If
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            If (mype==0) print*, '===== starting FormH calculation stage ====='
-            Allocate(Hamil%t(counter1))
-            Call system_clock(s1)
-            Do n=1,counter1
-                nn=Hamil%n(n)
-                kk=Hamil%k(n)
-                Call Gdet_win(nn,idet1)
-                Call Gdet_win(kk,idet2)
-                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                Hamil%t(n)=t
-            End Do
 
             Hamil%n = PACK(Hamil%n, Hamil%t/=0)
             Hamil%k = PACK(Hamil%k, Hamil%t/=0)
@@ -550,12 +620,7 @@ Module conf_aux
 
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        
-            Call system_clock(e1)
-            ttime=Real((e1-s1)/clock_rate)
-            Call FormattedTime(ttime, memStr)
-            Write(*,'(2X,A,1X,I3,1X,A)'), 'core', mype, 'took '// trim(memStr)// ' to complete calculations'
-        
+
             Call CloseIarrWindow(win, mpierr)
         
             ! Compute NumH, the total number of non-zero matrix elements
@@ -612,7 +677,7 @@ Module conf_aux
     real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
-        Use formj2, Only : F_J0
+        Use formj2, Only : F_J0, F_J2
         Implicit None
         Integer, allocatable, dimension(:), intent(inout)   :: idet1, idet2
         Integer, intent(inout)                              :: is, nf, i1, i2, j1, j2
@@ -626,6 +691,7 @@ Module conf_aux
         Select Case(nf)
             Case(2) ! determinants dIffer by two functions
                 t=t+Gint(i2,j2,i1,j1)*is 
+                t=t+Gj*F_J2(idet1,idet2)
             Case(1) ! determinants dIffer by one function
                 Do iq=1,Ne
                     i1=idet1(iq)
@@ -644,7 +710,7 @@ Module conf_aux
                     End If
                     t=t+Hint(i1,i1)*is
                 End Do
-                t=t+Gj*F_J0(idet1)
+                t=t+Gj*F_J2(idet1,idet2)
         End Select
         Hmltn=t
         Return
@@ -878,12 +944,13 @@ Module conf_aux
         real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
         real(dp), allocatable, dimension(:)  :: Cc, Dd
         Character(Len=1), dimension(11) :: st1, st2 
-        Character(Len=1), dimension(7)  :: stecp*7
+        Character(Len=1), dimension(10)  :: stecp*7
         Character(Len=1), dimension(2)  :: st3*3
         Character(Len=1), dimension(4)  :: strsms*6
         Character(Len=1), dimension(3)  :: strms*3
         data st1/11*'='/,st2/11*'-'/,st3/' NO','YES'/
         data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
+                   'GAUNT  ','G+MBPT1','G+MBPT2', &
                    'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/

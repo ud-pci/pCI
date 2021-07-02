@@ -48,7 +48,7 @@ Program conf
     use davidson, only : Prj_J
     use determinants, only : Wdet, FormD, Dinit, Jterm
     use integrals, only : Rint, RintS
-    use conf_init, only : Init
+    use conf_init, only : Init, InitFormH
     use formj2, only : FormJ, J_av
     Use str_fmt, Only : FormattedTime
     !Use conffilepaths
@@ -87,7 +87,6 @@ Program conf
     kXIJ=10    ! kXIJ sets the interval in which CONF.XIJ is written
                ! e.g. kXIJ=5 => CONF.XIJ written every 5 davidson iterations
                ! If kXIJ=0, then no intermediate CONF.XIJ will be written
-    
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF.RES')
@@ -105,6 +104,7 @@ Program conf
     Call AllocateFormHArrays(mype,npes)
     
     ! Evaluation of Hamiltonian
+    !Call InitFormH(npes,mype)
     If (Kl <= 2 .or. Kl4 == 0) Call FormH(npes,mype)
 
     Call FormJ(mype, npes)   ! calculates matrix J^2 and writes it to CONF.JJJ

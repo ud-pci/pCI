@@ -74,8 +74,8 @@ Module davidson
         Real(dp), dimension(:,:), allocatable :: Zz
 
         Ifail=0
-        tol=2.0d0**(-103)
-        eps=2.0d0**(-24)
+        tol=2.0d0**(-1021) !-103
+        eps=2.0d0**(-53)
         If (n > 1) Then
             Do ii=2,n
                 i=n-ii+2
@@ -269,12 +269,7 @@ Module davidson
                     If (j == 1)   B1(i)=0.d0
                     If (i <= Nd0) B1(i)=Z1(i,j)
                 End Do
-                !Select Case(Kv)
-                !    Case(4)
-                        Call J_av(B1,Nd0,xj,ierr,mype,npes)
-                !    Case(3)
-                !        Call J_av(B1,Nd0,xj,ierr)
-                !End Select
+                Call J_av(B1,Nd0,xj,ierr,mype,npes)
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hmin)
@@ -287,15 +282,17 @@ Module davidson
                 End If
             End Do
         Else
-            B1=0.d0
-            Read(17,err=210) dummy,dummy,ndpt
- 210        Write(*,*) ' Vector length = ',ndpt
-            Rewind(17)
-            Do J=1,Nlv
-                Read(17,end=220,err=220) E(J),Tj(J),idum,(B1(i),i=1,ndpt)
-                num=j
-                ArrB(1:Nd,j)=B1(1:Nd)
-            End Do
+            If (mype == 0) Then
+                B1=0.d0
+                Read(17,err=210) dummy,dummy,ndpt
+ 210            Write(*,*) ' Vector length = ',ndpt
+                Rewind(17)
+                Do J=1,Nlv
+                    Read(17,end=220,err=220) E(J),Tj(J),idum,(B1(i),i=1,ndpt)
+                    num=j
+                    ArrB(1:Nd,j)=B1(1:Nd)
+                End Do
+            End If
         End If
  220    if (mype==0) Rewind(17)
         Nlv=num

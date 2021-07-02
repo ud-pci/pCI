@@ -155,16 +155,17 @@ Module formj2
 
         Integer :: k1, n1, ic1, ndn, numjj, i, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
         Real :: ttime, ttot
-        Real(dp) :: t
+        Real(dp) :: t, tt
         Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum
         Integer(kind=int64), dimension(npes) :: ij8s
         Integer, allocatable, dimension(:) :: idet1, idet2, nk
-        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win
+        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer, Parameter    :: vaGrowBy = 1000000
-        Integer :: iSign, iIndexes(3), jIndexes(3)
-        Integer :: fh
+        Integer               :: growBy, vaGrowBy, ncGrowBy
+        Integer, Parameter    :: send_data_tag = 2001, return_data_tag = 2002
+        Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, return_msg, status(MPI_STATUS_SIZE)
+        Integer :: fh, sender
         Integer(kind=MPI_OFFSET_KIND) :: disp 
         Character(Len=16) :: filename, timeStr, memStr
 
@@ -191,10 +192,15 @@ Module formj2
             End If
           End Do
         Else ! Else start new calculation
+            growBy = log10(real(Nc/npes))
+            vaGrowBy = 1000000
+            ncGrowBy = 1
+            
             If (mype == 0) Then
-              Write( 6,'(4X,"Forming matrix J**2")')
-              Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
-              Close(unit=18,status='DELETE')
+                Write( 6,'(4X,"Forming matrix J**2")')
+                Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
+                Close(unit=18,status='DELETE')
+                print*,'vaGrowBy=',vaGrowBy,'ncGrowBy=',ncGrowBy
             End If
     
             counter1=1
@@ -203,67 +209,121 @@ Module formj2
     
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
+            Call RVAccumulatorInit(rva1, vaGrowBy)
     
             Call CreateIarrWindow(win, mpierr)
     
             Call system_clock(s1)
     
-            interval = Nc/npes
-            remainder = mod(Nc,npes)
-    
-            startNc = mype*interval+1
-            endNc = (mype+1)*interval
-            If (mype == npes-1) Then
-              endNc=Nc
-            End If
-            Do ic1=mype+1,Nc,npes
-              ndn=Ndc(ic1)
-              n=sum(Ndc(1:ic1-1))
-              Do n1=1,ndn
-                n=n+1
-                ndr=n
-                Call Gdet_win(n,idet1)
-                k=n-n1
-                Do k1=1,n1
-                  k=k+1
-                  Call Gdet_win(k,idet2)
-                  Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                  If (diff == 0 .or. diff == 2) Then
-                    nn=n
-                    kk=k
-                    Call IVAccumulatorAdd(iva1, nn)
-                    Call IVAccumulatorAdd(iva2, kk)
-                  End If
+            If (mype == 0) Then
+                ! Distribute a portion of the workload of size ncGrowBy to each worker process
+                Do an_id = 1, npes - 1
+                   nnc = ncGrowBy*an_id + 1
+                   Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_data_tag, MPI_COMM_WORLD, mpierr)
                 End Do
-              End Do
-            End Do
-    
+
+                Do ic1=1, ncGrowBy
+                  ndn=Ndc(ic1)
+                  n=sum(Ndc(1:ic1-1))
+                  Do n1=1,ndn
+                    n=n+1
+                    ndr=n
+                    Call Gdet_win(n,idet1)
+                    k=n-n1
+                    Do k1=1,n1
+                      k=k+1
+                      Call Gdet_win(k,idet2)
+                      Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                      If (diff == 0 .or. diff == 2) Then
+                        nn=n
+                        kk=k
+                        tt=F_J2(idet1, idet2)
+                        Call IVAccumulatorAdd(iva1, nn)
+                        Call IVAccumulatorAdd(iva2, kk)
+                        Call RVAccumulatorAdd(rva1, tt)
+                      End If
+                    End Do
+                  End Do
+                End Do
+
+                num_done = 0
+                Do 
+                    Call MPI_RECV( return_msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                        MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    sender = status(MPI_SOURCE)
+             
+                    If (nnc + ncGrowBy <= Nc) Then
+                        nnc = nnc + ncGrowBy
+                        Call MPI_SEND( nnc, 1, MPI_INTEGER, &
+                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                    Else
+                        msg = -1
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, &
+                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+                    
+                    If (num_done == npes-1) Exit
+                End Do
+            Else
+                Do 
+                    Call MPI_RECV ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+
+                    If (nnc == -1) Then
+                        Exit
+                    Else
+                        If (Nc - nnc < ncGrowBy) Then
+                            endnc = Nc
+                        Else
+                            endnc = nnc+ncGrowBy-1
+                        End If
+                        Do ic1=nnc,endnc
+                            ndn=Ndc(ic1)
+                            n=sum(Ndc(1:ic1-1))
+                            Do n1=1,ndn
+                              n=n+1
+                              ndr=n
+                              Call Gdet_win(n,idet1)
+                              k=n-n1
+                              Do k1=1,n1
+                                k=k+1
+                                Call Gdet_win(k,idet2)
+                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                If (diff == 0 .or. diff == 2) Then
+                                  nn=n
+                                  kk=k
+                                  tt=F_J2(idet1, idet2)
+                                  Call IVAccumulatorAdd(iva1, nn)
+                                  Call IVAccumulatorAdd(iva2, kk)
+                                  Call RVAccumulatorAdd(rva1, tt)
+                                End If
+                              End Do
+                            End Do
+                        End Do
+                    
+                        Call MPI_SEND( n, 1, MPI_INTEGER, 0, return_data_tag, MPI_COMM_WORLD, mpierr)
+                    End If
+                End Do
+            End If
+        
             Call IVAccumulatorCopy(iva1, Jsq%n, counter1)
             Call IVAccumulatorCopy(iva2, Jsq%k, counter2)
-        
+            Call RVAccumulatorCopy(rva1, Jsq%t, counter3)
+            
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
-    
-            Allocate(Jsq%t(counter1))
-            Do n=1,counter1
-                nn=Jsq%n(n)
-                kk=Jsq%k(n)
-                Call Gdet_win(nn,idet1)
-                Call Gdet_win(kk,idet2)
-                t=F_J2(idet1, idet2)
-                Jsq%t(n)=t
-            End Do
-    
-            Jsq%n = PACK(Jsq%n, Jsq%t/=0)
-            Jsq%k = PACK(Jsq%k, Jsq%t/=0)
-            Jsq%t = PACK(Jsq%t, Jsq%t/=0)
+            Call RVAccumulatorReset(rva1)
     
             Call system_clock(e1)
             ttime=Real((e1-s1)/clock_rate)
             Call FormattedTime(ttime, timeStr)
             Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    
+
+            Jsq%n = PACK(Jsq%n, Jsq%t/=0)
+            Jsq%k = PACK(Jsq%k, Jsq%t/=0)
+            Jsq%t = PACK(Jsq%t, Jsq%t/=0)
+
             ij8s=0_int64
             ij8=size(Jsq%t)
             Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
