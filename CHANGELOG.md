@@ -6,13 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2021-07-07
+- Updated progress report of FormH and FormJ to include memory progress
+- Removed print statements of number of elements for each core
+
 ## [0.3.1] - 2021-06-30
 - Bug fixes in FormH and FormJ new work schedulers
 - Implemented progress report at increments of 10% for FormH
 
 ## [0.3.0] - 2021-06-23
 - Major parallelism revamp: FormH and FormJ subroutines now use a work scheduler to distribute workloads
-- Householder diagonalization parameters changed
+- Householder diagonalization parameters changed (tol: -103 to -1021; eps: -24 to -53)
 
 ## [0.2.4] - 2021-05-14
 - "Rspq" bug fix: added diagnostics for dets to make sure orbitals are in correct order

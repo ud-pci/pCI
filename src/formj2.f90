@@ -146,28 +146,28 @@ Module formj2
 
     Subroutine FormJ(mype, npes)
         Use mpi
-        Use str_fmt, Only : FormattedTime
+        Use str_fmt, Only : FormattedMemSize, FormattedTime
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet_win, Rspq, Rspq_phase1, Rspq_phase2
         Use mpi_wins
         Use matrix_io
         Implicit None
 
-        Integer :: k1, n1, ic1, ndn, numjj, i, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
+        Integer :: k1, n1, ic1, ndn, numjj, i, j, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
         Real :: ttime, ttot
         Real(dp) :: t, tt
-        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum
+        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem
         Integer(kind=int64), dimension(npes) :: ij8s
         Integer, allocatable, dimension(:) :: idet1, idet2, nk
-        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg
+        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: growBy, vaGrowBy, ncGrowBy
-        Integer, Parameter    :: send_data_tag = 2001, return_data_tag = 2002
+        Integer               :: growBy, vaGrowBy, ncGrowBy, cnt, cnt2, nccnt, ncsplit
+        Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, return_msg, status(MPI_STATUS_SIZE)
         Integer :: fh, sender
         Integer(kind=MPI_OFFSET_KIND) :: disp 
-        Character(Len=16) :: filename, timeStr, memStr
+        Character(Len=16) :: filename, timeStr, memStr, memStr2, counterStr, counterStr2
 
         Call system_clock(count_rate=clock_rate)
         If (mype==0) Call system_clock(stot)
@@ -200,26 +200,32 @@ Module formj2
                 Write( 6,'(4X,"Forming matrix J**2")')
                 Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
                 Close(unit=18,status='DELETE')
-                print*,'vaGrowBy=',vaGrowBy,'ncGrowBy=',ncGrowBy
+                Write(counterStr,fmt='(I16)') vaGrowBy
+                Write(counterStr2,fmt='(I16)') ncGrowBy
+                Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ncGrowBy = '//Trim(AdjustL(counterStr2))
             End If
     
             counter1=1
             counter2=1
             counter3=1
+            cnt=0
+            cnt2=0
     
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
             Call RVAccumulatorInit(rva1, vaGrowBy)
     
             Call CreateIarrWindow(win, mpierr)
-    
+
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
             Call system_clock(s1)
     
             If (mype == 0) Then
                 ! Distribute a portion of the workload of size ncGrowBy to each worker process
                 Do an_id = 1, npes - 1
                    nnc = ncGrowBy*an_id + 1
-                   Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_data_tag, MPI_COMM_WORLD, mpierr)
+                   Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
                 End Do
 
                 Do ic1=1, ncGrowBy
@@ -238,32 +244,66 @@ Module formj2
                         nn=n
                         kk=k
                         tt=F_J2(idet1, idet2)
-                        Call IVAccumulatorAdd(iva1, nn)
-                        Call IVAccumulatorAdd(iva2, kk)
-                        Call RVAccumulatorAdd(rva1, tt)
+                        If (tt /= 0) Then
+                            cnt = cnt + 1
+                            cnt2 = cnt2 + 1
+                            Call IVAccumulatorAdd(iva1, nn)
+                            Call IVAccumulatorAdd(iva2, kk)
+                            Call RVAccumulatorAdd(rva1, tt)
+                        End If
                       End If
                     End Do
                   End Do
                 End Do
 
+                NumJ = cnt
                 num_done = 0
+                ncsplit = Nc/10
+                nccnt = ncsplit
+                maxme = cnt2
+                j=9
+
                 Do 
-                    Call MPI_RECV( return_msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                        MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV( cnt, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    !Call MPI_RECV(cnt2, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status(MPI_SOURCE)
              
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy
-                        Call MPI_SEND( nnc, 1, MPI_INTEGER, &
-                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                     Else
                         msg = -1
-                        Call MPI_SEND( msg, 1, MPI_INTEGER, &
-                            sender, send_data_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                         num_done = num_done + 1
                     End If
                     
-                    If (num_done == npes-1) Exit
+                    NumJ = NumJ + cnt
+                    maxme = max(cnt2,maxme)
+                    mem = NumJ * 16
+                    maxmem = maxme * 16
+
+                    If (nnc == nccnt .and. nnc /= ncsplit*10) Then
+                        Call system_clock(e1)
+                        ttime=Real((e1-s1)/clock_rate)
+                        Call FormattedTime(ttime, timeStr)
+                        Call FormattedMemSize(mem, memStr)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Write(counterStr,fmt='(I16)') NumJ
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//')'
+                        j=j-1
+                        nccnt = nccnt + ncsplit
+                    End If
+                    
+                    If (num_done == npes-1) Then
+                        Call system_clock(e1)
+                        ttime=Real((e1-s1)/clock_rate)
+                        Call FormattedTime(ttime, timeStr)
+                        Call FormattedMemSize(mem, memStr)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Write(counterStr,fmt='(I16)') NumJ
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//')'
+                        Exit
+                    End If
                 End Do
             Else
                 Do 
@@ -277,6 +317,8 @@ Module formj2
                         Else
                             endnc = nnc+ncGrowBy-1
                         End If
+
+                        cnt=0
                         Do ic1=nnc,endnc
                             ndn=Ndc(ic1)
                             n=sum(Ndc(1:ic1-1))
@@ -290,18 +332,23 @@ Module formj2
                                 Call Gdet_win(k,idet2)
                                 Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                 If (diff == 0 .or. diff == 2) Then
-                                  nn=n
-                                  kk=k
-                                  tt=F_J2(idet1, idet2)
-                                  Call IVAccumulatorAdd(iva1, nn)
-                                  Call IVAccumulatorAdd(iva2, kk)
-                                  Call RVAccumulatorAdd(rva1, tt)
+                                    nn=n
+                                    kk=k
+                                    tt=F_J2(idet1, idet2)
+                                    If (tt /= 0) Then
+                                        cnt = cnt + 1
+                                        cnt2 = cnt2 + 1
+                                        Call IVAccumulatorAdd(iva1, nn)
+                                        Call IVAccumulatorAdd(iva2, kk)
+                                        Call RVAccumulatorAdd(rva1, tt)
+                                    End If
                                 End If
                               End Do
                             End Do
                         End Do
                     
-                        Call MPI_SEND( n, 1, MPI_INTEGER, 0, return_data_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( cnt, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        !Call MPI_SEND(cnt2, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End If
                 End Do
             End If
@@ -317,7 +364,7 @@ Module formj2
             Call system_clock(e1)
             ttime=Real((e1-s1)/clock_rate)
             Call FormattedTime(ttime, timeStr)
-            Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
+            !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
             Jsq%n = PACK(Jsq%n, Jsq%t/=0)
@@ -336,6 +383,7 @@ Module formj2
             Call WriteMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr)
             !Call ReadMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr) 
         End If
+
         If (mype == 0) Then
             Write(11,'(4X,"NumJ =",I12)') NumJ
             Write( *,'(4X,"NumJ =",I12)') NumJ
