@@ -16,7 +16,7 @@ Module conf_aux
         Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(4X,"Program Conf")'
+        strfmt = '(4X,"Program Conf v0.3.4")'
         Write( 6,strfmt)
         Write(11,strfmt)
         ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
@@ -511,6 +511,7 @@ Module conf_aux
                         Call FormattedTime(ttime, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
+                        memEstimate = memEstimate + maxmem
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
                         If (memTotalPerCPU /= 0) Then

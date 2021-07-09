@@ -156,9 +156,9 @@ Module formj2
         Integer :: k1, n1, ic1, ndn, numjj, i, j, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
         Real :: ttime, ttot
         Real(dp) :: t, tt
-        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem
+        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
         Integer(kind=int64), dimension(npes) :: ij8s
-        Integer, allocatable, dimension(:) :: idet1, idet2, nk
+        Integer, allocatable, dimension(:) :: idet1, idet2, nk, cntarray
         Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
@@ -167,11 +167,11 @@ Module formj2
         Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, return_msg, status(MPI_STATUS_SIZE)
         Integer :: fh, sender
         Integer(kind=MPI_OFFSET_KIND) :: disp 
-        Character(Len=16) :: filename, timeStr, memStr, memStr2, counterStr, counterStr2
+        Character(Len=16) :: filename, timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2
 
         Call system_clock(count_rate=clock_rate)
         If (mype==0) Call system_clock(stot)
-        Allocate(idet1(Ne),idet2(Ne),nk(Nc))
+        Allocate(idet1(Ne),idet2(Ne),cntarray(2))
         
         ij8=0_int64
         NumJ=0_int64
@@ -210,6 +210,7 @@ Module formj2
             counter3=1
             cnt=0
             cnt2=0
+            cntarray=0
     
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
@@ -245,8 +246,7 @@ Module formj2
                         kk=k
                         tt=F_J2(idet1, idet2)
                         If (tt /= 0) Then
-                            cnt = cnt + 1
-                            cnt2 = cnt2 + 1
+                            cntarray = cntarray + 1
                             Call IVAccumulatorAdd(iva1, nn)
                             Call IVAccumulatorAdd(iva2, kk)
                             Call RVAccumulatorAdd(rva1, tt)
@@ -256,16 +256,15 @@ Module formj2
                   End Do
                 End Do
 
-                NumJ = cnt
+                NumJ = cntarray(1)
                 num_done = 0
                 ncsplit = Nc/10
                 nccnt = ncsplit
-                maxme = cnt2
+                maxme = cntarray(2)
                 j=9
 
                 Do 
-                    Call MPI_RECV( cnt, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    !Call MPI_RECV(cnt2, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status(MPI_SOURCE)
              
                     If (nnc + ncGrowBy <= Nc) Then
@@ -277,10 +276,13 @@ Module formj2
                         num_done = num_done + 1
                     End If
                     
-                    NumJ = NumJ + cnt
-                    maxme = max(cnt2,maxme)
-                    mem = NumJ * 16
-                    maxmem = maxme * 16
+                    NumJ = NumJ + cntarray(1)
+                    maxme = max(cntarray(2),maxme)
+                    mem = NumJ * 16_int64
+                    maxmem = maxme * 16_int64
+                    statmem = memEstimate + maxmem
+                    Call FormattedMemSize(statmem, memTotStr)
+                    Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
                     If (nnc == nccnt .and. nnc /= ncsplit*10) Then
                         Call system_clock(e1)
@@ -289,7 +291,12 @@ Module formj2
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//')'
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
+                        print*,statmem
+                        If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , Trim(memTotStr2) ,' is available.'
+                            Stop
+                        End If
                         j=j-1
                         nccnt = nccnt + ncsplit
                     End If
@@ -301,7 +308,17 @@ Module formj2
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//')'
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
+                        If (memTotalPerCPU /= 0) Then
+                            If (statmem > memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , Trim(memTotStr2) ,' is available.'
+                                Stop
+                            Else If (statmem < memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , Trim(memTotStr2) ,' is available.'
+                            End If
+                        Else
+                            Write(*,'(2X,A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but available memory was not saved to environment'
+                        End If
                         Exit
                     End If
                 End Do
@@ -318,7 +335,7 @@ Module formj2
                             endnc = nnc+ncGrowBy-1
                         End If
 
-                        cnt=0
+                        cntarray(1)=0
                         Do ic1=nnc,endnc
                             ndn=Ndc(ic1)
                             n=sum(Ndc(1:ic1-1))
@@ -336,8 +353,7 @@ Module formj2
                                     kk=k
                                     tt=F_J2(idet1, idet2)
                                     If (tt /= 0) Then
-                                        cnt = cnt + 1
-                                        cnt2 = cnt2 + 1
+                                        cntarray = cntarray + 1
                                         Call IVAccumulatorAdd(iva1, nn)
                                         Call IVAccumulatorAdd(iva2, kk)
                                         Call RVAccumulatorAdd(rva1, tt)
@@ -347,8 +363,7 @@ Module formj2
                             End Do
                         End Do
                     
-                        Call MPI_SEND( cnt, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
-                        !Call MPI_SEND(cnt2, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End If
                 End Do
             End If

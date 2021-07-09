@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2021-07-09
+- Updated progress report of FormJ to include memory per core
+
 ## [0.3.3] - 2021-07-08
 - Bug fix for FormH and FormJ subroutines
 
