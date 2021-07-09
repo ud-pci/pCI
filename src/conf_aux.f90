@@ -329,7 +329,7 @@ Module conf_aux
                    n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd, minme, maxme
         logical :: finished
-        Integer, allocatable, dimension(:) :: idet1, idet2, mepd
+        Integer, allocatable, dimension(:) :: idet1, idet2, mepd, cntarray
         Integer, dimension(npes) :: avgs, start1, end1
         Integer, dimension(npes) :: sizes, disps
         Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate
@@ -356,7 +356,7 @@ Module conf_aux
         ih8H=0_int64
         Call InitFormH(npes,mype) ! initialize all variables required for constructing H_IJ
         
-        NumH=0
+        NumH=0_int64
         Kherr=0
         Kgerr=0
         n0=1
@@ -371,7 +371,7 @@ Module conf_aux
 !       Reading/forming of the file CONF.HIJ
 !       - - - - - - - - - - - - - - - - - - - - - - - - - 
         ih8=NumH
-        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
+        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
 
         If (Kl /= 1) Then ! If continuing calculation and CONF.HIJ is available, skip FormH
             Nd0=IP1+1
@@ -407,6 +407,7 @@ Module conf_aux
             counter3=1
             cnt=0
             cnt2=0
+            cntarray=0
 
             ! Get accumulator vectors setup (or re-setup If this is rank 0):
             Call IVAccumulatorInit(iva1, vaGrowBy)
@@ -445,8 +446,7 @@ Module conf_aux
                                         Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                         tt=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                         If (tt /= 0) Then
-                                            cnt = cnt + 1
-                                            cnt2 = cnt2 + 1
+                                            cntarray = cntarray + 1
                                             Call IVAccumulatorAdd(iva1, nn)
                                             Call IVAccumulatorAdd(iva2, kk)
                                             Call RVAccumulatorAdd(rva1, tt)
@@ -458,17 +458,15 @@ Module conf_aux
                     End Do
                 End Do
                 
-                NumH = cnt
+                NumH = cntarray(1)
                 num_done = 0
                 ndsplit = Nd/10
                 ndcnt = ndsplit
-                maxme = cnt2
+                maxme = cntarray(2)
                 j=9
 
                 Do 
-                    Call MPI_RECV( cnt, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                        MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    Call MPI_RECV(cnt2, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                    Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, &
                         MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status(MPI_SOURCE)
              
@@ -483,11 +481,11 @@ Module conf_aux
                         num_done = num_done + 1
                     End If
             
-                    NumH = NumH + cnt
-                    maxme = max(cnt2,maxme)
-                    mem = NumH * 16
-                    maxmem = maxme * 16
-                    statmem = memEstimate + mem
+                    NumH = NumH + cntarray(1)
+                    maxme = max(cntarray(2),maxme)
+                    mem = NumH * 16_int64
+                    maxmem = maxme * 16_int64
+                    statmem = memEstimate + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
@@ -540,7 +538,7 @@ Module conf_aux
                             endnd = nnd+ndGrowBy-1
                         End If
 
-                        cnt=0
+                        cntarray(1)=0
                         Do n=nnd,endnd
                             Call Gdet_win(n,idet1)
                             k=0
@@ -563,8 +561,7 @@ Module conf_aux
                                                 Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                                 tt=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                                 If (tt /= 0) Then
-                                                    cnt = cnt + 1
-                                                    cnt2 = cnt2 + 1
+                                                    cntarray = cntarray + 1
                                                     Call IVAccumulatorAdd(iva1, nn)
                                                     Call IVAccumulatorAdd(iva2, kk)
                                                     Call RVAccumulatorAdd(rva1, tt)
@@ -576,8 +573,7 @@ Module conf_aux
                             End Do
                         End Do
                     
-                        Call MPI_SEND( cnt, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
-                        Call MPI_SEND(cnt2, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End if
                 End do
             End If
