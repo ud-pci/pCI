@@ -43,9 +43,9 @@ Module davidson
         Diag=0.d0
         Z1=0.d0
         Do l8=1,NumH
-            n=Hamil0%n(l8)
-            k=Hamil0%k(l8)
-            t=Hamil0%t(l8)
+            n=Hamil%n(l8)
+            k=Hamil%k(l8)
+            t=Hamil%t(l8)
             If (n == k) t=t-Hmin
             If (n <= Nd0) Then
                 Z1(n,k)=t
@@ -74,8 +74,8 @@ Module davidson
         Real(dp), dimension(:,:), allocatable :: Zz
 
         Ifail=0
-        tol=2.0d0**(-1021) !-103
-        eps=2.0d0**(-53)
+        tol=2.0d0**(-1021) !-103 or -1021
+        eps=2.0d0**(-53) ! -24 or -53
         If (n > 1) Then
             Do ii=2,n
                 i=n-ii+2

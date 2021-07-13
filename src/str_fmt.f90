@@ -54,7 +54,7 @@ Module str_fmt
 
         ! If time took 0 seconds, return immediately with output "0s"
         If (intSec == 0) Then
-            outString = "0s"
+            outString = "00s"
             Return
         End If
 

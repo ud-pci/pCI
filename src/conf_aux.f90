@@ -16,7 +16,7 @@ Module conf_aux
         Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(4X,"Program Conf v0.3.4")'
+        strfmt = '(4X,"Program Conf v0.3.5")'
         Write( 6,strfmt)
         Write(11,strfmt)
         ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
@@ -388,12 +388,6 @@ Module conf_aux
             vaGrowBy = 10000000
             ndGrowBy = 100
 
-            If (Nd0 < ndGrowBy) Then
-                Continue
-            Else
-                ndGrowBy = Nd0+1 
-            End If
-
             If (mype==0) Then
                 Call calcMemReqs
                 Write(counterStr,fmt='(I16)') vaGrowBy
@@ -415,16 +409,17 @@ Module conf_aux
             Call RVAccumulatorInit(rva1, vaGrowBy)
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call system_clock(s1)
 
             If (mype == 0) Then        
                 ! Distribute a portion of the workload of size ndGrowBy to each worker process
                 Do an_id = 1, npes - 1
-                   nnd = ndGrowBy*an_id + 1
+                   nnd = Nd0 + 1 + ndGrowBy*an_id + 1
                    Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
                 End Do
 
-                Do n=1,ndGrowBy
+                Call system_clock(s1)
+
+                Do n=1,Nd0+1
                     Call Gdet_win(n,idet1)
                     k=0
                     Do ic=1,Nc 
@@ -457,7 +452,14 @@ Module conf_aux
                         End If
                     End Do
                 End Do
+
+                Call system_clock(e1)
+                ttime=Real((e1-s1)/clock_rate)
+                Call FormattedTime(ttime, timeStr)
+                Write(*,'(2X,A)'), 'FormH: Initial approximation calculated in '// trim(timeStr)// '.'
                 
+                Call system_clock(s1)
+
                 NumH = cntarray(1)
                 num_done = 0
                 ndsplit = Nd/10

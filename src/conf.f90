@@ -112,7 +112,7 @@ Program conf
     Call DeAllocateFormHArrays(mype,npes)
     Call AllocateDvdsnArrays(mype,npes)
 
-    Call Diag4(mype, npes) ! Davidson diagonalization
+    Call Diag4(mype,npes) ! Davidson diagonalization
     
     Call WriteFinalXIJ(mype,npes)
 

@@ -469,7 +469,7 @@ Module determinants
         ! it does NOT post-process the located indices to determine scaling factor (is) or
         ! correct differing indices
         !
-        ! The two integer index vectors, "i" and "j", are three elements in size and are
+        ! The two Integer index vectors, "i" and "j", are three elements in size and are
         ! used as:
         !
         !     i(1)        running index over comparison
