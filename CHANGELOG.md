@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2021-07-14
+- Removed usage of MPI windows - suspected memory leak due to pointers not being deallocated
+- FormH bug fix - initial workload distribution was missing a chunk of determinants
+
 ## [0.3.5] - 2021-07-13
 - Minor bug fixes and progress text changes
 

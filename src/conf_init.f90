@@ -50,7 +50,7 @@ Module conf_init
         Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
         ! - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Qnl(100000000)) ! upper bound = 1 billion conf-s
+        Allocate(Qnl(100000000)) ! upper bound = 1 billion conf-s = 0.8 GB
         If (Nso /= 0) Then 
             Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
         End If
@@ -268,8 +268,7 @@ Module conf_init
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
-        Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
-             (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
+        Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
         Data Let/'s','p','d','f','g','h','i','k','l'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         c1 = 0.01d0
@@ -502,6 +501,9 @@ Module conf_init
         Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Do i=1,Ne
+            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End do  
         If (Ksig /= 0) Then
             Call MPI_Bcast(Rsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Dsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)

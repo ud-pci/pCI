@@ -148,8 +148,8 @@ Module formj2
         Use mpi
         Use str_fmt, Only : FormattedMemSize, FormattedTime
         Use vaccumulator
-        Use determinants, Only : Gdet, Gdet_win, Rspq, Rspq_phase1, Rspq_phase2
-        Use mpi_wins
+        Use determinants, Only : Gdet, Gdet, Rspq, Rspq_phase1, Rspq_phase2
+        !Use mpi_win
         Use matrix_io
         Implicit None
 
@@ -159,7 +159,7 @@ Module formj2
         Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
         Integer(kind=int64), dimension(npes) :: ij8s
         Integer, allocatable, dimension(:) :: idet1, idet2, nk, cntarray
-        Integer :: npes, mype, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
+        Integer :: npes, mype, shmrank, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: growBy, vaGrowBy, ncGrowBy, cnt, cnt2, nccnt, ncsplit
@@ -216,7 +216,7 @@ Module formj2
             Call IVAccumulatorInit(iva2, vaGrowBy)
             Call RVAccumulatorInit(rva1, vaGrowBy)
     
-            Call CreateIarrWindow(win, mpierr)
+            !Call CreateIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
 
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
@@ -235,11 +235,11 @@ Module formj2
                   Do n1=1,ndn
                     n=n+1
                     ndr=n
-                    Call Gdet_win(n,idet1)
+                    Call Gdet(n,idet1)
                     k=n-n1
                     Do k1=1,n1
                       k=k+1
-                      Call Gdet_win(k,idet2)
+                      Call Gdet(k,idet2)
                       Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                       If (diff == 0 .or. diff == 2) Then
                         nn=n
@@ -341,11 +341,11 @@ Module formj2
                             Do n1=1,ndn
                               n=n+1
                               ndr=n
-                              Call Gdet_win(n,idet1)
+                              Call Gdet(n,idet1)
                               k=n-n1
                               Do k1=1,n1
                                 k=k+1
-                                Call Gdet_win(k,idet2)
+                                Call Gdet(k,idet2)
                                 Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                 If (diff == 0 .or. diff == 2) Then
                                     nn=n
@@ -392,7 +392,7 @@ Module formj2
             Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
             ij8J = ij8
             ij4 = ij8
-            Call CloseIarrWindow(win, mpierr)
+            !Call CloseIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
 
             Call WriteMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr)
             !Call ReadMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr) 

@@ -38,7 +38,7 @@ Module conf_variables
         Real(dp), Allocatable, Dimension(:) ::  t
     End Type Matrix
 
-    Type(Matrix) :: Hamil, Hamil0, Jsq
+    Type(Matrix) :: Hamil, Jsq
 
     Save
     

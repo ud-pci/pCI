@@ -16,7 +16,7 @@ Module conf_aux
         Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
         ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(4X,"Program Conf v0.3.5")'
+        strfmt = '(4X,"Program Conf v0.3.6")'
         Write( 6,strfmt)
         Write(11,strfmt)
         ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
@@ -102,6 +102,7 @@ Module conf_aux
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
 
         If (Ksig /= 0) Then
             If (.not. Allocated(Rsig)) Allocate(Rsig(NhintS))
@@ -318,13 +319,13 @@ Module conf_aux
         Use str_fmt, Only : FormattedMemSize, FormattedTime
         Use, intrinsic :: ISO_C_BINDING, Only : C_PTR, C_F_POINTER
         Use conf_init, Only : InitFormH ! initialization subroutines for FormH 
-        Use determinants, Only : Gdet, Gdet_win, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
+        Use determinants, Only : Gdet, Gdet, CompCD, CompD, Rspq, Rspq_phase1, Rspq_phase2
         Use matrix_io
         Use vaccumulator
-        Use mpi_wins
+        !Use mpi_win
         Implicit None
 
-        Integer :: npes, mype, mpierr, interval, remainder, Hlim, numBins, cnt, cnt2
+        Integer :: npes, mype, shmrank, mpierr, interval, remainder, Hlim, numBins
         Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, n1, n2, int, split_type, key, disp_unit, win, &
                    n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd, minme, maxme
@@ -348,9 +349,9 @@ Module conf_aux
 !       - - - - - - - - - - - - - - - - - - - - - - - -
         Call system_clock(count_rate=clock_rate)
         If (mype==0) Call system_clock(stot)
+        !print*, mype, 'before0', allocated(Iarr), associated(Iarr)
+        !Call CreateIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
 
-        Call CreateIarrWindow(win, mpierr)
-    
         i8=0_int64  ! Integer*8
         ih8=0_int64
         ih8H=0_int64
@@ -399,8 +400,6 @@ Module conf_aux
             counter1=1
             counter2=1
             counter3=1
-            cnt=0
-            cnt2=0
             cntarray=0
 
             ! Get accumulator vectors setup (or re-setup If this is rank 0):
@@ -413,27 +412,27 @@ Module conf_aux
             If (mype == 0) Then        
                 ! Distribute a portion of the workload of size ndGrowBy to each worker process
                 Do an_id = 1, npes - 1
-                   nnd = Nd0 + 1 + ndGrowBy*an_id + 1
+                   nnd = Nd0 + 1 + ndGrowBy*(an_id-1) + 1
                    Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
                 End Do
 
                 Call system_clock(s1)
 
                 Do n=1,Nd0+1
-                    Call Gdet_win(n,idet1)
+                    Call Gdet(n,idet1)
                     k=0
                     Do ic=1,Nc 
                         kx=Ndc(ic)
                         If (k+kx > n) kx=n-k
                         If (kx /= 0) Then
-                            Call Gdet_win(k+1,idet2)
+                            Call Gdet(k+1,idet2)
                             Call CompCD(idet1,idet2,icomp)
                             If (icomp > 2) Then
                                 k=k+kx
                             Else
                                 Do k1=1,kx
                                     k=k+1
-                                    Call Gdet_win(k,idet2)
+                                    Call Gdet(k,idet2)
                                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                     If (diff <= 2) Then
                                         nn=n
@@ -468,18 +467,15 @@ Module conf_aux
                 j=9
 
                 Do 
-                    Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, &
-                        MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status(MPI_SOURCE)
              
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
-                        Call MPI_SEND( nnd, 1, MPI_INTEGER, &
-                            sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                     Else
                         msg = -1
-                        Call MPI_SEND( msg, 1, MPI_INTEGER, &
-                            sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                         num_done = num_done + 1
                     End If
             
@@ -540,23 +536,22 @@ Module conf_aux
                         Else
                             endnd = nnd+ndGrowBy-1
                         End If
-
                         cntarray(1)=0
                         Do n=nnd,endnd
-                            Call Gdet_win(n,idet1)
+                            Call Gdet(n,idet1)
                             k=0
                             Do ic=1,Nc 
                                 kx=Ndc(ic)
                                 If (k+kx > n) kx=n-k
                                 If (kx /= 0) Then
-                                    Call Gdet_win(k+1,idet2)
+                                    Call Gdet(k+1,idet2)
                                     Call CompCD(idet1,idet2,icomp)
                                     If (icomp > 2) Then
                                         k=k+kx
                                     Else
                                         Do k1=1,kx
                                             k=k+1
-                                            Call Gdet_win(k,idet2)
+                                            Call Gdet(k,idet2)
                                             Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                             If (diff <= 2) Then
                                                 nn=n
@@ -601,7 +596,9 @@ Module conf_aux
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
-            Call CloseIarrWindow(win, mpierr)
+            !print*, mype, 'before', allocated(Iarr)
+            !Call CloseIarrWindow(win, mype, npes, shmrank, mpierr)
+            !print*, mype, 'after', allocated(Iarr)
         
             ! Compute NumH, the total number of non-zero matrix elements
             Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -709,7 +706,7 @@ Module conf_aux
                     kx, i1, i2, it, mype, npes, mpierr
         Integer(Kind=int64) :: stot, etot, clock_rate
         Real :: ttot
-        real(dp)     :: start_time, End_time
+        real(dp)     :: start_time, end_time
         real(dp) :: crit, ax, x, xx, ss
         logical :: lsym
         Character(Len=16) :: timeStr
