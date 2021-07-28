@@ -286,7 +286,7 @@ Module basc_aux
         Real(dp) :: x
         Character(Len=512) :: strfmt
 
-        N_l(i)=0
+        N_l=0
         l_max=0
 
         Do i=1,Nsp

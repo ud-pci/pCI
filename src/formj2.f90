@@ -126,24 +126,6 @@ Module formj2
         Return
     End Function Plj
 
-    Recursive Integer Function triStart(mype,npes)
-        ! This function divides Nc configurations into equal workloads
-        Implicit None
-    
-        Integer :: mype, npes
-        Real :: t
-    
-        If (mype == 0) Then
-            t = 1.0
-        Else If (mype == npes) Then
-             t = Nc+1.0
-        Else
-            t = sqrt((1.0/(npes-1.0))*(Nc**2-1.0)+triStart(mype-1,npes)**2)
-        End If
-        triStart = int(t)
-        Return
-    End Function triStart
-
     Subroutine FormJ(mype, npes)
         Use mpi
         Use str_fmt, Only : FormattedMemSize, FormattedTime
@@ -291,9 +273,12 @@ Module formj2
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
+                                ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
+                                ', '//trim(memStr2)//' for a single core)'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , Trim(memTotStr2) ,' is available.'
+                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
+                            Trim(memTotStr2) ,' is available.'
                             Stop
                         End If
                         j=j-1
@@ -307,17 +292,8 @@ Module formj2
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
-                        If (memTotalPerCPU /= 0) Then
-                            If (statmem > memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , Trim(memTotStr2) ,' is available.'
-                                Stop
-                            Else If (statmem < memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , Trim(memTotStr2) ,' is available.'
-                            End If
-                        Else
-                            Write(*,'(2X,A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but available memory was not saved to environment'
-                        End If
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
+                        Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
                         Exit
                     End If
                 End Do
@@ -406,7 +382,7 @@ Module formj2
             Call FormattedTime(ttot, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If
-        Deallocate(idet1,idet2)
+        Deallocate(idet1,idet2,Jz,Nh,cntarray)
         Return
     End Subroutine FormJ
     
@@ -426,7 +402,6 @@ Module formj2
         ierr=0
         xj=0.d0
         nj=ij8J
-
         Do i=1,nj
             n=Jsq%n(i)
             k=Jsq%k(i)

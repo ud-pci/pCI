@@ -12,7 +12,7 @@ Module conf_variables
     Integer             :: Kherr, Kgerr, Idel, Lmax, NhintS, NgintS, Kmax, Ksym, Nsum
     Integer             :: IPdel, Jdel, ifile, ihf, Nd0
     Integer             :: startH, endH, sizeH, startJ, endJ, sizeJ, maxJcore
-    Integer             :: H_nstart, H_nend, H_nsize, H_nmax, bin
+    Integer             :: vaBinSize
     Integer(Kind=Int64) :: iscr, NumH, NumJ, Ibuf0, ih8H, counter1, ij8J
     Integer(Kind=Int64) :: memTotalPerCPU, memDvdsn, memFormH, memStaticArrays, memEstimate
     Real(dp)            :: Ecore, Hmin, XJ_av, dR_N, E_k, xscr, K_gnt, Cnx, vmax, E_0
@@ -21,7 +21,6 @@ Module conf_variables
 
     Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
-    Integer,  Allocatable, Dimension(:)    :: H_nsizes, H_ndisps
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is
     Real,     Allocatable, Dimension(:,:)  :: Rint2
     Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Diag, D, E

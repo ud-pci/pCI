@@ -347,6 +347,9 @@ Module conf_init
             Nip(nj)=ni
             If (Nsu < ni) Nsu=ni
         End Do
+
+        Deallocate(Qnl)
+
         nec=0
         If (Nso /= 0) nec=sum(Nq(1:Nso))
         Do ni=1,Nsu

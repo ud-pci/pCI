@@ -59,7 +59,7 @@ Module conf_pt_aux
         Use conf_init, Only : inpstr
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, &
-                                       nec, imax, j, n, ic, i0, nmin, i1, n2, n1, & l
+                                       nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
         Real(dp)                    :: c1, c2, z1, d
         Real(dp), Dimension(IP6)    :: p, q, p1, q1
         Real(dp), Dimension(4*IP6)  :: pq

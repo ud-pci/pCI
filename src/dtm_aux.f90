@@ -53,10 +53,10 @@ Module dtm_aux
         Implicit None
 
         Integer :: i, inam, iform, kan, ntype, imax
-        Character(Len=1), Dimension(12) :: fname, nam
+        Character(Len=1), Dimension(inam) :: fname, nam
         Character(Len=1) :: space
         Character(Len=12) :: fnam
-        equivalence (fnam, fname)
+        !equivalence (fnam, fname)
         data space/' '/
 
         ! NTYPE = 0 - OLD; NTYPE = 1 - NEW, UNKNOWN
@@ -840,13 +840,14 @@ Module dtm_aux
         ! radial integration inside the nucleus: R(1)**n1*int_0,1 f(x) dx
         ! where x = r/R(1) and f(x) = (s1*p(x)*q(x) + s2*a(x)*b(x))*x**n2
         Implicit None
-        Integer :: i, i1, j, j1, m2, n1, n2
+        Integer :: i, i1, j, j1, m2, n1, n2, maxtt
         Real(dp) :: s1, s2, dn
         Real(dp), Dimension(IP6)  :: p, q, a, b
         dn=0.d0
-        Do i=1,MaxT+1
+        maxtt=MaxT+1
+        Do i=1,maxtt
            i1=Ii+4+i
-           Do j=1,MaxT+1
+           Do j=1,maxtt
               j1=Ii+4+j
               m2=i+j+n2-1
               dn = dn + (s1*p(i1)*q(j1) + s2*a(i1)*b(j1))/m2
@@ -907,7 +908,8 @@ Module dtm_aux
             Call FormattedMemSize(memsum, memStr)
             Write(*,'(A,A,A)') 'DM requires approximately ',Trim(memStr),' of memory'
             Call FormattedMemSize(mem, memStr)
-            Write(*,'(A,A,A,A,A)') 'DM requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
+            Write(*,'(A,A,A,A,A)') 'DM requires approximately ',Trim(memStr),' of memory per core with ', &
+                                    Trim(AdjustL(npesStr)),' cores'
         End If
         If (ntrm <= 0) Return
         If (mype==0) Then
@@ -1196,7 +1198,8 @@ Module dtm_aux
             Call FormattedMemSize(memsum, memStr)
             Write(*,'(A,A,A)') 'TM requires approximately ',Trim(memStr),' of memory'
             Call FormattedMemSize(mem, memStr)
-            Write(*,'(A,A,A,A,A)') 'TM requires approximately ',Trim(memStr),' of memory per core with ',Trim(AdjustL(npesStr)),' cores'
+            Write(*,'(A,A,A,A,A)') 'TM requires approximately ',Trim(memStr),' of memory per core with ', &
+                                    Trim(AdjustL(npesStr)),' cores'
         End If
         
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)

@@ -95,7 +95,7 @@ Module determinants
         Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1
         Real(dp)        :: d
         Integer, allocatable, dimension(:) :: idet
-        Integer, dimension(6) :: nmj
+        Integer, dimension(60) :: nmj
         logical :: fin
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         allocate(idet(Ne),Ndc(Nc),Jtc(Nc))
@@ -232,6 +232,9 @@ Module determinants
             n=j
             ndj=Njt(n)
         End Do
+
+        Deallocate(idet, Nq, Nip, Jtc, Nq0)
+
         Return
     End Subroutine Jterm
 
