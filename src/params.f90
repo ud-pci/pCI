@@ -40,7 +40,7 @@ Module params
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
-    Integer, Parameter :: IPmr  =      4         ! =4 if word=1B (Pentium)
+    Integer, Parameter :: IPmr  =      1         ! =4 if word=1B (Pentium)
                                                  ! =1 if word=4B (Alpha-processor)   
     
     ! Global variables 

@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2021-08-09
+- Initial import of new parallelized "conf_lsj" program
+- "conf_lsj" program has been modernized and parallelized
+- "conf_lsj" program is now included in the build process of the parallel package.
+- "conf_lsj" has been tested with serial version and all results are identical in output files
+- "conf_lsj" now utilizes dynamic memory allocation
+
 ## [0.4.0] - 2021-07-29
 - Revamp of FormH procedure to use split comparison and calculation stages to save memory
 - Many small bug fixes regarding memory

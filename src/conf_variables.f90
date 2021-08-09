@@ -23,7 +23,7 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is
     Real,     Allocatable, Dimension(:,:)  :: Rint2
-    Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Diag, D, E
+    Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Tl, Ts, Diag, D, E
     Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W
 
     Integer,  Dimension(IPgnt) :: In
