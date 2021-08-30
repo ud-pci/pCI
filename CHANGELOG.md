@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ## [0.6.0] - 2021-08-30
 - Initial import of new modernized "ine" prgram
 - "ine" program has been modernized
@@ -14,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "conf" program subroutine WriteMatrix has been updated to write separate file nprocs.conf containing number of processors used in conf calculation
 - "sort.py" program has been updated to read nprocs.conf
 
+=======
+>>>>>>> 451901fb69b3d74cd6092978f195749164695c60
 ## [0.5.0] - 2021-08-09
 - Initial import of new parallelized "conf_lsj" program
 - "conf_lsj" program has been modernized and parallelized
