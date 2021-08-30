@@ -8,10 +8,6 @@ Program conf_lsj
     use formj2, Only : FormJ, J_av
     Use str_fmt, Only : FormattedTime
     Use lsj_aux
-<<<<<<< HEAD
-=======
-    !Use conffilepaths
->>>>>>> 451901fb69b3d74cd6092978f195749164695c60
 
     Implicit None
 
@@ -26,37 +22,17 @@ Program conf_lsj
 !   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     ! Initialize MPI
     Call MPI_Init(mpierr)
-<<<<<<< HEAD
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
-=======
-    ! Get process id
-    Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
-    ! Get number of processes
->>>>>>> 451901fb69b3d74cd6092978f195749164695c60
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
     Call system_clock(count_rate=clock_rate)
     If (mype==0) Call system_clock(start_time)
-<<<<<<< HEAD
-=======
-    
-    ! Give ConfFilePaths a chance to decide what filenames/paths to use:
-    !Call ConfFileInit()
->>>>>>> 451901fb69b3d74cd6092978f195749164695c60
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
     Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU",eValue)
     read(eValue,'(I12)') memTotalPerCPU
 
-<<<<<<< HEAD
-=======
-    Kw=0 ! If Kw=0, CONF.HIJ files are not written
-         ! If Kw=1, CONF.HIJ files are written
-    kXIJ=10    ! kXIJ sets the interval in which CONF.XIJ is written
-               ! e.g. kXIJ=5 => CONF.XIJ written every 5 davidson iterations
-               ! If kXIJ=0, then no intermediate CONF.XIJ will be written
->>>>>>> 451901fb69b3d74cd6092978f195749164695c60
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')

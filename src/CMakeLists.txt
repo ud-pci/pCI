@@ -41,8 +41,4 @@ TARGET_LINK_LIBRARIES(ine ine_common)
 ADD_EXECUTABLE(conf_pt conf_pt_aux.f90 conf_pt.f90)
 TARGET_LINK_LIBRARIES(conf_pt conf_pt_common)
 
-<<<<<<< HEAD
 INSTALL(TARGETS basc conf conf_lsj dtm ine conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
-=======
-INSTALL(TARGETS basc conf conf_lsj dtm conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
->>>>>>> 451901fb69b3d74cd6092978f195749164695c60
