@@ -49,40 +49,27 @@ Module dtm_aux
         Return
     End Subroutine Init_Char
 
-    Subroutine OpenFS(inam,nam,iform,kan,ntype)
+    Subroutine OpenFS(fnam,iform,kan,ntype)
         Implicit None
 
-        Integer :: i, inam, iform, kan, ntype, imax
-        Character(Len=1), Dimension(inam) :: fname, nam
-        Character(Len=1) :: space
-        Character(Len=12) :: fnam
-        !equivalence (fnam, fname)
-        data space/' '/
+        Integer :: i, iform, kan, ntype, imax
+        Character(Len=*) :: fnam
 
         ! NTYPE = 0 - OLD; NTYPE = 1 - NEW, UNKNOWN
-        Do i=1,inam
-            fname(i)=nam(i)
-        End Do
-        Do i=inam+1,12
-            fname(i)=space
-        End Do
-        imax=12
         If (ntype /= 0) Then
             If (iform == 0) Open(unit=kan,file=fnam,status='unknown',err=710)
-            If (iform == 1) Open(unit=kan,file=fnam,status='unknown', &
-                                    form='unformatted',err=710)
+            If (iform == 1) Open(unit=kan,file=fnam,status='unknown',form='unformatted',err=710)
         Else
             If (iform == 0) Open(unit=kan,file=fnam,status='old',err=700)
-            If (iform == 1) Open(unit=kan,file=fnam,status='old', &
-                                    form='unformatted',err=700)
+            If (iform == 1) Open(unit=kan,file=fnam,status='old',form='unformatted',err=700)
         End If
         Return
 
- 700    Write( 6,'(/" NO FILE ",12A1)') (fname(i),i=1,imax)
-        Write(11,'(/" NO FILE ",12A1)') (fname(i),i=1,imax)
+ 700    Write( 6,'(/" NO FILE ",12A1)') fnam
+        Write(11,'(/" NO FILE ",12A1)') fnam
         Stop
- 710    Write( 6,'(/" UNABLE TO OPEN FILE:",1X,12A1)') (fname(i),i=1,imax)
-        Write(11,'(/" UNABLE TO OPEN FILE:",1X,12A1)') (fname(i),i=1,imax)
+ 710    Write( 6,'(/" UNABLE TO OPEN FILE:",1X,12A1)') fnam
+        Write(11,'(/" UNABLE TO OPEN FILE:",1X,12A1)') fnam
         Stop
     End Subroutine OpenFS
 
@@ -105,14 +92,14 @@ Module dtm_aux
                 strfmt = '(/4X,"Program DTM: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
-                Call OpenFS(6,'DM.RES',0,11,1)
+                Call OpenFS('DM.RES',0,11,1)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
                 Read (99,*) nterm1, nterm2, nterm2f
                 strfmt = '(/4X,"Program DTM: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
-                Call OpenFS(6,'TM.RES',0,11,1)
+                Call OpenFS('TM.RES',0,11,1)
         End Select
         Close(99)
 
@@ -914,10 +901,10 @@ Module dtm_aux
         If (ntrm <= 0) Return
         If (mype==0) Then
             ! Read in wavefunctions of CONF.XIJ
-            Call OpenFS(8,'CONF.XIJ',1,16,0)
+            Call OpenFS('CONF.XIJ',1,16,0)
             If (ntrm > 1) Then
                 Do ntr=1,ntrm-1
-                    Read (16)
+                    Read(16)
                 End Do
             End If
             iab2=0
@@ -1135,8 +1122,8 @@ Module dtm_aux
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
         Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
-        If (mype==0) Write (*,'(1X," TM from term .. to terms .. - .. : &
-                ",I1,1X,I1,1X,I1)') nterm1, nterm2, nterm2f
+        If (mype==0) Write (*,'(1X," TM from term",I2," to terms",I2," - ",I2)') &
+                    nterm1, nterm2, nterm2f
         n1=nterm1
         n21=nterm2
         n22=nterm2f
@@ -1149,7 +1136,7 @@ Module dtm_aux
         
         If (mype==0) Then
             ! Read in wavefunctions of CONF.XIJ
-            Call OpenFS(8,'CONF.XIJ',1,16,0)
+            Call OpenFS('CONF.XIJ',1,16,0)
             Do n=1,n1
                 Read (16) e1,tj1,ndpt,(B1(i),i=1,Nd1)
                 e1=e1+4.d0*Gj*tj1*(tj1+1.d0)
@@ -1159,7 +1146,7 @@ Module dtm_aux
             tj1=jt/2.d0
         
             ! Read in determinants of CONF1.DET
-            Call OpenFS(9,'CONF1.DET',1,17,0)
+            Call OpenFS('CONF1.DET',1,17,0)
             Read (17) Nd2
             Write (*,*) 'Ne, Nd1, Nd2',Ne,Nd1,Nd2
             Do n=1,Nd2
@@ -1169,7 +1156,7 @@ Module dtm_aux
             Close(17)
         
             ! Read in wavefunctions of CONF1.XIJ
-            Call OpenFS(9,'CONF1.XIJ',1,16,0)
+            Call OpenFS('CONF1.XIJ',1,16,0)
             n20=n21-1
             If (n20 /= 0) Then
                 Do n2=1,n20

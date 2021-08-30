@@ -68,7 +68,10 @@ Module matrix_io
         Character(Len=16)             :: timeStr
         Type(Matrix)                  :: mat
     
-        If (mype == 0) Then
+        If (mype == 0) Then            
+            Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+            Write(66) npes
+            Close(66)
             print*, 'Writing ' // filename // '...'
             Call system_clock(count_rate=clock_rate)
             Call system_clock(start_time)
@@ -81,21 +84,21 @@ Module matrix_io
           disps(i)=disps(i-1)+sizes(i-1)
         end do
     
-        ! Write counters
+        ! Open file
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh, mpierr) 
 
         ! Write number of processors
-        disp=0
+        disp=0_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         if (mype == 0) then
             Call MPI_FILE_WRITE(fh, npes, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         end if
 
-        ! Write counters
+        ! Write number of matrix elements
         disp = mype * 4 + 4
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPI_FILE_WRITE(fh, num_elements, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
-        
+
         ! Write Hamil%n
         disp = npes * 4 + disps(mype+1) * 4 + 4
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 

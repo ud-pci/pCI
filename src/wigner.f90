@@ -6,7 +6,7 @@ Module wigner
 
     Private
 
-    Real(dp) :: ALL
+    Real(dp), Public :: ALL
     
     Public :: FJ3, FJ6, FJ9, DELFJ, NGFJ, OBME, PORAD
 
@@ -15,14 +15,16 @@ Module wigner
     Real(dp) Function FJ3(A1,A2,A3,A4,A5,A6)
       Implicit None
 
-      Integer                  :: K, L, KU, KM
+      Integer                  :: i, K, L, KU, KM
       Real(dp)                 :: A1, A2, A3, A4, A5, A6, EPS, UN
       Real(dp), Dimension(9)   :: X
       Integer, Dimension(9)    :: LU, LI
       Real(dp), Dimension(3)   :: Y, Z
       Integer, Dimension(3)    :: MA, NA
 
-      IF(dABS(A4+A5+A6)-0.0001d0) 20,2,2
+      !if (testwigner == 777) print*,'A',A1,A2,A3,A4,A5,A6,A1+A2,A2-A3,A1-A3,&
+      !                      A1+A2-A3,dABS(A4+A5+A6),dABS(A4+A5+A6)-0.0001_dp
+      IF(dABS(A4+A5+A6)-0.0001_dp) 20,2,2
 20    X(1)=A1+A2-A3
       X(2)=A1-A2+A3
       X(3)=-A1+A2+A3
@@ -32,21 +34,33 @@ Module wigner
       X(7)=A2-A5
       X(8)=A3+A6
       X(9)=A3-A6
-      EPS=0.0001d0
+      EPS=0.0001_dp
+      X=ANINT(X*100.0)/100.0
+      !Do i=1,9
+      !  If (X(i)<EPS) X(i)=0.0_dp
+      !End Do
+      !if (testwigner == 777) print*,'A',A1,A2,A3,A4,A5,A6
+      !if (testwigner == 777) print*,'X',X
+      !if (testwigner == 777) X(1)=0.0_dp
+      !if (testwigner == 777) X(2)=0.0_dp
+      !if (testwigner == 777) X(9)=0.0_dp
       DO 1 K=1,9
+        !if (testwigner == 777) print*,'K',K
       IF(X(K)) 2,3,3
 3     LU(K)=X(K)
       IF(dABS(LU(K)-X(K))-EPS) 1,2,2
 1     CONTINUE
       GO TO  4
-2     FJ3=0.d0
+2     FJ3=0._dp
       GO TO 5
 4     Y(1)=A1+A2-A3
       Y(2)=A1-A4
       Y(3)=A2+A5
-      Z(1)=0.d0
+      Y=ANINT(Y*100.0)/100.0
+      Z(1)=0._dp
       Z(2)=-A3+A2-A4
       Z(3)=-A3+A1+A5
+      Z=ANINT(Z*100.0)/100.0
       DO 6 K=1,3
       MA(K)=Y(K)
       NA(K)=Z(K)
@@ -57,7 +71,7 @@ Module wigner
       CALL PORAD(NA,3)
       IF(MA(1)) 2,8,8
 8     IF(MA(1)-NA(3)) 2,9,9
-9     LI(1)=A1+A2+A3+1.d0
+9     LI(1)=A1+A2+A3+1._dp
       DO 10 K=1,2
       LI(K+1)=MA(K+1)-MA(1)
       LI(K+3)=MA(K+1)-MA(1)
@@ -65,19 +79,20 @@ Module wigner
 10    LI(K+7)=NA(3)-NA(K)
       CALL PORAD(LU,9)
       CALL PORAD(LI,9)
-      ALL=0.d0
+      ALL=0._dp
       DO 11 K=1,9
       IF(LU(K)-LI(K)) 12,11,13
 12    CALL NGFJ(-1,LU(K),LI(K))
       GO TO 11
 13    CALL NGFJ(1,LI(K),LU(K))
 11    CONTINUE
-      FJ3=0.d0
+      FJ3=0._dp
       UN=ALL/2
       KM=MA(1)-NA(3)+1
       DO 14 KU=1,KM
       K=NA(3)+KU-1
-      ALL=0.d0
+      !if (testwigner == 777) print*,'K',NA(3),KU
+      ALL=0._dp
       CALL NGFJ(-1,0,MA(1)-K)
       CALL NGFJ(-1,MA(2)-MA(1),MA(2)-K)
       CALL NGFJ(-1,MA(3)-MA(1),MA(3)-K)
@@ -85,9 +100,11 @@ Module wigner
       CALL NGFJ(-1,NA(3)-NA(1),K-NA(1))
       CALL NGFJ(-1,NA(3)-NA(2),K-NA(2))
       L=K+A1-A2-A6
+      !if (testwigner == 777) print*,'L',L,K,A1,A2,A6
 14    FJ3=FJ3+(-1)**L*dEXP(ALL)
       FJ3=dEXP(UN)*FJ3
 5     CONTINUE
+      !if (testwigner == 777) print*,'wig',FJ3,L,K,dEXP(ALL),ALL,dEXP(UN)
       RETURN
     End Function FJ3
 
@@ -109,7 +126,7 @@ Module wigner
       Y1=A1+A2+A4+A5
       Y2=A2+A3+A5+A6
       Y3=A3+A1+A6+A4
-      EPS=0.0001d0
+      EPS=0.0001_dp
       MA(1)=X1+EPS
       MA(2)=X2+EPS
       MA(3)=X3+EPS
@@ -125,7 +142,7 @@ Module wigner
 24    IF(dABS(NA(2)-Y2)-EPS) 25,12,12
 25    IF(dABS(NA(3)-Y3)-EPS) 26,12,12
 26    GO TO 10
-12    FJ6=0.d0
+12    FJ6=0._dp
       GO TO 11
 10    CALL PORAD(MA,4)
       CALL PORAD(NA,3)
@@ -142,7 +159,8 @@ Module wigner
       X(10)=A4+A5-A3
       X(11)=A4-A5+A3
       X(12)=-A4+A5+A3
-      ALL=0.d0
+      X=ANINT(X*100.0)/100.0
+      ALL=0._dp
       DO 1 K=1,12
       IF(X(K)) 12,1,1
 1     LU(K)=X(K)+EPS
@@ -156,19 +174,19 @@ Module wigner
 3     LI(11+K)=LI(9+K)
       CALL PORAD(LU,13)
       CALL PORAD(LI,13)
-      ALL=0.d0
+      ALL=0._dp
       DO 4 K=1,13
       IF(LU(K)-LI(K)) 5,4,7
 5     CALL NGFJ(-1,LU(K),LI(K))
       GO  TO  4
 7     CALL NGFJ(1,LI(K),LU(K))
 4     CONTINUE
-      FJ6=0.d0
+      FJ6=0._dp
       UN=ALL/2
       KM=NA(1)-MA(4)+1
       DO 6 L=1,KM
       K=MA(4)+L-1
-      ALL=0.d0
+      ALL=0._dp
       CALL NGFJ(1,MA(4)+1,K+1)
       CALL NGFJ(-1,MA(4)-MA(1),K-MA(1))
       CALL NGFJ(-1,MA(4)-MA(2),K-MA(2))
@@ -220,18 +238,18 @@ Module wigner
 7     Y=DOUN(N)
 2     CONTINUE
       IF(X-Y)3,8,8
-8     D=X-Y+1.d0
+8     D=X-Y+1._dp
       N=D
-      IF(dABS(D-N)-0.00001d0) 9,3,3
-9     FJ9=0.d0
+      IF(dABS(D-N)-0.00001_dp) 9,3,3
+9     FJ9=0._dp
       DO 4 K=1,N
-      A=Y+K-1.d0
-      M=2*A+0.00001d0
+      A=Y+K-1._dp
+      M=2*A+0.00001_dp
       FJ9=FJ9+(-1)**M*(M+1)*FJ6(A11,A21,A31,A32,A33,A)* &
       FJ6(A12,A22,A32,A21,A,A23)*FJ6(A13,A23,A33,A,A11,A12)
 4     CONTINUE
       GO TO 5
-3     FJ9=0.d0
+3     FJ9=0._dp
 5     RETURN
     End Function FJ9
 
@@ -260,7 +278,7 @@ Module wigner
       IF(M-N) 4,3,3
 4     K=M+1
       DO 1 L=K,N
-      AL=dLOG(1.d0*L)
+      AL=dLOG(1._dp*L)
 1     ALL=ALL+J*AL
 3     RETURN
     End Subroutine NGFJ

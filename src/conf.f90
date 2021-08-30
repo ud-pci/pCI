@@ -61,7 +61,7 @@ Program conf
     Real :: total_time
     Real(dp)  :: t
     Character(Len=1024) :: strFromEnv
-    Character(Len=255)  :: eValue
+    Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: memStr, timeStr
 !   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     ! Initialize MPI
@@ -82,7 +82,7 @@ Program conf
     Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU",eValue)
     read(eValue,'(I12)') memTotalPerCPU
 
-    Kw=0 ! If Kw=0, CONF.HIJ files are not written
+    Kw=1 ! If Kw=0, CONF.HIJ files are not written
          ! If Kw=1, CONF.HIJ files are written
     kXIJ=10    ! kXIJ sets the interval in which CONF.XIJ is written
                ! e.g. kXIJ=5 => CONF.XIJ written every 5 davidson iterations
@@ -90,7 +90,9 @@ Program conf
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        strfmt = '(4X,"Program conf v0.3.8")'
+        Write( 6,strfmt)
+        Write(11,strfmt)
         Call Input ! reads list of configurations from CONF.INP
         Call Init ! reads basis set information from CONF.DAT
         Call Rint ! reads radial integrals from CONF.INT
@@ -118,7 +120,7 @@ Program conf
 
     ! Print table of final results and total computation time
     If (mype==0) Then
-        Call PrintResults   !#   Output of the results
+        Call PrintEnergies   !#   Output of the results
 
         Call system_clock(end_time)
         total_time=Real((end_time-start_time)/clock_rate)

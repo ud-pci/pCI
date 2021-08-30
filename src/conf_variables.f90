@@ -10,7 +10,7 @@ Module conf_variables
     Integer             :: NmaxS, LmaxS, Nmax1, Lmax1, NmaxScr, LmaxScr, kchunks
     Integer             :: IPlv, nrd, kdavidson, K_sms, kXIJ, kJJJ, num_is
     Integer             :: Kherr, Kgerr, Idel, Lmax, NhintS, NgintS, Kmax, Ksym, Nsum
-    Integer             :: IPdel, Jdel, ifile, ihf, Nd0
+    Integer             :: IPdel, ifile, ihf, Nd0
     Integer             :: startH, endH, sizeH, startJ, endJ, sizeJ, maxJcore
     Integer             :: vaBinSize
     Integer(Kind=Int64) :: iscr, NumH, NumJ, Ibuf0, ih8H, counter1, ij8J
@@ -23,7 +23,7 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is
     Real,     Allocatable, Dimension(:,:)  :: Rint2
-    Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Diag, D, E
+    Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Tl, Ts, Diag, D, E
     Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W
 
     Integer,  Dimension(IPgnt) :: In

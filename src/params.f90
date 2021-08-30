@@ -31,7 +31,7 @@ Module params
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
     Integer, Parameter :: IPjd  =     33         ! Njd - number of possible J's   
     Integer, Parameter :: IPx   =    400         ! Nx - used for indexation of integrals   
-    Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for 
+    Integer, Parameter :: IP1   =  15000         ! Nd1 - number of determinants for 
                                                  !       direct diagonalization   
     Integer, Parameter :: IPgnt =   2891         ! Ngaunt - number of tabulated Gaunts
     Integer, Parameter :: IPlx  =      5         ! max l for tabulation of Gaunts   
@@ -40,12 +40,12 @@ Module params
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
-    Integer, Parameter :: IPmr  =      4         ! =4 if word=1B (Pentium)
+    Integer, Parameter :: IPmr  =      1         ! =4 if word=1B (Pentium)
                                                  ! =1 if word=4B (Alpha-processor)   
     
     ! Global variables 
-    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, n_it, M, Mj
-    Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas
+    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, M, Mj
+    Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, testwigner
     Real(dp) :: Z, H, Jm, Gj, gnuc, Rnuc, Qnuc, Cut0, Crt4, C_is, Am
 
     ! Global arrays

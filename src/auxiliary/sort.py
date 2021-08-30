@@ -2,8 +2,20 @@ import struct
 import time
 
 filename = input("Enter the name of the file you would like to convert: ")
-with open(filename, "rb") as f:
+fnproc = open("nprocs.conf", "rb")
+
+try:
+    f = open(filename, "rb")
+except OSError:
+    print("Could not open/read file:" + filename)
+    sys.exit()
+except FileNotFoundError:
+    print(f"File {filename} not found.  Aborting")
+    sys.exit(1)
+
+with f:
 	num_cores = struct.unpack('i', f.read(4))[0]
+	num_cores = struct.unpack('i', fnproc.read(4))[0]
 	list_elements = []
 	old_matrix = [[],[],[]]
 	new_matrix = []
@@ -27,9 +39,14 @@ with open(filename, "rb") as f:
 	toc = time.perf_counter()
 	print("Reading " + filename + f" took {toc - tic:0.4f} seconds ")
 	tic = time.perf_counter()
+	numzero=0
 	for num in range(len(old_matrix[0])):
-		new_matrix.append([old_matrix[1][num],old_matrix[0][num],old_matrix[2][num]])
+		if old_matrix[2][num] != 0:
+			new_matrix.append([old_matrix[1][num],old_matrix[0][num],old_matrix[2][num]])
+		else:
+			numzero=numzero+1
 	toc = time.perf_counter()
+	print("Removed " + str(numzero) + " zero-valued matrix elements")
 	print("Re-packaging " + filename + f" took {toc - tic:0.4f} seconds ")
 	tic = time.perf_counter()
 	new_matrix = sorted(new_matrix, key=lambda x: x[1])
@@ -38,6 +55,7 @@ with open(filename, "rb") as f:
 
 with open(filename + "sorted", "wb") as f:
 	f.write(struct.pack('i',len(new_matrix)))
+	print("# of matrix elements=" + str(len(new_matrix)))
 	for num in range(len(new_matrix)):
 		f.write(struct.pack('iid', new_matrix[num][0], new_matrix[num][1], new_matrix[num][2]))
 

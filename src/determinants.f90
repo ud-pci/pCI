@@ -674,9 +674,13 @@ Module determinants
         Integer  :: i, i1, i2, j1, j2, icomp, is, m
         Integer, allocatable, dimension(:)  :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Jdel=0
         iconf1(1:Ne)=Nh(idet1(1:Ne))   !### iconf1(i) = No of the orbital occupied
         iconf2(1:Ne)=Nh(idet2(1:Ne))    !#### by the electron i
         Call Rspq(iconf1,iconf2,is,icomp,i1,j1,i2,j2)
+        If (icomp == 1) then
+          Jdel=iabs(Jj(i2)-Jj(j2))/2
+        End If
         Return
     End Subroutine CompC
 

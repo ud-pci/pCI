@@ -15,10 +15,6 @@ Module conf_aux
         Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, n, k
         Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(4X,"Program Conf v0.3.7")'
-        Write( 6,strfmt)
-        Write(11,strfmt)
         ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
         Call ReadConfInp
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -950,7 +946,7 @@ Module conf_aux
         Return
     End Subroutine WriteFinalXIJ
 
-    Subroutine PrintResults
+    Subroutine PrintEnergies
         Implicit None
 
         Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
@@ -1078,6 +1074,6 @@ Module conf_aux
         close(unit=11)
         Deallocate(Cc, Dd, W, Ndc)
         RETURN
-    End Subroutine PrintResults
+    End Subroutine PrintEnergies
 
 End Module conf_aux

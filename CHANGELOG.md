@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2021-08-30
+- Initial import of new modernized "ine" prgram
+- "ine" program has been modernized
+- "ine" program now uses intel mkl subroutine 'zspsv'
+- "dtm" program subroutine OpenFS has been updated to conf_pt_breit version
+- "conf" program subroutine WriteMatrix has been updated to write separate file nprocs.conf containing number of processors used in conf calculation
+- "sort.py" program has been updated to read nprocs.conf
+
+## [0.5.0] - 2021-08-09
+- Initial import of new parallelized "conf_lsj" program
+- "conf_lsj" program has been modernized and parallelized
+- "conf_lsj" program is now included in the build process of the parallel package.
+- "conf_lsj" has been tested with serial version and all results are identical in output files
+- "conf_lsj" now utilizes dynamic memory allocation
+
 ## [0.4.0] - 2021-07-29
 - Revamp of FormH procedure to use split comparison and calculation stages to save memory
 - Many small bug fixes regarding memory
