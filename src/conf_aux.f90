@@ -631,7 +631,7 @@ Module conf_aux
         
             If (mype==0) print*, '========== Formation of Hamiltonian matrix completed =========='
 
-            If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONF.HIJ',mype,npes,mpierr)
+            If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         Else
             If (mype==0) Then
                 print*, 'Reading CONF.HIJ...'

@@ -180,7 +180,7 @@ Module formj2
             
             If (mype == 0) Then
                 Write( 6,'(4X,"Forming matrix J**2")')
-                Open (unit=18,file='CONF.JJJ',status='UNKNOWN',form='UNFORMATTED')
+                Open (unit=18,file='CONFp.JJJ',status='UNKNOWN',form='UNFORMATTED')
                 Close(unit=18,status='DELETE')
                 Write(counterStr,fmt='(I16)') vaGrowBy
                 Write(counterStr2,fmt='(I16)') ncGrowBy
@@ -370,7 +370,7 @@ Module formj2
             ij4 = ij8
             !Call CloseIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
 
-            Call WriteMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr)
+            Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
             !Call ReadMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr) 
         End If
 
