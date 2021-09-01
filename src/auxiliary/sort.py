@@ -7,7 +7,7 @@ fnproc = open("nprocs.conf", "rb")
 try:
     f = open(filename, "rb")
 except OSError:
-    print("Could not open file:" + filename)
+    print("Could not open/read file:" + filename)
     sys.exit()
 except FileNotFoundError:
     print(f"File {filename} not found.  Aborting")
@@ -53,7 +53,7 @@ with f:
 	toc = time.perf_counter()
 	print("Sorting " + filename + f" took {toc - tic:0.4f} seconds ")
 
-with open(filename[0:4] + filename[-3:0], "wb") as f:
+with open(filename[0:4] + filename[5:9], "wb") as f:
 	f.write(struct.pack('i',len(new_matrix)))
 	print("# of matrix elements=" + str(len(new_matrix)))
 	for num in range(len(new_matrix)):

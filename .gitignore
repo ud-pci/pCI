@@ -1,0 +1,23 @@
+# Fortran module files
+*.mod
+
+# Compiled static libraries
+*.a
+
+# Executables
+basc
+conf
+conf_pt
+conf_lsj
+dtm
+ine
+
+# CMake
+build/
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+Makefile
+
+# Test directory
+test/

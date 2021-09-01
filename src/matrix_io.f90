@@ -147,7 +147,9 @@ Module matrix_io
         ! Read number of processors
         disp = 0
         if (mype == 0) then
-            Call MPI_FILE_READ_AT(fh, disp, npes_read, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
+            Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+            Read(66) npes_read
+            Close(66)
             if (npes /= npes_read) then
                 print*, 'Number of processors inconsistent. '// filename //' was written with ', npes_read, ' processors,', &
                         ' but', npes, ' is available.'
