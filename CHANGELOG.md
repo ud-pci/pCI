@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2021-09-01
+- bug fixes in "conf", allowing use of Kl=1 - reading of CONF.HIJ and CONF.JJJ files in conf
+
 ## [0.6.1] - 2021-08-31
 - "conf" program now writes CONFp.HIJ and CONFp.JJJ instead of CONF.HIJ and CONF.JJJ
 - "sort.py" program converts CONFp.HIJ and CONFp.JJJ into serial CONF.HIJ and CONF.JJJ

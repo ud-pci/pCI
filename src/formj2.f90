@@ -156,23 +156,17 @@ Module formj2
         Allocate(idet1(Ne),idet2(Ne),cntarray(2))
         
         ij8=0_int64
+        ij8s=0_int64
         NumJ=0_int64
-        If (Kl == 1) Then ! If continuing from previous calculation, skip forming CONF.JJJ
-          Open (unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',iostat=io)
-          If (io /= 0) Write( 6,'(4X,"Forming matrix J**2")')
-          Do
-            Read (18,iostat=io) numjj,k,n,t
-            If (io > 0) Then 
-              print*, 'I/O ERROR at FormJ'
-            Else If (io < 0) Then
-              Write(11,'(4X,"NumJ =",I12)') NumJ
-              Write( *,'(4X,"NumJ =",I12)') NumJ
-              Close(unit=18)
-              Exit
-            Else
-              NumJ=numjj
-            End If
-          End Do
+        If (Kl == 1 .or. Kl == 3) Then ! If continuing from previous calculation, skip forming CONF.JJJ
+            Call system_clock(s1)
+            Call ReadMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+            Call system_clock(e1)
+            If (mype == 0) print*, 'Reading CONFp.JJJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
+            ij8=ij4
+            ij8J = ij8
+            Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
         Else ! Else start new calculation
             growBy = log10(real(Nc/npes))
             vaGrowBy = 1000000
@@ -357,21 +351,14 @@ Module formj2
             !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-            Jsq%n = PACK(Jsq%n, Jsq%t/=0)
-            Jsq%k = PACK(Jsq%k, Jsq%t/=0)
-            Jsq%t = PACK(Jsq%t, Jsq%t/=0)
-
-            ij8s=0_int64
             ij8=size(Jsq%t)
             Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
             ij8J = ij8
             ij4 = ij8
-            !Call CloseIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
 
             Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
-            !Call ReadMatrix(Jsq,ij4,NumJ,'CONF.JJJ',mype,npes,mpierr) 
         End If
 
         If (mype == 0) Then

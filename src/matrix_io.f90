@@ -167,8 +167,7 @@ Module matrix_io
         ! Calculate displacements
         sizes=0
         Call MPI_AllGather(num_elements, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(num_elements, num_total, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-
+        Call MPI_AllReduce(num_elements, num_total, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
         disps=0
         do i=2,npes
           disps(i)=disps(i-1)+sizes(i-1)

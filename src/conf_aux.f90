@@ -355,6 +355,7 @@ Module conf_aux
         Call InitFormH(npes,mype) ! initialize all variables required for constructing H_IJ
         
         NumH=0_int64
+        numzero=0
         Kherr=0
         Kgerr=0
         n0=1
@@ -365,23 +366,34 @@ Module conf_aux
             xscr=0
             If (mype == 0) Write(*,*) 'Screening is included'
         End If
-!       - - - - - - - - - - - - - - - - - - - - - - - - -
-!       Reading/forming of the file CONF.HIJ
-!       - - - - - - - - - - - - - - - - - - - - - - - - - 
-        ih8=NumH
-        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
 
-        If (Kl /= 1) Then ! If continuing calculation and CONF.HIJ is available, skip FormH
-            Nd0=IP1+1
-            n1=0
-            n2=Nd0-1
-            Do ic=1,Nc4
-                n1=n1+Ndc(ic)
-                If (n1 < Nd0) Then
-                    n2=n1
-                End If
+        Nd0=IP1+1
+        n1=0
+        n2=Nd0-1
+        Do ic=1,Nc4
+            n1=n1+Ndc(ic)
+            If (n1 < Nd0) Then
+                n2=n1
+            End If
+        End Do
+        Nd0=n2
+
+        If (Kl == 1 .or. Kl == 3) Then
+            If (mype==0) Then
+                print*, 'Reading CONF.HIJ...'
+            End If
+            Call system_clock(s1)
+            If (Kl == 1) Then
+                Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            End If
+            Call system_clock(e1)
+            If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
+            ih8=NumH
+            Do i=1,ih4
+                If (Hamil%t(i) == 0) numzero = numzero + 1
             End Do
-            Nd0=n2
+        Else ! If continuing calculation and CONF.HIJ is available, skip FormH
+            Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
             vaGrowBy = vaBinSize
             ndGrowBy = 1
 
@@ -601,7 +613,7 @@ Module conf_aux
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                    t=Hmltn(idet1, idet2, iSign, dIff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                    t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                     Hamil%t(n)=t
                     If (t==0) numzero=numzero+1
 
@@ -616,33 +628,24 @@ Module conf_aux
             Else
                 print*, '========== Starting calculation stage of FormH =========='
             End If
-
-            ih8=size(Hamil%t)
-            ih4=ih8
-
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllReduce(numzero, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            ! Compute NumH, the total number of non-zero matrix elements
-            Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-
             Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
-        
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (mype==0) print*, '========== Formation of Hamiltonian matrix completed =========='
-
-            If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-        Else
-            If (mype==0) Then
-                print*, 'Reading CONF.HIJ...'
-            End If
-            Call system_clock(s1)
-            If (Kl == 1) Then
-                Call ReadMatrix(Hamil,ih4,NumH,'CONF.HIJ',mype,npes,mpierr)
-            End If
-            Call system_clock(e1)
-            If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
         End If
+
+        ih8=size(Hamil%t)
+        ih4=ih8
+    
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(numzero, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        ! Compute NumH, the total number of non-zero matrix elements
+        Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        
+    
+        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+        
     
         ! give all cores Hmin, the minimum matrix element value
         Call MPI_AllReduce(Hamil%t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
