@@ -90,7 +90,7 @@ Program conf
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.9")'
+        strfmt = '(4X,"Program conf v0.3.10")'
         Write( 6,strfmt)
         Write(11,strfmt)
         Call Input ! reads list of configurations from CONF.INP

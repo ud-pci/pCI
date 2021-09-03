@@ -139,7 +139,6 @@ Module formj2
         Real :: ttime, ttot
         Real(dp) :: t, tt
         Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
-        Integer(kind=int64), dimension(npes) :: ij8s
         Integer, allocatable, dimension(:) :: idet1, idet2, nk, cntarray
         Integer :: npes, mype, shmrank, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
         Type(IVAccumulator)   :: iva1, iva2
@@ -156,17 +155,12 @@ Module formj2
         Allocate(idet1(Ne),idet2(Ne),cntarray(2))
         
         ij8=0_int64
-        ij8s=0_int64
         NumJ=0_int64
         If (Kl == 1 .or. Kl == 3) Then ! If continuing from previous calculation, skip forming CONF.JJJ
-            Call system_clock(s1)
             Call ReadMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
-            Call system_clock(e1)
-            If (mype == 0) print*, 'Reading CONFp.JJJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
             ij8=ij4
             ij8J = ij8
             Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
         Else ! Else start new calculation
             growBy = log10(real(Nc/npes))
             vaGrowBy = 1000000
@@ -354,7 +348,6 @@ Module formj2
             ij8=size(Jsq%t)
             Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllGather(ij8, 1, MPI_INTEGER8, ij8s, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpierr)
             ij8J = ij8
             ij4 = ij8
 

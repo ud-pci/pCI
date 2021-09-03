@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2021-09-03
+- bug fix in conf.f90 - fixed required memory count display before Davidson procedure
+
 ## [0.6.5] - 2021-09-03
 - bug fix in ine.f90 - added rounding of Tj0 to prevent errors with NaN
 

@@ -229,9 +229,7 @@ Module conf_aux
             !print*,'Z1',sizeof(Z1)
             !print*,'D1',sizeof(D1)
             !print*,'E1',sizeof(E1)
-            !print*,'J_n',sizeof(J_n)
-            !print*,'J_k',sizeof(J_k)
-            !print*,'J_t',sizeof(J_t)
+            !print*,'J',maxJcore*16
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
             memEstimate = memEstimate - memFormH + memDvdsn
@@ -378,16 +376,12 @@ Module conf_aux
         End Do
         Nd0=n2
 
+        If (mype == 0) Call calcMemReqs
+
         If (Kl == 1 .or. Kl == 3) Then
-            If (mype==0) Then
-                print*, 'Reading CONF.HIJ...'
-            End If
-            Call system_clock(s1)
             If (Kl == 1) Then
                 Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
             End If
-            Call system_clock(e1)
-            If (mype == 0) print*, 'Reading CONF.HIJ in parallel took ', Real((e1-s1)/clock_rate), 'sec'
             ih8=NumH
             Do i=1,ih4
                 If (Hamil%t(i) == 0) numzero = numzero + 1
@@ -398,7 +392,6 @@ Module conf_aux
             ndGrowBy = 1
 
             If (mype==0) Then
-                Call calcMemReqs
                 Write(counterStr,fmt='(I16)') vaGrowBy
                 Write(counterStr2,fmt='(I16)') ndGrowBy
                 Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
