@@ -319,6 +319,7 @@ Module ine_aux
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
                 Write(11,strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
                 Close(13)
+                Deallocate(l1)
                 Return
             Else
                 Write (*,*) ' Rint: Wrong order of orbitals in DTM.INT'
@@ -372,6 +373,8 @@ Module ine_aux
             End If
         End Do
         Close(16)
+
+        Tj0=Anint(Tj0*100.0)/100.0
 
         Open(unit=18,file='CONF0.JJJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat == 0) Then
