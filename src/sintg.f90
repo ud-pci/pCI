@@ -11,7 +11,7 @@ Module sintg
   Contains
 
     Subroutine Sint(ds) 
-        !# Integration over ro=r*v*hh which is slightly faster thanintegration over r
+        !# Integration over ro=r*v*hh which is slightly faster than integration over r
         Implicit None
 
         Integer :: i, ih, i0, i1, i2, i3

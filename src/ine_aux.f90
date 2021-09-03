@@ -970,7 +970,7 @@ Module ine_aux
         Integer :: j, err_stat
         Character(Len=256) :: err_msg
 
-        open(unit=18,file='CONF.JJJunsortedsorted',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
+        open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
            Write(*,*) ' file CONF.JJJ is not found'
            Stop

@@ -106,7 +106,6 @@ Program conf
     Call AllocateFormHArrays(mype,npes)
     
     ! Evaluation of Hamiltonian
-    !Call InitFormH(npes,mype)
     If (Kl <= 2 .or. Kl4 == 0) Call FormH(npes,mype)
 
     Call FormJ(mype, npes)   ! calculates matrix J^2 and writes it to CONF.JJJ

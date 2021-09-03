@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2021-09-02
+- bug fix in ine.f90 - fixed ReadJJJ subroutine to read CONF.JJJ file
+
 ## [0.6.3] - 2021-09-01
 - bug fixes in matrix_io.f90 - ReadMatrix subroutine now reads nprocs.conf for # processors
 
