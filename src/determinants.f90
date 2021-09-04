@@ -9,7 +9,7 @@ Module determinants
     Private
 
     Public :: FormD, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, Gdet_win, CompC, CompD, CompCD
+    Public :: Gdet, CompC, CompD, CompCD
 
   Contains
     
@@ -611,17 +611,6 @@ Module determinants
         idet(1:Ne)=Iarr(1:Ne,n)
         Return
     End Subroutine Gdet
-
-    Subroutine Gdet_win(n,idet)
-        ! this subroutine generates the determinant with index n
-        ! using MPI allocated windows (shared memory)
-        Implicit None
-        Integer :: i, n
-        Integer, allocatable, dimension(:)  :: idet
-        ! - - - - - - - - - - - - - - - - - - - - - - - -
-        idet(1:Ne)=Iarr_win(1:Ne,n)
-        Return
-    End Subroutine Gdet_win
 
     Subroutine CompCD(idet1,idet2,icomp)
         Implicit None

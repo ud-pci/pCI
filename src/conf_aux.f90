@@ -165,6 +165,7 @@ Module conf_aux
         If (Allocated(IntOrd)) Deallocate(IntOrd)
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
         If (Allocated(Iarr)) Deallocate(Iarr)
+        If (Allocated(Scr)) Deallocate(Scr)
     
         !If (mype==0) Then
         !  print*,'Nvc',sizeof(Nvc)
@@ -249,7 +250,7 @@ Module conf_aux
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
-                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(Scr)+sizeof(C)+sizeof(Er)+16*vaBinSize
+                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(C)+16*vaBinSize
         !print*,'Nn',sizeof(Nn)
         !print*,'Kk',sizeof(Kk)
         !print*,'Ll',sizeof(Ll)
@@ -266,7 +267,6 @@ Module conf_aux
         !print*,'Gnt',sizeof(Gnt)
         !print*,'Scr',sizeof(Scr)
         !print*,'C',sizeof(C)
-        !print*,'Er',sizeof(Er)
         !Call FormattedMemSize(memStaticArrays, memStr)
         !Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays requires ',Trim(memStr),' of memory per core' 
     End Subroutine calcMemStaticArrays
@@ -728,9 +728,9 @@ Module conf_aux
                     kx, i1, i2, it, mype, npes, mpierr
         Integer(Kind=int64) :: stot, etot, clock_rate
         Real :: ttot
-        real(dp)     :: start_time, end_time
-        real(dp) :: crit, ax, x, xx, ss
-        logical :: lsym
+        real(dp)  :: start_time, end_time
+        real(dp)  :: crit, ax, x, xx, ss
+        logical   :: lsym
         Character(Len=16) :: timeStr
         !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         Call system_clock(count_rate=clock_rate)
@@ -948,7 +948,7 @@ Module conf_aux
         Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
                    j3
         real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
-        real(dp), allocatable, dimension(:)  :: Cc, Dd
+        real(dp), allocatable, dimension(:)  :: Cc, Dd, Er
         Character(Len=1), dimension(11) :: st1, st2 
         Character(Len=1), dimension(10)  :: stecp*7
         Character(Len=1), dimension(2)  :: st3*3
@@ -961,7 +961,7 @@ Module conf_aux
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv))
+        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv), Er(Nlv))
         ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
         If (K_is == 3) K_sms=4       !### Used for output
         If (Kecp == 1) ist=7
@@ -1068,7 +1068,7 @@ Module conf_aux
         CLOSE(unit=16)
         close(unit=6)
         close(unit=11)
-        Deallocate(Cc, Dd, W, Ndc)
+        Deallocate(Cc, Dd, W, Ndc, Er)
         RETURN
     End Subroutine PrintEnergies
 

@@ -143,7 +143,7 @@ Module integrals
             End Do
         End Do
         rewind(18)
-        Allocate(Iint1S(NhintS),Rsig(NhintS),Dsig(NhintS),Esig(NhintS))
+        Allocate(Iint1S(NhintS),Rsig(NhintS),Dsig(NhintS),Esig(NhintS),Scr(10))
         Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
         i=0
         Do na=nsh,NmaxS

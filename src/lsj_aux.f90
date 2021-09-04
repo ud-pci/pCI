@@ -311,7 +311,7 @@ Module lsj_aux
         Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
                    j3
         real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
-        real(dp), allocatable, dimension(:)  :: Cc, Dd
+        real(dp), allocatable, dimension(:)  :: Cc, Dd, Er
         Character(Len=1), dimension(11) :: st1, st2 
         Character(Len=1), dimension(10)  :: stecp*7
         Character(Len=1), dimension(2)  :: st3*3
@@ -325,7 +325,7 @@ Module lsj_aux
         data strms/'SMS','NMS',' MS'/
         Character(Len=256) :: strfmt, strfmt2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv))
+        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv), Er(Nlv))
         ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
         If (K_is == 3) K_sms=4       !### Used for output
         If (Kecp == 1) ist=7
@@ -443,7 +443,7 @@ Module lsj_aux
         Close(unit=16)
         Close(unit=6)
         Close(unit=11)
-        Deallocate(Cc, Dd, W, Ndc, Tl, Ts)
+        Deallocate(Cc, Dd, W, Ndc, Tl, Ts, Er)
         Return
     End Subroutine PrintLSJ
     

@@ -13,9 +13,9 @@ SET(CMAKE_Fortran_FLAGS "-mkl")
 
 ADD_LIBRARY(basc_common params.f90 str_fmt.f90 conf_variables.f90 basc_variables.f90 conf_init.f90 readfff.f90 wigner.f90 sintg.f90 test_ori.f90 diff.f90 pi_pk.f90 breit.f90)
 
-ADD_LIBRARY(conf_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90 mpi_wins.f90)
+ADD_LIBRARY(conf_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90)
 
-ADD_LIBRARY(lsj_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90 mpi_wins.f90 lsj_aux.f90)
+ADD_LIBRARY(lsj_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90 lsj_aux.f90)
 
 ADD_LIBRARY(dtm_common params.f90 str_fmt.f90 conf_variables.f90 dtm_variables.f90 conf_init.f90 wigner.f90 determinants.f90 amp_ops.f90)
 
