@@ -34,7 +34,6 @@ Module params
     Integer, Parameter :: IP1   =  15000         ! Nd1 - number of determinants for 
                                                  !       direct diagonalization   
     Integer, Parameter :: IPgnt =   2891         ! Ngaunt - number of tabulated Gaunts
-    Integer, Parameter :: IPlx  =      5         ! max l for tabulation of Gaunts   
     Integer, Parameter :: IPbr  =      2         ! 1 - no valence Breit
                                                  ! 2 - valence Breit/Gaunt  
 

@@ -6,9 +6,9 @@ Module conf_variables
     
     Public
 
-    Integer             :: Kexn, Kp, Ksig, Kdsig, K_prj, Ngint, Nhint, Ifail, Kw
+    Integer             :: Kexn, Ksig, Kdsig, K_prj, Ngint, Nhint, Ifail, Kw
     Integer             :: NmaxS, LmaxS, Nmax1, Lmax1, NmaxScr, LmaxScr, kchunks
-    Integer             :: IPlv, nrd, kdavidson, K_sms, kXIJ, kJJJ, num_is
+    Integer             :: IPlv, nrd, kdavidson, K_sms, kXIJ, num_is
     Integer             :: Kherr, Kgerr, Lmax, NhintS, NgintS, Kmax, Ksym, Nsum
     Integer             :: Nd0, maxJcore, vaBinSize
     Integer(Kind=Int64) :: iscr, NumH, NumJ, counter1, ij8J, ih8H

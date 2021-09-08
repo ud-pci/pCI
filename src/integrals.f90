@@ -731,9 +731,10 @@ Module integrals
 
     Real(dp) Function Gaunt(k,xj1,xm1,xj2,xm2)
         Implicit None
-        Integer  :: i, is, ind, ib1, ib2, im, k, ij
+        Integer  :: i, is, ind, ib1, ib2, im, k, ij, IPlx
         Real(dp)   :: g, x, xj1, xj2, xm1, xm2, j1, j2, m1, m2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        IPlx = 5 ! max l
         j1=xj1
         j2=xj2
         m1=xm1

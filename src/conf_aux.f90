@@ -100,6 +100,7 @@ Module conf_aux
         If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
 
         If (Ksig /= 0) Then
+            If (.not. Allocated(Scr)) Allocate(Scr(10))
             If (.not. Allocated(Rsig)) Allocate(Rsig(NhintS))
             If (.not. Allocated(Dsig)) Allocate(Dsig(NhintS))
             If (.not. Allocated(Esig)) Allocate(Esig(NhintS)) 
@@ -455,6 +456,7 @@ Module conf_aux
 
                 Call system_clock(e1)
                 ttime=Real((e1-s1)/clock_rate)
+                !print*,e1,s1,e1-s1
                 Call FormattedTime(ttime, timeStr)
                 Write(*,'(2X,A)'), 'FormH: Initial approximation calculated in '// trim(timeStr)// '.'
                 
@@ -891,7 +893,7 @@ Module conf_aux
                         Write( 6,'(1X,"Davidson procedure converged")')
                         Write(11,'(1X,"Davidson procedure converged")')
                     End If
-                    Return
+                    Exit
                 End If
             End If
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)

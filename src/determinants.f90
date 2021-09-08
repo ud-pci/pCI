@@ -9,7 +9,7 @@ Module determinants
     Private
 
     Public :: FormD, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompCD
+    Public :: Gdet, CompC, CompD, CompD2, CompCD
 
   Contains
     
@@ -622,6 +622,36 @@ Module determinants
         Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompCD
+
+    Subroutine CompD2(id1,id2,nf)
+        ! this subroutine compares determinants and counts number of differences in orbitals
+        ! return the number of differences nf
+        Implicit None
+        Integer  :: ni, nj, nf, i, j, l1, l2, k, imax
+        Integer, allocatable, dimension(:)   :: id1, id2
+        Integer, dimension(IP6) :: det1, det2
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        det1=0
+        det2=0
+        Do i=1,Ne
+            det1(id1(i))=1
+            det2(id2(i))=1
+        End Do
+        nf = 0
+        imax=max(maxval(id1),maxval(id2))
+        print*,imax
+        Do i=1,imax
+            nf = nf + popcnt(xor(det1(i),det1(i))) 
+        End Do
+        !Do i=1,Ne
+        !    nf = nf + popcnt(xor(id1(i),id2(i)))
+        !End Do
+        print*,'before',id1(1:Ne),id2(1:Ne),nf
+        nf = ishft(nf,-1)
+        print*,'after',id1(1:Ne),id2(1:Ne),nf
+        Return
+    End Subroutine CompD2
+
 
     Subroutine CompD(id1,id2,nf)
         ! this subroutine compares determinants and counts number of differences in orbitals

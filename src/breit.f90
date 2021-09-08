@@ -14,10 +14,12 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, IPlx
         Real(dp) :: J1,M1,J2,M2, x
 
         Open (unit=12,file='CONF.GNT',status='UNKNOWN',form='unformatted')
+
+        IPlx = 5            ! max(l)
 
         l=0
         lx=IPlx+1            !### = max(l)
@@ -50,7 +52,6 @@ Module breit
                 End Do
             End Do
         End Do
-
         If (l.NE.IPgnt) Then
            Write (*,*) ' number of gaunts ',l,' NE IPgnt'
            Stop
