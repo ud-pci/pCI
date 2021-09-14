@@ -8,42 +8,33 @@ Module determinants
 
     Private
 
-    Public :: FormD, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
+    Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
     Public :: Gdet, CompC, CompD, CompD2, CompCD
 
   Contains
-    
-    Subroutine FormD
-        ! This subroutine evaluates HF energies of the determinants (for HintS).
+
+    Subroutine calcNd0(ic1, n2)
         Implicit None
-        Integer :: i, ie, ke, n
-        Real(dp) :: Emin, Emax, x
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Diag(Nd))
+        Integer, Intent(out) :: ic1, n2
+        Integer :: ic, n1 
 
-        Emin= 1.d99
-        Emax=-1.d99
-        Do n=1,Nd
-            x=0.d0
-            Do i=1,Ne
-                ie=Iarr(i,n)
-                ke=Nh(ie)
-                x=x+Eps(ke)
-            End Do
-            x=E_0-x
-            Diag(n)=x
-            Emin=dmin1(Emin,x)
-            Emax=dmax1(Emax,x)
-        End Do
-        write( 6,'(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)') Emin,Emax
-        write(11,'(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)') Emin,Emax
-        Return
-    End Subroutine FormD
-
+        ic1=0
+        Nd0=IP1+1
+        n1=0
+        n2=Nd0-1
+        Do ic=1,Nc4
+            n1=n1+Ndc(ic)
+            If (n1 < Nd0) Then
+                n2=n1
+                ic1=ic
+            End If
+        End Do    
+    End Subroutine calcNd0
+    
     Subroutine Dinit
         Implicit None
         Integer :: i0, ni, j, n, ic, i, nmin, nem, imax
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         i0=0
         Do ni=1,Ns
             nem=Jj(ni)+1
@@ -138,7 +129,6 @@ Module determinants
                 End If
                 Call Ndet(iconf,fin,idet)
             End Do
-    !  -- -  - - - - - - - - - - - - - - - - - - - - - -
             Ndc(iconf)=ndi
             Jtc(iconf)=ndi
             If (kv == 1) Jtc(iconf)=ndi-ndi1
@@ -485,7 +475,7 @@ Module determinants
         Integer, intent(InOut)                            :: i(3), j(3)
         
         Integer                                           :: l0, l1, l2, ni, nj, n, ic, nn0, &
-                                                             nn1, ll0, ll1, jj0, jj1, ndi, iconf 
+                                                             nn1, ll0, ll1, jj0, jj1, ndi, iconf, imax
         Character(Len=1), Dimension(5) :: let
         data let/'s','p','d','f','g'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -629,26 +619,24 @@ Module determinants
         Implicit None
         Integer  :: ni, nj, nf, i, j, l1, l2, k, imax
         Integer, allocatable, dimension(:)   :: id1, id2
-        Integer, dimension(IP6) :: det1, det2
+        Integer, dimension(Nsu) :: det1, det2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         det1=0
         det2=0
-        Do i=1,Ne
-            det1(id1(i))=1
-            det2(id2(i))=1
-        End Do
+        det1(id1(1:Ne))=1
+        det2(id2(1:Ne))=1
         nf = 0
         imax=max(maxval(id1),maxval(id2))
-        print*,imax
+        !print*,imax
         Do i=1,imax
             nf = nf + popcnt(xor(det1(i),det1(i))) 
         End Do
         !Do i=1,Ne
         !    nf = nf + popcnt(xor(id1(i),id2(i)))
         !End Do
-        print*,'before',id1(1:Ne),id2(1:Ne),nf
+        !print*,'before',id1(1:Ne),id2(1:Ne),nf
         nf = ishft(nf,-1)
-        print*,'after',id1(1:Ne),id2(1:Ne),nf
+        !print*,'after',id1(1:Ne),id2(1:Ne),nf
         Return
     End Subroutine CompD2
 
@@ -694,11 +682,11 @@ Module determinants
         Integer, allocatable, dimension(:)  :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Jdel=0
-        iconf1(1:Ne)=Nh(idet1(1:Ne))   !### iconf1(i) = No of the orbital occupied
-        iconf2(1:Ne)=Nh(idet2(1:Ne))    !#### by the electron i
+        iconf1(1:Ne)=Nh(idet1(1:Ne))   !### iconf1(i) = No of the orbital occupied by the electron i
+        iconf2(1:Ne)=Nh(idet2(1:Ne))    
         Call Rspq(iconf1,iconf2,is,icomp,i1,j1,i2,j2)
         If (icomp == 1) then
-          Jdel=iabs(Jj(i2)-Jj(j2))/2
+            Jdel=iabs(Jj(i2)-Jj(j2))/2
         End If
         Return
     End Subroutine CompC

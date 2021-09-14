@@ -8,53 +8,6 @@ Module conf_pt_aux
 
   Contains
 
-    Subroutine Input
-        ! This subroutine Reads in parameters and configurations from CONF.INP
-        Use conf_init, Only : inpstr, ReadConfInp, ReadConfigurations
-        Implicit None
-        Integer :: i, j, k, i1, i2, ic, icc, ne0, nx, ny, nz, istr
-        Character(Len=1) :: name(16)
-        Character(Len=512) :: strfmt
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(/4X,"Program CONF_PT", &
-               /4X,"PT corrections to binding energy", & 
-               /4X,"Zero approximation is taken from CONF.XIJ", &
-               /4X,"New vectors are in CONF_PT.XIJ and", &
-               /4X,"new input is in CONF_new.INP")'
-        Write( 6,strfmt) 
-        Write(11,strfmt)
-        ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
-        Ksig=0
-        Kdsig=0
-        average_diag=.true.      ! diagonal is averaged over relat. config.
-
-        Call ReadConfInp
-
-        Ncci = Nc
-        If (Ncpt < Ncci) Then
-            Write (*,*) 'Nothing to Do for NcPT =', Ncpt, ' & Nc = NcCI =', Ncci
-            Stop
-        End If
-        Nc = Ncpt
-
-        Open(unit=21, file='cpt.in')
-        Read(21,*) ktf,kvar
-        Close (21)
-    
-        If (abs(C_is) < 1.d-6) K_is = 0
-        If (K_is == 0) C_is = 0.d0
-        If (K_is == 2  .or.  K_is == 4) Then
-            Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): '
-            Read(*,*) K_sms
-            If ((K_sms-1)*(K_sms-2)*(K_sms-3) /=  0) Stop
-        End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        Call ReadConfigurations
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -  
-        Kl = 3
-        Return
-    End Subroutine Input
-
     Subroutine Init
         Use conf_init, Only : inpstr
         Implicit None

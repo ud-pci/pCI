@@ -11,38 +11,31 @@ Module davidson
 
   Contains
     
-    Subroutine Init4
+    Subroutine Init4(mype,npes)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
         ! The initial approximation Hamil is stored in the 
         ! matrix Z1 and is constructed by selecting the top-left 
         ! block of the full Hamil matrix H.
         ! The diagonal elements of H are stored in the array Diag.
+        Use mpi
+        Use determinants, Only : calcNd0
         Implicit None
-        Integer  :: k, ierr, n, n1, n2, ic, ic1
+        Integer  :: k, ierr, n, n1, n2, ic, ic1, mype, npes, mpierr
+        Integer(Kind=int64) :: l8
         Real(dp) :: t
-        Integer*8 :: num8, Ibuf0, ibuf, l8
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ! Dimension of the approximation to start with:
-        n1=0
-        ic1=0
-        n2=Nd0-1
-        Do ic=1,Nc4
-            n1=n1+Ndc(ic)
-            If (n1 < Nd0) Then
-                n2=n1
-                ic1=ic
-            End If
-        End Do
-        Nd0=n2
-        Write( 6,'(3X,"Starting approx. includes ",I3," conf.,", &
-             I4," det.")') ic1,Nd0
-        Write(11,'(3X,"Starting approx. includes ",I3," conf.,", &
-             I4," det.")') ic1,Nd0
+        Call calcNd0(ic1, Nd0)
+        If (mype == 0) Then
+            Write( 6,'(3X,"Starting approx. includes ",I3," conf.,",I4," det.")') ic1,Nd0
+            Write(11,'(3X,"Starting approx. includes ",I3," conf.,",I4," det.")') ic1,Nd0
+        End If
+
         ! Construct the Hamil in the initial approximation:
         Diag=0.d0
         Z1=0.d0
-        Do l8=1,NumH
+        Do l8=1,ih8H
             n=Hamil%n(l8)
             k=Hamil%k(l8)
             t=Hamil%t(l8)
@@ -54,10 +47,15 @@ Module davidson
                 Exit
             End If
         End Do
-        Return
+        If (mype==0) Then
+            Call MPI_Reduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                                MPI_COMM_WORLD, mpierr)
+          Else
+            Call MPI_Reduce(Z1, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                                MPI_COMM_WORLD, mpierr)
+        End If
     End Subroutine Init4
 
-!     =================================================
     Subroutine Hould(n,ndim,Ee,Dd,Zz)
         ! This subroutine diagonalizes the matrix Zz using 
         ! Householder's method of diagonalization.

@@ -26,10 +26,10 @@ ADD_LIBRARY(conf_pt_common params.f90 conf_variables.f90 conf_pt_variables.f90 c
 ADD_EXECUTABLE(basc basc_aux.f90 basc.f90)
 TARGET_LINK_LIBRARIES(basc basc_common) 
 
-ADD_EXECUTABLE(conf conf_aux.f90 conf_init.f90 conf.f90)
+ADD_EXECUTABLE(conf conf_init.f90 conf.f90)
 TARGET_LINK_LIBRARIES(conf conf_common)
 
-ADD_EXECUTABLE(conf_lsj conf_aux.f90 conf_init.f90 conf_lsj.f90)
+ADD_EXECUTABLE(conf_lsj conf_init.f90 conf_lsj.f90)
 TARGET_LINK_LIBRARIES(conf_lsj lsj_common)
 
 ADD_EXECUTABLE(dtm dtm_aux.f90 dtm.f90)

@@ -94,8 +94,6 @@ Module matrix_io
             Call FormattedTime(total_time, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> Writing ' // filename // ' took ' // trim(timeStr)
         End If
-
-        Return
     End Subroutine WriteMatrix
 
     Subroutine ReadMatrix(mat,num_elements,num_total,filename,mype,npes,mpierr)

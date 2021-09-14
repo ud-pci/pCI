@@ -453,7 +453,7 @@ Module conf_init
     Subroutine InitFormH(npes,mype)
         ! this subroutine initializes variables used for FormH and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
-        Use mpi_f08
+        Use mpi
         Implicit None
         Integer :: npes, mype, mpierr, i
 

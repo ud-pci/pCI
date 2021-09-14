@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.9] - 2021-09-14
+- restructed conf program - removed conf_aux module and combined with main conf program
+- parallelized contruction of initial approximation in conf
+
 ## [0.6.8] - 2021-09-08
 - bug fix in conf.f90 - Kl4 is now broadcasted
 
