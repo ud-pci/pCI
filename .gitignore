@@ -21,3 +21,6 @@ Makefile
 
 # Test directory
 test/
+
+# vscode
+.vscode
