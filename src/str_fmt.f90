@@ -1,12 +1,36 @@
 Module str_fmt
 
+    Use, Intrinsic :: iso_fortran_env, Only : int64
+
     Implicit None
     
     Private
 
-    Public :: FormattedMemSize, FormattedTime
+    Public :: startTimer, stopTimer, FormattedMemSize, FormattedTime
 
   Contains
+
+    Subroutine startTimer(start_time)
+        Implicit None
+        Integer(Kind=int64), Intent(Out) :: start_time
+
+        Call system_clock(start_time)
+        
+    End Subroutine startTimer
+
+    Subroutine stopTimer(start_time, timeStr)
+        Implicit None
+        Integer(Kind=int64), Intent(In) :: start_time
+        Integer(Kind=int64)             :: end_time, clock_rate
+        Real                            :: total_time
+        Character(Len=16), Intent(Out) :: timeStr
+
+        Call system_clock(count_rate=clock_rate)
+        Call system_clock(end_time)
+        total_time = (end_time - start_time) / clock_rate
+        Call FormattedTime(total_time, timeStr)
+        
+    End Subroutine stopTimer
 
     Subroutine FormattedMemSize(bytes, outString)
         Implicit none

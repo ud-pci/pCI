@@ -4,14 +4,11 @@ Module params
     !                      parameters determining dimensions of arrays,
     !                      and global variables and arrays used in parallel programs
     !
-    Use, Intrinsic :: iso_fortran_env
+    Use, Intrinsic :: iso_fortran_env, Only : dp => real64, int64
 
     Implicit None
     
     Public
-
-    ! double precision
-    Integer, Parameter  :: dp   = real64   
 
     ! defining numerical values for physical constants
     Real(dp), Parameter :: DPcl = 137.0359922594e0_dp ! speed of light in a.u.

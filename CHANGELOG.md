@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.11] - 2021-09-16
+- implemented dynamic workload scheduling in conf_lsj
+- added completion time message to ine
+- added several timing messages to conf_lsj
+
+## [0.6.10] - 2021-09-15
+- bug fix in conf - fixed energies for case of Kl4 = 2
+- added more code documentation to conf
+
 ## [0.6.9] - 2021-09-14
 - restructed conf program - removed conf_aux module and combined with main conf program
 - parallelized contruction of initial approximation in conf

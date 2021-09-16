@@ -6,9 +6,18 @@ Module conf_variables
     
     Public
 
-    Integer             :: Kexn, Ksig, Kdsig, K_prj, Ngint, Nhint, Ifail, Kw
-    Integer             :: NmaxS, LmaxS, Nmax1, Lmax1, NmaxScr, LmaxScr, kchunks
-    Integer             :: IPlv, nrd, kdavidson, K_sms, kXIJ, num_is
+    ! Set Kw to determine whether CONF.HIJ will be written or not
+    ! Kw=0 - CONF.HIJ will not be written
+    ! Kw=1 - CONF.HIJ will be written
+    Integer, Parameter :: Kw=1 
+
+    ! Set kXIJ to determine the interval in which CONF.XIJ will be written
+    ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
+    Integer, Parameter :: kXIJ=10
+
+    Integer             :: Kexn, Ksig, Kdsig, K_prj, Ngint, Nhint, Ifail 
+    Integer             :: NmaxS, LmaxS, Nmax1, Lmax1, NmaxScr, LmaxScr
+    Integer             :: IPlv, nrd, kdavidson, K_sms, num_is
     Integer             :: Kherr, Kgerr, Lmax, NhintS, NgintS, Kmax, Ksym, Nsum
     Integer             :: Nd0, maxJcore, vaBinSize
     Integer(Kind=Int64) :: iscr, NumH, NumJ, counter1, ij8J, ih8H

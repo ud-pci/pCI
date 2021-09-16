@@ -9,43 +9,135 @@ Module lsj_aux
     Subroutine lsj(cc,nmax,xj,xl,xs,mype,npes)
         Use mpi
         Use determinants, Only : Gdet
+        Use str_fmt, Only : startTimer, stopTimer
         Implicit None
         Real(dp), Allocatable, Dimension(:) :: cc
         Integer, Allocatable, Dimension(:) :: idet1, idet2
-        Integer :: mype, npes, mpierr
-        Integer :: n, n1, ic1, ic2, k, k1, k1n, ndn, ndk, nmax
+        Integer(Kind=int64) :: s1
+        Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, maxme, an_id, ncGrowBy, endnc, num_done
+        Integer :: n, n1, ic1, ic2, j, k, k1, k1n, ndn, ndk, nmax, status(MPI_STATUS_SIZE), sender
+        Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Real(dp) :: xj, xl, xs, ckn, tj, tl, ts
+        Character(Len=16) :: counterStr, timeStr
+        Logical :: moreTimers
+
+        ! Set moreTimers to .true. to display progress of each lsj iteration
+        moreTimers = .false.
 
         xj=0.d0
         xl=0.d0
         xs=0.d0
-        n=0
+        n=0 
+        ncGrowBy = 1
 
         Allocate(idet1(Ne),idet2(Ne))
-        Do ic1=mype+1,Nc,npes
-            ndn=Ndc(ic1)
-            n=sum(Ndc(1:ic1-1))
-            Do n1=1,ndn
-                n=n+1
-                call Gdet(n,idet1)
-                k=n-1
-                Do ic2=ic1,Nc
-                    ndk=Ndc(ic2)
-                    k1n=1
-                    If (ic2.EQ.ic1) k1n=n1
-                    Do k1=k1n,ndk
-                        k=k+1
-                        call Gdet(k,idet2)
-                        call lsj_det(idet1,idet2,tj,tl,ts)
-                        ckn=cc(n)*cc(k)
-                        If (n.ne.k) ckn=2*ckn
-                        xj=xj+ckn*tj
-                        xl=xl+ckn*tl
-                        xs=xs+ckn*ts
+
+        Call startTimer(s1)
+        If (mype == 0) Then
+            ! Distribute a portion of the workload of size ncGrowBy to each worker process
+            Do an_id = 1, npes - 1
+               nnc = ncGrowBy*an_id + 1
+               Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+            End Do
+
+            Do ic1=1, ncGrowBy
+                ndn=Ndc(ic1)
+                n=sum(Ndc(1:ic1-1))
+                Do n1=1,ndn
+                    n=n+1
+                    call Gdet(n,idet1)
+                    k=n-1
+                    Do ic2=ic1,Nc
+                        ndk=Ndc(ic2)
+                        k1n=1
+                        If (ic2.EQ.ic1) k1n=n1
+                        Do k1=k1n,ndk
+                            k=k+1
+                            call Gdet(k,idet2)
+                            call lsj_det(idet1,idet2,tj,tl,ts)
+                            ckn=cc(n)*cc(k)
+                            If (n.ne.k) ckn=2*ckn
+                            xj=xj+ckn*tj
+                            xl=xl+ckn*tl
+                            xs=xs+ckn*ts
+                        End Do
                     End Do
                 End Do
             End Do
-        End Do
+
+            num_done = 0
+            ncsplit = Nc/10
+            nccnt = ncsplit
+            j=9
+
+            Do 
+                Call MPI_RECV(msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                sender = status(MPI_SOURCE)
+                
+                If (nnc + ncGrowBy <= Nc) Then
+                    nnc = nnc + ncGrowBy
+                    Call MPI_SEND( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                Else
+                    msg = -1
+                    Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                    num_done = num_done + 1
+                End If
+                
+                If (nnc == nccnt .and. nnc /= ncsplit*10) Then
+                    Call stopTimer(s1, timeStr)
+                    If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                    j=j-1
+                    nccnt = nccnt + ncsplit
+                End If
+
+                If (num_done == npes-1) Then
+                    Call stopTimer(s1, timeStr)
+                    If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                    Exit
+                End If
+            End Do
+        Else
+            Do 
+                Call MPI_RECV ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                
+                If (nnc == -1) Then
+                    Exit
+                Else
+                    If (Nc - nnc < ncGrowBy) Then
+                        endnc = Nc
+                    Else
+                        endnc = nnc+ncGrowBy-1
+                    End If
+
+                    Do ic1=nnc,endnc
+                        ndn=Ndc(ic1)
+                        n=sum(Ndc(1:ic1-1))
+                        Do n1=1,ndn
+                            n=n+1
+                            call Gdet(n,idet1)
+                            k=n-1
+                            Do ic2=ic1,Nc
+                                ndk=Ndc(ic2)
+                                k1n=1
+                                If (ic2.EQ.ic1) k1n=n1
+                                Do k1=k1n,ndk
+                                    k=k+1
+                                    call Gdet(k,idet2)
+                                    call lsj_det(idet1,idet2,tj,tl,ts)
+                                    ckn=cc(n)*cc(k)
+                                    If (n.ne.k) ckn=2*ckn
+                                    xj=xj+ckn*tj
+                                    xl=xl+ckn*tl
+                                    xs=xs+ckn*ts
+                                End Do
+                            End Do
+                        End Do
+                    End Do
+                    Call MPI_SEND( msg, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                End If
+            End Do
+        End If
+
         Call MPI_AllReduce(xj, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(xl, xl, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(xs, xs, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -53,7 +145,6 @@ Module lsj_aux
         Deallocate(idet1,idet2)
         Return
     End Subroutine lsj
-
 
     Subroutine lsj_det(idet1,idet2,tj,tl,ts)
         Use formj2, Only : Plj

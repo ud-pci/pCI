@@ -49,12 +49,12 @@ Program conf
     Use integrals, only : Rint
     use conf_init, only : InitFormH
     use formj2, only : FormJ, J_av
-    Use str_fmt, Only : FormattedTime
+    Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
     Implicit None
 
     Integer   :: n, k, i, j, ierr, mype, npes, mpierr
-    Integer(kind=int64) :: clock_rate, start_time, end_time
+    Integer(kind=int64) :: start_time
     Real :: total_time
     Real(dp)  :: t
     Character(Len=1024) :: strFromEnv
@@ -68,61 +68,59 @@ Program conf
     ! Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
-    Call system_clock(count_rate=clock_rate)
-    If (mype==0) Call system_clock(start_time)
+    Call startTimer(start_time)
     
     ! Give ConfFilePaths a chance to decide what filenames/paths to use:
     !Call ConfFileInit()
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
-    Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU",eValue)
-    read(eValue,'(I12)') memTotalPerCPU
+    Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU", eValue)
+    read(eValue,'(I12)') memTotalPerCPU  
 
-    ! Set Kw to determine whether CONF.HIJ will be written or not
-    ! Kw=0 - CONF.HIJ will not be written
-    ! Kw=1 - CONF.HIJ will be written
-    Kw=1 
-
-    ! Set kXIJ to determine the interval in which CONF.XIJ will be written
-    ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
-    kXIJ=10    
-
+    ! Initialization subroutines
+    ! master processor will read input files and broadcast parameters and arrays to all processors
     If (mype == 0) Then
-        Call Input ! reads list of configurations from CONF.INP
-        Call Init ! reads basis set information from CONF.DAT
-        Call Rint ! reads radial integrals from CONF.INT
-        If (Ksig /= 0) Call RintS ! reads in radial integrals from SGC.CON and SCRC.CON
-        Call Dinit      ! forms list of determinants
-        Call Jterm      ! prints table with numbers of levels with given J
+        Call Input                  ! reads list of configurations from CONF.INP
+        Call Init                   ! reads basis set information from CONF.DAT
+        Call Rint                   ! reads radial integrals from CONF.INT
+        If (Ksig /= 0) Call RintS   ! reads in radial integrals from SGC.CON and SCRC.CON
+        Call Dinit                  ! forms list of determinants
+        Call Jterm                  ! prints table with numbers of levels with given J
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
         If (Ksig*Kdsig /= 0) Call FormD
     End If
 
+    ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype,npes)
     
-    ! Evaluation of Hamiltonian
+    ! Formation of Hamiltonian matrix
     If (Kl <= 2 .or. Kl4 == 0) Call FormH(npes,mype)
 
-    Call FormJ(mype, npes)   ! calculates matrix J^2 and writes it to CONF.JJJ
+    ! Formation of J^2 matrix
+    Call FormJ(mype, npes)   
     
+    ! Deallocate arrays that are no longer used in FormH
     Call DeAllocateFormHArrays(mype,npes)
+
+    ! Allocate arrays that are used in Davidson procedure
     Call AllocateDvdsnArrays(mype,npes)
     
-    Call Diag4(mype,npes) ! Davidson diagonalization
+    ! Davidson diagonalization
+    Call Diag4(mype,npes) 
     
+    ! Write final eigenvectors to file CONF.XIJ
     Call WriteFinalXIJ(mype,npes)
 
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call PrintEnergies   !#   Output of the results
 
-        Call system_clock(end_time)
-        total_time=Real((end_time-start_time)/clock_rate)
-        Call FormattedTime(total_time, timeStr)
+        Call stopTimer(start_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
 
+    ! Finalize MPI 
     Call MPI_Finalize(mpierr)
 
 Contains
@@ -131,8 +129,6 @@ Contains
         ! This subroutine reads in parameters and configurations from CONF.INP
         Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
-        Integer  :: i, i1, i2, ic, nx, ny, nz, ne0, n, k
-        Character(Len=1) :: name(16)
         Character(Len=32) :: strfmt
 
         ! Write name of program
@@ -140,24 +136,34 @@ Contains
         strfmt = '(4X,"Program conf v0.3.11")'
         Write( 6,strfmt)
         Write(11,strfmt)
-        ! - input from the file 'CONF.INP' - - - - - - - - - - - - - - - -
+
+        ! Read input parameters from file CONF.INP
         Call ReadConfInp
 
         If (dabs(C_is) < 1.d-6) K_is=0
         If (K_is == 0) C_is=0.d0
 
+        ! Read job parameters from file c.in
+        ! Kl = 0 - new computation
+        ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
+        ! Kl = 2 - new computation with MBPT
+        ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
         Read (99,*) Kl, Ksig, Kdsig
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
-        Read(99,*) K_sms
-        Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
-        If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
+            Read(99,*) K_sms
+            Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+            If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
         Close(99)
 
-        Call ReadConfigurations
-        ! - - - - - - -  Case kl = 2  - - - - - - - - - - -
+        ! If starting new computation with MBPT
+        ! Ksig = 0 - no MBPT included (same as Kl = 0)
+        ! Ksig = 1 - include 1-electron MBPT corrections 
+        ! Ksig = 2 - include 1-electron and 2-electron MBPT corrections
+        ! Kdsig = 0 - automatic approximation of the energy dependence of Sigma
+        ! Kdsig = 1 - manually include energy dependence of Sigma
         If (Kl == 2) Then
             Write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
             If (Ksig /= 0) Then
@@ -169,18 +175,25 @@ Contains
         Else
             Ksig=0
         End If
-        ! - - - - - - -  Case kv = 1,3  - - - - - - - - - -
-        K_prj=0                    !# this key is fixed for kv=2,4
-        If (Kv == 1 .or. Kv == 3) Then
-        K_prj=1
-        Write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
-        Write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
+
+        ! Read configurations from file CONF.INP
+        Call ReadConfigurations
+
+        ! Set key for projection of J
+        ! If Kv = 3, then K_prj = 1 - use selection of states with projection of J
+        ! If Kv = 4, then K_prj = 0 - no selection of states with projection of J
+        K_prj=0                   
+        If (Kv == 3) Then
+            K_prj=1
+            Write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
+            Write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         !If (Kl /= 1) Then ! If Kl=1, continue from a previous calculation
         !      Open(unit=16,status='UNKNOWN',file='CONF.JJJ')
         !      Close(unit=16,status='DELETE')
         !End If
+
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
         Read(16) (In(i),i=1,IPgnt)
         Read(16) (Gnt(i),i=1,IPgnt)
@@ -191,7 +204,7 @@ Contains
     Subroutine Init
         Implicit None
         Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, If, &
-                    ii, i1, n2, n1, l, nmin, jlj, i0, nlmax
+                    ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
@@ -201,38 +214,48 @@ Contains
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
+        Character(Len=256) :: strfmt, err_msg
+
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
         Data Let/'s','p','d','f','g','h','i','k','l'/
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,err=700)
+
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        If (err_stat /= 0) Then
+            strfmt='(/2X,"file CONF.DAT is absent"/)'
+            Write( *,strfmt)
+            Write(11,strfmt)
+            Stop
+        End If
+
         Read(12,rec=1) p
         Read(12,rec=2) q
         Read(12,rec=5) p1
         Read(12,rec=6) q1
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         z1 = pq(1)
         If (abs(Z-z1) > 1.d-6) Then
-            Write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
-            Write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
+            strfmt = '("nuc. charge is changed: Z =",F12.6," ><",F12.6)'
+            Write( 6,strfmt) Z,z1
+            Write(11,strfmt) Z,z1
             Read(*,*)
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
         Ns = pq(2)+c1
         ii = pq(3)+c1
         Rnuc=pq(13)
         dR_N=pq(16)
+        
+        strfmt = '(4X,"Kl  =",I3,7X,"Z   =",F6.2,4X,"Jm  =",F6.2,/4X, &
+                    "Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3,5X,"Nc =",I6)'
+        Write( 6,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
+        Write(11,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
+
         longbasis=abs(PQ(20)-0.98765d0) < 1.d-6
-        Write( 6,'(4X,"Kl  =",I3,7X,"Z   =",F6.2,4X,"Jm  =",F6.2, &
-               /4X,"Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3, &
-                5X,"Nc =",I6)') Kl,Z,Jm,Nsp,Ns,Nso,Nc
-        Write(11,'(4X,"Kl  =",I3,7X,"Z   =",F6.2,4X,"Jm  =",F6.2, &
-               /4X,"Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3, &
-                5X,"Nc =",I6)') Kl,Z,Jm,Nsp,Ns,Nso,Nc
         If (longbasis) Then
             Write( *,*) ' Using variant for long basis '
             Write(11,*) ' Using variant for long basis '
@@ -257,6 +280,7 @@ Contains
                 Jj(ni)=pq(If)+c2
             End Do
         End If
+
         Nsu=0
         Do nj=1,Nsp
             i=sign(1.d0,Qnl(nj))
@@ -273,8 +297,9 @@ Contains
                 If (nnj == Nn(ni) .and. Kk(ni) == kkj) Then
                     Exit
                 Else If (ni == ns) Then
-                    Write( 6,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
-                    Write(11,'(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)') nj,nnj,llj,kkj
+                    strfmt = '(/2X,"no orbital for shell ",I3,": n,l,k=",3I4)'
+                    Write( 6,strfmt) nj,nnj,llj,kkj
+                    Write(11,strfmt) nj,nnj,llj,kkj
                     Stop
                 End If
             End Do
@@ -292,10 +317,11 @@ Contains
                 Nst=Nst+1
             End Do
         End Do
-        Write( 6,'(4X,"Number of actually Used orbitals: Nsu =",I3, &
-             /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
-        Write(11,'(4X,"Number of actually Used orbitals: Nsu =",I3, &
-             /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)') Nsu,Ne,nec,Nst
+        strfmt = '(4X,"Number of actually Used orbitals: Nsu =",I3, &
+                    /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)'
+        Write( 6,strfmt) Nsu,Ne,nec,Nst
+        Write(11,strfmt) Nsu,Ne,nec,Nst
+
         n=0
         ic=0
         i0=0
@@ -320,21 +346,25 @@ Contains
                 i=0
             End If
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Write( 6,'(1X,71("="))')
-        Write(11,'(1X,71("="))')
+
+        strfmt = '(1X,71("="))'
+        Write( 6,strfmt)
+        Write(11,strfmt)
+
         Do ni=1,Nso
             l =Ll(ni)+1
             lll(ni)=let(l)
         End Do
-        Write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                        /6X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
-                        (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
+
+        strfmt = '(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"), &
+                           /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                           /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                           /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                           /6X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                           /6X,6(I2,A1,"(",I1,"/2)",I2,";"))'
+        Write(11,strfmt) (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
         Write(11,'(1X,71("="))')
+
         Do ic=1,Nc
             n1=Nc0(ic)+1
             n2=Nc0(ic)+Nvc(ic)
@@ -347,20 +377,22 @@ Contains
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
                 If (Nq(i) > jjj(i1)+1) Then
-                   Write(11,'(/2X,"wrong number of electrons"/ &
-                        2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
-                        " (",I2,")")') ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
-                 Stop
+                    strfmt = '(/2X,"wrong number of electrons",/2X,"for the shell:", &
+                                I3,3X,I2,A1,I2,"/2"," (",I2,")")'
+                    Write(11,strfmt) ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
+                    Stop
                 End If
             End Do
             n=n2-n1+1
-            Write(11,'(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
-                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                 /8X,6(I2,A1,"(",I1,"/2)",I2,";"))') &
-                 ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
+            strfmt = '(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"))'
+            Write(11,strfmt) ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
         End Do
+
         Write(11,'(1X,71("="))')
+
         If (Ksig > 0) Then
             Do ni=Nso+1,Nsu
                Read(12,rec=2*ni+7) p
@@ -370,6 +402,7 @@ Contains
                    /5(I5,F10.6))') (i,Eps(i),i=Nso+1,Nsu)
         End If
         Close(unit=12)
+
         ! Maximal number of eigenvectors Nlv:
         nlmax=IPlv
         If (Kv >= 3) Then
@@ -377,38 +410,50 @@ Contains
         End If
         If (Nlv > nlmax) Nlv=nlmax
         Return
-        !     - - - - - - - - - - - - - - - - - - - - - - - - -
-700     Write( 6,'(/2X,"file CONF.DAT is absent"/)')
-        Write(11,'(/2X,"file CONF.DAT is absent"/)')
-        Stop
-        !     - - - - - - - - - - - - - - - - - - - - - - - - -
+
     End subroutine Init
 
     Subroutine RintS
-        ! Reading of files SGC.CON and SCRC.CON with the self-energy and
-        ! screening radial integrals.
+        ! Reading of files SGC.CON and SCRC.CON with the self-energy and screening radial integrals.
         Implicit None
         Integer :: na, nb, ierr, k, nsh, nx, khot, la, lb, ja, jb, na1, nb1, ind, &
-                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy
-        Real :: x, y, z
-        !     - - - - - - - - - - - - - - - - - - - - - - - - -
+                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy, err_stat
+        Real :: x, y
+        Character(Len=256) :: strfmt, err_msg
+
+        ! Initialize counters
         NhintS=0
         NgintS=0
+        
         If (Ksig == 0) Return
         nsh=Nso+1
+
         ! parameter for indexation of integrals:
         nx = IPx
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ! Reading matrix element of Sigma from SGC.CON
         If (Kdsig /= 0) Then
-            Write(*,'(5X,"Give valence energy: ",$)')
+            strfmt = '(5X,"Give valence energy: ",$)'
+            Write(*,strfmt)
             Read(*,*) E_0
             Kexn=1
-            Write(*,'(5X,"Extrapolation variant ","(1-normal,2-one side,3-nonlin.): ",I2)') Kexn
+            strfmt = '(5X,"Extrapolation variant ","(1-normal,2-one side,3-nonlin.): ",I2)'
+            Write(*,strfmt) Kexn
         End If
-        Open(unit=18,file='SGC.CON',status='OLD',err=700)
-        Write(*,*)' Reading file SGC.CON ...'
-        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
+
+        Open(unit=18,file='SGC.CON',status='OLD',iostat=err_stat,iomsg=err_msg)
+        If (err_stat /= 0) Then
+            strfmt='(/2X,"file SGC.CON is absent"/)'
+            Write( *,strfmt)
+            Write(11,strfmt)
+            Stop
+        Else
+            Write(*,*)' Reading file SGC.CON ...'
+        End If
+        
+        strfmt = '(7X,I3,5X,I1,24X,I1)'
+        Read(18,strfmt) NmaxS,LmaxS,khot
+
         Do na=nsh,NmaxS
             la=Ll(na)
             ja=Jj(na)
@@ -426,9 +471,10 @@ Contains
                 End If
             End Do
         End Do
-        rewind(18)
+        Rewind(18)
         Allocate(Iint1S(NhintS),Rsig(NhintS),Dsig(NhintS),Esig(NhintS),Scr(10))
-        Read(18,'(7X,I3,5X,I1,24X,I1)') NmaxS,LmaxS,khot
+        strfmt = '(7X,I3,5X,I1,24X,I1)'
+        Read(18,strfmt) NmaxS,LmaxS,khot
         i=0
         Do na=nsh,NmaxS
             la=Ll(na)
@@ -455,9 +501,10 @@ Contains
         xscr=10.d0
         If (Ksig == 2) Then
             xscr=0.d0
-            Read(18,'(5X,I2,5X,F8.5)')
+            strfmt = '(5X,I2,5X,F8.5)'
+            Read(18,strfmt)
             Do k=1,10
-                Read(18,'(5X,I2,5X,F8.5)') k1,Scr(k)
+                Read(18,strfmt) k1,Scr(k)
                 If (k1 /= k-1) Then
                     Write(*,*)' wrong order of screening coefficients'
                     Stop
@@ -467,29 +514,37 @@ Contains
         End If
         Write(*,*)' Khot =',khot
         Close(unit=18)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (Ksig < 2) Return
         ierr=0
-        Open (unit=13,file='SCRC.CON',status='OLD',form='UNFORMATTED',err=710)
-        Write(*,*)' Reading file SCRC.CON...'
+        Open (unit=13,file='SCRC.CON',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+        If (err_stat /= 0) Then
+            strfmt='(/2X,"file SCRC.CON is absent"/)'
+            Write( *,strfmt)
+            Write(11,strfmt)
+            Stop
+        Else
+            Write(*,*)' Reading file SCRC.CON ...'
+        End If
+
         Read (13) ns1,nso1,nsh,khot1,nsx1,nsx2,Ksym
         Read (13) Nmax1,Lmax1,Kmax,nav,kbox
-        Write(11,'(4X,"Parameters from the file SCRC.CON:", &
-                /4X,"Ns=",I3," Nso=",I2," Nsh=",I2," Khot=",I1, &
-                " Nsx=",2I3,/4X," Ksym=",I1,"NmaxS=",I3," LmaxS=",I2, &
-                " Kmax=",I2," Nav=",I3," Kbox=",I1)') ns1,nso1,nsh, &
-                    khot1,nsx1,nsx2,Ksym,Nmax1,Lmax1,Kmax,nav,kbox
+        strfmt = '(4X,"Parameters from the file SCRC.CON:", &
+                    /4X,"Ns=",I3," Nso=",I2," Nsh=",I2," Khot=",I1, &
+                    " Nsx=",2I3,/4X," Ksym=",I1,"NmaxS=",I3," LmaxS=",I2, &
+                    " Kmax=",I2," Nav=",I3," Kbox=",I1)'
+        Write(11,strfmt) ns1,nso1,nsh,khot1,nsx1,nsx2,Ksym,Nmax1,Lmax1,Kmax,nav,kbox
         If (nso1 /= Nso) Then
             Write(*,*)' RintS warning: Nso=',Nso,' <> ',Nso1
             ierr=ierr+1
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (NmaxS /= nmax1 .or. LmaxS /= lmax1 .or. khot /= khot1) Then
-            Write( *,'(3X,"DIfference between SGC.CON and SCRC.CON:", &
-                /3X,"nmaxS =",I3," (SGC) =",I3," (SCRC)", &
-                /3X,"lmaxS =",I3," (SGC) =",I3," (SCRC)", &
-                /3X,"khot =",I3," (SGC) =",I3," (SCRC)")') & 
-                NmaxS,Nmax1,LmaxS,Lmax1,khot,khot1
+            strfmt = '(3X,"DIfference between SGC.CON and SCRC.CON:", &
+                        /3X,"nmaxS =",I3," (SGC) =",I3," (SCRC)", &
+                        /3X,"lmaxS =",I3," (SGC) =",I3," (SCRC)", &
+                        /3X,"khot =",I3," (SGC) =",I3," (SCRC)")'
+            Write( *,strfmt) NmaxS,Nmax1,LmaxS,Lmax1,khot,khot1
             If (NmaxS < Nmax1 .or. LmaxS < Lmax1) ierr=ierr+1
         End If
         Read (13) NgintS,nrd
@@ -507,6 +562,7 @@ Contains
         Else
             Nsum=4*Nmax1
         End If
+
         Read (13) (Rint2S(i), i=1,NgintS)
         Read (13) (Iint2S(i), i=1,NgintS)
         Read (13) (Iint3S(i), i=1,NgintS)
@@ -515,19 +571,14 @@ Contains
         Read (13) (Eint2S(i), i=1,NgintS)
         Close(unit=13)
         Write(*,*)' File SCRC.CON is Read'
+
         If (dabs(xscr-10.d0) > 1.d-5) Then
             Write(*,*) ' Note: Screening coefficients will be used'
             Write(*,*) ' above NmaxS ',Nmax1,' and LmaxS',Lmax1
             Read(*,*)
         End If
         Return
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-  700   Write(6, '(2X," Can not find file SGC.CON...")')
-        Write(11,'(2X," Can not find file SGC.CON...")')
-        Stop
-  710   Write(6, '(2X," Can not find file SCRC.CON...")')
-        Write(11,'(2X," Can not find file SCRC.CON...")')
-        Stop
+
     End subroutine RintS
 
     Subroutine FormD
@@ -535,7 +586,8 @@ Contains
         Implicit None
         Integer :: i, ie, ke, n
         Real(dp) :: Emin, Emax, x
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Character(Len=128) :: strfmt
+
         Allocate(Diag(Nd))
 
         Emin= 1.d99
@@ -552,9 +604,10 @@ Contains
             Emin=dmin1(Emin,x)
             Emax=dmax1(Emax,x)
         End Do
-        write( 6,'(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)') Emin,Emax
-        write(11,'(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)') Emin,Emax
-        Return
+        strfmt = '(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)'
+        write( 6,strfmt) Emin,Emax
+        write(11,strfmt) Emin,Emax
+
     End Subroutine FormD
     
     Subroutine AllocateFormHArrays(mype, npes)
@@ -635,22 +688,6 @@ Contains
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
                         + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(C)+16*vaBinSize
-        !print*,'Nn',sizeof(Nn)
-        !print*,'Kk',sizeof(Kk)
-        !print*,'Ll',sizeof(Ll)
-        !print*,'Jj',sizeof(Jj)
-        !print*,'Nf0',sizeof(Nf0)
-        !print*,'Jt',sizeof(Jt)
-        !print*,'Njt',sizeof(Njt)
-        !print*,'Eps',sizeof(Eps)
-        !print*,'Diag',sizeof(Diag)
-        !print*,'Ndc',sizeof(Ndc)
-        !print*,'Jz',sizeof(Jz)
-        !print*,'Nh',sizeof(Nh)
-        !print*,'In',sizeof(In)
-        !print*,'Gnt',sizeof(Gnt)
-        !print*,'Scr',sizeof(Scr)
-        !print*,'C',sizeof(C)
         !Call FormattedMemSize(memStaticArrays, memStr)
         !Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays requires ',Trim(memStr),' of memory per core' 
     End Subroutine calcMemStaticArrays
@@ -699,7 +736,7 @@ Contains
         Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2
         Use matrix_io
         Use vaccumulator
-        !Use mpi_win
+
         Implicit None
 
         Integer :: npes, mype, shmrank, mpierr, interval, remainder, Hlim, numBins, maxh
@@ -720,9 +757,7 @@ Contains
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Integer(Kind=MPI_OFFSET_KIND) :: disp       
 
-        Call system_clock(count_rate=clock_rate)
-        If (mype==0) Call system_clock(stot)
-
+        Call startTimer(stot)
         Call InitFormH(npes,mype) 
 
         ih8=0_int64
@@ -744,14 +779,11 @@ Contains
 
         If (mype == 0) Call calcMemReqs
 
-        If (Kl == 1 .or. Kl == 3) Then ! If continuing calculation and CONF.HIJ is available, read CONF.HIJ
-            If (Kl == 1) Then
-                Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-            End If
+        If (Kl == 1) Then ! If continuing calculation and Hamiltonian has already been constructed
+            ! Read the Hamiltonian from file CONFp.HIJ
+            Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
             ih8=NumH
-            Do i=1,ih4
-                If (Hamil%t(i) == 0) numzero = numzero + 1
-            End Do
+            numzero = Count(Hamil%t(1:ih4) == 0)
         Else 
             Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
             vaGrowBy = vaBinSize
@@ -816,7 +848,7 @@ Contains
                     End If
                 End Do
 
-                Call system_clock(s1)
+                Call startTimer(s1)
 
                 NumH = cntarray(1)
                 num_done = 0
@@ -847,9 +879,7 @@ Contains
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
                     If (nnd == ndcnt .and. nnd /= ndsplit*10) Then
-                        Call system_clock(e1)
-                        ttime=Real((e1-s1)/clock_rate)
-                        Call FormattedTime(ttime, timeStr)
+                        Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumH
@@ -866,9 +896,7 @@ Contains
                     End If
                     
                     If (num_done == npes-1) Then
-                        Call system_clock(e1)
-                        ttime=Real((e1-s1)/clock_rate)
-                        Call FormattedTime(ttime, timeStr)
+                        Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         memEstimate = memEstimate + maxmem
@@ -947,7 +975,7 @@ Contains
             If (mype == 0) Call RVAccumulatorReset(rva1)
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call system_clock(s1)
+            Call startTimer(s1)
 
             Call MPI_AllReduce(counter1, maxh, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             mesplit = maxh/10
@@ -956,7 +984,7 @@ Contains
 
             If (mype /= 0) Then
                 Allocate(Hamil%t(counter1))
-                Call system_clock(s2)
+                Call startTimer(s2)
                 Do n=1,counter1
                     nn=Hamil%n(n)
                     kk=Hamil%k(n)
@@ -969,16 +997,12 @@ Contains
                     If (t==0) numzero=numzero+1
 
                     If (counter1 == maxh .and. mod(n,mesplit)==0) Then
-                        Call system_clock(e1)
-                        ttime=Real((e1-s1)/clock_rate)
-                        Call FormattedTime(ttime, timeStr)
+                        Call stopTimer(s1, timeStr)
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
                         j=j+1
                     End If
                 End Do
-                Call system_clock(e2)
-                ttime=Real((e2-s2)/clock_rate)
-                Call FormattedTime(ttime, timeStr)
+                Call stopTimer(s2, timeStr)
                 !print*,mype,timeStr
             Else
                 print*, '========== Starting calculation stage of FormH =========='
@@ -998,6 +1022,7 @@ Contains
         Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
+        ! Write Hamiltonian to file CONFp.HIJ
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
@@ -1023,10 +1048,9 @@ Contains
             End If
         End If
     
+        ! Stop timer and output computation time of FormH 
         If (mype == 0) Then
-            Call system_clock(etot)
-            ttot=Real((etot-stot)/clock_rate)
-            Call FormattedTime(ttot, timeStr)
+            Call stopTimer(stot, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> FormH took '// trim(timeStr) // ' to complete'
         End If
 
@@ -1034,6 +1058,7 @@ Contains
     End Subroutine FormH
 
     real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
+        ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
         Use formj2, Only : F_J0, F_J2
@@ -1112,31 +1137,7 @@ Contains
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
         If (Allocated(Iarr)) Deallocate(Iarr)
         If (Allocated(Scr)) Deallocate(Scr)
-    
-        !If (mype==0) Then
-        !  print*,'Nvc',sizeof(Nvc)
-        !  print*,'Nc0',sizeof(Nc0)
-        !  print*,'Rint1',sizeof(Rint1)
-        !  print*,'Rint2',sizeof(Rint1)
-        !  print*,'Iint1',sizeof(Iint1)
-        !  print*,'Iint2',sizeof(Iint2)
-        !  print*,'Iint3',sizeof(Iint3)
-        !  print*,'Rint2S',sizeof(Rint2S)
-        !  print*,'Dint2S',sizeof(Dint2S)
-        !  print*,'Eint2S',sizeof(Eint2S)
-        !  print*,'Iint1S',sizeof(Iint1S)
-        !  print*,'Iint2S',sizeof(Iint2S)
-        !  print*,'Iint3S',sizeof(Iint3S)
-        !  print*,'Rsig',sizeof(Rsig)
-        !  print*,'Dsig',sizeof(Dsig)
-        !  print*,'Esig',sizeof(Esig) 
-        !  print*,'R_is',sizeof(R_is)
-        !  print*,'I_is',sizeof(I_is)
-        !  print*,'IntOrd',sizeof(IntOrd)
-        !  print*,'IntOrdS',sizeof(IntOrdS)
-        !  print*,'Iarr',sizeof(Iarr)
-        !End If
-        Return
+
     End Subroutine DeAllocateFormHArrays
 
     Subroutine AllocateDvdsnArrays(mype, npes)
@@ -1164,26 +1165,13 @@ Contains
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(D)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(D1)+sizeof(E1)
             memDvdsn = memDvdsn+maxJcore*16_int64 ! 16 bytes to store J_n, J_k, J_t; maxJcore is max # of m.e. for a core
-            !print*,'ArrB',sizeof(ArrB)
-            !print*,'Tk',sizeof(Tk)
-            !print*,'Tj',sizeof(Tj)
-            !print*,'P',sizeof(P)
-            !print*,'D',sizeof(D)
-            !print*,'E',sizeof(E)
-            !print*,'Iconverge',sizeof(Iconverge)
-            !print*,'B1',sizeof(B1)
-            !print*,'B2',sizeof(B2)
-            !print*,'Z1',sizeof(Z1)
-            !print*,'D1',sizeof(D1)
-            !print*,'E1',sizeof(E1)
-            !print*,'J',maxJcore*16
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
             memEstimate = memEstimate - memFormH + memDvdsn
             Call FormattedMemSize(memEstimate, memStr)
             Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' of memory per core' 
         End If   
-        Return
+
     End Subroutine AllocateDvdsnArrays
 
     Subroutine Diag4(mype, npes)
@@ -1191,22 +1179,20 @@ Contains
         ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
         ! all other Subroutines are performed by the master core
         Use mpi
-        Use str_fmt, Only : FormattedTime
+        Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Implicit None
     
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
                     kx, i1, i2, it, mype, npes, mpierr
-        Integer(Kind=int64) :: stot, etot, clock_rate
+        Integer(Kind=int64) :: start_time, end_time
         Real :: ttot
-        real(dp)  :: start_time, end_time
         real(dp)  :: crit, ax, x, xx, ss
         logical   :: lsym
         Character(Len=16) :: timeStr
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        Call system_clock(count_rate=clock_rate)
 
-        If (mype==0) Call system_clock(stot)
+        Call startTimer(start_time)
+
         crit=1.d-6
         If (mype == 0) Then
             If (Kl4 == 0) Return
@@ -1231,7 +1217,7 @@ Contains
         End If
 
         Call FormB0(mype,npes)
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
         If (Nd0 == Nd) Return
         ! Davidson loop:
         iter = 0
@@ -1247,17 +1233,19 @@ Contains
             Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (ax > crit .and. iter <= n_it) Then
-                If (mype == 0) Write( 6,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
-                If (mype == 0) Write(11,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+                If (mype == 0) Then
+                    Write( 6,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+                    Write(11,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+                End if
                 ! Orthonormalization of Nlv probe vectors:
                 If (mype==0) Then
-                  Do i=1,Nlv
-                     Call Ortn(i)
-                     If (Ifail /= 0) Then
-                        Write(*,*)' Fail of orthogonalization for ',i
-                        Stop
-                     End If
-                  End Do
+                    Do i=1,Nlv
+                        Call Ortn(i)
+                        If (Ifail /= 0) Then
+                            Write(*,*)' Fail of orthogonalization for ',i
+                            Stop
+                        End If
+                    End Do
                 End If
                 ! Formation of the left-upper block of the energy matrix P:
                 Call Mxmpy(1, mype, npes)
@@ -1368,6 +1356,8 @@ Contains
                     If (mype == 0) Then
                         Write( 6,'(1X,"Davidson procedure converged")')
                         Write(11,'(1X,"Davidson procedure converged")')
+                        ! Assign values of Tk for case when Davidson procedure is already converged 
+                        If (Kl4 == 2 .and. iter==1) Tk=E(1:Nlv) 
                     End If
                     Exit
                 End If
@@ -1376,10 +1366,8 @@ Contains
         End Do
 
         If (mype == 0) Then
-            Call system_clock(etot)
-            ttot=Real((etot-stot)/clock_rate)
-            Call FormattedTime(ttot, timeStr)
-            write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
+            Call stopTimer(start_time, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
         End If
 
         Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, D, E, B1, B2, Z1, E1)
@@ -1390,7 +1378,7 @@ Contains
     Subroutine WriteFinalXIJ(mype,npes)
         Use mpi
         Use formj2, Only : J_av
-        Use davidson, Only : Prj_J
+        Use davidson, Only : Prj_J, FormBskip
         Implicit None
         Integer :: i, n, ierr, mype, npes, mpierr
 
@@ -1405,11 +1393,9 @@ Contains
     
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            !B1(1:Nd)=ArrB(1:Nd,n)
             Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
             If (mype==0) Then
                 write(17) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
-                !print*,D1(n),Tj(n),ArrB(1,n),ArrB(Nd,n)
             End If
         End Do
 
@@ -1488,9 +1474,9 @@ Contains
             DO I=1,IMAX
                 READ (16)
             END DO
- 250        READ (16) ER(J),xj,idum,(CC(I),I=1,ND)
+ 250        READ (16) ER(j),xj,idum,(CC(I),I=1,ND)
             Er(j)=Er(j)+4.d0*Gj*xj*(xj+1.d0)
-            E=ER(J)
+            E=ER(j)
             DT=E-ECORE
             ! Rydberg constant is taken from "phys.par"
             DEL=(ER(1)-ER(J))*2*DPRy

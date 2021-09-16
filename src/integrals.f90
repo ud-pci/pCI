@@ -17,7 +17,7 @@ Module integrals
         Character*7 :: str(3),str1(4)*4
         Data str /'Coulomb','Gaunt  ','Breit  '/
         Data str1 /' VS','SMS','NMS',' MS'/
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         nsh=Nso+1
         Nhint=0
         Ngint=0
@@ -28,9 +28,8 @@ Module integrals
         Else
             nx = IPx
         End If
-        Open(unit=13,file='CONF.INT',status='OLD', &
-             form='UNFORMATTED',err=700)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Open(unit=13,file='CONF.INT',status='OLD',form='UNFORMATTED',err=700)
+
         Write(*,*)' Reading file CONF.INT...'
         Read (13) ns1,nso1,nsp1,Nsu1,Ecore
         If (ns1 /=  Ns) Then
@@ -47,7 +46,7 @@ Module integrals
         End If
         Write( 6,'(4X,"Total core energy:",F17.7)') Ecore
         Write(11,'(4X,"Total core energy:",F17.7)') Ecore
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Read (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsu)
         Read (13)
         Read (13) Nhint,Kbrt
@@ -86,13 +85,13 @@ Module integrals
             Write( *,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
             Write(11,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (Nsp /=  nsp1) Then
             Write ( 6,*) ' Nsp changed since integrals were calculated'
             Write (11,*) ' Nsp changed since integrals were calculated'
             End If
         Return
-        !- - - - - - - - - - - - - - - - - - - - - - - - -
+
   700   Write( 6,'(2X," Can not find file CONF.INT...")')
         Write(11,'(2X," Can not find file CONF.INT...")')
         Stop

@@ -55,10 +55,15 @@ Program ine
     Use ine_variables
     Use determinants, Only : Dinit, Jterm
     Use ine_aux
+    Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
     Integer :: i, Nd2, Nddir, nsu2, icyc
+    Integer(Kind=int64) :: start_time
+    Character(Len=16) :: timeStr
     logical :: ok
+
+    Call startTimer(start_time)
 
     Call Init_Char(Let,Alet,Blet)
     Khe= 1   ! 1- new solution of homogeneous eq-n,
@@ -158,4 +163,8 @@ Program ine
         End If
     End Do
     Close(unit=11)
+
+    Call stopTimer(start_time, timeStr)
+    write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    
 End Program ine

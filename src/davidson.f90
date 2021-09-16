@@ -123,7 +123,7 @@ Module davidson
                 Dd(i)=h
             End Do
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Dd(1)=0.0d0
         Ee(1)=0.0d0
         Do i=1,n
@@ -253,7 +253,8 @@ Module davidson
         Implicit None
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype, npes
         Real(dp) :: dummy, xj
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        Character(Len=128) :: strfmt
+
         num=0
         nskip=0
         
@@ -261,7 +262,7 @@ Module davidson
 
         Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
 
-        If (abs(Kl4) /= 2) Then
+        If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
                 Do i=1,Nd
                     If (j == 1)   B1(i)=0.d0
@@ -279,7 +280,7 @@ Module davidson
                     If (mype==0) Write(*,*) '  skip Ej =',-(E1(j)+Hmin)
                 End If
             End Do
-        Else
+        Else ! Reading CONF.XIJ
             If (mype == 0) Then
                 B1=0.d0
                 Read(17,err=210) dummy,dummy,ndpt
@@ -296,8 +297,9 @@ Module davidson
         Nlv=num
         If (mype == 0) Then
             Do j=1,Nlv
-                Write( 6,'(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)') j,E(j),Tj(j)
-                Write(11,'(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)') j,E(j),Tj(j)
+                strfmt = '(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)'
+                Write( 6,strfmt) j,E(j),Tj(j)
+                Write(11,strfmt) j,E(j),Tj(j)
                 If (kXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
             End Do
             close (unit=17)
@@ -316,7 +318,7 @@ Module davidson
         Implicit None
         Integer :: i, idum, k, l
         Real(dp) :: t, tjk, ek
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ! Eigenvectors obtained by Davidson procedure are not written to CONF.XIJ file
         Do k=1,Nlv
             B2=0.d0
@@ -329,7 +331,7 @@ Module davidson
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
         ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
-        Write ( 6,'(1X,"FormBskip: Vectors not saved")')
+        Write ( 6,*) '(1X,"FormBskip: Vectors not saved")'
         Return
     End Subroutine FormBskip
 
@@ -356,7 +358,7 @@ Module davidson
         End Do
         ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
         close (unit=17)
-        Write ( 6,'(1X,"FormB: Vectors saved")')
+        Write ( 6,*) '(1X,"FormB: Vectors saved")'
         Return
     End Subroutine FormB
 
@@ -366,7 +368,7 @@ Module davidson
         Implicit None
         Integer :: ix, i, kx, kp, k1, k2, j, k, i1
         Real(dp) :: x
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (kp == 1) Then
             Do i=1,Nlv
               Do k=1,i

@@ -128,7 +128,7 @@ Module formj2
 
     Subroutine FormJ(mype, npes)
         Use mpi
-        Use str_fmt, Only : FormattedMemSize, FormattedTime
+        Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize, FormattedTime
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet, Rspq, Rspq_phase1, Rspq_phase2
         !Use mpi_win
@@ -150,8 +150,7 @@ Module formj2
         Integer(kind=MPI_OFFSET_KIND) :: disp 
         Character(Len=16) :: filename, timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2
 
-        Call system_clock(count_rate=clock_rate)
-        If (mype==0) Call system_clock(stot)
+        Call startTimer(stot)
         Allocate(idet1(Ne),idet2(Ne),cntarray(2))
         
         ij8=0_int64
@@ -190,7 +189,7 @@ Module formj2
 
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-            Call system_clock(s1)
+            Call startTimer(s1)
     
             If (mype == 0) Then
                 ! Distribute a portion of the workload of size ncGrowBy to each worker process
@@ -255,9 +254,7 @@ Module formj2
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
                     If (nnc == nccnt .and. nnc /= ncsplit*10) Then
-                        Call system_clock(e1)
-                        ttime=Real((e1-s1)/clock_rate)
-                        Call FormattedTime(ttime, timeStr)
+                        Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
@@ -274,9 +271,7 @@ Module formj2
                     End If
                     
                     If (num_done == npes-1) Then
-                        Call system_clock(e1)
-                        ttime=Real((e1-s1)/clock_rate)
-                        Call FormattedTime(ttime, timeStr)
+                        Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
@@ -339,9 +334,7 @@ Module formj2
             Call IVAccumulatorReset(iva2)
             Call RVAccumulatorReset(rva1)
     
-            Call system_clock(e1)
-            ttime=Real((e1-s1)/clock_rate)
-            Call FormattedTime(ttime, timeStr)
+            Call stopTimer(s1, timeStr)
             !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
@@ -351,19 +344,18 @@ Module formj2
             ij8J = ij8
             ij4 = ij8
 
+            ! Write J^2 matrix to file CONFp.JJJ
             Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
         End If
 
         If (mype == 0) Then
             Write(11,'(4X,"NumJ =",I12)') NumJ
             Write( *,'(4X,"NumJ =",I12)') NumJ
-            Call system_clock(etot)
-            ttot=Real((etot-stot)/clock_rate)
-            Call FormattedTime(ttot, timeStr)
+            Call stopTimer(stot, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If
         Deallocate(idet1,idet2,Jz,Nh,cntarray)
-        Return
+
     End Subroutine FormJ
     
     Subroutine J_av(X1,nx,xj,ierr,mype,npes)    !# <x1|J**2|x1>

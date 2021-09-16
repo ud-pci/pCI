@@ -5,13 +5,13 @@ Program conf_lsj
     use integrals, Only : Rint
     use conf_init, Only : InitFormH
     use formj2, Only : FormJ, J_av
-    Use str_fmt, Only : FormattedTime
+    Use str_fmt, Only : startTimer, stopTimer, FormattedTime
     Use lsj_aux
 
     Implicit None
 
     Integer   :: n, k, i, j, ierr, mype, npes, mpierr, nnd
-    Integer(kind=int64) :: clock_rate
+    Integer(kind=int64) :: clock_rate, s1
     Integer(kind=int64) :: start_time, end_time
     Real :: total_time
     Real(dp)  :: t, xtj, xtl, xts, xj
@@ -24,8 +24,7 @@ Program conf_lsj
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
-    Call system_clock(count_rate=clock_rate)
-    If (mype==0) Call system_clock(start_time)
+    Call startTimer(start_time)
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
@@ -34,9 +33,9 @@ Program conf_lsj
 
     ! Only the master core needs to initialize the conf program
     If (mype == 0) Then
-        Call Input ! reads list of configurations from CONF.INP
-        Call Init ! reads basis set information from CONF.DAT
-        Call Rint ! reads radial integrals from CONF.INT
+        Call Input      ! reads list of configurations from CONF.INP
+        Call Init       ! reads basis set information from CONF.DAT
+        Call Rint       ! reads radial integrals from CONF.INT
         Call Dinit      ! forms list of determinants
         Call Jterm      ! prints table with numbers of levels with given J
     End If
@@ -44,8 +43,12 @@ Program conf_lsj
     Call AllocateFormHArrays(mype,npes)
     Call InitFormH(mype,npes) 
     Allocate(Tj(Nlv),Tl(Nlv),Ts(Nlv),B1(Nd),D1(Nlv))
-    If (mype == 0) Open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-    
+    If (mype == 0) Then
+        Open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+        Write(*,*) 'Starting lsj procedure...'
+    End If
+
+    Call startTimer(s1)
     Do n=1,Nlv
         If (mype == 0) Read(16) D1(n),Tj(n),nnd,(B1(i),i=1,Nd)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -60,15 +63,18 @@ Program conf_lsj
         Tl(n)=0.5d0*(sqrt(xtl+1)-1)
         Ts(n)=0.5d0*(sqrt(xts+1)-1)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (mype ==0) Then
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A,I2,A,I2,A)'), 'Level ',n,' of ', Nlv, ' done in '// trim(timeStr)
+        End If
     End Do
 
     ! Print table of final results and total computation time
     If (mype==0) Then
+        Close(16)
         Call PrintLSJ   !#   Output of the results
 
-        Call system_clock(end_time)
-        total_time=Real((end_time-start_time)/clock_rate)
-        Call FormattedTime(total_time, timeStr)
+        Call stopTimer(start_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
 
