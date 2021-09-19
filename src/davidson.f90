@@ -24,18 +24,18 @@ Module davidson
         Integer  :: k, ierr, n, n1, n2, ic, ic1, mype, npes, mpierr
         Integer(Kind=int64) :: l8
         Real(dp) :: t
+        Character(Len=256) :: strfmt
 
-        ! Dimension of the approximation to start with:
-        Call calcNd0(ic1, Nd0)
         If (mype == 0) Then
-            Write( 6,'(3X,"Starting approx. includes ",I3," conf.,",I4," det.")') ic1,Nd0
-            Write(11,'(3X,"Starting approx. includes ",I3," conf.,",I4," det.")') ic1,Nd0
+            strfmt = '(3X,"Starting approx. includes ",I3," conf.,",I4," det.")'
+            Write( 6,strfmt) Nc4,Nd0
+            Write(11,strfmt) Nc4,Nd0
         End If
 
         ! Construct the Hamil in the initial approximation:
         Diag=0.d0
         Z1=0.d0
-        Do l8=1,ih8H
+        Do l8=1,ih8
             n=Hamil%n(l8)
             k=Hamil%k(l8)
             t=Hamil%t(l8)
@@ -47,6 +47,7 @@ Module davidson
                 Exit
             End If
         End Do
+
         If (mype==0) Then
             Call MPI_Reduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
                                 MPI_COMM_WORLD, mpierr)
@@ -56,22 +57,24 @@ Module davidson
         End If
     End Subroutine Init4
 
-    Subroutine Hould(n,ndim,Ee,Dd,Zz)
+    Subroutine Hould(n,Ee,Dd,Zz,ifail)
         ! This subroutine diagonalizes the matrix Zz using 
         ! Householder's method of diagonalization.
         ! Dd-array of eigenvalues
         ! Zz-matrix of eigenvectors
         ! n-dimension of matrix z
         ! eps-criteria of diagonalization
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Implicit None
+        Integer, Intent(In) :: n
+        Integer, Intent(Out) :: ifail
+        Real(dp), dimension(:), allocatable, Intent(InOut) :: Ee, Dd
+        Real(dp), dimension(:,:), allocatable, Intent(InOut) :: Zz
 
-        Integer :: n, ii, k, j, l, i, jj, m1, ndim, im, im1, li, k1, l1
+        Integer :: ii, k, j, l, i, jj, m1, im, im1, li, k1, l1
         Real(dp) :: tol, f, g, b, r, em, h, hh, c, ei, s, p, di, eps
-        Real(dp), dimension(:), allocatable :: Ee, Dd
-        Real(dp), dimension(:,:), allocatable :: Zz
 
-        Ifail=0
+
+        ifail=0
         tol=2.0d0**(-1021) !-103 or -1021
         eps=2.0d0**(-53) ! -24 or -53
         If (n > 1) Then
@@ -102,8 +105,8 @@ Module davidson
                     Zz(j,i)=Zz(i,j)/h
                     g=0.0d0
                     Do k=1,j
-                          g=g+Zz(j,k)*Zz(i,k)
-                        End Do
+                        g=g+Zz(j,k)*Zz(i,k)
+                    End Do
                     k1=j+1
                     If (k1 <= l) Then
                         Do k=k1,l
@@ -222,8 +225,8 @@ Module davidson
             Dd(l)=Dd(l)+f
         End Do
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! eigenvalues in D; eigenvectors in Z
-        ! ordering of D and Z
+        ! eigenvalues in Dd; eigenvectors in Zz
+        ! ordering of Dd and Zz
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         i=0
         Do while (i < n)
@@ -331,7 +334,7 @@ Module davidson
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
         ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
-        Write ( 6,*) '(1X,"FormBskip: Vectors not saved")'
+        Write ( 6,*) ' FormBskip: Vectors not saved'
         Return
     End Subroutine FormBskip
 
@@ -342,7 +345,7 @@ Module davidson
         Implicit None
         Integer :: i, idum, k, l
         Real(dp) :: t, tjk, ek
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
         Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         Do k=1,Nlv
@@ -358,15 +361,18 @@ Module davidson
         End Do
         ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
         close (unit=17)
-        Write ( 6,*) '(1X,"FormB: Vectors saved")'
+        Write ( 6,*) ' FormB: Vectors saved'
         Return
     End Subroutine FormB
 
-    Subroutine FormP (kp)
+    Subroutine FormP(kp, vmax)
         ! Calculation of upper-left block (Nlv X Nlv) of matrix P for kp=1 
         ! Calculation of other three blocks (2Nlv X 2Nlv) of matrix P for kp=2
         Implicit None
-        Integer :: ix, i, kx, kp, k1, k2, j, k, i1
+        Integer, Intent(In) :: kp
+        Real(dp), Intent(In) :: vmax
+
+        Integer :: ix, i, kx, k1, k2, j, k, i1
         Real(dp) :: x
 
         If (kp == 1) Then
@@ -419,15 +425,18 @@ Module davidson
         Return
     End Subroutine FormP
     
-    Subroutine Dvdsn (j)
+    Subroutine Dvdsn (j, cnx)
         ! Main part of the Davidson algorithm. 
         ! Formation of the J-th residual vector and the corresponding new probe vector.
         ! New probe vectors are stored in the second block of ArrB.
         Implicit None
-        Integer :: j1, i, j, l, k, n01
+        Integer, Intent(In) :: j
+        Real(dp), Intent(InOut) :: cnx
+
+        Integer :: j1, i, l, k, n01
         Real(dp) :: val, t, cnorm, s
         character(len=9) :: char
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         cnorm=0.d0
         j1=j+Nlv
         val=P(j,j)
@@ -485,18 +494,20 @@ Module davidson
         Return
     End Subroutine Dvdsn
 
-    Subroutine Mxmpy(ip,mype,npes)
+    Subroutine Mxmpy(ip, mype, npes)
         ! This subroutine evaluates the products Q_i = H_ij * B_j
         ! if ip=1, products are stored in the second block of ArrB
         ! if ip=2, products are stored in the third block of ArrB
         Use mpi
         Implicit None
-        Integer :: i, i1, i2, k, ierr, ip, nlp, n, mype, npes, mpierr, &
+        Integer, Intent(In) :: ip
+
+        Integer :: i, i1, i2, k, ierr, nlp, n, mype, npes, mpierr, &
                     i2min, i2max, i1min, i1max, kd
         Real :: start_time, end_time
         Real(dp) :: t
-        Integer*8 :: l8
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -        
+        Integer(Kind=int64) :: l8
+
         nlp=ip*Nlv
 
         i2min=1+nlp
@@ -514,7 +525,7 @@ Module davidson
             Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
         ArrB(1:Nd,i2min:i2max)=0.d0
-        Do l8=1, ih8H
+        Do l8=1, ih8
             n=Hamil%n(l8)
             k=Hamil%k(l8)
             t=Hamil%t(l8)
@@ -547,14 +558,19 @@ Module davidson
         Return
     End Subroutine Mxmpy
 
-    Subroutine Ortn (j)
+    Subroutine Ortn(j, ifail)
         ! Orthogonalization of J-th vector to J-1 previous ones.
         ! Normalization of the J-th vector.
         Implicit None
-        Integer :: i, l, j, jm, it
+        Integer, Intent(In)  :: j
+        Integer, Intent(Out) :: ifail
+
+        Integer :: i, l, jm, it
         Real(dp) :: s, smax2, smax1, critN, ortho
+        
         ! Orthogonality criteria:
         ortho=1.d-6
+
         ! Critical value for norma of new vector:
         critN=1.d-9
         jm=j-1
@@ -576,7 +592,7 @@ Module davidson
             If (smax1 < ortho) Exit
             If (smax1 > smax2 .or. it > 3) Then
                 Write (6,'(4X,"Fail of orthogonalization of vector ",I2)') j
-                Ifail=j
+                ifail=j
                 Return
             End If
             smax2=smax1
@@ -589,38 +605,35 @@ Module davidson
         End Do
         If (s < critN) Then
             Write (6,'(4X,"Fail of normalization of vector ",I2)') j
-            Ifail=j
+            ifail=j
         End If
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,j)=ArrB(1:Nd,j)*s
         Return
     End Subroutine Ortn
 
-    Subroutine Prj_J (lin, num, lout, trsd, mype, npes) 
+    Subroutine Prj_J(lin, num, lout, trsd, mype, npes) 
         Use mpi
-        Use formj2, Only : F_J2
         Use determinants, Only : Gdet
         Implicit None
         Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, nsj, lout, num, lin, jav, j_av, mpierr, imin, imax
         Integer, optional :: mype, npes
-        Integer*8 :: nj
         Real(dp) :: err1, err, sj, t, f, s, s1, a, aj, trsd, start, end
         logical :: proceed
-        Integer, allocatable, dimension(:) :: idet1, idet2
-        !     - - - - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(idet1(Ne),idet2(Ne))
+        Character(Len=256) :: strfmt
+
         ierr=1
         If (mype == 0 .and. lout+num-1 > IPlv) Then
-            Write( *,'(" Prj_J warning:", /," to project",I3," levels I need",I3, &
-                " vectors & have Only",I3)') Nlv,lout+num-1,IPlv
-            Write(11,'(" Prj_J warning:", /," to project",I3," levels I need",I3, &
-                " vectors & have Only",I3)') Nlv,lout+num-1,IPlv
+            strfmt = '(" Prj_J warning:", /," to project",I3," levels I need",I3," vectors & have only",I3)'
+            Write( *,strfmt) Nlv,lout+num-1,IPlv
+            Write(11,strfmt) Nlv,lout+num-1,IPlv
             Stop
         End If
         jav=2*XJ_av+0.1d0
         If (mype == 0) Then
-            Write( *,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
-            Write(11,'(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)') num,XJ_av
+            strfmt = '(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)'
+            Write( *,strfmt) num,XJ_av
+            Write(11,strfmt) num,XJ_av
         End If
 
         Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -643,7 +656,7 @@ Module davidson
                     i2=lout+i-1
                     ArrB(1:Nd,i2)=0.d0
                 End Do
-                Do j=1,ij8J
+                Do j=1,ij8
                     n=Jsq%n(j)
                     k=Jsq%k(j)
                     t=Jsq%t(j)
@@ -710,8 +723,9 @@ Module davidson
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End Do
         If (mype == 0) Then
-            Write( *,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
-            Write(11,'(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)') Njd+1-it,err1,ierr
+            strfmt = '(4X,"iter =",I3,"; max error =",E12.3,"; ierr =",I2)'
+            Write( *,strfmt) Njd+1-it,err1,ierr
+            Write(11,strfmt) Njd+1-it,err1,ierr
             If (ierr /= 0) Then
                 Write(*,*) ' Wrong J values for Probe vectors '
             End If

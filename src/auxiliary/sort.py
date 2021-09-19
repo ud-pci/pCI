@@ -14,7 +14,6 @@ except FileNotFoundError:
     sys.exit(1)
 
 with f:
-	num_cores = struct.unpack('i', f.read(4))[0]
 	num_cores = struct.unpack('i', fnproc.read(4))[0]
 	list_elements = []
 	old_matrix = [[],[],[]]

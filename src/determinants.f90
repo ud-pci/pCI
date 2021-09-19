@@ -16,19 +16,20 @@ Module determinants
     Subroutine calcNd0(ic1, n2)
         Implicit None
         Integer, Intent(out) :: ic1, n2
-        Integer :: ic, n1 
+        Integer :: ic, n1, n0
 
         ic1=0
-        Nd0=IP1+1
+        n0=IP1+1
         n1=0
-        n2=Nd0-1
+
         Do ic=1,Nc4
             n1=n1+Ndc(ic)
-            If (n1 < Nd0) Then
+            If (n1 < n0) Then
                 n2=n1
                 ic1=ic
             End If
         End Do    
+        
     End Subroutine calcNd0
     
     Subroutine Dinit
@@ -88,7 +89,7 @@ Module determinants
         Integer, allocatable, dimension(:) :: idet
         Integer, dimension(60) :: nmj
         logical :: fin
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         allocate(idet(Ne),Ndc(Nc),Jtc(Nc))
         Njd=0
         Nd=0
@@ -182,7 +183,7 @@ Module determinants
                 End If
             End If
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (Nd == 0) Then
             write( 6,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
             write(11,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
@@ -237,11 +238,11 @@ Module determinants
                    n3, iq, im, i0, if0, n0, i, nqi, ni, n2, n1
         Integer, allocatable, dimension(:) :: idet
         logical :: fin
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         M=0
         n1=Nc0(ic)+1
         n2=Nc0(ic)+Nvc(ic)
-        ! - - - - - - - - - - - - - - - -
+
         If (fin) Then
             Do ni=n1,n2
                 nqi=Nq(ni)
@@ -368,7 +369,7 @@ Module determinants
         Integer, Allocatable, dimension(:)   :: id1, id2
         Character(Len=1), Dimension(5) :: let
         data let/'s','p','d','f','g'/
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         is=1
         ni=0
         nj=0
@@ -478,7 +479,7 @@ Module determinants
                                                              nn1, ll0, ll1, jj0, jj1, ndi, iconf, imax
         Character(Len=1), Dimension(5) :: let
         data let/'s','p','d','f','g'/
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         is=1
         nf=3
         i(1) = 1
@@ -572,7 +573,6 @@ Module determinants
         Integer, intent(InOut)                            :: i(3), j(3)
         
         Integer                                           :: k
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
   
         Select Case(nf)
             Case (1) ! number of differences = 1
@@ -597,7 +597,7 @@ Module determinants
         Implicit None
         Integer :: i, n
         Integer, allocatable, dimension(:)  :: idet
-        ! - - - - - - - - - - - - - - - - - - - - - - - -
+
         idet(1:Ne)=Iarr(1:Ne,n)
         Return
     End Subroutine Gdet
@@ -647,7 +647,7 @@ Module determinants
         Implicit None
         Integer  :: ni, nj, nf, i, j, l1, l2, k
         Integer, allocatable, dimension(:)   :: id1, id2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ni=0
         nj=0
         nf=3
@@ -680,7 +680,7 @@ Module determinants
         Implicit None
         Integer  :: i, i1, i2, j1, j2, icomp, is, m
         Integer, allocatable, dimension(:)  :: idet1, idet2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Jdel=0
         iconf1(1:Ne)=Nh(idet1(1:Ne))   !### iconf1(i) = No of the orbital occupied by the electron i
         iconf2(1:Ne)=Nh(idet2(1:Ne))    

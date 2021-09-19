@@ -15,14 +15,14 @@ Module conf_variables
     ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
     Integer, Parameter :: kXIJ=10
 
-    Integer             :: Kexn, Ksig, Kdsig, K_prj, Ngint, Nhint, Ifail 
-    Integer             :: NmaxS, LmaxS, Nmax1, Lmax1, NmaxScr, LmaxScr
-    Integer             :: IPlv, nrd, kdavidson, K_sms, num_is
-    Integer             :: Kherr, Kgerr, Lmax, NhintS, NgintS, Kmax, Ksym, Nsum
-    Integer             :: Nd0, maxJcore, vaBinSize
-    Integer(Kind=Int64) :: iscr, NumH, NumJ, counter1, ij8J, ih8H
-    Integer(Kind=Int64) :: memTotalPerCPU, memDvdsn, memFormH, memStaticArrays, memEstimate
-    Real(dp)            :: Ecore, Hmin, XJ_av, dR_N, E_k, xscr, K_gnt, Cnx, vmax, E_0
+    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0
+    Integer             :: NmaxS=0, LmaxS=0, Ngint=0, Nhint=0, NhintS=0, NgintS=0
+    Integer             :: IPlv, nrd, kdavidson, num_is
+    Integer             :: Kherr=0, Kgerr=0, Lmax, Kmax, Ksym, Nsum
+    Integer             :: Nd0=0, vaBinSize
+    Integer(Kind=Int64) :: iscr=0_int64, NumH=0_int64, NumJ=0_int64, counter1=0_int64, ij8=0_int64, ih8=0_int64
+    Integer(Kind=Int64) :: memTotalPerCPU=0_int64, memDvdsn=0_int64, memFormH=0_int64, memStaticArrays=0_int64, memEstimate=0_int64
+    Real(dp)            :: Ecore=0_dp, Hmin=0_dp, XJ_av, dR_N, E_k, xscr=0_dp, K_gnt, E_0
 
     Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is

@@ -1,5 +1,5 @@
 Module formj2
-    ! subroutines FormJ, F_J2, Plj, & J_av (J**2 on determinants)
+    ! subroutines FormJ, F_J0, F_J2, Plj, & J_av (J**2 on determinants)
     Use conf_variables
 
     Implicit None
@@ -35,77 +35,42 @@ Module formj2
         Return
     End Function F_J0
 
-    Real(dp) Function F_J2(idet1,idet2)
-        Use determinants, Only : Rspq
+    Real(dp) Function F_J2(idet1, idet2, is, nf, ia, ic, ib, id) 
         Implicit None
+        Integer, allocatable, dimension(:), intent(InOut) :: idet1, idet2
+        Integer, intent(InOut)                            :: is, nf, ia, ib, ic, id
 
-        Integer :: ia, na, ja, ma, jq0, iq, ib, ic, id, nf, jq, is
-        Integer, allocatable, dimension(:) :: idet1, idet2
+        Integer :: na, ja, ma, jq0, iq, jq
         Real(dp)  :: t
 
         t=0.d0
-        Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
-        If (nf == 0) Then !determinants are equal
-            t=mj*mj
-            Do iq=1,Ne
-                ia=idet1(iq)
-                na=Nh(ia)
-                ja=Jj(na)
-                ma=Jz(ia)
-                t=t+ja*(ja+2)-ma**2
-                jq0=iq+1
-                If (jq0 <= Ne) Then
-                    Do jq=jq0,Ne
-                        ib=idet1(jq)
-                        t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
-                    End Do
-                End If
-            End Do
-        End If
-        If (nf == 2) Then !determinants differ by two functions
-            t=is*(Plj(ia,ic)*Plj(id,ib)+Plj(ic,ia)*Plj(ib,id)- &
-                Plj(ia,id)*Plj(ic,ib)-Plj(id,ia)*Plj(ib,ic))
-        End If
+        Select Case(nf)
+            Case(0) 
+                t=mj*mj
+                Do iq=1,Ne
+                    ia=idet1(iq)
+                    na=Nh(ia)
+                    ja=Jj(na)
+                    ma=Jz(ia)
+                    t=t+ja*(ja+2)-ma**2
+                    jq0=iq+1
+                    If (jq0 <= Ne) Then
+                        Do jq=jq0,Ne
+                            ib=idet1(jq)
+                            t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
+                        End Do
+                    End If
+                End Do
+            Case(2)
+                t=is*(Plj(ia,ic)*Plj(id,ib)+Plj(ic,ia)*Plj(ib,id)- &
+                    Plj(ia,id)*Plj(ic,ib)-Plj(id,ia)*Plj(ib,ic))
+        End Select
+
         F_J2=t
         Return
     End Function F_J2
 
-    Real(dp) Function F_J2_new(idet1,idet2, is, nf, i2, i1, j2, j1)
-        Use determinants, Only : Rspq
-        Implicit None
-
-        Integer :: ia, na, ja, ma, jq0, iq, ib, ic, id, nf, jq, is, i1, i2, j1, j2
-        Integer, allocatable, dimension(:) :: idet1, idet2
-        Real(dp)  :: t
-
-        t=0.d0
-        If (nf == 0) Then !determinants are equal
-            t=mj*mj
-            Do iq=1,Ne
-                ia=idet1(iq)
-                na=Nh(ia)
-                ja=Jj(na)
-                ma=Jz(ia)
-                t=t+ja*(ja+2)-ma**2
-                jq0=iq+1
-                If (jq0 <= Ne) Then
-                    Do jq=jq0,Ne
-                        ib=idet1(jq)
-                        t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
-                    End Do
-                End If
-            End Do
-        End If
-        If (nf == 2) Then !determinants differ by two functions
-            t=is*(Plj(ia,ic)*Plj(id,ib)+Plj(ic,ia)*Plj(ib,id)- &
-                Plj(ia,id)*Plj(ic,ib)-Plj(id,ia)*Plj(ib,ic))
-        End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        F_J2_new=t
-        Return
-    End Function F_J2_new
-
-    Real(dp) Function Plj(ia,ib)
+    Real(dp) Function Plj(ia, ib)
         Implicit None
 
         Integer :: ia, ib, na, nb, ma, mb, ja
@@ -131,62 +96,59 @@ Module formj2
         Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize, FormattedTime
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet, Rspq, Rspq_phase1, Rspq_phase2
-        !Use mpi_win
         Use matrix_io
         Implicit None
 
-        Integer :: k1, n1, ic1, ndn, numjj, i, j, ij4, n, k, nn, kk, io, counter1, counter2, counter3, diff
+        Integer :: k1, n1, ic1, ndn, i, j, ij4, ijmax, n, k, nn, kk, counter1, counter2, counter3, diff
         Real :: ttime, ttot
         Real(dp) :: t, tt
-        Integer(kind=int64) :: size8, ij8, stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
+        Integer(kind=int64) :: stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
         Integer, allocatable, dimension(:) :: idet1, idet2, nk, cntarray
-        Integer :: npes, mype, shmrank, mpierr, interval, remainder, startNc, endNc, sizeNc, counter, win, msg, maxme
+        Integer :: npes, mype, mpierr, msg, maxme, endNc
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: growBy, vaGrowBy, ncGrowBy, cnt, cnt2, nccnt, ncsplit
+        Integer               :: vaGrowBy, ncGrowBy, nccnt, ncsplit
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, return_msg, status(MPI_STATUS_SIZE)
         Integer :: fh, sender
         Integer(kind=MPI_OFFSET_KIND) :: disp 
-        Character(Len=16) :: filename, timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2
+        Character(Len=16) :: timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2, strfmt
 
         Call startTimer(stot)
         Allocate(idet1(Ne),idet2(Ne),cntarray(2))
         
-        ij8=0_int64
-        NumJ=0_int64
-        If (Kl == 1 .or. Kl == 3) Then ! If continuing from previous calculation, skip forming CONF.JJJ
+        ! If continuing from previous calculation or J^2 matrix has already been constructed
+        If (Kl == 1) Then 
+            ! Read the matrix J^2 from file CONFp.JJJ
             Call ReadMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
-            ij8=ij4
-            ij8J = ij8
-            Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-        Else ! Else start new calculation
-            growBy = log10(real(Nc/npes))
+
+            ! Add maximum memory per core from storing J^2 to total memory count
+            Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            memEstimate = memEstimate + ijmax*16
+
+        ! If starting a new computation and J^2 matrix has not been constructed
+        Else
             vaGrowBy = 1000000
             ncGrowBy = 1
             
             If (mype == 0) Then
-                Write( 6,'(4X,"Forming matrix J**2")')
                 Open (unit=18,file='CONFp.JJJ',status='UNKNOWN',form='UNFORMATTED')
                 Close(unit=18,status='DELETE')
                 Write(counterStr,fmt='(I16)') vaGrowBy
                 Write(counterStr2,fmt='(I16)') ncGrowBy
                 Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ncGrowBy = '//Trim(AdjustL(counterStr2))
+                print*, '========== Starting calculation stage of FormJ =========='
             End If
     
             counter1=1
             counter2=1
             counter3=1
-            cnt=0
-            cnt2=0
             cntarray=0
     
             Call IVAccumulatorInit(iva1, vaGrowBy)
             Call IVAccumulatorInit(iva2, vaGrowBy)
             Call RVAccumulatorInit(rva1, vaGrowBy)
     
-            !Call CreateIarrWindow(win, mype, npes, shmrank, baseptr, mpierr)
-
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
             Call startTimer(s1)
@@ -199,30 +161,31 @@ Module formj2
                 End Do
 
                 Do ic1=1, ncGrowBy
-                  ndn=Ndc(ic1)
-                  n=sum(Ndc(1:ic1-1))
-                  Do n1=1,ndn
-                    n=n+1
-                    ndr=n
-                    Call Gdet(n,idet1)
-                    k=n-n1
-                    Do k1=1,n1
-                      k=k+1
-                      Call Gdet(k,idet2)
-                      Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                      If (diff == 0 .or. diff == 2) Then
-                        nn=n
-                        kk=k
-                        tt=F_J2(idet1, idet2)
-                        If (tt /= 0) Then
-                            cntarray = cntarray + 1
-                            Call IVAccumulatorAdd(iva1, nn)
-                            Call IVAccumulatorAdd(iva2, kk)
-                            Call RVAccumulatorAdd(rva1, tt)
-                        End If
-                      End If
+                    ndn=Ndc(ic1)
+                    n=sum(Ndc(1:ic1-1))
+                    Do n1=1,ndn
+                        n=n+1
+                        ndr=n
+                        Call Gdet(n,idet1)
+                        k=n-n1
+                        Do k1=1,n1
+                            k=k+1
+                            Call Gdet(k,idet2)
+                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                            If (diff == 0 .or. diff == 2) Then
+                                nn=n
+                                kk=k
+                                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                tt=F_J2(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                If (tt /= 0) Then
+                                    cntarray = cntarray + 1
+                                    Call IVAccumulatorAdd(iva1, nn)
+                                    Call IVAccumulatorAdd(iva2, kk)
+                                    Call RVAccumulatorAdd(rva1, tt)
+                                End If
+                            End If
+                        End Do
                     End Do
-                  End Do
                 End Do
 
                 NumJ = cntarray(1)
@@ -261,7 +224,7 @@ Module formj2
                         Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
                                 ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
                                 ', '//trim(memStr2)//' for a single core)'
-                        If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                        If (memTotalPerCPU /= 0 .and. memEstimate > memTotalPerCPU) Then
                             Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
                             Trim(memTotStr2) ,' is available.'
                             Stop
@@ -274,6 +237,7 @@ Module formj2
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
+                        memEstimate = memEstimate + maxmem
                         Write(counterStr,fmt='(I16)') NumJ
                         Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
                         Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
@@ -309,7 +273,8 @@ Module formj2
                                 If (diff == 0 .or. diff == 2) Then
                                     nn=n
                                     kk=k
-                                    tt=F_J2(idet1, idet2)
+                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    tt=F_J2(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                     If (tt /= 0) Then
                                         cntarray = cntarray + 1
                                         Call IVAccumulatorAdd(iva1, nn)
@@ -337,20 +302,21 @@ Module formj2
             Call stopTimer(s1, timeStr)
             !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-
-            ij8=size(Jsq%t)
-            Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_AllReduce(ij8, maxJcore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            ij8J = ij8
-            ij4 = ij8
-
-            ! Write J^2 matrix to file CONFp.JJJ
-            Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
         End If
 
+        ij8=size(Jsq%t)
+        ij4 = ij8
+
+        Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+        ! Write J^2 matrix to file CONFp.JJJ
+        If (Kl /= 1) Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
+
         If (mype == 0) Then
-            Write(11,'(4X,"NumJ =",I12)') NumJ
-            Write( *,'(4X,"NumJ =",I12)') NumJ
+            Write(counterStr,fmt='(I16)') NumJ
+            strfmt = '(4X,"NumJ = ",A)'
+            Write(11,strfmt) Trim(AdjustL(counterStr))
+            Write( *,strfmt) Trim(AdjustL(counterStr))
             Call stopTimer(stot, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If
@@ -358,7 +324,7 @@ Module formj2
 
     End Subroutine FormJ
     
-    Subroutine J_av(X1,nx,xj,ierr,mype,npes)    !# <x1|J**2|x1>
+    Subroutine J_av(X1, nx, xj, ierr, mype, npes)    !# <x1|J**2|x1>
         Use mpi
         Use determinants, Only : Gdet
         Implicit None
@@ -370,11 +336,9 @@ Module formj2
         Real(dp), dimension(nx) :: X1
         Integer, allocatable, dimension(:) :: idet1, idet2
 
-        Allocate(idet1(Ne),idet2(Ne))
         ierr=0
         xj=0.d0
-        nj=ij8J
-        Do i=1,nj
+        Do i=1,ij8
             n=Jsq%n(i)
             k=Jsq%k(i)
             t=Jsq%t(i)
@@ -392,7 +356,6 @@ Module formj2
         If (K_prj == 1) Then
             If (dabs(xj-XJ_av) > 1.d-1) ierr=1
         End If
-        Deallocate(idet1,idet2)
         Return
     End Subroutine J_av
 

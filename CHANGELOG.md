@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.12] - 2021-09-18
+- removed writing/reading of processors from HIJ and JJJ files
+- added more code documentation
+- initialization of global variables moved to module
+- revamped F_J2 function to remove redundant comparisons by Rspq
+
 ## [0.6.11] - 2021-09-16
 - implemented dynamic workload scheduling in conf_lsj
 - added completion time message to ine

@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.11")'
+        strfmt = '(4X,"Program conf v0.3.12")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -180,9 +180,10 @@ Contains
         Call ReadConfigurations
 
         ! Set key for projection of J
+        ! Kv = 1, 2 - Direct diagonaliztion (not implemented)
+        ! Kv = 3, 4 - Davidson diagonalization
         ! If Kv = 3, then K_prj = 1 - use selection of states with projection of J
         ! If Kv = 4, then K_prj = 0 - no selection of states with projection of J
-        K_prj=0                   
         If (Kv == 3) Then
             K_prj=1
             Write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
@@ -198,7 +199,7 @@ Contains
         Read(16) (In(i),i=1,IPgnt)
         Read(16) (Gnt(i),i=1,IPgnt)
         Close(unit=16)
-        Return
+
     End Subroutine Input
 
     Subroutine Init
@@ -333,10 +334,10 @@ Contains
             If (n >= Ne) Then
                 ic=ic+1
                 If (n > Ne) Then
-                    Write( 6,'(/2X,"wrong number of electrons", &
-                         /2X,"for configuration ICONF =",I6)') ic
-                    Write(11,'(/2X,"wrong number of electrons", &
-                         /2X,"for configuration ICONF =",I6)') ic
+                    strfmt = '(/2X,"wrong number of electrons", &
+                                /2X,"for configuration ICONF =",I6)'
+                    Write( 6,strfmt) ic
+                    Write(11,strfmt) ic
                   Stop
                 End If
                 Nvc(ic)=i
@@ -417,13 +418,9 @@ Contains
         ! Reading of files SGC.CON and SCRC.CON with the self-energy and screening radial integrals.
         Implicit None
         Integer :: na, nb, ierr, k, nsh, nx, khot, la, lb, ja, jb, na1, nb1, ind, &
-                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy, err_stat
+                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy, err_stat, Nmax1, Lmax1
         Real :: x, y
         Character(Len=256) :: strfmt, err_msg
-
-        ! Initialize counters
-        NhintS=0
-        NgintS=0
         
         If (Ksig == 0) Return
         nsh=Nso+1
@@ -739,16 +736,16 @@ Contains
 
         Implicit None
 
-        Integer :: npes, mype, shmrank, mpierr, interval, remainder, Hlim, numBins, maxh
-        Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ic1, n1, n2, int, split_type, key, disp_unit, win, &
+        Integer :: npes, mype, mpierr, interval, remainder, maxNumElementsPerCore=0
+        Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ic1, n1, n2, ihmax, &
                    n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd, minme, maxme
         logical :: finished
         Integer, allocatable, dimension(:) :: idet1, idet2, cntarray
-        Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate, numzero
+        Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate, numzero=0
         real :: ttime, ttot
         real(dp)  :: t, tt
-        Integer(Kind=int64) :: ih8, l8, sumd, statmem, mem, mem2, memsum, ih, cntr, avgme, numme, size8, minmem, maxmem, mesplit
+        Integer(Kind=int64) :: statmem, mem, memsum, maxmem, mesplit
         Character(Len=16)     :: memStr, memStr2, memTotStr, memTotStr2, npesStr, counterStr, counterStr2, filename, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
@@ -759,37 +756,32 @@ Contains
 
         Call startTimer(stot)
         Call InitFormH(npes,mype) 
-
-        ih8=0_int64
-        ih8H=0_int64
-        maxh=0_int64        
-        NumH=0_int64
-        numzero=0
-        Kherr=0
-        Kgerr=0
-        Hmin=0.d0
-
         Call calcNd0(ic1, Nd0)
 
-        If (Ksig == 2) Then
-            iscr=0
-            xscr=0
-            If (mype == 0) Write(*,*) 'Screening is included'
+        If (mype == 0) Then
+            If (Ksig == 2) Write(*,*) 'Screening is included'
+            Call calcMemReqs
         End If
 
-        If (mype == 0) Call calcMemReqs
-
-        If (Kl == 1) Then ! If continuing calculation and Hamiltonian has already been constructed
+        ! If continuing calculation or Hamiltonian has already been constructed
+        If (Kl == 1) Then 
             ! Read the Hamiltonian from file CONFp.HIJ
             Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-            ih8=NumH
             numzero = Count(Hamil%t(1:ih4) == 0)
+
+            ! Add maximum memory per core from storing H to total memory count
+            Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            memEstimate = memEstimate + ihmax*16
+
+        ! If starting a new computation and Hamiltonian has not been constructed
         Else 
             Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
             vaGrowBy = vaBinSize
             ndGrowBy = 1
 
             If (mype==0) Then
+                Open (unit=18,file='CONFp.HIJ',status='UNKNOWN',form='UNFORMATTED')
+                Close(unit=18,status='DELETE')
                 Write(counterStr,fmt='(I16)') vaGrowBy
                 Write(counterStr2,fmt='(I16)') ndGrowBy
                 Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
@@ -835,6 +827,7 @@ Contains
                                     nn=n
                                     kk=k
                                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                                     tt=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                     If (tt /= 0) Then
                                         cntarray = cntarray + 1
@@ -885,7 +878,7 @@ Contains
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
-                                                    ', MaxMemPerCPU='//trim(memStr2)//')'
+                                                    ', MaxMemPerCore='//trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
                             Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
                                                     Trim(memTotStr2) ,' is available.'
@@ -903,7 +896,7 @@ Contains
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
-                                                    ', MaxMemPerCPU='//trim(memStr2)//')'
+                                                    ', MaxMemPerCore='//trim(memStr2)//')'
                         If (memTotalPerCPU /= 0) Then
                             If (statmem > memTotalPerCPU) Then
                                 Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
@@ -947,7 +940,7 @@ Contains
                                         Do k1=1,kx
                                             k=k+1
                                             Call Gdet(k,idet2)
-                                            Call CompCD(idet1, idet2, diff)
+                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                             If (diff <= 2) Then
                                                 nn=n
                                                 kk=k
@@ -977,8 +970,8 @@ Contains
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call startTimer(s1)
 
-            Call MPI_AllReduce(counter1, maxh, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            mesplit = maxh/10
+            Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            mesplit = maxNumElementsPerCore/10
             numzero=0
             j=1
 
@@ -992,11 +985,12 @@ Contains
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                     t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                     Hamil%t(n)=t
-                    If (t==0) numzero=numzero+1
+                    If (t == 0) numzero=numzero+1
 
-                    If (counter1 == maxh .and. mod(n,mesplit)==0) Then
+                    If (counter1 == maxNumElementsPerCore .and. mod(n,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
                         j=j+1
@@ -1014,9 +1008,7 @@ Contains
 
         ih8=size(Hamil%t)
         ih4=ih8
-    
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        ! Compute NumH, the total number of non-zero matrix elements
+        
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(numzero, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1027,23 +1019,38 @@ Contains
         
         ! give all cores Hmin, the minimum matrix element value
         Call MPI_AllReduce(Hamil%t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
-
-        ih8H = ih8 ! global variable for total number of matrix elements for each core
         
         If (mype==0) Then
-            Write( 6,'(4X,"NumH =",I12)') NumH-numzero
-            Write(11,'(4X,"NumH =",I12)') NumH-numzero
-            Write( 6,'(4X,"numzero =",I12)') numzero
-            Write(11,'(4X,"numzero =",I12)') numzero
+            ! Write number of non-zero matrix elements
+            Write(counterStr,fmt='(I16)') NumH-numzero
+            strfmt = '(4X,"NumH = ",A)'
+            Write( 6,strfmt) Trim(AdjustL(counterStr))
+            Write(11,strfmt) Trim(AdjustL(counterStr))
+
+            ! Write number of zero-valued matrix elements
+            Write(counterStr,fmt='(I16)') numzero
+            strfmt = '(4X,"numzero = ",A)'
+            Write( 6,strfmt) Trim(AdjustL(counterStr))
+            Write(11,strfmt) Trim(AdjustL(counterStr))
+
+            ! Write value of lowest matrix element
+            Write(counterStr,fmt='(F14.8)') Hmin
+            strfmt = '(4X,"Hmin = ",A)'
+            Write( 6,strfmt) Trim(AdjustL(counterStr))
+            Write(11,strfmt) Trim(AdjustL(counterStr))
+
+            ! Write number of screened integrals
             If (Ksig == 2 .and. iscr > 0) Then
                 xscr=xscr/iscr
-                Write ( 6,'(5X,"For ",I13," integrals averaged screening ",F8.5)') iscr,xscr
-                Write (11,'(5X,"For ",I13," integrals averaged screening ",F8.5)') iscr,xscr
+                Write(counterStr,fmt='(I16)') iscr
+                strfmt = '(5X,"For ",A," integrals averaged screening ",F8.5)'
+                Write ( 6,strfmt) Trim(AdjustL(counterStr)),xscr
+                Write (11,strfmt) Trim(AdjustL(counterStr)),xscr
                 If (Kherr+Kgerr > 0) Then
-                    Write ( 6,'(4X,"Extrapolation warning: small denominators.", &
-                        /4X,"HintS: ",I6,"; GintS: ",I7)') Kherr,Kgerr
-                    Write (11,'(4X,"Extrapolation warning: small denominators.", &
-                        /4X,"HintS: ",I6,"; GintS: ",I7)') Kherr,Kgerr
+                    strfmt = '(4X,"Extrapolation warning: small denominators.", &
+                    /4X,"HintS: ",I6,"; GintS: ",I7)'
+                    Write ( 6,strfmt) Kherr,Kgerr
+                    Write (11,strfmt) Kherr,Kgerr
                End If
             End If
         End If
@@ -1068,14 +1075,12 @@ Contains
         
         Integer     :: iq, jq, jq0, k
         real(dp)    :: t
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         
         t=0.d0
-        If (Kdsig /= 0 .and. nf <= 2) E_k=Diag(k)
         Select Case(nf)
             Case(2) ! determinants dIffer by two functions
                 t=t+Gint(i2,j2,i1,j1)*is 
-                t=t+Gj*F_J2(idet1,idet2)
+                t=t+Gj*F_J2(idet1,idet2,is,nf,i2,i1,j2,j1)
             Case(1) ! determinants dIffer by one function
                 Do iq=1,Ne
                     i1=idet1(iq)
@@ -1094,7 +1099,7 @@ Contains
                     End If
                     t=t+Hint(i1,i1)*is
                 End Do
-                t=t+Gj*F_J2(idet1,idet2)
+                t=t+Gj*F_J2(idet1,idet2,is,nf,i2,i1,j2,j1)
         End Select
         Hmltn=t
         Return
@@ -1164,7 +1169,7 @@ Contains
             memDvdsn = 0_int64
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(D)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(D1)+sizeof(E1)
-            memDvdsn = memDvdsn+maxJcore*16_int64 ! 16 bytes to store J_n, J_k, J_t; maxJcore is max # of m.e. for a core
+            memDvdsn = memDvdsn
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
             memEstimate = memEstimate - memFormH + memDvdsn
@@ -1184,38 +1189,29 @@ Contains
         Implicit None
     
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
-                    kx, i1, i2, it, mype, npes, mpierr
+                    kx, i1, i2, it, mype, npes, mpierr, ifail
         Integer(Kind=int64) :: start_time, end_time
         Real :: ttot
-        real(dp)  :: crit, ax, x, xx, ss
+        Real(dp)  :: crit, ax, x, xx, ss, cnx, vmax
         logical   :: lsym
         Character(Len=16) :: timeStr
 
         Call startTimer(start_time)
-
         crit=1.d-6
         If (mype == 0) Then
-            If (Kl4 == 0) Return
+            If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
             If (Nc4 > Nc) Nc4=Nc
             Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
-            ! Starting vectors of dim. < Nd0 :
-            Nd0=IP1+1
         End If
 
         Call Init4(mype,npes)
-        If (mype == 0) Call Hould(Nd0,IP1,D1,E1,Z1)
+        If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
 
-        Do While (Ifail /= 0)
+        Do While (ifail /= 0)
            If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I4," failed")') Nd0
            Call Init4(mype,npes)
-           If (mype == 0) Call Hould(Nd0,IP1,D1,E1,Z1)
+           If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
         End Do
-
-        If (mype == 0) Then
-            Write( 6,'(1X,"Hmin =",F14.8)') Hmin
-            Write(11,'(1X,"Hmin =",F14.8)') Hmin
-        End If
-
         Call FormB0(mype,npes)
 
         If (Nd0 == Nd) Return
@@ -1234,14 +1230,15 @@ Contains
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (ax > crit .and. iter <= n_it) Then
                 If (mype == 0) Then
-                    Write( 6,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
-                    Write(11,'(1X,"** Davidson iteration ",I3," for ",I2," levels **")') iter,Nlv
+                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I2," levels **")'
+                    Write( 6,strfmt) iter,Nlv
+                    Write(11,strfmt) iter,Nlv
                 End if
                 ! Orthonormalization of Nlv probe vectors:
                 If (mype==0) Then
                     Do i=1,Nlv
-                        Call Ortn(i)
-                        If (Ifail /= 0) Then
+                        Call Ortn(i,ifail)
+                        If (ifail /= 0) Then
                             Write(*,*)' Fail of orthogonalization for ',i
                             Stop
                         End If
@@ -1251,7 +1248,7 @@ Contains
                 Call Mxmpy(1, mype, npes)
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 If (mype==0) Then ! start master core only block
-                  Call FormP(1)
+                  Call FormP(1, vmax)
                   lsym=K_prj == 1.OR.kskp == 1.OR.kskp == 3
                   If (iter == 1 .and. lsym) Then    !# averaging diagonal over confs
                     id0=1
@@ -1279,10 +1276,10 @@ Contains
                   cnx=0.d0
                   Do i=1,Nlv
                     i1=i+Nlv
-                    Call Dvdsn(i)
+                    Call Dvdsn(i,cnx)
                     If (Iconverge(i)==0) Then
-                      Call Ortn(i1)
-                      If (Ifail /= 0) Then
+                      Call Ortn(i1,ifail)
+                      If (ifail /= 0) Then
                         Write(*,*)' Fail of orthogonalization for ',i1
                         Stop
                       End If
@@ -1295,15 +1292,15 @@ Contains
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
                           If (Iconverge(i-Nlv)==0) Then
-                            Call Ortn(i)
-                            If (Ifail /= 0) Then
+                            Call Ortn(i,ifail)
+                            If (ifail /= 0) Then
                               If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
                               If (kdavidson==1) Then
                                 Stop
                               Else
                                 kdavidson=1
                                 If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
-                                Ifail=0
+                                ifail=0
                                 exit
                               End If
                             End If
@@ -1317,10 +1314,10 @@ Contains
                     ! Formation of other three blocks of the matrix P:
                     Call Mxmpy(2, mype, npes)
                     If (mype==0) Then
-                        Call FormP(2)
+                        Call FormP(2,vmax)
                         n1=2*Nlv
                         ! Evaluation of Nlv eigenvectors:
-                        Call Hould(n1,IPlv,D,E,P)
+                        Call Hould(n1,D,E,P,ifail)
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
@@ -1336,10 +1333,9 @@ Contains
                             If (ax < xx) ax=xx
                             If (vmax < E(i)) vmax=E(i)
                             If (mype == 0) Then
-                                Write( 6,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
-                                        I2,": ",F10.7)') i,-(E(i)+Hmin),kx,xx
-                                Write(11,'(1X,"E(",I2,") =",F14.8,"; admixture of vector ", & 
-                                        I2,": ",F10.7)') i,-(E(i)+Hmin),kx,xx
+                                strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
+                                Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
+                                Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
                             End If
                         End Do
                         If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
@@ -1354,10 +1350,11 @@ Contains
                     End If
                 Else
                     If (mype == 0) Then
-                        Write( 6,'(1X,"Davidson procedure converged")')
-                        Write(11,'(1X,"Davidson procedure converged")')
+                        strfmt = '(" Davidson procedure converged")'
+                        Write( 6,strfmt)
+                        Write(11,strfmt)
                         ! Assign values of Tk for case when Davidson procedure is already converged 
-                        If (Kl4 == 2 .and. iter==1) Tk=E(1:Nlv) 
+                        If (Kl4 == 2 .and. iter == 1) Tk=E(1:Nlv) 
                     End If
                     Exit
                 End If
@@ -1390,7 +1387,7 @@ Contains
         If (mype == 0) Then
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         End If
-    
+
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2

@@ -50,7 +50,7 @@ Module conf_init
         Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
         ! - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Qnl(100000000)) ! upper bound = 1 billion conf-s = 0.8 GB
+        Allocate(Qnl(100000000)) ! upper bound = 100 million rel. conf-s = 0.8 GB
         If (Nso /= 0) Then 
             Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
         End If
