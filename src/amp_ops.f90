@@ -18,9 +18,8 @@ Module amp_ops
 
     Private
 
-    Public :: AmpE1, AmpE2, AmpE3, AmpM1, AmpM2, AmpM3
-    Public :: AmpEDM, AmpPNC, AmpAM, AmpMQM, HfsA, HfsB
-    Public :: Fint, AmpOut
+    Public :: AmpE1, AmpE2, AmpE3, AmpM1, AmpM2, AmpM3, AmpEDM, AmpPNC
+    Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
 
   Contains 
 

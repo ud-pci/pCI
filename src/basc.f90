@@ -26,20 +26,22 @@ Program basc
         Call Input
         ! Norb = number of orbitals to be formed by Fbas:
         Call Init(Norb)
-        if (Norb.NE.0) then
+        If (Norb /= 0) then
             write (*,*) ' Run "bass" to form ',Norb,' new orbitals.'
             stop
-        end if
+        End If
         Call Fill_N_l
         Call Core
         Call Rint0(nsx,nsx2,lsx)
-        Call Rint(nsx,nsx2,lsx)
+    End If
+
+    Call AllocateRintArrays(nsx,nsx2,lsx,mype,npes)
+    Call Rint(nsx,nsx2,lsx,mype,npes)
+
+    If (mype == 0) Then
         write(*,*)' RINT finished'
         Call Gaunt
         write(*,*)' GAUNT finished'
-    End If
-
-    If (mype == 0) Then
         Close(11)
         Call stopTimer(start_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of basc was '// trim(timeStr)
@@ -63,7 +65,7 @@ Contains
         lrec=0
         iflag=1
 200     lrec=lrec+1
-        If (lrec.gt.8) Then
+        If (lrec > 8) Then
           Write(*,*)  'lrec > 8'
           Stop
         End If
@@ -72,11 +74,11 @@ Contains
         Write(13,rec=2,err=210) t2
         Read(13,rec=1,err=210) d1
         Read(13,rec=2,err=210) d2
-        If (d1.ne.t1) goto 210
-        If (d2.ne.t2) goto 210
+        If (d1 /= t1) goto 210
+        If (d2 /= t2) goto 210
         iflag=0
 210     Close(unit=13,status='delete')
-        If (iflag.ne.0) goto 200
+        If (iflag /= 0) goto 200
         nbytes=8/lrec
         ipmr=4/nbytes
 
@@ -99,7 +101,6 @@ Contains
         Write(11,strfmt)
 
         MaxT=9           !### length of expansion at the origin
-        fname='CONF.DAT'
         Kout=1
 
         ! Read input parameters from file CONF.INP
@@ -160,7 +161,7 @@ Contains
         Call ReadF (12,3,P1,Q1,2)
 
         z1  =PQ(1)
-        If (dABS(Z-z1).GT.1.d-6) Then
+        If (dABS(Z-z1) > 1.d-6) Then
             strfmt='(/2X,"nuc. charge is changed"/2X,"Z1=",F12.6/2X,"Z2=",F12.6)'
             Write( *,strfmt) Z,Z1
             Write(11,strfmt) Z,Z1
@@ -187,7 +188,7 @@ Contains
         Write( *,strfmt) Z,Kt,II,H,R2,R1,Rnuc,Al,Bt,Nsp,Ns,Nso,Nc
         Write(11,strfmt) Z,Kt,II,H,R2,R1,Rnuc,Al,Bt,Nsp,Ns,Nso,Nc
 
-        longbasis=dabs(PQ(20)-0.98765d0).LT.1.d-6
+        longbasis=dabs(PQ(20)-0.98765d0) < 1.d-6
         If (longbasis) Then
             Write( *,*) ' Using variant for long basis '
             Write(11,*) ' Using variant for long basis '
@@ -231,14 +232,14 @@ Contains
             kkj=-i*((jjj+1)/2)
             d=100.0d0*(d-llj)
             Nq(nj)=d+0.1d0
-            If (nj.LE.Nso) Then
+            If (nj <= Nso) Then
                 Do ni=1,Nso
-                    If (Nn(ni).EQ.Nn(nj).AND.Ll(ni).EQ.Ll(nj)) Qw(ni) = Qw(ni) + Nq(nj)   ! number of e on NR shell
+                    If (Nn(ni) == Nn(nj) .and. Ll(ni) == Ll(nj)) Qw(ni) = Qw(ni) + Nq(nj)   ! number of e on NR shell
                 End Do
             End If
             Do i=1,nsb
                 ni=i
-                If (nnj.EQ.Nn(ni).AND.Kk(ni).EQ.kkj) goto 210
+                If (nnj == Nn(ni) .and. Kk(ni) == kkj) goto 210
             End Do
             Norb=Norb+1
             ni=Ns+Norb
@@ -247,23 +248,23 @@ Contains
             Kk(ni)=kkj
             Ll(ni)=llj
             Jj(ni)=jjj
-            If (Kbas(ni).EQ.3) Kfile=1
-            If (Kbas(ni).EQ.4) kfile=1
+            If (Kbas(ni) == 3) Kfile=1
+            If (Kbas(ni) == 4) kfile=1
  210        Nip(nj)=ni
         End Do
         Write(*,*) Norb, ' new orbitals to be formed'
         nsmax=(4*IP6-20)/6
         nsmax1=(4*IP6-20)/3
-        If (nsb.GT.nsmax.AND..NOT.longbasis) Then
+        If (nsb > nsmax .and. .not.longbasis) Then
             Write(*,*) ' Ns =',nsb,' > ',nsmax
             Write(*,*) ' switch to long basis variant '
         End If
-        If (nsb.GT.nsmax1) Then
+        If (nsb > nsmax1) Then
             Write(*,*) ' For IP6 =',IP6
             Write(*,*) ' maximum length of basis set is ',nsmax1
             Stop
         End If
-        If (Nso.NE.0) Then
+        If (Nso /= 0) Then
             Do ni=1,Nso
                 Qq(ni) = Qw(ni)*(Jj(ni)+1.d0)/(4*Ll(ni)+2)    !# N_e on a shell
             End Do
@@ -271,7 +272,7 @@ Contains
         n0=0
         ne=0
         nmin=Nso+1
-        If (nmin.LE.Nsp) Then
+        If (nmin <= Nsp) Then
             Do ni=nmin,Nsp
                 n0=n0+Nq(ni)
             End Do
@@ -294,9 +295,9 @@ Contains
         Do ni=nmin,Nsp
             i=i+1
             n=n+Nq(ni)
-            If (n.LT.ne) Cycle
+            If (n < ne) Cycle
             ic=ic+1
-            If (n.GT.ne) Then
+            If (n > ne) Then
                 strfmt='(/2X,"wrong number of electrons"/2X,"for configuration ICONF =",I4/)'
                 Write( *,strfmt) ic
                 Write(11,strfmt) ic
@@ -308,7 +309,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file=FNAME,status='UNKNOWN',access='DIRECT',recl=2*IP6*IPmr)
+        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=2*IP6*IPmr)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -331,7 +332,7 @@ Contains
     
         Integer :: i, l_max, n_i, n2, l_i, l1, l
         Real(dp) :: x
-        Character(Len=512) :: strfmt
+        Character(Len=128) :: strfmt
 
         N_l=0
         l_max=0
@@ -342,8 +343,8 @@ Contains
             n2=100*x               
             l_i=n2-10*n_i          ! orbital QN  
             l1=l_i+1
-            If (n_i.GT.N_l(l1)) N_l(l1)=n_i          ! - max n for given l
-            If (l_i.GT.l_max) l_max=l_i
+            If (n_i > N_l(l1)) N_l(l1)=n_i          ! - max n for given l
+            If (l_i > l_max) l_max=l_i
         End Do
 
         strfmt='(/4x,"Max principle QN for given l:")'
@@ -373,7 +374,7 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        Open(12,file=FNAME,status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
         Ecore=0.d0
         Hcore=0.d0
         ih=2-kt
@@ -382,7 +383,7 @@ Contains
         Y=0.d0
 
         !### Coulomb potential of the core
-        If (Nso.NE.0) Then
+        If (Nso /= 0) Then
             Call Y0(Y)               
             err1=2.d-4
             err2=2.d-3
@@ -399,7 +400,7 @@ Contains
             t=Cl*Kk(ni)
             Call ReadF (12,ni+4,P,Q,2)
             Call ReadF (12,ni+Ns+4,A,B,2)
-            If (Kout.GT.0) Then
+            If (Kout > 0) Then
                 Write(11,*) ' Core: forming CP and CQ for orbital ',ni
                 Write(*,*) ' Core: Testing P,Q,A,B for orb. ',ni,'..'
             End If
@@ -426,23 +427,23 @@ Contains
                 im=ii+5+m
                 dd(m1)=Cl*B(im)-t*Q(im)
                 ss(m1)=-Cl*A(im)-t*P(im)
-                If (m.GE.1) ss(m1)=ss(m1)-2*Cl*Cl*r1*Q(im-1)
-                If (dgm.GT.1.d-6) Then     !### case of the pointlike nucleus
+                If (m >= 1) ss(m1)=ss(m1)-2*Cl*Cl*r1*Q(im-1)
+                If (dgm > 1.d-6) Then     !### case of the pointlike nucleus
                     dd(m1)=dd(m1)-Z*P(im)
                     ss(m1)=ss(m1)-Z*Q(im)
                 Else                       !### case of the finite nucleus
-                    If (m.GE.1) Then
+                    If (m >= 1) Then
                         dd(m1)=dd(m1)-1.5d0*Z*P(im-1)
                         ss(m1)=ss(m1)-1.5d0*Z*Q(im-1)
                     End If
-                    If (m.GE.3) Then
+                    If (m >= 3) Then
                         dd(m1)=dd(m1)+0.5d0*Z*P(im-3)
                         ss(m1)=ss(m1)+0.5d0*Z*Q(im-3)
                     End If
                 End If
                 cpp=0.d0
                 cqq=0.d0
-                If (m.GE.1) Then
+                If (m >= 1) Then
                     Do k=0,m-1
                         ik=ii+5+k
                         cpp=cpp+P(ik)*Y(im-k-1)
@@ -453,13 +454,13 @@ Contains
                 CQ(im)=ss(m1)+r1*cqq
             End Do
     
-            If (Nso.EQ.0) Then
+            If (Nso == 0) Then
                 ! test of expansion at the origin
                 Call WriteF(12,ni+4+Ns,CP,CQ,2)
                 Cycle
             End If
 
-            If (ni.LE.Nso) Then
+            If (ni <= Nso) Then
                 C(ii+4)=2*P(ii+4)-1.d0
                 Call Sint1(ds)
                 Hcore=Hcore+qa*ds
@@ -483,7 +484,7 @@ Contains
                 Do k1=kmin,kmax
                     k=k1-1
                     ip=la+lb+k
-                    If (ip.EQ.2*(ip/2)) Then
+                    If (ip == 2*(ip/2)) Then
                         Do i=1,ii,ih
                             C(i)=P(i)*A(i)+Q(i)*B(i)
                         End Do
@@ -500,10 +501,10 @@ Contains
                             CQ(i)=CQ(i)-yy*B(i)
                         End Do
                 
-                        If (nj.LE.ni.AND.ni.LE.Nso) Then
+                        If (nj <= ni .and. ni <= Nso) Then
                             t=qa
-                            If (ni.EQ.nj.AND.k.NE.0) t=0.5d0*(qa-1.d0)*(ja+1.d0)/ja
-                            If (ni.EQ.nj.AND.k.EQ.0) t=0.5d0*qa
+                            If (ni == nj .and. k /= 0) t=0.5d0*(qa-1.d0)*(ja+1.d0)/ja
+                            If (ni == nj .and. k == 0) t=0.5d0*qa
                             d=t*d
                             Do i=1,ii,ih
                                 C(i)=C(i)*(P(i)*A(i)+Q(i)*B(i))/R(i)
@@ -516,14 +517,14 @@ Contains
                 End Do
             End Do
     
-            If (ir.GT.0) Then
+            If (ir > 0) Then
                 irr=irr+1
                 strfmt='(" Orbital",I4,": Expansion at the origin badness ",I6)'
-                If (Kout.GT.0) Write( *,strfmt) ni,ir
+                If (Kout > 0) Write( *,strfmt) ni,ir
                 Write(11,strfmt) ni,ir
             End If
 
-            If (irr.EQ.0) nigd=ni
+            If (irr == 0) nigd=ni
 
             ! test of expansion at the origin
             Call WriteF(12,ni+4+Ns,CP,CQ,2)
@@ -538,13 +539,13 @@ Contains
         Write( *,strfmt) Hcore,Ecore
         Write(11,strfmt) Hcore,Ecore
 
-        If(irr.GT.0) Then
+        If(irr > 0) Then
             strfmt='(4X,"Only",I4," first orbitals are good at the origin", &
                   /4X,"for other orbitals there were",I6," errors.", &
                   /4X,"See RES file and use Kout=2 for more details.")'
             Write( *,strfmt) nigd,irr
             Write(11,strfmt) nigd,irr
-            If (Kout.GT.0) Then
+            If (Kout > 0) Then
                 Write(*,*) '  Push...'
                 Read(*,*)
             End If
@@ -557,96 +558,38 @@ Contains
     Subroutine Rint0(nsx,nsx2,lsx) 
         ! This subroutine counts the number of radial integrals
         Implicit None
-        Integer :: nsx, lsx, i, is, ngint2, nmin, n0, na, nb, nc, nd, la, lb, lc, ld
-        Integer :: ja, jb, jc, jd, n1, n2, n3, n4, iis, kmin, kmax, k1, k, ierr, nsx2
-        Character(Len=512) :: strfmt
+        Integer, Intent(Out) :: nsx, nsx2, lsx ! nsx and lsx are used to eliminate integrals:
+        Integer :: ngint2=0, i, is, nmin, n0, na, nb, nc, nd, la, lb, lc, ld
+        Integer :: ja, jb, jc, jd, n1, n2, n3, n4, iis, kmin, kmax, k1, k, ierr
+        Character(Len=128) :: strfmt
 
-        ! nsx and lsx are used to eliminate integrals:
         nsx=0
         lsx=0
+
         Do i=Nso+1,Nsp
            is=Nip(i)
-           If (is.GT.nsx) nsx=is
-           If (Ll(is).GT.lsx) lsx=Ll(is)
+           If (is > nsx) nsx=is
+           If (Ll(is) > lsx) lsx=Ll(is)
         End Do
 
         Call Nxt_to_max(nsx,nsx2)
 
-        nhint=0
-        ngint=0
-        ngint2=0
-
         ! parameter for indexation of integrals:
-        If (nsx.GT.IPx+Nso-1) Then
+        If (nsx > IPx+Nso-1) Then
            Write (*,*) ' Rint0: IPx is too small'
            Stop
         End If
-        If (nsx.NE.Nso) Then
+
+        If (nsx /= Nso) Then
             Write(*,*) 'Counting of radial integrals'
             nmin=Nso+1
-            ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
             ! counting of one-electron integrals
-            Do na=nmin,Nsx
-                If (Ll(na).GT.lsx) Cycle
-                Do nb=na,Nsx
-                    If (Kk(na).NE.Kk(nb)) Cycle
-                    nhint=nhint+1
-                End Do
-            End Do
-            ! - - - - - - - - - - - - - - - - - - - - - - - - -
-            ! counting of integrals R(K;NA,NB,NC,ND)
-            If (Ne.GT.1) Then
-             n0=Nso+1
-             Do n1=n0,Nsx
-              If (Ll(n1).GT.lsx)    Cycle
-              Do n2=n1,Nsx
-               If (Ll(n2).GT.lsx)   Cycle
-               Do n3=n1,Nsx
-                If (Ll(n3).GT.lsx)  Cycle
-                Do n4=n3,Nsx
-                 If (Ll(n4).GT.lsx) Cycle
-                 na=n1
-                 nb=n2
-                 nc=n3
-                 nd=n4
-                 Do iis=1,2
-                  If (nb.LE.nd) Then
-                   la=Ll(na)
-                   If (Nn(na).GT.N_l(la+1)) Continue
-                   lb=Ll(nb)
-                   If (Nn(nb).GT.N_l(lb+1)) Continue
-                   lc=Ll(nc)
-                   If (Nn(nc).GT.N_l(lc+1)) Continue
-                   ld=Ll(nd)
-                   If (Nn(nd).GT.N_l(ld+1)) Continue
-                   i=la+lb+lc+ld
-                   If (i.NE.2*(i/2)) Exit
-                   ja=Jj(na)
-                   jb=Jj(nb)
-                   jc=Jj(nc)
-                   jd=Jj(nd)
-                   kmin=max(iabs(ja-jc)/2+1,iabs(jb-jd)/2+1)
-                   kmax=min((ja+jc)/2+1,(jb+jd)/2+1)
-                   Do k1=kmin,kmax
-                     k=k1-1
-                     i=k+la+lc
-                     If (i.NE.2*(i/2).AND.kbrt.EQ.0) Cycle
-                     If (n1.LE.nsx2) Then
-                       ngint=ngint+1
-                     Else
-                       ngint2=ngint2+1
-                     End If
-                   End Do
-                   If (n1.EQ.n2.OR.n3.EQ.n4) Exit
-                   nc=n4
-                   nd=n3
-                   Continue
-                  End If
-                 End Do
-                End Do
-               End Do
-              End Do
-             End Do
+            Call countNhint(nmin,nsx,nhint)
+
+            ! counting of two-electron integrals R(K;NA,NB,NC,ND)
+            If (Ne > 1) then
+                call countNgint(nsx,ngint,ngint2)
             End If
         End If
 
@@ -680,28 +623,28 @@ Contains
             ncx=0                 !### ncx= max orbital in conf ic
             kcx=0                 !### index of max orbital
             Do k=i+1,kx
-                If (Nip(k).GT.ncx) Then
+                If (Nip(k) > ncx) Then
                     ncx=Nip(k)
                     kcx=k
                     nek=Nq(k)
                 End If
             End Do
-            If (nek.GE.2) Then    !### next to max orbital
+            If (nek >= 2) Then    !### next to max orbital
                 nsx2=max(nsx2,ncx)
             Else
                 Do k=i+1,kx
-                    If (Nip(k).GT.nsx2.AND.k.NE.kcx) nsx2=Nip(k)
+                    If (Nip(k) > nsx2 .and. k /= kcx) nsx2=Nip(k)
                 End Do
             End If
             i=kx
         End Do
 
-        If (i.NE.Nsp) Then
+        If (i /= Nsp) Then
             Write(*,*) 'Nxt_to_max error: i=',i,' <> ',Nsp
             Read(*,*)
         End If
 
-        If (nsx2.GT.nsx) Then
+        If (nsx2 > nsx) Then
             Write(*,*) 'Nxt_to_max error: nsx2=',nsx2,' > ',nsx
             Read(*,*)
             nsx2=nsx
@@ -710,35 +653,166 @@ Contains
         Return
     End Subroutine Nxt_to_max
 
-    Subroutine Rint(nsx,nsx2,lsx)
+    Subroutine AllocateRintArrays(nsx,nsx2,lsx,mype,npes)
+        Use mpi
+        Implicit None
+        Integer, Intent(InOut) :: nsx, nsx2, lsx, mype, npes
+        
+        Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kout, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        Call MPI_Bcast(nsx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nsx2, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(lsx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        Call MPI_Bcast(nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        Call MPI_Bcast(Nn, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        allocate(Rint1(nhint),Iint1(nhint),I_is(nhint),R_is(nhint))
+        allocate(Rint2(IPbr,ngint),Iint2(ngint),Iint3(ngint))
+        allocate(IntOrd(IPx*IPx))
+
+    End Subroutine AllocateRintArrays
+
+    Subroutine AllocateRint2Arrays(mype,npes)
+        Use mpi
+        Use readfff, Only : ArrP, ArrQ
+        Implicit None
+        Integer, Intent(InOut) :: mype, npes
+        
+        Call MPI_Bcast(ii, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(kt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(H0, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(r2, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+        Call MPI_Bcast(Dint, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Alfd, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(N_l, 10, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(rcut, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(ArrP(1:IP6,1:Ns), IP6*Ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(ArrQ(1:IP6,1:Ns), IP6*Ns, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+        Call MPI_Bcast(C, IP6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(R, IP6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(V, IP6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+    End Subroutine AllocateRint2Arrays
+
+    Subroutine countNhint(nmin,End,nhint)
+        Implicit None
+        Integer, Intent(In) :: nmin, End
+        Integer, Intent(Out) :: nhint
+
+        Integer :: na, nb
+
+        nhint=0
+        Do na=nmin,Nsx
+            If (Ll(na) > lsx) Cycle
+            Do nb=na,Nsx
+                If (Kk(na) /= Kk(nb)) Cycle
+                nhint=nhint+1
+            End Do
+        End Do
+    
+    End Subroutine countNhint
+
+    Subroutine countNgint(End,ngint1,ngint2)
+        Implicit None
+        Integer, Intent(In) :: End
+        Integer, Intent(Out) :: ngint1, ngint2
+
+        Integer :: n0, n1, n2, n3, n4, na, nb, nc, nd, la, lb, lc, ld, ja, jb, jc, jd
+        Integer :: k1, k, kmin, kmax, i, iis
+
+        ngint1=0
+        ngint2=0
+        n0=Nso+1
+        Do n1=n0,End
+            If (Ll(n1) > lsx) Cycle
+            Do n2=n1,Nsx
+                If (Ll(n2) > lsx) Cycle
+                Do n3=n1,Nsx
+                    If (Ll(n3) > lsx) Cycle
+                    Do n4=n3,Nsx
+                        If (Ll(n4) > lsx) Cycle
+                        na=n1
+                        nb=n2
+                        nc=n3
+                        nd=n4
+                        Do iis=1,2
+                            If (nb <= nd) then
+                                la=Ll(na)
+                                If (Nn(na) > N_l(la+1)) Cycle
+                                lb=Ll(nb)
+                                If (Nn(nb) > N_l(lb+1)) Cycle
+                                lc=Ll(nc)
+                                If (Nn(nc) > N_l(lc+1)) Cycle
+                                ld=Ll(nd)
+                                If (Nn(nd) > N_l(ld+1)) Cycle
+                                i=la+lb+lc+ld
+                                If (i /= 2*(i/2)) Exit
+                                ja=Jj(na)
+                                jb=Jj(nb)
+                                jc=Jj(nc)
+                                jd=Jj(nd)
+                                kmin=max(iabs(ja-jc)/2+1,iabs(jb-jd)/2+1)
+                                kmax=min((ja+jc)/2+1,(jb+jd)/2+1)
+                                Do k1=kmin,kmax
+                                    k=k1-1
+                                    i=k+la+lc
+                                    If (i /= 2*(i/2) .and. kbrt == 0) Cycle
+                                    If (n1 <= nsx2) then
+                                        ngint1=ngint1+1
+                                    else
+                                        ngint2=ngint2+1
+                                    End If
+                                End Do
+                                If (n1 == n2.OR.n3 == n4) Exit
+                                nc=n4
+                                nd=n3
+                            End If
+                        End Do
+                    End Do
+                End Do
+            End Do
+        End Do
+    End Subroutine countNgint
+
+    Subroutine Rint(nsx,nsx2,lsx,mype,npes)
+        Use mpi
         Use breit
         Use readfff
         Use sintg
         Use str_fmt, Only : FormattedTime
         Implicit None
 
+        Integer :: mype, npes, mpierr
         Integer :: lnx, num_is, nx, i, Idel, idel1, nsx, ih, nmin, na, lsx
         Integer :: nna, lla, jjd, lb, la, nnc, nnb, iis, nb, n4, n3, n2, n1
         Integer :: nsx2, kmin, kmax, k, k1, lc, ld, ja, jb, jc, jd, Iab, nm_br
-        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld
+        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, ngint2
         Real(dp) :: dint1, r_e1, r_e2, fis, tab_br, tad_br, r_br, rabcd, r_c, tad
         Real(dp), Dimension(IP6) :: p, q, a, b, cp, cq, ca, cb
         Integer, Dimension(11) :: ilogr
         Real(dp), Dimension(20) :: Rint_br
-        Integer(kind=int64) :: clock_rate, start_time, end_time
-        Real :: total_time
+        Integer(kind=int64) :: start_time
         Character(Len=16) :: timeStr
         Character(Len=512) :: strfmt
         Character(Len=1) :: let(9)
         Logical*1  ::  l_br
         data let/'s','p','d','f','g','h','i','k','l'/
 
-        Call system_clock(count_rate=clock_rate)
-
         ! nsx and lsx are used to eliminate integrals
-        allocate(Rint1(nhint),Iint1(nhint),I_is(nhint),R_is(nhint))
-        allocate(Rint2(IPbr,ngint),Iint2(ngint),Iint3(ngint))
-        allocate(IntOrd(IPx*IPx))
         small=1.d-8
         nhint=0
         ngint=0
@@ -747,148 +821,163 @@ Contains
         fis=0.d0                   !## rad. int. for Volume shift (VS)
         num_is=0                   !## number of IS integrals (VS or SMS)
 
-        !       parameter for indexation of integrals:
+        ! parameter for indexation of integrals:
         nx = IPx
-        Do i=1,11                  ! this array is used to count
-            ilogr(i)=0             !# two-electron integrals of
-        End Do                     !## particular abs value
-        If (Kout.EQ.0) Idel=50000
-        If (Kout.EQ.1) Idel=5000
-        If (Kout.GE.2) Idel=1
+
+        !this array is used to count two-electron integrals of particular abs value
+        ilogr=0  
+        
+        If (Kout == 0) Idel=50000
+        If (Kout == 1) Idel=5000
+        If (Kout >= 2) Idel=1
         idel1=max(idel,10000)
 
-        !     >>>>>>>>>>>>>> ECP of the core >>>>>>>>>>>>>>>>>>
-        If (Kecp.NE.0) Then
-            Open(unit=10,file='CONF.ECP',status='OLD')
-            strfmt='(F7.3)'
-            Read (10,strfmt) Alfd
-            Read (10,strfmt) (rcut(i),i=1,10)
-            strfmt='(5X,"ECP: Alfd =",F7.3,5X,"Rcut:"/5(I2,":",F7.3))'
-            Write(11,strfmt) Alfd,(i-1,rcut(i),i=1,10)
-            Close(unit=10)
+        If (mype == 0) Then
+            !     >>>>>>>>>>>>>> ECP of the core >>>>>>>>>>>>>>>>>>
+            If (Kecp /= 0) Then
+                Open(unit=10,file='CONF.ECP',status='OLD')
+                strfmt='(F7.3)'
+                Read (10,strfmt) Alfd
+                Read (10,strfmt) (rcut(i),i=1,10)
+                strfmt='(5X,"ECP: Alfd =",F7.3,5X,"Rcut:"/5(I2,":",F7.3))'
+                Write(11,strfmt) Alfd,(i-1,rcut(i),i=1,10)
+                Close(unit=10)
+            End If
+            !     <<<<<<<<<<<<<<    End of ECP   <<<<<<<<<<<<<<<<<<
+
+            strfmt='(14X,"Radial integrals",2X,/4x,67("="),  &
+                   /5X,"N",12X,"NA",8X,"NB",8X,"H0(NA,NB)",&
+                   6X,"Br(Na,Nb)",6X,"VS(NA,NB)",/4x,67("-"))'
+            Write(11,strfmt)
         End If
         
-        !     <<<<<<<<<<<<<<    End of ECP   <<<<<<<<<<<<<<<<<<
-        strfmt='(14X,"Radial integrals",2X,/4x,67("="),  &
-               /5X,"N",12X,"NA",8X,"NB",8X,"H0(NA,NB)",&
-               6X,"Br(Na,Nb)",6X,"VS(NA,NB)",/4x,67("-"))'
-        Write(11,strfmt)
-
-        If (nsx.EQ.Nso) Then
+        If (nsx == Nso) Then
             Continue
         Else
-            Open(12,file=FNAME,status='OLD',access='DIRECT',recl=2*IP6*IPmr)
-            ih=2-Kt
-            nmin=Nso+1
-            ! - - - - - - - - - - - - - - - - - - - - - - - - -
-            !   evaluation of one-electron integrals
-            Call system_clock(start_time)
-            Do na=nmin,Nsx
-                If (Ll(na).GT.lsx) Cycle
-                Call ReadFF (12,na+4,Pa,Qa,2)      ! p,q
-                Call Readf (12,na+Ns+4,cp,cq,2)
-                nna=nn(na)
-                lla=ll(na)+1
-                If (nna.GT.N_l(lla)) Cycle
-                jja=jj(na)
-                Do nd=na,Nsx
-                    If (Kk(na).NE.Kk(nd)) Cycle
-                    tab_br=0.d0
-                    nnd=nn(nd)
-                    lld=ll(nd)+1
-                    If (nnd.GT.N_l(lld)) Cycle
-                    jjd=jj(nd)
-                    Call ReadFF (12,nd+4,Pd,Qd,2)    ! a,b
-                    Call readf (12,nd+Ns+4,ca,cb,2)
-                    Do i=1,Ii,ih
-                        C(i)=cp(i)*Pd(i)+cq(i)*Qd(i)
-                        ! >>>>>>>>>>>>>>> EFFECTIVE CORE POTENTIAL >>>>>>>>>>>>>>>>>
-                        If(Kecp.NE.0) C(i)=C(i)- &
-                             0.5d0*(Pa(i)*Pd(i)+Qa(i)*Qd(i)) &
-                             *Alfd/(R(i)**2+Rcut(lla)**2)**2
+            If (mype == 0) Then
+                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+                ih=2-Kt
+                nmin=Nso+1
+
+                ! Evaluation of one-electron integrals
+                Call startTimer(start_time)
+                Do na=nmin,Nsx
+                    If (Ll(na) > lsx) Cycle
+                    Call ReadFF (12,na+4,Pa,Qa,2)      ! p,q
+                    Call Readf (12,na+Ns+4,cp,cq,2)
+                    nna=nn(na)
+                    lla=ll(na)+1
+                    If (nna > N_l(lla)) Cycle
+                    jja=jj(na)
+                    Do nd=na,Nsx
+                        If (Kk(na) /= Kk(nd)) Cycle
+                        tab_br=0.d0
+                        nnd=nn(nd)
+                        lld=ll(nd)+1
+                        If (nnd > N_l(lld)) Cycle
+                        jjd=jj(nd)
+                        Call ReadFF (12,nd+4,Pd,Qd,2)    ! a,b
+                        Call readf (12,nd+Ns+4,ca,cb,2)
+                        Do i=1,Ii,ih
+                            C(i)=cp(i)*Pd(i)+cq(i)*Qd(i)
+                            ! >>>>>>>>>>>>>>> EFFECTIVE CORE POTENTIAL >>>>>>>>>>>>>>>>>
+                            If (Kecp /= 0) C(i)=C(i)- &
+                                 0.5d0*(Pa(i)*Pd(i)+Qa(i)*Qd(i)) &
+                                 *Alfd/(R(i)**2+Rcut(lla)**2)**2
+                        End Do
+                        C(ii+4)=Pa(ii+4)+Pa(ii+4)-1.d0
+                        Call Sint1(tad)
+                        If (jja == 1) Then                    !## Correction of the
+                            Call NclInt(cp,cq,Pd,Qd,dint1)    !## integral inside the
+                            tad=tad+dint1-Dint                !## nucleus for j=1/2
+                        End If
+                        If (K_is == 1) fis = dV_nuc(Pa,Qa,Pd,Qd)     !### Volume IS
+                        If (Kbrt >= 1) tad_br=Br_core(na,nd,12)      !### Core Breit
+                        nhint=nhint+1
+                        nad=nx*(na-nso-1)+(nd-nso)
+                        Write(11,'(I6,8X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",3F15.8)') &
+                            nhint,nna,let(lla),jja,nnd,let(lld),jjd,tad,tad_br,fis
+                        Rint1(nhint)=tad+tad_br
+                        Iint1(nhint)=nad
+                        R_is(nhint)=fis
+                        I_is(nhint)=nad
                     End Do
-                    C(ii+4)=Pa(ii+4)+Pa(ii+4)-1.d0
-                    Call Sint1(tad)
-                    If (jja.EQ.1) Then                    !## Correction of the
-                        Call NclInt(cp,cq,Pd,Qd,dint1)    !## integral inside the
-                        tad=tad+dint1-Dint                !## nucleus for j=1/2
-                    End If
-                    If (K_is.EQ.1) fis = dV_nuc(Pa,Qa,Pd,Qd)     !### Volume IS
-                    If (Kbrt.GE.1) tad_br=Br_core(na,nd,12)      !### Core Breit
-                    nhint=nhint+1
-                    nad=nx*(na-nso-1)+(nd-nso)
-                    Write(11,'(I6,8X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",3F15.8)') &
-                        nhint,nna,let(lla),jja,nnd,let(lld),jjd,tad,tad_br,fis
-                    Rint1(nhint)=tad+tad_br
-                    Iint1(nhint)=nad
-                    R_is(nhint)=fis
-                    I_is(nhint)=nad
                 End Do
-            End Do
+
+                Call stopTimer(start_time, timeStr)
+                Write(*,'(2X,A)'), 'TIMING >>> Evaluation of one-electron integrals took '// trim(timeStr)
+            End If
+            If (K_is == 1) num_is=nhint            
+
+            ! Allocate arrays required for calculating Rint2
+            Call AllocateRint2Arrays(mype, npes)
+
+            ! Evaluation of two-electron integrals R(K;NA,NB,NC,ND)
+            Call startTimer(start_time)
             
-            Call system_clock(end_time)
-            total_time=Real((end_time-start_time)/clock_rate)
-            Call FormattedTime(total_time, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Evaluation of one-electron integrals took '// trim(timeStr)
-            If (K_is.EQ.1) num_is=nhint
-    
-            ! - - - - - - - - - - - - - - - - - - - - - - - - -
-            !   evaluation of integrals R(K;NA,NB,NC,ND)
-            Call system_clock(start_time)
-            If (Ne.NE.1) Then
+            If (Ne /= 1) Then
                 kt1=Kt
                 ih=2-Kt
     
-                strfmt = '(3x,69("=")/5X,"N",4X,"K",5X,"NA",8X,"NB",8X,"NC", &
-                            7X,"ND",3X,"R(K;NA,NB,NC,ND)  R_br"/3x,69("-"))'
-                Write( *,strfmt)
-                Write(11,strfmt)
-    
+                If (mype == 0) Then
+                    strfmt = '(3x,69("=")/5X,"N",4X,"K",5X,"NA",8X,"NB",8X,"NC", &
+                                7X,"ND",3X,"R(K;NA,NB,NC,ND)  R_br"/3x,69("-"))'
+                    Write( *,strfmt)
+                    Write(11,strfmt)
+                End If
+                    
                 n0=Nso+1
                 r_br=0.d0
-                l_br=Kbrt.NE.0.AND.IPbr.EQ.2
+                l_br=Kbrt /= 0 .and. IPbr == 2
                 nm_br=0
-                Do n1=n0,Nsx2
-                    If (Ll(n1).GT.lsx) Cycle
+                rint2=0_dp
+                iint2=0
+                iint3=0
+                ilogr=0
+                intord=0
+                Do n1=mype+n0,Nsx2,npes
+                    Call countNgint(n1-1,ngint,ngint2)
+                    ngint=ngint+ngint2
+                    If (Ll(n1) > lsx) Cycle
                     Do n2=n1,Nsx
-                        If (Ll(n2).GT.lsx) Cycle
+                        If (Ll(n2) > lsx) Cycle
                         Iab= nx*(n1-Nso-1)+(n2-nso)
                         IntOrd(Iab)= ngint+1
                         Do n3=n1,Nsx
-                            If (Ll(n3).GT.lsx) Cycle
+                            If (Ll(n3) > lsx) Cycle
                             Do n4=n3,Nsx
-                                If (Ll(n4).GT.lsx) Cycle
+                                If (Ll(n4) > lsx) Cycle
                                 na=n1
                                 nb=n2
                                 nc=n3
                                 nd=n4
                                 Do iis=1,2
-                                    If (nb.LE.nd) Then
+                                    If (nb <= nd) then
                                         nna=Nn(na)
                                         nnb=Nn(nb)
                                         nnc=Nn(nc)
                                         nnd=Nn(nd)
                                         la=Ll(na)
-                                        If (nna.GT.N_l(la+1)) Continue
+                                        If (nna > N_l(la+1)) Cycle
                                         lb=Ll(nb)
-                                        If (nnb.GT.N_l(lb+1)) Continue
+                                        If (nnb > N_l(lb+1)) Cycle
                                         lc=Ll(nc)
-                                        If (nnc.GT.N_l(lc+1)) Continue
+                                        If (nnc > N_l(lc+1)) Cycle
                                         ld=Ll(nd)
-                                        If (nnd.GT.N_l(ld+1)) Continue
+                                        If (nnd > N_l(ld+1)) Cycle
                                         i=la+lb+lc+ld
-                                        If (i.NE.2*(i/2)) Exit
+                                        If (i /= 2*(i/2)) Exit
                                         ja=Jj(na)
                                         jb=Jj(nb)
                                         jc=Jj(nc)
                                         jd=Jj(nd)
                                         kmin=max(iabs(ja-jc)/2+1,iabs(jb-jd)/2+1)
                                         kmax=min((ja+jc)/2+1,(jb+jd)/2+1)
-                                        Call ReadFF (12,na+4,Pa,Qa,2)
-                                        Call ReadFF (12,nc+4,Pc,Qc,2)
-                                        Call ReadFF (12,nb+4,Pb,Qb,2)
-                                        Call ReadFF (12,nd+4,Pd,Qd,2)
-                                        If (l_br) Then  ! valence Gaunt included
+                                        call ReadPQ(Pa,Qa,na)
+                                        call ReadPQ(Pc,Qc,nc)
+                                        call ReadPQ(Pb,Qb,nb)
+                                        call ReadPQ(Pd,Qd,nd)
+                                        If (l_br) then  ! valence Gaunt included
                                             xja=0.5d0*ja
                                             xla=la
                                             yla=ja-la
@@ -903,58 +992,46 @@ Contains
                                             yld=jd-ld
                                             Do k = kmin, kmax
                                                 Rint_br(k) = breit_int(k-1,na,Pa,Qa,nb,Pb,Qb,nc,Pc,Qc,nd,Pd,Qd)
-                                            enddo
+                                            End Do
                                         End If
                                         Do k1=kmin,kmax
                                             k=k1-1
                                             i=k+la+lc
-                                            If (i.NE.2*(i/2).AND..NOT.l_br) Cycle
-                                            If (i.NE.2*(i/2)) Then
+                                            If (i /= 2*(i/2) .and. .not. l_br) Cycle
+                                            If (i /= 2*(i/2)) then
                                                 r_c=0.d0
                                             Else 
                                                 Do i=1,Ii,ih
                                                     C(i)=Pa(i)*Pc(i)+Qa(i)*Qc(i)
                                                 End Do
                                                 C(ii+4)=Pa(ii+4)+Pc(ii+4)
-                                                Call Yk(k)
+                                                call Yk(k)
                                                 Do i=1,Ii,ih
                                                     C(i)=(Pb(i)*Pd(i)+Qb(i)*Qd(i))*C(i)/R(i)
                                                 End Do
                                                 C(ii+4)=Pd(ii+4)+Pb(ii+4)+k
-                                                Call Sint(r_c)
+                                                call Sint(r_c)
                                                 ! >>>>>>>>>>>>>>> EFFECTIVE CORE POTENTIAL >>>>>>>>>>>>>>>>>
-                                                If (k.EQ.1.AND.Kecp.NE.0) Then
+                                                If (k == 1 .and. Kecp /= 0) then
                                                     Do i=1,ii,ih
                                                         C(i)=(Pa(i)*Pc(i)+Qa(i)*Qc(i))/(R(i)**2+Rcut(la+1)*Rcut(lc+1))
                                                     End Do
                                                     C(ii+4)=Pa(ii+4)+Pc(ii+4)
-                                                    Call Sint1(r_e1)
+                                                    call Sint1(r_e1)
                                                     Do i=1,ii,ih
                                                         C(i)=(Pb(i)*Pd(i)+Qb(i)*Qd(i))/(R(i)**2+Rcut(lb+1)*Rcut(ld+1))
                                                     End Do
                                                     C(ii+4)=Pb(ii+4)+Pd(ii+4)
-                                                    Call Sint1(r_e2)
+                                                    call Sint1(r_e2)
                                                     r_c=r_c-r_e1*r_e2*Alfd
                                                 End If
+                                                ! <<<<<<<<<<<<<<< EFFECTIVE CORE POTENTIAL <<<<<<<<<<<<<<<<<
                                             End If
                                             rabcd=r_c
                                             If (l_br) r_br=Rint_br(k1)  ! - Breit/Gaunt(+Breit/retardation for kbrt=2)
                                             ngint=ngint+1
                                             kac=nx*nx*K+nx*(na-Nso-1)+(nc-Nso)
                                             kbd=nx*(nb-Nso-1)+(nd-Nso)
-                                            strfmt='(1X,I8,1X,I2,2X,I3,A1,1X,I1,"/2",1X,I3, &
-                                                 A1,1X,I1,"/2",1X,I3,A1,1X,I1,"/2", &
-                                                 1X,I3,A1,1X,I1,"/2",2F13.7)'
-                                            If (ngint.EQ.(ngint/idel1)*idel1) &
-                                                 Write (*,strfmt) ngint,k,nna,let(la+1),ja, &
-                                                                       nnb,let(lb+1),jb, &
-                                                                       nnc,let(lc+1),jc, &
-                                                                       nnd,let(ld+1),jd,r_c,r_br
-                                            If (ngint.EQ.(ngint/Idel)*Idel) &
-                                                 Write (11,strfmt) ngint,k,nna,let(la+1),ja, &
-                                                                       nnb,let(lb+1),jb, & 
-                                                                       nnc,let(lc+1),jc, &
-                                                                       nnd,let(ld+1),jd,r_c,r_br
                                             rint2(1,ngint)=rabcd
                                             If (l_br) rint2(IPbr,ngint)=r_br
                                             iint2(ngint)=kac
@@ -964,9 +1041,9 @@ Contains
                                             ln=max(ln,1)
                                             lnx=max(lnx,ln)
                                             ilogr(ln)=ilogr(ln)+1
-                                            If (l_br.AND.dabs(r_br).GT.1.d-9) nm_br=nm_br+1
+                                            If (l_br .and. dabs(r_br) > 1.d-9) nm_br=nm_br+1
                                         End Do
-                                        If (n1.EQ.n2.OR.n3.EQ.n4) Exit
+                                        If (n1 == n2.OR.n3 == n4) Exit
                                         nc=n4
                                         nd=n3
                                     End If
@@ -975,68 +1052,149 @@ Contains
                         End Do
                     End Do
                 End Do
+                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(ngint, ngint, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+                Do i=1,IPbr
+                    Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:Ngint), Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                End Do
+                Call MPI_AllReduce(nm_br, nm_br, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, Iint2, Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, Iint3, Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, IntOrd, IPx*IPx, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, ilogr, 11, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
                 Kt=kt1
             Else
                 Continue
             End If
         End If
 
-        Call system_clock(end_time)
-        total_time=Real((end_time-start_time)/clock_rate)
-        Call FormattedTime(total_time, timeStr)
-        Write(*,'(2X,A)'), 'TIMING >>> Evaluation of two-electron integrals took '// trim(timeStr)
+        If (mype == 0) Then
+            Call PrintRint2Table(idel1)
 
-        Close(unit=12)
+            Call stopTimer(start_time, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> Evaluation of two-electron integrals took '// trim(timeStr)
 
-        strfmt = '(2X,"NHINT=",I5," NGINT=", &
-               I8, &
-               /(4X,"10**(-",I2,") < |R| < 10**(-",I2,") num =",I8))'
-        Write( *,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
-        Write(11,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
+            Close(unit=12)
 
-        ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        If (K_is.GE.2) Then
-            Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
-            Call Rint_MS(nsx,lsx,num_is)
-            Close(13)
+            strfmt = '(2X,"NHINT=",I5," NGINT=",I8, &
+                   /(4X,"10**(-",I2,") < |R| < 10**(-",I2,") num =",I8))'
+            Write( *,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
+            Write(11,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
+
+            ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            If (K_is >= 2) Then
+                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+                Call Rint_MS(nsx,lsx,num_is)
+                Close(13)
+            End If
+            ! <<<<<<<<<<<<<< MS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+            ! Write radial integrals to file CONF.INT
+            Write(*,*)' Formation of the file CONF.INT...'
+            Open (unit=13,file='CONF.INT',status='UNKNOWN',form='UNFORMATTED')
+            Write (13) Ns,Nso,Nsp,Nsx,Ecore
+            Write (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsx)
+            Write (13) (Nq(i),Nip(i), i=1,Nsp)
+            Write (13) nhint,kbrt
+            Write (13) (Rint1(i), i=1,nhint)
+            Write (13) (Iint1(i), i=1,nhint)
+            Write (13) ngint,0,nx*nx
+            Write (13) ((Rint2(k,i),k=1,IPbr), i=1,ngint)
+            Write (13) (Iint2(i), i=1,ngint)
+            Write (13) (Iint3(i), i=1,ngint)
+            Write (13) (IntOrd(i), i=1,nx*nx)
+            If (K_is >= 1) Then
+                Write(13) K_is,Klow,num_is
+                Write(13) (R_is(i),i=1,num_is)
+                Write(13) (I_is(i),i=1,num_is)
+            End If
+            Close(unit=13)
+
+            Write(*,*)' File CONF.INT formed'
+            Write(*,*)' nsx = ',nsx,' lsx =',lsx
+            Write(*,*)' nhint=',nhint,' ngint=',ngint,' num_is=',num_is
+
+            If (l_br) Then
+                If (kbrt == 1) Write(*,*)' Valence Magnetic Breit is included:'
+                If (kbrt == 2) Write(*,*)' Valence Full Breit is included:'
+                Write (*,*) nm_br,' integrals exceed 1.d-9'
+            End If
         End If
-        ! <<<<<<<<<<<<<< MS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-        Write(*,*)' Formation of the file CONF.INT...'
-        Open (unit=13,file='CONF.INT',status='UNKNOWN',form='UNFORMATTED')
-        Write (13) Ns,Nso,Nsp,Nsx,Ecore
-        Write (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsx)
-        Write (13) (Nq(i),Nip(i), i=1,Nsp)
-        Write (13) nhint,kbrt
-        Write (13) (Rint1(i), i=1,nhint)
-        Write (13) (Iint1(i), i=1,nhint)
-        Write (13) ngint,0,nx*nx
-        Write (13) ((Rint2(k,i),k=1,IPbr), i=1,ngint)
-        Write (13) (Iint2(i), i=1,ngint)
-        Write (13) (Iint3(i), i=1,ngint)
-        Write (13) (IntOrd(i), i=1,nx*nx)
-
-        If (K_is.GE.1) Then
-            Write(13) K_is,Klow,num_is
-            Write(13) (R_is(i),i=1,num_is)
-            Write(13) (I_is(i),i=1,num_is)
-        End If
-
-        Close(unit=13)
-
-        Write(*,*)' File CONF.INT formed'
-        Write(*,*)' nsx = ',nsx,' lsx =',lsx
-        Write(*,*)' nhint=',nhint,' ngint=',ngint,' num_is=',num_is
-
-        If (l_br) Then
-            If (kbrt.eq.1) Write(*,*)' Valence Magnetic Breit is included:'
-            If (kbrt.eq.2) Write(*,*)' Valence Full Breit is included:'
-            Write (*,*) nm_br,' integrals exceed 1.d-9'
-        End If
-
-       Return
 
     End Subroutine Rint
+
+    Subroutine PrintRint2Table(idel)
+        Implicit None
+        Integer, Intent(In) :: idel
+
+        Integer :: ngint, n1, n2, n3, n4, na, nb, nc, nd, i, iis, la, lb, lc, ld, ja, jb, jc, jd
+        Integer :: l_br, k, k1, kmin, kmax, nna, nnb, nnc, nnd, n0
+        Character(Len=256) :: strfmt
+        Character(Len=1) :: let(9)
+        data let/'s','p','d','f','g','h','i','k','l'/
+
+        ngint=0
+        n0=Nso+1
+
+        Do n1=n0,Nsx2
+            If (Ll(n1) > lsx) Cycle
+            Do n2=n1,Nsx
+                If (Ll(n2) > lsx) Cycle
+                Do n3=n1,Nsx
+                    If (Ll(n3) > lsx) Cycle
+                    Do n4=n3,Nsx
+                        If (Ll(n4) > lsx) Cycle
+                        na=n1
+                        nb=n2
+                        nc=n3
+                        nd=n4
+                        Do iis=1,2
+                            If (nb <= nd) then
+                                nna=Nn(na)
+                                nnb=Nn(nb)
+                                nnc=Nn(nc)
+                                nnd=Nn(nd)
+                                la=Ll(na)
+                                If (nna > N_l(la+1)) Cycle
+                                lb=Ll(nb)
+                                If (nnb > N_l(lb+1)) Cycle
+                                lc=Ll(nc)
+                                If (nnc > N_l(lc+1)) Cycle
+                                ld=Ll(nd)
+                                If (nnd > N_l(ld+1)) Cycle
+                                i=la+lb+lc+ld
+                                If (i /= 2*(i/2)) Exit
+                                ja=Jj(na)
+                                jb=Jj(nb)
+                                jc=Jj(nc)
+                                jd=Jj(nd)
+                                kmin=max(iabs(ja-jc)/2+1,iabs(jb-jd)/2+1)
+                                kmax=min((ja+jc)/2+1,(jb+jd)/2+1)
+                                Do k1=kmin,kmax
+                                    k=k1-1
+                                    i=k+la+lc
+                                    If (i /= 2*(i/2) .and. .not.l_br) Cycle
+                                    ngint=ngint+1
+                                    strfmt = '(1X,I8,1X,I2,2X,I3,A1,1X,I1,"/2",1X,I3,A1,1X,I1, &
+                                            "/2",1X,I3,A1,1X,I1,"/2",1X,I3,A1,1X,I1,"/2",2F13.7)'
+                                    If (ngint == (ngint/idel)*idel) Then
+                                        write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                        write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                    End If
+                                End Do
+                                If (n1 == n2.OR.n3 == n4) Exit
+                                nc=n4
+                                nd=n3
+                            End If
+                        End Do
+                    End Do
+                End Do
+            End Do
+        End Do
+    End Subroutine PrintRint2Table
 
     Real(dp) Function dV_nuc(P,Q,A,B)  !### calculates volume shift
         Implicit none
@@ -1099,10 +1257,10 @@ Contains
         data let/'s','p','d','f','g','h','i','k','l'/
         data chms/'SMS','NMS','MS '/
 
-        If (nsx.EQ.Nso.OR.K_is.LE.1) Return
+        If (nsx == Nso.OR.K_is <= 1) Return
 
         num_is=0
-        strfmt='(14X,A3," verteces",2X,/4x,48("="),/5X,"N",12X, &
+        strfmt='(14X,A3," vertices",2X,/4x,48("="),/5X,"N",12X, &
                     "NA",8X,"NB",5X,"P(NA,NB)",/4x,48("-"))'
         Write( *,strfmt) chms(K_is-1)
         Write(11,strfmt) chms(K_is-1)
@@ -1111,26 +1269,26 @@ Contains
 
         ! evaluation of one-electron SMS and NMS verteces
         Do na=nmin,nsx
-            If (Ll(na).GT.lsx) Cycle
+            If (Ll(na) > lsx) Cycle
             nna=nn(na)
             lla=ll(na)
             jja=jj(na)
             Do nb=na,nsx
-                If (Ll(nb).GT.lsx) Cycle
+                If (Ll(nb) > lsx) Cycle
                 nnb=nn(nb)
                 llb=ll(nb)
                 jjb=jj(nb)
         
-                one_e=lla.EQ.llb.AND.jja.EQ.jjb
-                two_e=iabs(lla-llb).EQ.1.AND.iabs(jja-jjb).LE.2
-                two_e=two_e.AND.K_is.NE.3             ! No two-e integrals for NMS
-                If (.NOT.one_e.AND..NOT.two_e) Cycle
+                one_e=lla == llb .and. jja == jjb
+                two_e=iabs(lla-llb) == 1 .and. iabs(jja-jjb) <= 2
+                two_e=two_e .and. K_is /= 3             ! No two-e integrals for NMS
+                If (.not.one_e .and. .not.two_e) Cycle
         
                 tab=0.d0
                 If(one_e) Then
                     case='one_e'
-                    If (K_is.NE.3) tab=SMS_core(na,nb,13)  ! SMS included for K_is=2,4
-                    If (K_is.NE.2) tab=tab+V_nms(na,nb,13) ! NMS included for K_is=3,4
+                    If (K_is /= 3) tab=SMS_core(na,nb,13)  ! SMS included for K_is=2,4
+                    If (K_is /= 2) tab=tab+V_nms(na,nb,13) ! NMS included for K_is=3,4
                 End If
                 If (two_e) Then
                     case='two_e'

@@ -8,7 +8,7 @@ Module readfff
 
     Integer, Public :: Ird
     Real(dp), Public, Dimension(IP6, IPs) :: ArrP, ArrQ
-    Public :: ReadF, WriteF, ReadFF
+    Public :: ReadF, WriteF, ReadFF, ReadPQ
 
   Contains
 
@@ -44,7 +44,7 @@ Module readfff
        Return
     End Subroutine WriteF
 
-    Subroutine ReadFF (Kan,record,V1,V2,nrec)
+    Subroutine ReadFF(Kan,record,V1,V2,nrec)
         Implicit None
 
         Integer :: record, nrec, kan, ni, i
@@ -78,5 +78,16 @@ Module readfff
 
         Return
     End Subroutine ReadFF
+
+    Subroutine ReadPQ(V1,V2,nrec)
+        Implicit None
+
+        Integer, Intent(In) :: nrec
+        Real(dp), Dimension(IP6), Intent(Out) :: V1, V2
+
+        V1(1:IP6)=ArrP(1:IP6,nrec)
+        V2(1:IP6)=ArrQ(1:IP6,nrec)
+
+    End Subroutine ReadPQ
 
 End Module readfff

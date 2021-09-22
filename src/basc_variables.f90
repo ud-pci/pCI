@@ -24,7 +24,6 @@ Module basc_variables
     Real(dp) :: xja, xjb, xjc, xjd !### total angular moments of orbitals
     Real(dp) :: xla,xlb,xlc,xld !### orbital angular moments of upper c-s
     Real(dp) :: yla,ylb,ylc,yld !### orbital angular moments of lower c-s
-    Character(Len=16) :: fname
     Character(len=1), Dimension(9) :: let
 
     Public 

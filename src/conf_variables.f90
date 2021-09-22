@@ -9,7 +9,7 @@ Module conf_variables
     ! Set Kw to determine whether CONF.HIJ will be written or not
     ! Kw=0 - CONF.HIJ will not be written
     ! Kw=1 - CONF.HIJ will be written
-    Integer, Parameter :: Kw=1 
+    Integer, Parameter :: Kw=0
 
     ! Set kXIJ to determine the interval in which CONF.XIJ will be written
     ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations

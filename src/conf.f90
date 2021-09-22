@@ -47,7 +47,6 @@ Program conf
     use davidson, only : Prj_J
     use determinants, only : Wdet, Dinit, Jterm
     Use integrals, only : Rint
-    use conf_init, only : InitFormH
     use formj2, only : FormJ, J_av
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
@@ -84,18 +83,18 @@ Program conf
         Call Input                  ! reads list of configurations from CONF.INP
         Call Init                   ! reads basis set information from CONF.DAT
         Call Rint                   ! reads radial integrals from CONF.INT
-        If (Ksig /= 0) Call RintS   ! reads in radial integrals from SGC.CON and SCRC.CON
+        Call RintS                  ! reads in radial integrals from SGC.CON and SCRC.CON
         Call Dinit                  ! forms list of determinants
         Call Jterm                  ! prints table with numbers of levels with given J
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
-        If (Ksig*Kdsig /= 0) Call FormD
+        Call FormD
     End If
 
     ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype,npes)
     
     ! Formation of Hamiltonian matrix
-    If (Kl <= 2 .or. Kl4 == 0) Call FormH(npes,mype)
+    Call FormH(npes,mype)
 
     ! Formation of J^2 matrix
     Call FormJ(mype, npes)   
@@ -114,7 +113,7 @@ Program conf
 
     ! Print table of final results and total computation time
     If (mype==0) Then
-        Call PrintEnergies   !#   Output of the results
+        Call PrintEnergies
 
         Call stopTimer(start_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
@@ -190,11 +189,7 @@ Contains
             Write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
         End If
 
-        !If (Kl /= 1) Then ! If Kl=1, continue from a previous calculation
-        !      Open(unit=16,status='UNKNOWN',file='CONF.JJJ')
-        !      Close(unit=16,status='DELETE')
-        !End If
-
+        ! Read angular factors from file CONF.GNT
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
         Read(16) (In(i),i=1,IPgnt)
         Read(16) (Gnt(i),i=1,IPgnt)
@@ -334,8 +329,7 @@ Contains
             If (n >= Ne) Then
                 ic=ic+1
                 If (n > Ne) Then
-                    strfmt = '(/2X,"wrong number of electrons", &
-                                /2X,"for configuration ICONF =",I6)'
+                    strfmt = '(/2X,"wrong number of electrons for configuration ICONF =",I6)'
                     Write( 6,strfmt) ic
                     Write(11,strfmt) ic
                   Stop
@@ -378,7 +372,7 @@ Contains
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
                 If (Nq(i) > jjj(i1)+1) Then
-                    strfmt = '(/2X,"wrong number of electrons",/2X,"for the shell:", &
+                    strfmt = '(/2X,"wrong number of electrons for the shell:", &
                                 I3,3X,I2,A1,I2,"/2"," (",I2,")")'
                     Write(11,strfmt) ni,nnn(i1),lll(i1),jjj(i1),nqq(i1)
                     Stop
@@ -399,8 +393,8 @@ Contains
                Read(12,rec=2*ni+7) p
                Eps(ni)=-p(ii+1)
             End Do
-            Write(11,'(" HF energies are Read from DAT file", &
-                   /5(I5,F10.6))') (i,Eps(i),i=Nso+1,Nsu)
+            strfmt = '(" HF energies are read from DAT file",/5(I5,F10.6))'
+            Write(11,strfmt) (i,Eps(i),i=Nso+1,Nsu)
         End If
         Close(unit=12)
 
@@ -484,7 +478,7 @@ Contains
                 Read(18,*) idummy,na1,nb1,x,y,z
                 i=i+1
                 If (na1 /= na .or. nb1 /= nb) Then
-                    Write(*,*)' wrong indeces for ',NhintS,' sigma:'
+                    Write(*,*)' wrong indices for ',NhintS,' sigma:'
                     Write(*,*)' expected ',na,nb,' got ',na1,nb1
                     Stop
                 End If
@@ -514,6 +508,7 @@ Contains
 
         If (Ksig < 2) Return
         ierr=0
+
         Open (unit=13,file='SCRC.CON',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file SCRC.CON is absent"/)'
@@ -537,7 +532,7 @@ Contains
         End If
 
         If (NmaxS /= nmax1 .or. LmaxS /= lmax1 .or. khot /= khot1) Then
-            strfmt = '(3X,"DIfference between SGC.CON and SCRC.CON:", &
+            strfmt = '(3X,"Difference between SGC.CON and SCRC.CON:", &
                         /3X,"nmaxS =",I3," (SGC) =",I3," (SCRC)", &
                         /3X,"lmaxS =",I3," (SGC) =",I3," (SCRC)", &
                         /3X,"khot =",I3," (SGC) =",I3," (SCRC)")'
@@ -547,7 +542,7 @@ Contains
         Read (13) NgintS,nrd
         Allocate(Rint2S(NgintS),Iint2S(NgintS),Iint3S(NgintS),Dint2S(NgintS),Eint2S(NgintS),IntOrdS(nrd))
         If (nrd /= nx*nx) Then
-            Write(*,*)' RintS: IPx was changed'
+            Write(*,*)' RintS: IPx was changed from nrd=',nrd,'to nx*nx=',nx*nx
             ierr=ierr+1
         End If
         If (ierr > 0) Then
@@ -584,6 +579,8 @@ Contains
         Integer :: i, ie, ke, n
         Real(dp) :: Emin, Emax, x
         Character(Len=128) :: strfmt
+
+        If (Ksig*Kdsig == 0) Return
 
         Allocate(Diag(Nd))
 
@@ -680,7 +677,6 @@ Contains
 
         Character(Len=16) :: memStr
         
-        memStaticArrays = 0_int64
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
@@ -726,10 +722,85 @@ Contains
         Return
     End Subroutine calcMemReqs
 
+    Subroutine InitFormH(npes,mype)
+        ! this subroutine initializes variables used for FormH and subsequent subroutines
+        ! All necessary variables are broadcasted from root to all cores
+        Use mpi
+        Implicit None
+        Integer :: npes, mype, mpierr, i
+
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kl4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kherr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kgerr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_prj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Mj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(NmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(LmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ksym, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsum, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Eps(1:IPs), IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In(1:IPgnt), IPgnt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt(1:IPgnt), IPgnt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Do i=1,Ne
+            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End do  
+        If (Ksig /= 0) Then
+            Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Esig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint1S(1:NhintS), NhintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint2S(1:NgintS), NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint3S(1:NgintS), NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Eint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(IntOrdS, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(R_is(1:num_is), num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is(1:num_is), num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End If
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Return
+    End subroutine InitFormH
+
     Subroutine FormH(npes, mype)
         Use mpi
         Use str_fmt, Only : FormattedMemSize, FormattedTime
-        Use conf_init, Only : InitFormH ! initialization subroutines for FormH 
         Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2
         Use matrix_io
         Use vaccumulator

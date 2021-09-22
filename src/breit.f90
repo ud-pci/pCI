@@ -31,8 +31,8 @@ Module breit
                 jj2=2*ij2
                 kmin=ij2-ij1+1
                 kmax=ij1+ij2
-                If (kmin.LT.2) kmin=2
-                If (kmax.LT.kmin) Cycle
+                If (kmin < 2) kmin=2
+                If (kmax < kmin) Cycle
                 Do kk=kmin,kmax
                     k=kk-1
                     ind1=jx*jx*k + 2*jx*j1 + 2*j2 + 0.1d0
@@ -42,7 +42,7 @@ Module breit
                             m2=im2-j2-1
                             ind=jx*jx*ind1 + jx*(j1+m1) + (j2+m2) + 0.1d0
                             mk=(m2-m1)
-                            If(iabs(mk).gt.k) Cycle
+                            If(iabs(mk) > k) Cycle
                             l=l+1
                             in(l)=ind
                             x=Gaun(K,J1,M1,J2,M2)
@@ -56,7 +56,6 @@ Module breit
            Write (*,*) ' number of gaunts ',l,' NE IPgnt'
            Stop
         End If
-
         Write(12) (in(i),i=1,l)
         Write(12) (gnt(i),i=1,l)
 
@@ -69,7 +68,7 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: i, is,K
+        Integer :: i, is, K
         Real(dp) :: J1, M1, J2, M2, xk, q
 
         is=dabs(m1+0.5d0)+0.1d0
@@ -84,7 +83,6 @@ Module breit
         Gaun=is*dsqrt((2*j1+1)*(2*j2+1)) &
              * Fj3(j1,j2,xk,-m1,m2,q) &
              * Fj3(j1,j2,xk,0.5d0,-0.5d0,0.d0)
-
         Return
     End Function Gaun
 
@@ -108,7 +106,7 @@ Module breit
         z12=0.5d0
         z00=0.0d0
         Br_core=z00
-        If (Nso.EQ.0) Return
+        If (Nso == 0) Return
  
         ja=Jj(na)
         jb=Jj(nb)
@@ -133,11 +131,10 @@ Module breit
                 xj=k
                 gac=-(2*xjc+1)*FJ3(xja,xjc,xj,z12,-z12,z00)**2
                 ds = 0.d0
-                If (dabs(gac).gt.1.d-7) &
-                ds = breit_int(k,na,Pa,Qa,nc,Pc,Qc,nc,Pc,Qc,nb,Pb,Qb)
+                If (dabs(gac) > 1.d-7) ds = breit_int(k,na,Pa,Qa,nc,Pc,Qc,nc,Pc,Qc,nb,Pb,Qb)
                 s = s+ds*gac
             End Do
-            If (kout.GT.2) Then
+            If (kout > 2) Then
                 strfmt='(2X,"contribution of ",I2,A1,I1,"/2 :",E12.5)'
                 Write( *,strfmt) Nn(nc),let(lc+1),jc,s
                 Write(11,strfmt) Nn(nc),let(lc+1),jc,s
@@ -145,7 +142,7 @@ Module breit
             a_ab=a_ab+s
         End Do
 
-        If (kout.GT.2) Then
+        If (kout > 2) Then
             strfmt='(/2X,"<",I2,A1,I1,"/2| V_B^core |",I2,A1,I1,"/2> = ",E12.5)'
             Write( *,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
             Write(11,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
@@ -176,7 +173,7 @@ Module breit
         ds1=brint_magn(l,nb,pb,qb,nd,pd,qd)
         ds2=0.d0
 
-        If (kbrt.eq.2) Then
+        If (kbrt == 2) Then
             Call breit_pot_ret(l,na,pa,qa,nc,pc,qc)
             ds2=brint_ret(l,nb,pb,qb,nd,pd,qd)
         End If
@@ -201,10 +198,10 @@ Module breit
         s2=0.d0
 
         Do k=l-1,l+1
-            If (k.lt.0) Cycle
-            If (l.eq.0.and.k.eq.0) Cycle
+            If (k < 0) Cycle
+            If (l == 0 .and. k == 0) Cycle
             i=lb+ld+k
-            If (2*(i/2).eq.i) Cycle
+            If (2*(i/2) == i) Cycle
     
             Do i=1,IP6
               c(i)=yy(i,k+1)
@@ -226,7 +223,7 @@ Module breit
         Implicit None
         
         Integer :: i0, imax, i, j, j1, n, k
-        Real(dp) :: r0, v0, g, t0, p0, dw, f0, dt, f, s
+        Real(dp) :: r0, v0, g, t0, p0, dw, f0, dt, f, s, dv, dvr
         Real(dp), Dimension(IP6) :: a,b,c
 
         i0=1
@@ -255,12 +252,14 @@ Module breit
         t0=t0*r0**(g+1)
         p0=p0*r0**(g-1)
         f0=c(i0)*(a(i0)*b(i0))*v0/r(i0)
-        p0=p0*v0*v0+f0*bt/(al*r0+bt)**2
+        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h)
+        dv=r(1)/v(1)*dvr+v(1)/r(1)
+        p0=p0*v0*v0+f0*dv
 
-200     dt=0.d0
+        dt=0.d0
         Do i=i0,imax
           f=c(i)*(a(i)*b(i))
-          If (r2.gt.0.d0) f=f*v(i)/r(i)
+          f=f*v(i)/r(i)
           dt=dt+f
         End Do
         s=t0+h*dt-h*(0.5d0*f0-h/12.d0*p0)-0.5d0*h*f
@@ -282,7 +281,7 @@ Module breit
         alk=0.5d0*(k*(k+1)-l*(l+1))
         lk=k+l
         blk=1.d0
-        If (k.eq.l) blk=1.d0/dsqrt(2.d0)
+        If (k == l) blk=1.d0/dsqrt(2.d0)
         u=dsqrt((2*l+1.d0)/(lk*(lk+1)*(lk+2)))/blk
         d=kb
         If (2*(lk/2).ne.lk) d=-d
@@ -308,51 +307,51 @@ Module breit
         s2=0.d0
 
         Do k1=l-1,l+1,2
-            If (k1.lt.0) Cycle
+            If (k1 < 0) Cycle
             i=lb+ld+k1
-            If (2*(i/2).eq.i) Cycle
+            If (2*(i/2) == i) Cycle
     
             dk=k1
-            If (k1.eq.l+1) Then
+            If (k1 == l+1) Then
                 ck1=dsqrt(dk/(2*l+1))
             Else
                 ck1=-dsqrt((dk+1.d0)/(2*l+1))
             End If
 
-            If (dabs(ck1).lt.1.d-10) Cycle
+            If (dabs(ck1) < 1.d-10) Cycle
     
             Do k2=l-1,l+1,2
-                If (k2.lt.0) Cycle
+                If (k2 < 0) Cycle
                 i=lb+ld+k2
-                If (2*(i/2).eq.i) Cycle
+                If (2*(i/2) == i) Cycle
         
                 dk=k2
-                If (k2.eq.l+1) Then
+                If (k2 == l+1) Then
                     ck2=dsqrt(dk/(2*l+1))
                 Else
                     ck2=-dsqrt((dk+1.d0)/(2*l+1))
                 End If
-                If (ck2.eq.0.d0) Cycle
+                If (ck2 == 0.d0) Cycle
         
                 c12=ck1*ck2*dsqrt((2*k1+1.d0)*(2*k2+1.d0))
-                If (k1.eq.k2) c12=2.d0*c12/(2*k1+1)
-                If (dabs(c12).lt.1.d-10) Cycle
+                If (k1 == k2) c12=2.d0*c12/(2*k1+1)
+                If (dabs(c12) < 1.d-10) Cycle
         
-                If (k1.eq.k2) Then
+                If (k1 == k2) Then
                     Do i=1,IP6
                         c(i)=yy(i,k1+1)
                     End Do
                 Else
-                    If (k2.eq.k1+2) k=k1
-                    If (k1.eq.k2+2) k=k2
+                    If (k2 == k1+2) k=k1
+                    If (k1 == k2+2) k=k2
         
-                    If (k2.eq.k1+2) Then
+                    If (k2 == k1+2) Then
                         Do i=1,IP6
                           c(i)=uu(i,k+1)
                         End Do
                     End If
             
-                    If (k1.eq.k2+2) Then
+                    If (k1 == k2+2) Then
                         Do i=1,IP6
                             c(i)=vv(i,k+1)
                         End Do
@@ -385,20 +384,20 @@ Module breit
         lc=Ll(nc)
 
         Do k=l-1,l+1
-            If (k.lt.0) Cycle
-            If (l.eq.0.and.k.eq.0) Cycle
+            If (k < 0) Cycle
+            If (l == 0 .and. k == 0) Cycle
             i=la+lc+k
-            If (2*(i/2).eq.i) Cycle
+            If (2*(i/2) == i) Cycle
     
-            If (k.gt.maxk) Then
-                Write( k7,'(/2x,a/2x,a)')'*** k.gt.maxk in brin_m_fast ***', 'Increase maxk'
+            If (k > maxk) Then
+                Write( k7,'(/2x,a/2x,a)')'*** k > maxk in brin_m_fast ***', 'Increase maxk'
                 Call exit(1)
             End If
     
             g1=coefb( 1,k,l,na,nc)
             g2=coefb(-1,k,l,na,nc)
             Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
-            Call ykt(k,ro,c)
+            Call ykt(k,MaxT,ro,c)
 
             Do i=1,IP6
                 yy(i,k+1)=c(i)
@@ -421,59 +420,59 @@ Module breit
         lc=Ll(nc)
 
         Do k1=l-1,l+1,2
-            If (k1.lt.0) Cycle
+            If (k1 < 0) Cycle
             i=la+lc+k1
-            If (2*(i/2).eq.i) Cycle
+            If (2*(i/2) == i) Cycle
     
             g1=coefb( 1,k1,l,na,nc)
             g2=coefb(-1,k1,l,na,nc)
             Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
     
             Do k2=l-1,l+1,2
-                If (k2.lt.0) Cycle
+                If (k2 < 0) Cycle
                 i=la+lc+k2
-                If (2*(i/2).eq.i) Cycle
+                If (2*(i/2) == i) Cycle
         
                 dk=k2
-                If (k2.eq.l+1) Then
+                If (k2 == l+1) Then
                     ck2=dsqrt(dk/(2*l+1))
                 Else
                     ck2=-dsqrt((dk+1.d0)/(2*l+1))
                 End If
-                If (ck2.eq.0.d0) Cycle
+                If (ck2 == 0.d0) Cycle
         
                 g1=coefb( 1,k1,l,na,nc)
                 g2=coefb(-1,k1,l,na,nc)
                 Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
         
-                If (k1.eq.k2) Then
-                    If (k1.gt.maxk) Then
-                        Write( k7,'(/2x,a/2x,a)')'*** k1.gt.maxk in brin_r_fast ***', 'Increase maxk'
+                If (k1 == k2) Then
+                    If (k1 > maxk) Then
+                        Write( k7,'(/2x,a/2x,a)')'*** k1 > maxk in brin_r_fast ***', 'Increase maxk'
                         Call exit(1)
                     End If
             
-                    Call ykt(k1,ro,c)
+                    Call ykt(k1,MaxT,ro,c)
             
                     Do i=1,IP6
                         yy(i,k1+1)=c(i)
                     End Do
                 Else
-                    If (k2.eq.k1+2) k=k1
-                    If (k1.eq.k2+2) k=k2
-                    If (k.gt.maxk) Then
-                        Write( k7,'(/2x,a/2x,a)')'*** k.gt.maxk in brin_r_fast ***', 'Increase maxk'
+                    If (k2 == k1+2) k=k1
+                    If (k1 == k2+2) k=k2
+                    If (k > maxk) Then
+                        Write( k7,'(/2x,a/2x,a)')'*** k > maxk in brin_r_fast ***', 'Increase maxk'
                         Call exit(1)
                     End If
             
-                    If (k2.eq.k1+2) Then
-                        Call ukt(k,ro,c)
+                    If (k2 == k1+2) Then
+                        Call ukt(k,MaxT,ro,c)
                         Do i=1,IP6
                           uu(i,k+1)=c(i)
                         End Do
                     End If
             
-                    If (k1.eq.k2+2) Then
-                        Call vkt(k,ro,c)
+                    If (k1 == k2+2) Then
+                        Call vkt(k,MaxT,ro,c)
                         Do i=1,IP6
                            vv(i,k+1)=c(i)
                         End Do
@@ -524,11 +523,11 @@ Module breit
         Return
     End Subroutine rho_pq_tot
 
-    Subroutine ykt(k,ro,c)
+    Subroutine ykt(k,nmax,ro,c)
         Implicit None
 
-        Integer :: i0, imax, k, ih, i1, i, im, j, ip, id
-        Real(dp) :: r0, v0, dk1, dk2, g, t0, p0, f0, fm, t, d, fi, dh, s, g0, r0d
+        Integer :: i0, imax, k, ih, i1, i, im, j, ip, id, nmax
+        Real(dp) :: r0, v0, dk1, dk2, g, t0, p0, f0, fm, t, d, fi, dh, s, g0, r0d, dv, dvr
         Real(dp), Dimension(IP6):: ro,c,w
 
         IH=2-KT
@@ -542,7 +541,7 @@ Module breit
         dk1=1.d0-dexp(-k*h)
         dk2=1.d0-dexp(-(k+1)*h)
 
-        If (r2.ge.0.d0) Then
+        If (r2 >= 0.d0) Then
             i1=i0+1
             Do i=i1,ii
                 w(i)=0.d0
@@ -553,7 +552,7 @@ Module breit
         g=ro(ii+4)+k
         t0=0.d0
         p0=0.d0
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
             t0=t0+ro(i)/(g+m+1)
             p0=p0+ro(i)*(g+m)
@@ -561,7 +560,9 @@ Module breit
         t0=t0*r0**(g+1-k)
         p0=p0*r0**(g-1-k)
         f0=ro(i0)
-        p0=h*p0*v0*v0+f0*bt/(al*r0+bt)**2 
+        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h)
+        dv=r(1)/v(1)*dvr+v(1)/r(1)
+        p0=h*p0*v0*v0+f0*dv
         fm=ro(imax)
 
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -573,7 +574,7 @@ Module breit
         i1=i0+1
         Do i=i1,imax
             fi=ro(i)
-            If (r2.gt.0.d0) d=w(i)
+            If (r2 > 0.d0) d=w(i)
             If (k.ne.0) fi=fi-d*t
             t=t+fi
             c(i)=t
@@ -592,7 +593,7 @@ Module breit
             i=i1-j
             ip=i+1
             s=dh
-            If (r2.ge.0.d0) Then
+            If (r2 >= 0.d0) Then
                 d=r(i)/r(ip)
                 If (k.ne.0) d=d*(1.d0-w(ip))
                 d=1.d0-d
@@ -609,13 +610,13 @@ Module breit
 
         Do i=imax,ii
             c(i)=t
-            If (k.eq.0) Cycle
-            If (r2.gt.0.d0) d=w(i)
+            If (k == 0) Cycle
+            If (r2 > 0.d0) d=w(i)
             t=t-d*t
         End Do
 
         g0=ro(ii+4)
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
             c(i)=0.d0
         End Do
@@ -624,18 +625,18 @@ Module breit
         id=g0+0.5d0
         r0d=r0**id
 
-        If (g0-k.gt.1.d-4) Then
+        If (g0-k > 1.d-4) Then
             t0=0.d0
-            Do m=0,MaxT
+            Do m=0,nmax
                 i=ii+5+m
                 t0=t0+(ro(i)/(g0+m-k)-ro(i)/(g0+m+k+1))
             End Do
             t0=t0*r0**g0
-            If (k.lt.MaxT) c(ii+5+k)=c(i0)/r0+t0
+            If (k < nmax) c(ii+5+k)=c(i0)/r0+t0
     
-            Do m=0,MaxT
+            Do m=0,nmax
                 i=ii+5+m
-                If ((m+id).le.MaxT) c(i+id)= &
+                If ((m+id) <= nmax) c(i+id)= &
                 ro(i)*(1.d0/(g0+k+m+1)-1.d0/(g0+m-k))*r0d
             End Do
         Else
@@ -645,11 +646,11 @@ Module breit
         Return
     End Subroutine ykt
 
-    Subroutine ukt(k,ro,c)
+    Subroutine ukt(k,nmax,ro,c)
         Implicit None
 
-        Integer :: ih, k, i0, imax, i1, i, id
-        Real(dp) :: r0, v0, dk1, g, t0, p0, t2, p2, f0, zi, d, d12, d2
+        Integer :: ih, k, i0, imax, i1, i, id, nmax
+        Real(dp) :: r0, v0, dk1, g, t0, p0, t2, p2, f0, zi, d, d12, d2, dv, dvr
         Real(dp) :: fi, fm, t, dh1, g0, z1, r0d
         Real(dp), Dimension(IP6) :: ro,c,w
 
@@ -664,7 +665,7 @@ Module breit
         v0=v(i0)
         dk1=1.d0-dexp(-k*h)
 
-        If (r2.ge.0.d0) Then
+        If (r2 >= 0.d0) Then
             i1=i0+1
             w(i1:ii)=0.d0
             Do i=i1,ii
@@ -677,7 +678,7 @@ Module breit
         p0=0.d0
         t2=0.d0
         p2=0.d0
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
             t0=t0+ro(i)/(g+m+1)
             t2=t2+ro(i)/(g+m+3)
@@ -690,8 +691,10 @@ Module breit
         p0=p0*r0**(g-1-k)
         p2=p2*r0**(g-1-k)
         f0=ro(i0)
-        p0=h*p0*v0*v0+f0*bt/(al*r0+bt)**2
-        p2=h*p2*v0*v0+f0*bt/(al*r0+bt)**2
+        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h)
+        dv=r(1)/v(1)*dvr+v(1)/r(1)
+        p0=h*p0*v0*v0+f0*dv
+        p2=h*p2*v0*v0+f0*dv
 
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Calculation of the Function uk(k;r)
@@ -702,7 +705,7 @@ Module breit
         d=dk1
         i1=i0+1
         Do i=i1,imax
-            If (r2.gt.0.d0) d=w(i)
+            If (r2 > 0.d0) d=w(i)
     
             d12=r(i-1)/r(i)
             d12=d12*d12
@@ -721,8 +724,8 @@ Module breit
         t=c(imax)-0.5d0*fm
         Do i=imax,ii
             c(i)=t
-            If (k.eq.0) Cycle
-            If (r2.gt.0.d0) d=w(i)
+            If (k == 0) Cycle
+            If (r2 > 0.d0) d=w(i)
             t=t-d*t
         End Do
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -739,26 +742,26 @@ Module breit
         id=g0+0.5d0
         r0d=r0**id
 
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
             c(i)=0.d0
         End Do
 
         c(ii+3)=ii
         c(ii+4)=1.d0+g0-id
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
-            If (m+id.gt.MaxT) Cycle
+            If (m+id > nmax) Cycle
             c(i+id)=ro(i)*(1.d0/(g0+k+2+m+1)-1.d0/(g0+k+m+1))*r0d
         End Do
 
         Return
     End Subroutine ukt
 
-    Subroutine vkt(k,ro,c)
+    Subroutine vkt(k,nmax,ro,c)
         Implicit None
 
-        Integer :: ih, i0, imax, i1, k, i, im, j, ip, id
+        Integer :: ih, i0, imax, i1, k, i, im, j, ip, id, nmax
         Real(dp) :: r0, v0, dk2, d, g, fm, xi, d12, d2, fi, dh1, g0, r0d, t0
         Real(dp) :: x1, c1, c2, c3, x2, x3, a2, a1, a3, t2
         Real(dp), Dimension(IP6):: ro,c,w
@@ -775,11 +778,11 @@ Module breit
         v0=v(i0)
         dk2=1.d0-dexp(-(k+1)*h)
 
-        If (r2.ge.0.d0) Then
+        If (r2 >= 0.d0) Then
             i1=i0+1
             Do i=i1,ii
                 d=r(i-1)/r(i)
-                If (k.eq.0) w(i)=1.d0-d
+                If (k == 0) w(i)=1.d0-d
                 If (k.ne.0) w(i)=1.d0-d**(k+1)
             End Do
         End If
@@ -797,7 +800,7 @@ Module breit
         Do j=i0,im
             i=i1-j
             ip=i+1
-            If (r2.gt.0.d0) d=w(ip)
+            If (r2 > 0.d0) d=w(ip)
     
             d12=r(ip-1)/r(ip)
             d12=d12*d12
@@ -810,7 +813,7 @@ Module breit
     
             c(i)=x1
     
-            If (i-i0+1.le.10) Then
+            If (i-i0+1 <= 10) Then
                 v1(i)=xi
                 v2(i)=c(i)+xi
             End If
@@ -826,7 +829,7 @@ Module breit
         c(imax+1:ii)=0.d0
 
         g0=ro(ii+4)
-        Do m=0,MaxT
+        Do m=0,nmax
             i=ii+5+m
             c(i)=0.d0
         End Do
@@ -837,17 +840,17 @@ Module breit
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Near the origin
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (g0-k.gt.1.d-4) Then
+        If (g0-k > 1.d-4) Then
             t0=0.d0
-            Do m=0,MaxT
+            Do m=0,nmax
                 i=ii+5+m
                 t0=t0+ro(i)/(g0+m-k)
             End Do
             t0=t0*r0**g0
-            If (k.le.MaxT) c(ii+5+k)=c(ii+5+k)-v1(i0)/r0-t0
-            Do m=0,MaxT
+            If (k <= nmax) c(ii+5+k)=c(ii+5+k)-v1(i0)/r0-t0
+            Do m=0,nmax
                 i=ii+5+m
-                If ((m+id).le.MaxT)c(i+id)=c(i+id)+ro(i)/(g0+m-k)*r0d
+                If ((m+id) <= nmax)c(i+id)=c(i+id)+ro(i)/(g0+m-k)*r0d
             End Do
         Else
             id=g0+0.5d0-1
@@ -860,29 +863,29 @@ Module breit
             x3=r(5)
             a2=(c2-c1)/(x2-x1)
             a1=c1-a2*x1
-            If (id.le.MaxT)   c(ii+5+id)=a1*r0d
-            If (id+1.le.MaxT) c(ii+6+id)=a2*r0d*r0
+            If (id <= nmax)   c(ii+5+id)=a1*r0d
+            If (id+1 <= nmax) c(ii+6+id)=a2*r0d*r0
             a3=(x3-x2)*(c2-c1)-(x2-x1)*(c3-c2)
             a3=a3/((x2*x2-x1*x1)*(x3-x2)-(x3*x3-x2*x2)*(x2-x1))
             a2=(c2-c1)-a3*(x2*x2-x1*x1)
             a2=a2/(x2-x1)
             a1=c1-a2*x1-a3*x1*x1
-            If (id.le.MaxT)   c(ii+5+id)=c(ii+5+id)-a1*r0d
-            If (id+1.le.MaxT) c(ii+6+id)=c(ii+6+id)-a2*r0d*r0
-            If (id+2.le.MaxT) c(ii+7+id)=c(ii+7+id)-a3*r0d*r0**2
+            If (id <= nmax)   c(ii+5+id)=c(ii+5+id)-a1*r0d
+            If (id+1 <= nmax) c(ii+6+id)=c(ii+6+id)-a2*r0d*r0
+            If (id+2 <= nmax) c(ii+7+id)=c(ii+7+id)-a3*r0d*r0**2
         End If
 
-        If (g0-k-2.gt.1.d-4) Then
+        If (g0-k-2 > 1.d-4) Then
             t2=0.d0
-            Do m=0,MaxT
+            Do m=0,nmax
                 i=ii+5+m
                 t2=t2+ro(i)/(g0+m-k-2)
             End Do
             t2=t2*r0**g0
-            If (k+2.le.MaxT)c(ii+5+k+2)=c(ii+5+k+2)+v2(i0)/r0+t2
-            Do m=0,MaxT
+            If (k+2 <= nmax)c(ii+5+k+2)=c(ii+5+k+2)+v2(i0)/r0+t2
+            Do m=0,nmax
                 i=ii+5+m
-                If ((m+id).le.MaxT)c(i+id)=-ro(i)/(g0+m-k-2)*r0d+ro(i)/(g0+m-k)*r0d
+                If ((m+id) <= nmax)c(i+id)=-ro(i)/(g0+m-k-2)*r0d+ro(i)/(g0+m-k)*r0d
             End Do
         Else
             id=g0+0.5d0-1
@@ -896,17 +899,17 @@ Module breit
             x3=r(5)
             a2=(c2-c1)/(x2-x1)
             a1=c1-a2*x1
-            If (id.le.MaxT)   c(ii+5+id)=a1*r0d
-            If (id+1.le.MaxT) c(ii+6+id)=a2*r0d*r0
+            If (id <= nmax)   c(ii+5+id)=a1*r0d
+            If (id+1 <= nmax) c(ii+6+id)=a2*r0d*r0
     
             a3=(x3-x2)*(c2-c1)-(x2-x1)*(c3-c2)
             a3=a3/((x2*x2-x1*x1)*(x3-x2)-(x3*x3-x2*x2)*(x2-x1))
             a2=(c2-c1)-a3*(x2*x2-x1*x1)
             a2=a2/(x2-x1)
             a1=c1-a2*x1-a3*x1*x1
-            If (id.le.MaxT)   c(ii+5+id)=c(ii+5+id)+a1*r0d
-            If (id+1.le.MaxT) c(ii+6+id)=c(ii+6+id)+a2*r0d*r0
-            If (id+2.le.MaxT) c(ii+7+id)=c(ii+7+id)+a3*r0d*r0**2
+            If (id <= nmax)   c(ii+5+id)=c(ii+5+id)+a1*r0d
+            If (id+1 <= nmax) c(ii+6+id)=c(ii+6+id)+a2*r0d*r0
+            If (id+2 <= nmax) c(ii+7+id)=c(ii+7+id)+a3*r0d*r0**2
         End If
         
         Return

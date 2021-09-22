@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2021-09-21
+- basc has been parallelized with MPI using simple static workload distribution
+- minor refactoring and text revisions
+
 ## [0.6.12] - 2021-09-18
 - removed writing/reading of processors from HIJ and JJJ files
 - added more code documentation
