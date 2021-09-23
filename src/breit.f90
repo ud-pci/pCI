@@ -489,7 +489,7 @@ Module breit
 
         Integer :: i, imax, j, n, ih
         Real(dp) :: coef1, coef2, d1, d2, ulam, c1, dh1, dh2, dr
-        Real(dp), Dimension(IP6) :: p,q,a,b,ro
+        Real(dp), Dimension(IP6) :: p, q, a, b, ro
 
         c1=0.01
 

@@ -9,7 +9,7 @@ Program conf_lsj
 
     Implicit None
 
-    Integer   :: n, k, i, j, ierr, mype, npes, mpierr, nnd
+    Integer   :: n, k, i, j, ierr, mype, npes, mpierr, nnd, rec1, rec2
     Integer(kind=int64) :: clock_rate, s1
     Integer(kind=int64) :: start_time, end_time
     Real :: total_time
@@ -40,16 +40,21 @@ Program conf_lsj
     End If
 
     Call AllocateFormHArrays(mype,npes)
-    Call InitFormH(mype,npes) 
+    Call InitLSJ(mype,npes) 
     Allocate(Tj(Nlv),Tl(Nlv),Ts(Nlv),B1(Nd),D1(Nlv))
     If (mype == 0) Then
         Open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-        Write(*,*) 'Starting lsj procedure...'
+        strfmt = '(A,I3,A,I3)'
+        Write(*,strfmt) 'Starting lsj procedure for levels ', rec1, ' to ', rec2
     End If
 
     Call startTimer(s1)
     Do n=1,Nlv
-        If (mype == 0) Read(16) D1(n),Tj(n),nnd,(B1(i),i=1,Nd)
+        If (n < rec1 .or. n > rec2) Then
+            Cycle
+        Else
+            If (mype == 0) Read(16) D1(n),Tj(n),nnd,(B1(i),i=1,Nd)
+        End if
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nnd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -62,7 +67,7 @@ Program conf_lsj
         Tl(n)=0.5d0*(sqrt(xtl+1)-1)
         Ts(n)=0.5d0*(sqrt(xts+1)-1)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        If (mype ==0) Then
+        If (mype == 0) Then
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A,I2,A,I2,A)'), 'Level ',n,' of ', Nlv, ' done in '// trim(timeStr)
         End If
@@ -87,11 +92,18 @@ Contains
         Implicit None
         Character(Len=32) :: strfmt
 
+        Write(*,'(/A)')'Give initial and final number of the level in CONF.RES'
+        Read (*,*) rec1, rec2
+        Write( 6,'(A,I2,A,I2)')' No.1=',rec1,'  No.2=',rec2
+
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v0.1.0")'
+        strfmt = '(4X,"Program conf_lsj v0.1.1")'
         Write( 6,strfmt)
         Write(11,strfmt)
+
+        strfmt = '(" N1=",I2,"  N2=",I2)'
+        Write(11,strfmt) rec1,rec2
 
         ! Read input parameters from file CONF.INP
         Call ReadConfInp
@@ -359,14 +371,16 @@ Contains
         Return
     End Subroutine AllocateFormHArrays
 
-    Subroutine InitFormH(npes,mype)
-        ! this subroutine initializes variables used for FormH and subsequent subroutines
+    Subroutine InitLSJ(npes,mype)
+        ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
         Use mpi
         Implicit None
         Integer :: npes, mype, mpierr, i
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(rec1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(rec2, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -419,7 +433,7 @@ Contains
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
-    End subroutine InitFormH
+    End subroutine InitLSJ
 
     Subroutine calcLSJ(startnc,endnc,cc,xj,xl,xs)
         Use determinants, Only : Gdet
@@ -892,8 +906,10 @@ Contains
             ! Rydberg constant is taken from "phys.par"
             DEL=(ER(1)-ER(J))*2*DPRy
             strfmt = '(4X,I3,F14.9,2F10.5,F14.8,F15.6,F15.2)'
-            Write( 6,strfmt) j,xj,Tl(j),Ts(j),E,DT,DEL
-            Write(11,strfmt) j,xj,Tl(j),Ts(j),E,DT,DEL
+            If (j >= rec1 .and. j <= rec2) Then
+                Write( 6,strfmt) j,xj,Tl(j),Ts(j),E,DT,DEL
+                Write(11,strfmt) j,xj,Tl(j),Ts(j),E,DT,DEL
+            End If
         End Do
 
         strfmt = '(4X,82("="))'
