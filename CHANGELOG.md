@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2021-09-22
+- conf_lsj v0.1.2 - bug fix for conf_lsj to read correct eigenvectors
+
 ## [0.7.2] - 2021-09-22
 - conf_lsj v0.1.1 - conf_lsj now asks for 2 input parameters rec1 and rec2 to select range of desired levels
 

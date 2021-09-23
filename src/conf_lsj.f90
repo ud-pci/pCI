@@ -16,7 +16,7 @@ Program conf_lsj
     Real(dp)  :: t, xtj, xtl, xts, xj
     Character(Len=1024) :: strFromEnv
     Character(Len=255)  :: eValue, strfmt
-    Character(Len=16)   :: memStr, timeStr
+    Character(Len=16)   :: memStr, timeStr, recStr1, recStr2
 
     ! Initialize MPI
     Call MPI_Init(mpierr)
@@ -44,17 +44,17 @@ Program conf_lsj
     Allocate(Tj(Nlv),Tl(Nlv),Ts(Nlv),B1(Nd),D1(Nlv))
     If (mype == 0) Then
         Open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-        strfmt = '(A,I3,A,I3)'
-        Write(*,strfmt) 'Starting lsj procedure for levels ', rec1, ' to ', rec2
+        print*, rec1,rec2
+        Write(recStr1,'(I4)') rec1
+        Write(recStr2,'(I4)') rec2
+        strfmt = '(A)'
+        Write(*,strfmt) 'Starting lsj procedure for levels ' // Trim(AdjustL(recStr1)) // ' to ' // Trim(AdjustL(recStr2))
     End If
 
     Call startTimer(s1)
     Do n=1,Nlv
-        If (n < rec1 .or. n > rec2) Then
-            Cycle
-        Else
-            If (mype == 0) Read(16) D1(n),Tj(n),nnd,(B1(i),i=1,Nd)
-        End if
+        If (mype == 0) Read(16) D1(n),Tj(n),nnd,(B1(i),i=1,Nd)
+        If (n < rec1 .or. n > rec2) Cycle
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nnd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -98,7 +98,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v0.1.1")'
+        strfmt = '(4X,"Program conf_lsj v0.1.2")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
