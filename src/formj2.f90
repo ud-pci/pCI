@@ -337,6 +337,8 @@ Module formj2
         Integer, allocatable, dimension(:) :: idet1, idet2
 
         ierr=0
+        if (mype == 0) print*,'before',xj, nx
+        if (mype == 0) print*, 'X1', X1(1:5), X1(nx-5:nx)
         xj=0.d0
         Do i=1,ij8
             n=Jsq%n(i)
@@ -351,8 +353,9 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        If (Present(mype)) Call MPI_AllReduce(xj, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        If (Present(mype)) Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         xj=0.5d0*(dsqrt(1.d0+xj)-1.d0)
+        if (mype == 0) print*,'after',xj
         If (K_prj == 1) Then
             If (dabs(xj-XJ_av) > 1.d-1) ierr=1
         End If

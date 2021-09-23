@@ -1053,7 +1053,7 @@ Contains
                     End Do
                 End Do
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(ngint, ngint, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, ngint, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
                 Do i=1,IPbr
                     Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:Ngint), Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 End Do

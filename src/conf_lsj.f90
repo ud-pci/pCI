@@ -39,12 +39,11 @@ Program conf_lsj
         Call Jterm      ! prints table with numbers of levels with given J
     End If
 
-    Call AllocateFormHArrays(mype,npes)
+    Call AllocateLSJArrays(mype,npes)
     Call InitLSJ(mype,npes) 
     Allocate(Tj(Nlv),Tl(Nlv),Ts(Nlv),B1(Nd),D1(Nlv))
     If (mype == 0) Then
         Open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
-        print*, rec1,rec2
         Write(recStr1,'(I4)') rec1
         Write(recStr2,'(I4)') rec2
         strfmt = '(A)'
@@ -92,13 +91,14 @@ Contains
         Implicit None
         Character(Len=32) :: strfmt
 
+        ! Read range of desired energy levels
         Write(*,'(/A)')'Give initial and final number of the level in CONF.RES'
         Read (*,*) rec1, rec2
         Write( 6,'(A,I2,A,I2)')' No.1=',rec1,'  No.2=',rec2
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v0.1.2")'
+        strfmt = '(4X,"Program conf_lsj v0.1.3")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -321,7 +321,7 @@ Contains
 
     End subroutine Init
 
-    Subroutine AllocateFormHArrays(mype, npes)
+    Subroutine AllocateLSJArrays(mype, npes)
         Use mpi
         Use str_fmt, Only : FormattedMemSize
         Implicit None
@@ -369,7 +369,7 @@ Contains
         End If   
 
         Return
-    End Subroutine AllocateFormHArrays
+    End Subroutine AllocateLSJArrays
 
     Subroutine InitLSJ(npes,mype)
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
@@ -569,9 +569,9 @@ Contains
             End Do
         End If
 
-        Call MPI_AllReduce(xj, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(xl, xl, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(xs, xs, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xl, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xs, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
     End Subroutine lsj

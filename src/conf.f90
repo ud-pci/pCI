@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.12")'
+        strfmt = '(4X,"Program conf v0.3.13")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1081,9 +1081,9 @@ Contains
         ih4=ih8
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(numzero, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(iscr, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(xscr, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
         ! Write Hamiltonian to file CONFp.HIJ
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
@@ -1452,6 +1452,7 @@ Contains
 
         Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         D1(1:Nlv)=Tk(1:Nlv)
+        if (mype==0) print*,'WriteFinalXIJ',ArrB(1:5,1)
         If (K_prj == 1) Then
             Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype,npes)
         End If

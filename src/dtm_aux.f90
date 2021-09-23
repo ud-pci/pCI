@@ -889,7 +889,7 @@ Module dtm_aux
         ! Sum all the mem sizes to get a total...
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         ! ...before overwriting mem with the maximum value across all workers:
-        Call MPI_AllReduce(mem, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
         If (mype==0) Then
             Write(npesStr,fmt='(I16)') npes
             Call FormattedMemSize(memsum, memStr)
@@ -1021,7 +1021,7 @@ Module dtm_aux
               Call MPI_Reduce(Ro(1:IP1,1:IP1), Ro(1:IP1,1:IP1), IP1*IP1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
             End If
-            Call MPI_AllReduce(imax, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             If (mype==0) Then
                 s=0.d0
                 Do i=imin,imax
@@ -1179,7 +1179,7 @@ Module dtm_aux
         ! Sum all the mem sizes to get a total...
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         ! ...before overwriting mem with the maximum value across all workers:
-        Call MPI_AllReduce(mem, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
         If (mype==0) Then
             Write(npesStr,fmt='(I16)') npes
             Call FormattedMemSize(memsum, memStr)
@@ -1280,7 +1280,7 @@ Module dtm_aux
                     End If
                 End Do
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(imax, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             
                 ! A manual implementation of MPI_Reduce for Ro
                 !Allocate(ro1(imax))
