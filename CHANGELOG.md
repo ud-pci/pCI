@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2021-09-26
+- minor text fix for ine
+- moved subroutines from ine_aux.f90 to ine.f90
+
 ## [0.7.5] - 2021-09-25
 - ine now reads a range of wavelengths along with step instead of a single wavelength
 

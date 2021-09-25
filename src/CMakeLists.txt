@@ -34,7 +34,7 @@ TARGET_LINK_LIBRARIES(conf_lsj lsj_common)
 ADD_EXECUTABLE(dtm dtm_aux.f90 dtm.f90)
 TARGET_LINK_LIBRARIES(dtm dtm_common)
 
-ADD_EXECUTABLE(ine ine_aux.f90 ine.f90)
+ADD_EXECUTABLE(ine ine.f90)
 TARGET_LINK_LIBRARIES(ine ine_common)
 
 ADD_EXECUTABLE(conf_pt conf_pt.f90)
