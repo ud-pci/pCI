@@ -9,7 +9,7 @@ Module ine_variables
     Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft
     Integer  :: IPlv, IP4, Kt, NumH, NumJ
     Integer  :: Nlev, N0, N2
-    Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, XInuc, Crit1, W0, W00, Q, Elft, Hmin
+    Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin
 
     Integer, Parameter :: IPad = 8
 

@@ -109,12 +109,12 @@ Module ine_aux
 
         W0= 0.d0
         If (Kli.EQ.2 .AND. Klf.EQ.2 .OR. Kli.EQ.5) Then
-            Write(*,'(A)')' Give wavelength (nm):'
-            Write(*,'(A)')' (for static polarizability give 0)'
-            Read (*,*) xlamb
-            If (dabs(xlamb).GT.1.d-8) Then
-              W0 = 1.d+7/(xlamb*219474.63d0)
-              Write(*,'(A,F11.2,A)')' lambda=',xlamb,' nm'
+            Write(*,'(A)')' Give range of wavelengths (nm) followed by step size (e.g. 535 537 0.5):'
+            Write(*,'(A)')' (for static polarizability give 0 0 0)'
+            Read (*,*) xlamb1, xlamb2, xlambstep
+            If (dabs(xlamb1).GT.1.d-8) Then
+              W0 = 1.d+7/(xlamb1*219474.63d0)
+              Write(*,'(A,F11.2,A,F11.2,A,F11.2)')' lambda=',xlamb1,' nm to ',xlamb2,' in steps of ',xlambstep
             Else
               Write(*,'(A)')' W0 = 0'
             End If
@@ -426,7 +426,14 @@ Module ine_aux
             Stop
         End If
         Read(17) Nd0
-        Allocate(YY1(Nd),YY2(Nd),idet0(Ne),idet1(Ne),iconf1(Ne),iconf2(Ne))
+        
+        If (.not. Allocated(YY1)) Allocate(YY1(Nd))
+        If (.not. Allocated(YY2)) Allocate(YY2(Nd))
+        If (.not. Allocated(idet0)) Allocate(idet0(Ne))
+        If (.not. Allocated(idet1)) Allocate(idet1(Ne))
+        If (.not. Allocated(iconf1)) Allocate(iconf1(Ne))
+        If (.not. Allocated(iconf2)) Allocate(iconf2(Ne))
+
         strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1,/)'
         If (kl.NE.2) Write( 6,strfmt) trd
         YY1(i)=0.d0
@@ -668,7 +675,7 @@ Module ine_aux
         If (.not. Allocated(scales)) Allocate(scales(IP1))
         If (.not. Allocated(Mps)) Allocate(Mps(IP1))
         If (.not. Allocated(ipiv)) Allocate(ipiv(IP1))
-
+        
         elft= E0+W0                          !### equation has the form:
         If (Kli.EQ.2.AND.Klf.NE.2) elft=E2   !### (elft-H)X1=Y1
         If (kl.GE.1) then
@@ -732,7 +739,8 @@ Module ine_aux
 
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
         If (.not. Allocated(Az)) Allocate(Az(IP1,IP1))
-
+        Z1=0.d0
+        Az=0.d0
         Call system_clock(start1)
         Hmin=0_dp
         Do i8=1,NumH         !### construction of Z matrix                      
@@ -1288,7 +1296,7 @@ Module ine_aux
         strfmt = '(3X,63("="))'
         write( 6,strfmt)
         write(11,strfmt)
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (W0.EQ.0.d0) Then
             strfmt = '(4X,"solution of the eq-n (E-H0)|X1> = ",A5,"|X0>," &
                 /4X,"where    E =",F13.6,",", &

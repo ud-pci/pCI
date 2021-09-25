@@ -59,6 +59,7 @@ Program ine
 
     Implicit None
     Integer :: i, Nd2, Nddir, nsu2, icyc
+    Real(dp) :: lambda
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
     logical :: ok
@@ -101,7 +102,9 @@ Program ine
     Nsu=max(nsu2,Nsu)                 !### can differ for two
     Close(17)                         !### spaces!
     Call Dinit                        !### Construction of the
-    Call Jterm                        !### basisset of determinants
+    Call Jterm                        !### basis set of determinants
+    Call ReadHIJ                      ! Read Hamiltonian matrix from file CONF.HIJ
+    Call ReadJJJ                      ! Read J^2 matrix from file CONF.JJJ
 
     If (Kli.EQ.5 .AND. IP1.LT.Nd) Then
       Write(*,'(A,I6,A,I6)') 'IP1=',IP1,' < Nd=',Nd
@@ -115,52 +118,53 @@ Program ine
     icyc= 1
     If (W0.NE.0.d0) icyc= 2
 
-    Call ReadHIJ
-    Call ReadJJJ
-
-    Do i=1,icyc
-        Ndir=Nddir
-        If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
-        If (i.EQ.2) W0= -W0
-        If (dabs(xlamb).GT.1.d-8) Then
-            If (i.EQ.2) xlamb= -xlamb
-            Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
-            Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
-        Else
-            Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-            Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-        End If
-        Call SolEq1(kl)                   !### Direct solution
-        If (Ndir.LT.Nd) Then
-            Call SolEq4(ok)                 !### Iterative solution
-            If (Nd.LE.IP1 .AND. .NOT.ok) Then
-              Ndir= Nd
-              Write(*,*)
-              Call SolEq1(kl)
-              ok=.TRUE.
+    Do lambda=xlamb1,xlamb2,xlambstep
+        xlamb=lambda
+        W0 = 1.d+7/(xlamb*219474.63d0)
+        Do i=1,icyc
+            Ndir=Nddir
+            If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
+            If (i.EQ.2) W0= -W0
+            If (dabs(xlamb).GT.1.d-8) Then
+                If (i.EQ.2) xlamb= -xlamb
+                Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
+                Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
+            Else
+                Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
             End If
-        End If
-        If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
-        If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
-        Call RdcX1J                                       !### Transforms and saves X1J
-        If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
-        If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
-        Call Prin                                  !### Output of the results
-        If (Kli.EQ.2.AND.Klf.EQ.2) Then
-          Call RdcE1(i)                            !### Evaluation of E1 polarizability
-          If (W0.EQ.0.d0 .OR. i.EQ.2) Call C_3     !### C_3 coefficient for X2 state
-        End If
-        If (Kli.EQ.5) Call RdcE2(i)                !### Evaluation of E2 polarizabilty
-        If (Kli.EQ.1.OR.Klf.EQ.1) Call RdcPNC      !### Final numbers for Q_w
-        If (Klf.EQ.3) Call RdcAM                   !### Final numbers for AM
-        If (Int_err.NE.0) Then
-          Write( *,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
-          Write(11,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
-        End If
-        If (.NOT.ok) Then
-          Write( *,'(4X,"Convergence was not reached.")')
-          Write(11,'(4X,"Convergence was not reached.")')
-        End If
+            Call SolEq1(kl)                   !### Direct solution
+            If (Ndir.LT.Nd) Then
+                Call SolEq4(ok)                 !### Iterative solution
+                If (Nd.LE.IP1 .AND. .NOT.ok) Then
+                  Ndir= Nd
+                  Write(*,*)
+                  Call SolEq1(kl)
+                  ok=.TRUE.
+                End If
+            End If
+            If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
+            If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
+            Call RdcX1J                                       !### Transforms and saves X1J
+            If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
+            If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
+            Call Prin                                  !### Output of the results
+            If (Kli.EQ.2.AND.Klf.EQ.2) Then
+              Call RdcE1(i)                            !### Evaluation of E1 polarizability
+              If (W0.EQ.0.d0 .OR. i.EQ.2) Call C_3     !### C_3 coefficient for X2 state
+            End If
+            If (Kli.EQ.5) Call RdcE2(i)                !### Evaluation of E2 polarizabilty
+            If (Kli.EQ.1.OR.Klf.EQ.1) Call RdcPNC      !### Final numbers for Q_w
+            If (Klf.EQ.3) Call RdcAM                   !### Final numbers for AM
+            If (Int_err.NE.0) Then
+              Write( *,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
+              Write(11,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
+            End If
+            If (.NOT.ok) Then
+              Write( *,'(4X,"Convergence was not reached.")')
+              Write(11,'(4X,"Convergence was not reached.")')
+            End If
+        End Do
     End Do
     Close(unit=11)
 

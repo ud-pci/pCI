@@ -1452,7 +1452,7 @@ Contains
 
         Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         D1(1:Nlv)=Tk(1:Nlv)
-        if (mype==0) print*,'WriteFinalXIJ',ArrB(1:5,1)
+
         If (K_prj == 1) Then
             Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype,npes)
         End If

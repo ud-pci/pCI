@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2021-09-25
+- ine now reads a range of wavelengths along with step instead of a single wavelength
+
 ## [0.7.4] - 2021-09-23
 - conf v0.3.13 - bug fix for MPI_AllReduce to same buffer with large number of cores
 
