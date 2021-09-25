@@ -113,12 +113,19 @@ Program ine
     Int_err=0
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
-    icyc= 1
-    If (W0.NE.0.d0) icyc= 2
+
+    If (W0.EQ.0.d0) Then
+        icyc= 1
+        xlamb1=1
+        xlamb2=1
+        xlambstep=1
+    Else
+        icyc= 2
+    End If
 
     Do lambda=xlamb1,xlamb2,xlambstep
         xlamb=lambda
-        W0 = 1.d+7/(xlamb*219474.63d0)
+        If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
         Do i=1,icyc
             Ndir=Nddir
             If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
@@ -293,7 +300,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v.1.1",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.2",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -815,7 +822,7 @@ Contains
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
         Do i8=1,NumH
-            Read(15), Hamil%n(i8), Hamil%k(i8), Hamil%t(i8)
+            Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
         End Do
         Return
     End Subroutine
