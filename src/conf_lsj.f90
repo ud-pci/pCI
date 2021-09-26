@@ -54,7 +54,7 @@ Program conf_lsj
         Call PrintLSJ   !#   Output of the results
 
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
+        write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf_lsj was '// trim(timeStr)
     End If
 
     Call MPI_Finalize(mpierr)

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9] - 2021-09-25
+- minor text fix: total computation time of conf_lsj 
+
 ## [0.7.8] - 2021-09-25
 - conf_lsj v0.2.0 - major revamp and optimization of lsj routine
 - relevant eigenvectors are all stored in memory in array B1h(Nd,nlvs)
