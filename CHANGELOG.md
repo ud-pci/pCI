@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.11] - 2021-09-26
+- ine v1.5 - removed IP1 dependency from params.f90 and allows it to be set it in subroutine Input
+
 ## [0.7.10] - 2021-09-26
 - ine v1.4 - revamped input for range of wavelengths to accept single wavelength by inputting (wavelength1 wavelength1 x) as range
 - added several code documentation for ine

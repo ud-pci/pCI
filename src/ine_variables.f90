@@ -1,12 +1,12 @@
 Module ine_variables
 
-    Use params, ipmr1 => IPmr
+    Use params, ipmr1 => IPmr, IP1conf => IP1
 
     Implicit None
     
     Public
 
-    Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft
+    Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
     Integer  :: IPlv, IP4, Kt, NumH, NumJ
     Integer  :: Nlev, N0, N2
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin

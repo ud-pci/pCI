@@ -228,8 +228,12 @@ Contains
         Khe= 1   
 
         ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
-        ! To solve solve homogeneous equation for the whole matrix, Nddir=IP1
+        ! To solve homogeneous equation for the whole matrix, Nddir=IP1
         Nddir= 1000  
+
+        ! Specify IP1 - dimension of the matrix to solve homogeneous equation
+        ! Set IP1=IP1conf for same dimensionality as in conf
+        IP1= 3000
 
         ! Specify N_it - number of iterations in SolEq4
         N_it = 20
@@ -284,7 +288,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.3",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.5",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1784,9 +1788,9 @@ Contains
           write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
           write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
-          strfmt2 = '(/1X,"RESULT: lambda=",F11.2,"  alpha_0=",F9.3,"  alpha_2=",F9.3)'
-          write( 6,strfmt2) -xlamb,al0,al2
-          write(11,strfmt2) -xlamb,al0,al2
+          strfmt2 = '(/1X,"RESULT: lambda=",F11.2,"      alpha_0=    ",F9.3,"  alpha_2=    ",F9.3)'
+          write( 6,strfmt2) abs(xlamb),al0,al2
+          write(11,strfmt2) abs(xlamb),al0,al2
         End If
         Return
     End Subroutine RdcE1
