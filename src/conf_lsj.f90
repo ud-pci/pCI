@@ -74,7 +74,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v0.2.0")'
+        strfmt = '(4X,"Program conf_lsj v0.2.1")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -459,7 +459,7 @@ Contains
     End subroutine InitLSJ
 
     Subroutine calcLSJ(startnc,endnc,cc,xj,xl,xs,nst,plj,pls,p0s,pll,p0l)
-        Use determinants, Only : Gdet, CompNRC
+        Use determinants, Only : Gdet, CompC, CompNRC
         Implicit None
         Integer, Intent(In) :: startnc, endnc, nst
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
@@ -489,21 +489,26 @@ Contains
                     call Gdet(k+1,idet2)
                     call CompNRC(idet1,idet2,icomp)
                     if (icomp.GT.0) then
-                      k=k+ndk
-                    else
-                        Do k1=k1n,ndk
-                            k=k+1
-                            call Gdet(k,idet2)
-                            call lsj_det(idet1,idet2,tj,tl,ts,nst,plj,pls,p0s,pll,p0l)
-                            do m=1,nlvs
-                                ckn=cc(n,m)*cc(k,m)
-                                if (n.ne.k) ckn=2*ckn
-                                xj(m)=xj(m)+ckn*tj
-                                xl(m)=xl(m)+ckn*tl
-                                xs(m)=xs(m)+ckn*ts
-                            end do
-                        End Do
+                        k=k+ndk
+                        Cycle
                     end if
+                    call CompC(idet1,idet2,icomp)
+                    if (icomp.GT.2) then
+                        k=k+ndk
+                        Cycle
+                    end if
+                    Do k1=k1n,ndk
+                        k=k+1
+                        call Gdet(k,idet2)
+                        call lsj_det(idet1,idet2,tj,tl,ts,nst,plj,pls,p0s,pll,p0l)
+                        do m=1,nlvs
+                            ckn=cc(n,m)*cc(k,m)
+                            if (n.ne.k) ckn=2*ckn
+                            xj(m)=xj(m)+ckn*tj
+                            xl(m)=xl(m)+ckn*tl
+                            xs(m)=xs(m)+ckn*ts
+                        end do
+                    End Do
                 End Do
             End Do
         End Do

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.13] - 2021-09-26
+- conf_lsj v0.2.1 - include comparison of rel. conf-s after comparison of non-rel. confs
+
 ## [0.7.12] - 2021-09-26
 - ine v1.6 - added new subroutine SetParams to set parameters for job and arrays
 - added new key kIters=(0-iterate and invert if diverged, 2-invert only)
