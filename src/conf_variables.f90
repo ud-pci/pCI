@@ -6,16 +6,11 @@ Module conf_variables
     
     Public
 
-    ! Set Kw to determine whether CONF.HIJ will be written or not
-    ! Kw=0 - CONF.HIJ will not be written
-    ! Kw=1 - CONF.HIJ will be written
-    Integer, Parameter :: Kw=0
-
     ! Set kXIJ to determine the interval in which CONF.XIJ will be written
     ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
     Integer, Parameter :: kXIJ=10
 
-    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0
+    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0
     Integer             :: NmaxS=0, LmaxS=0, Ngint=0, Nhint=0, NhintS=0, NgintS=0
     Integer             :: IPlv, nrd, kdavidson, num_is
     Integer             :: Kherr=0, Kgerr=0, Lmax, Kmax, Ksym, Nsum

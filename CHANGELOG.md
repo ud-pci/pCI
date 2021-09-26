@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.6] - 2021-09-26
+## [0.7.7] - 2021-09-25
+- conf v0.3.14 - key Kw revamped to be an input parameter along with Kl, Ksig and Kdsig
+
+## [0.7.6] - 2021-09-25
 - minor text fix for ine
 - moved subroutines from ine_aux.f90 to ine.f90
 

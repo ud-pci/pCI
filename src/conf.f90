@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.13")'
+        strfmt = '(4X,"Program conf v0.3.14")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -148,13 +148,18 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read (99,*) Kl, Ksig, Kdsig
+        Read(99,*) Kl, Ksig, Kdsig, Kw
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
             Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
             If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
+
+        ! Kw determines whether CONF.HIJ will be written or not
+        ! Kw=0 - CONF.HIJ will not be written
+        ! Kw=1 - CONF.HIJ will be written
+        Write( 6,'(/4X,"Kw = (0-write CONF.HIJ, 2-no CONF.HIJ) ",I1)') Kw
         Close(99)
 
         ! If starting new computation with MBPT
@@ -754,6 +759,7 @@ Contains
         Call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kw, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
