@@ -56,7 +56,7 @@ Program ine
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
-    Integer :: i, Nd2, Nddir, nsu2, icyc
+    Integer :: i, n, Nd2, Nddir, nsu2, icyc, nlamb
     Real(dp) :: lambda
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
@@ -64,67 +64,27 @@ Program ine
 
     Call startTimer(start_time)
 
-    Call Init_Char(Let,Alet,Blet)
-    Khe= 1   ! 1- new solution of homogeneous eq-n,
-             ! 0- old solution of homogeneous eq-n.
-
-    Nddir= 1000  ! Dimension of the matrix for initial solution by SolEq1
-                 ! To solve homogeneous eq-n for the whole matrix, put Ndir=IP1
-
-    Open(unit=11,status='UNKNOWN',file='INE.RES')
-    Close(unit=11,status='DELETE')
-    Open(unit=11,status='NEW',file='INE.RES')
-    Write(*,'(A)')' kl= (0-new, 1-use X1, 2-use X1,Y1,Y2 ):'
-    Read (*,*) kl
-    Write(*,'(A,I2)')' kl=',kl
-    N_it = 20                         !### iterations in SolEq4
-    Gj = 0.d0
-    Call recunit
-    Call Input
-    Call Init
-    If (Gj.NE.0.d0) Then
-      Write (*,*) ' Gj =',Gj
-      Write (*,*) ' This code works only for Gj=0!'
-      stop
-    End If
-    Nmax=IP4                          !### max dimension of vectors
-    ok = (Kli.EQ.1.AND.Klf.EQ.2).OR.(Kli.EQ.1.AND.Klf.EQ.4).OR. &
-         (Kli.EQ.2.AND.Klf.LE.3).OR.(Kli.EQ.5.AND.Klf.EQ.5)
-    If (.NOT.ok) Then
-       Write(*,*)' Unknown combination Kli =',Kli,' Klf =',Klf
-       Stop
-    End If
-    Call Rint                         !### Radial integrals
-    Open(17,file='CONF0.DET',status='OLD',form='UNFORMATTED')
-    Read (17) Nd2,nsu2                !### Number of used orbitals
-    Nsu=max(nsu2,Nsu)                 !### can differ for two
-    Close(17)                         !### spaces!
-    Call Dinit                        !### Construction of the
-    Call Jterm                        !### basis set of determinants
-    Call ReadHIJ                      ! Read Hamiltonian matrix from file CONF.HIJ
-    Call ReadJJJ                      ! Read J^2 matrix from file CONF.JJJ
-
-    If (Kli.EQ.5 .AND. IP1.LT.Nd) Then
-      Write(*,'(A,I6,A,I6)') 'IP1=',IP1,' < Nd=',Nd
-      Write(*,*)' This case is not coded for E2 yet !'
-      Stop
-    End If
-
-    Int_err=0
+    Call Input                        ! Read list of configurations from CONF.INP
+    Call Init                         ! Read basis set information from CONF.DAT
+    Call Rint                         ! Read radial integrals from CONF.INT
+    Call Dinit                        ! Form list of determinants
+    Call Jterm                        ! Print table with numbers of levels with given J
+    Call ReadHIJ                      ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
+    Call ReadJJJ                      ! Read J^2 matrix in X1 space from file CONF.JJJ
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
-    If (W0.EQ.0.d0) Then
-        icyc= 1
-        xlamb1=1
-        xlamb2=1
-        xlambstep=1
+    If (W0 == 0.d0) Then
+        icyc=1
     Else
-        icyc= 2
+        icyc=2
     End If
 
-    Do lambda=xlamb1,xlamb2,xlambstep
-        xlamb=lambda
+    If (xlamb1==xlamb2) xlambstep=1
+
+    nlamb=(xlamb2-xlamb1)/xlambstep+1
+    xlamb=xlamb1
+    Do n=1,nlamb
         If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
         Do i=1,icyc
             Ndir=Nddir
@@ -170,11 +130,12 @@ Program ine
               Write(11,'(4X,"Convergence was not reached.")')
             End If
         End Do
+        xlamb=abs(xlamb)+xlambstep
     End Do
-    Close(unit=11)
 
+    Close(unit=11)
     Call stopTimer(start_time, timeStr)
-    write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
     
 Contains
 
@@ -258,6 +219,29 @@ Contains
         Character(Len=128) :: strfmt
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
+        Call recunit
+        Call Init_Char(Let,Alet,Blet)
+
+        ! Choose Khe - variant of solution of homogeneous equation
+        ! Khe=0 - old solution of homogeneous eq-n
+        ! Khe=1 - new solution of homogeneous eq-n
+        Khe= 1   
+
+        ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
+        ! To solve solve homogeneous equation for the whole matrix, Nddir=IP1
+        Nddir= 1000  
+
+        ! Specify N_it - number of iterations in SolEq4
+        N_it = 20
+        Gj = 0.d0
+        
+        Open(unit=11,status='UNKNOWN',file='INE.RES')
+        Close(unit=11,status='DELETE')
+        Open(unit=11,status='NEW',file='INE.RES')
+        Write(*,'(A)')' kl= (0-new, 1-use X1, 2-use X1,Y1,Y2 ):'
+        Read (*,*) kl
+        Write(*,'(A,I2)')' kl=',kl
+
         Write(*,'(A)')' R.H.S. of equation: H_p, E1(L), E2 (1,2,5):'
         Read (*,*) Kli
         Write(*,'(A,I2)')' Kli=',Kli
@@ -300,7 +284,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.2",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.3",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -349,7 +333,7 @@ Contains
             Write(11,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
             Read(*,*)
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
         Ns  =pq(2)+c1
         Ii  =pq(3)+c1
@@ -450,9 +434,27 @@ Contains
                 i=0
             End If
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Write( 6,'(1X,71("="))')
         Write(11,'(1X,71("="))')
+
+        ! Stop program if parameter Gj /= 0
+        If (Gj.NE.0.d0) Then
+            Write (*,*) ' Gj =',Gj
+            Write (*,*) ' This code works only for Gj=0!'
+            Stop
+        End If
+
+        ! Specify Nmax - the maximum dimension of vectors
+        Nmax=IP4                          
+
+        ! Diagnostic for combination LHS and RHS operators
+        ok = (Kli.EQ.1.AND.Klf.EQ.2).OR.(Kli.EQ.1.AND.Klf.EQ.4).OR. &
+             (Kli.EQ.2.AND.Klf.LE.3).OR.(Kli.EQ.5.AND.Klf.EQ.5)
+        If (.NOT.ok) Then
+           Write(*,*)' Unknown combination Kli =',Kli,' Klf =',Klf
+           Stop
+        End If
 
         Return
     End subroutine Init
@@ -472,6 +474,7 @@ Contains
             Write(11,strfmt)
             Stop
         End If
+
         Read(13) ns1,nso1,z1,rn1
         Allocate(l1(ns1))
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
@@ -511,6 +514,13 @@ Contains
         Real(dp) :: xj0, xj2, t
         Character(Len=256) :: strfmt, err_msg
 
+        ! Read number of used orbitals in X0/X2 space from file CONF0.DET
+        Open(17,file='CONF0.DET',status='OLD',form='UNFORMATTED')
+        Read (17) Nd2,nsu2                
+        Nsu=max(nsu2,Nsu)                 
+        Close(17)                         
+
+        ! Read eigenvectors X0/X2 (initial/final) from file CONF0.XIJ
         Open(unit=16,file='CONF0.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF0.XIJ is absent"/)'
@@ -518,6 +528,7 @@ Contains
             Write(11,strfmt)
             Stop
         End If
+
         Read(16) E0,Tj0,Nd0
         Allocate(X0(Nd0),X2(Nd0))
         rewind(16)
@@ -578,7 +589,8 @@ Contains
         Return
     End Subroutine Init0
 
-    Subroutine Vector(kl)   !### RHS vector |Y1>=A|X0> and LHS vector <Y2|=<X2|B,
+    Subroutine Vector(kl)   
+        ! Read RHS vector |Y1>=A|X0> and LHS vector <Y2|=<X2|B,
         Use conf_variables, Only : iconf1, iconf2
         Use determinants, Only : Gdet, Rspq, CompC
         Implicit None
@@ -605,12 +617,12 @@ Contains
         If (.not. Allocated(iconf1)) Allocate(iconf1(Ne))
         If (.not. Allocated(iconf2)) Allocate(iconf2(Ne))
 
-        strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1,/)'
+        strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1)'
         If (kl.NE.2) Write( 6,strfmt) trd
         YY1(i)=0.d0
         YY2(i)=0.d0
         negl=0              !### number of vector components below threshold
-        idIf= 1
+        idif= 1
         If (Kli.EQ.5) idif= 2
         Do n=1,Nd0
             xn0=X0(n)
