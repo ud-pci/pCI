@@ -56,7 +56,7 @@ Program ine
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
-    Integer :: i, n, Nd2, Nddir, nsu2, icyc, nlamb
+    Integer :: i, n, Nd2, Nddir, nsu2, icyc, nlamb, kIters
     Real(dp) :: lambda
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
@@ -64,6 +64,7 @@ Program ine
 
     Call startTimer(start_time)
 
+    Call SetParams                    ! Set job and array parameters
     Call Input                        ! Read list of configurations from CONF.INP
     Call Init                         ! Read basis set information from CONF.DAT
     Call Rint                         ! Read radial integrals from CONF.INT
@@ -98,16 +99,23 @@ Program ine
                 Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
                 Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
             End If
-            Call SolEq1(kl)                   !### Direct solution
-            If (Ndir.LT.Nd) Then
-                Call SolEq4(ok)                 !### Iterative solution
-                If (Nd.LE.IP1 .AND. .NOT.ok) Then
-                  Ndir= Nd
-                  Write(*,*)
-                  Call SolEq1(kl)
-                  ok=.TRUE.
-                End If
-            End If
+            Select Case(kIters)
+                Case(0)
+                    Call SolEq1(kl) ! Direct solution
+                    If (Ndir.LT.Nd) Then
+                        Call SolEq4(ok)                 !### Iterative solution
+                        If (Nd.LE.IP1 .AND. .NOT.ok) Then
+                          Ndir= Nd
+                          Write(*,*)
+                          Call SolEq1(kl)
+                          ok=.TRUE.
+                        End If
+                    End If
+                Case(1)
+                    Ndir=Nd
+                    IP1=Nd
+                    Call SolEq1(kl) ! Direct solution
+            End Select
             If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
             If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
             Call RdcX1J                                       !### Transforms and saves X1J
@@ -138,6 +146,32 @@ Program ine
     Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
     
 Contains
+
+    Subroutine SetParams
+        Implicit None
+
+        ! Choose Khe - variant of solution of homogeneous equation
+        ! Khe=0 - old solution of homogeneous eq-n
+        ! Khe=1 - new solution of homogeneous eq-n
+        Khe= 1   
+
+        ! Specify kIters - (0-iterate and invert if diverged, 2-invert only)
+        kIters=0
+
+        ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
+        ! To solve homogeneous equation for the whole matrix, Nddir=IP1
+        Nddir= 1000  
+
+        ! Specify IP1 - dimension of the matrix to solve homogeneous equation
+        ! Set IP1=IP1conf for same dimensionality as in conf
+        IP1=15000
+
+        ! Specify N_it - number of iterations in SolEq4
+        N_it = 20
+        
+        Gj = 0.d0
+
+    End Subroutine SetParams
 
     Subroutine Init_Char(Let,Alet,Blet)
         Implicit None
@@ -221,23 +255,6 @@ Contains
 
         Call recunit
         Call Init_Char(Let,Alet,Blet)
-
-        ! Choose Khe - variant of solution of homogeneous equation
-        ! Khe=0 - old solution of homogeneous eq-n
-        ! Khe=1 - new solution of homogeneous eq-n
-        Khe= 1   
-
-        ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
-        ! To solve homogeneous equation for the whole matrix, Nddir=IP1
-        Nddir= 1000  
-
-        ! Specify IP1 - dimension of the matrix to solve homogeneous equation
-        ! Set IP1=IP1conf for same dimensionality as in conf
-        IP1= 3000
-
-        ! Specify N_it - number of iterations in SolEq4
-        N_it = 20
-        Gj = 0.d0
         
         Open(unit=11,status='UNKNOWN',file='INE.RES')
         Close(unit=11,status='DELETE')
@@ -288,7 +305,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.5",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.6",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -450,7 +467,7 @@ Contains
         End If
 
         ! Specify Nmax - the maximum dimension of vectors
-        Nmax=IP4                          
+        Nmax=IP4             
 
         ! Diagnostic for combination LHS and RHS operators
         ok = (Kli.EQ.1.AND.Klf.EQ.2).OR.(Kli.EQ.1.AND.Klf.EQ.4).OR. &
@@ -1001,6 +1018,7 @@ Contains
         Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
 
         If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  !# Orthogonalization of X1 to X0 (If J0 /= 0)
+        
         Open(unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
@@ -1194,6 +1212,8 @@ Contains
         Real(dp), Allocatable, Dimension(:,:) :: X1J
         Character(Len=6) :: str
         Character(Len=256) :: strfmt, err_msg
+
+        If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
 
         trsd=1.d-3            !### Threshold used to eliminate small terms
         jj=2*Tj0+0.1d0
@@ -1691,6 +1711,8 @@ Contains
         Real(dp), Dimension(3) :: sk0, sk1, sk2
         Real(dp), Dimension(2) :: s, s0, s1, s2, ss
         Character(Len=256) :: strfmt, strfmt2, strfmt3
+
+        If (.not. Allocated(Y2J)) Allocate(Y2J(Nd,5))
 
         if (dabs(Tj2-Tj0).GT.1.d-5) then
            write(*,*) ' can not calculate polarizability for J2 >< J0'

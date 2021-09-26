@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.12] - 2021-09-26
+- ine v1.6 - added new subroutine SetParams to set parameters for job and arrays
+- added new key kIters=(0-iterate and invert if diverged, 2-invert only)
+
 ## [0.7.11] - 2021-09-26
 - ine v1.5 - removed IP1 dependency from params.f90 and allows it to be set it in subroutine Input
 
