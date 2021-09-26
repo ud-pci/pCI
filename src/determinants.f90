@@ -9,7 +9,7 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompD2, CompCD
+    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC
 
   Contains
 
@@ -35,6 +35,7 @@ Module determinants
     Subroutine Dinit
         Implicit None
         Integer :: i0, ni, j, n, ic, i, nmin, nem, imax
+        Logical :: NRorb
 
         i0=0
         Do ni=1,Ns
@@ -45,10 +46,15 @@ Module determinants
             End Do
         End Do
 
-        Allocate(Jz(i0),Nh(i0),Nq0(Nsp))
+        Allocate(Jz(i0),Nh(i0),Nh0(i0),Nq0(Nsp))
   
         i0=0
         Do ni=1,Ns
+            if (ni.GT.1) then
+                NRorb=Nn(ni-1).EQ.Nn(ni).AND.Ll(ni-1).EQ.Ll(ni)
+            else
+                NRorb=.FALSE.
+            end if
             nem=Jj(ni)+1
             Nf0(ni)=i0
             imax=2*Jj(ni)+1
@@ -56,6 +62,11 @@ Module determinants
                 i0=i0+1
                 Jz(i0)=j-nem
                 Nh(i0)=ni
+                if (NRorb) then
+                    Nh0(i0)=ni-1
+                  else
+                    Nh0(i0)=ni
+                  end if
             End Do
         End Do
         n=0
@@ -690,5 +701,18 @@ Module determinants
         End If
         Return
     End Subroutine CompC
+
+    Subroutine CompNRC (idet1,idet2,icomp) 
+        ! compares two determinants and determines the difference between
+        ! corresponding non-relativistic configurations
+        Implicit None
+        Integer  :: i, i1, i2, j1, j2, icomp, is, m
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+
+        iconf1(1:Ne)=Nh0(idet1(1:Ne))   !### iconf1(i) = No of the NR orbital occupied by the electron i
+        iconf2(1:Ne)=Nh0(idet2(1:Ne))    
+        Call CompD(iconf1,iconf2,icomp)
+        Return
+    End Subroutine CompNRC
 
 end module determinants

@@ -45,7 +45,7 @@ Module params
     ! Global arrays
     Integer, Dimension(IPjd)              :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0
-    Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
+    Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
     Real(dp), Allocatable, Dimension(:)   :: D1, E1, B1, B2, Qnl
     Integer, Allocatable, Dimension(:,:)  :: Iarr
     Real(dp), Allocatable, Dimension(:,:) :: ArrB

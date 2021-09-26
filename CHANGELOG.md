@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2021-09-25
+- conf_lsj v0.2.0 - major revamp and optimization of lsj routine
+- relevant eigenvectors are all stored in memory in array B1h(Nd,nlvs)
+- one-electron matrix elements of l, s and j are stored in arrays instead of calculated every iteration
+- in the inner loop of lsj, conf-s are skipped if they belong to different non-rel. conf-s (using new subroutine CompNRC) 
+- selection rules are added to skip zero contributions
+- many-electron matrix elements are calculated only once and used for all levels
+
 ## [0.7.7] - 2021-09-25
 - conf v0.3.14 - key Kw revamped to be an input parameter along with Kl, Ksig and Kdsig
 
