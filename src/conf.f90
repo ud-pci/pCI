@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.14")'
+        strfmt = '(4X,"Program conf v0.3.15")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1266,15 +1266,15 @@ Contains
         Implicit None
     
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail
-        Integer(Kind=int64) :: start_time, end_time
+                    kx, i1, i2, it, mype, npes, mpierr, ifail=0
+        Integer(Kind=int64) :: start_time, s1
         Real :: ttot
-        Real(dp)  :: crit, ax, x, xx, ss, cnx, vmax
+        Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
         logical   :: lsym
         Character(Len=16) :: timeStr
 
         Call startTimer(start_time)
-        crit=1.d-6
+
         If (mype == 0) Then
             If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
             If (Nc4 > Nc) Nc4=Nc
@@ -1282,8 +1282,14 @@ Contains
         End If
 
         Call Init4(mype,npes)
-        If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
+        If (mype == 0) Then
+            Call startTimer(s1)
+            Call Hould(Nd0,D1,E1,Z1,ifail)
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
+        End If
 
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Do While (ifail /= 0)
            If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I4," failed")') Nd0
            Call Init4(mype,npes)
