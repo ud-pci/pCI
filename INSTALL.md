@@ -21,14 +21,21 @@ $ git checkout devel
 
 ## Building with CMake
 
-The codes are built using the 'CMakeLists.txt' file. 
+The codes are built using CMake with the 'CMakeLists.txt' file and OpenMPI with Intel compiler. 
+To load these modules on Caviness:
+```
+vpkg_require cmake openmpi/4.0.2:intel
+```
+To load these modules on Darwin:
+```
+vpkg_require cmake openmpi/4.1.0:intel-2020
+```
 
 A general build can be done:
 ```
 $ cd pCI
 $ mkdir build
 $ cd build
-$ vpkg_require cmake openmpi/4.0.2:intel
 $ FC=mpifort cmake -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ../src/
    :
 $ make
@@ -40,7 +47,6 @@ A Debug build can be done:
 $ cd pCI
 $ mkdir build-debug
 $ cd build-debug
-$ vpkg_require cmake openmpi/4.0.2:intel
 $ FC=mpifort cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(pwd)/../20200402-debug ../src/
    :
 $ make
