@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.17] - 2021-09-29
 - conf v0.3.18 - bug fix for writing/reading CONF.HIJ/CONF.JJJ for large scale runs 
 - changed disp and disps in matrix_io.f90 to kind=MPI_OFFSET_KIND
+- added error message if matrix file doesn't exist
 
 ## [0.7.16] - 2021-09-29
 - conf v0.3.17 - changed formatting, increasing range for Nc4 and Nd0 for initial approximation

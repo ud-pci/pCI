@@ -99,20 +99,25 @@ Module matrix_io
         Integer, Intent(Out)             :: num_elements_per_core
         Integer(Kind=int64), Intent(Out) :: num_elements_total
 
-        Integer                          :: mype, npes, npes_read, i, mpierr, fh
-        Integer(kind=int64)              :: start_time
-        Real                             :: total_time
-        Integer, dimension(npes)         :: sizes
-        Integer(kind=MPI_OFFSET_KIND), Dimension(npes) :: disps
-        Integer(kind=MPI_OFFSET_KIND)    :: disp       
-        Character(Len=*)                 :: filename
-        Character(Len=16)                :: timeStr
+        Integer                                         :: mype, npes, npes_read, i, mpierr, fh
+        Integer(kind=int64)                             :: start_time
+        Real                                            :: total_time
+        Integer, dimension(npes)                        :: sizes
+        Integer(kind=MPI_OFFSET_KIND), Dimension(npes)  :: disps
+        Integer(kind=MPI_OFFSET_KIND)                   :: disp=0_MPI_OFFSET_KIND   
+        Character(Len=*)                                :: filename
+        Character(Len=16)                               :: timeStr
 
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, fh, mpierr) 
 
-        ! Read number of processors
-        disp = 0_MPI_OFFSET_KIND
         If (mype == 0) then
+            ! Stop program if file does not exist
+            If (mpierr /= 0) Then
+                print*, 'File ',filename,' does not exist'
+                Stop
+            End If
+
+            ! Read number of processors
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Read(66) npes_read
             Close(66)
