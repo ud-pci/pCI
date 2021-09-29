@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.15] - 2021-09-29
+- conf v0.3.16 - replaced Hould subroutine during initial diagonalization with LAPACK 'dsyev' subroutine 
+- removed redundant MPI_Bcast call of D1=Tk in subroutine WriteFinalXIj
+
 ## [0.7.14] - 2021-09-28
 - conf v0.3.15 - added timing for initial diagonalization
 

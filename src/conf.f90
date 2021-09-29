@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.15")'
+        strfmt = '(4X,"Program conf v0.3.16")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1240,7 +1240,7 @@ Contains
         If (.not. Allocated(B1)) Allocate(B1(Nd))
         If (.not. Allocated(B2)) Allocate(B2(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
-        If (.not. Allocated(D1)) Allocate(D1(Nd0))
+        If (.not. Allocated(D1)) Allocate(D1(3*Nd0-1))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
         If (mype==0) Then
             memDvdsn = 0_int64
@@ -1264,7 +1264,8 @@ Contains
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Implicit None
-    
+        External DSYEV
+
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
                     kx, i1, i2, it, mype, npes, mpierr, ifail=0
         Integer(Kind=int64) :: start_time, s1
@@ -1284,7 +1285,8 @@ Contains
         Call Init4(mype,npes)
         If (mype == 0) Then
             Call startTimer(s1)
-            Call Hould(Nd0,D1,E1,Z1,ifail)
+            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
+            !Call Hould(Nd0,D1,E1,Z1,ifail)
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If
@@ -1293,8 +1295,10 @@ Contains
         Do While (ifail /= 0)
            If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I4," failed")') Nd0
            Call Init4(mype,npes)
-           If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
+           !If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
+           If (mype == 0) Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
         End Do
+
         Call FormB0(mype,npes)
 
         If (Nd0 == Nd) Return
@@ -1401,6 +1405,7 @@ Contains
                         n1=2*Nlv
                         ! Evaluation of Nlv eigenvectors:
                         Call Hould(n1,D,E,P,ifail)
+                        !Call DSYEV('V','U',n1,P,n1,E,D,3*n1-1,ifail)
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
@@ -1462,9 +1467,6 @@ Contains
         Implicit None
         Integer :: i, n, ierr, mype, npes, mpierr
 
-        Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        D1(1:Nlv)=Tk(1:Nlv)
-
         If (K_prj == 1) Then
             Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype,npes)
         End If
@@ -1476,7 +1478,7 @@ Contains
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
             If (mype==0) Then
-                write(17) D1(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
+                write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
         End Do
 
