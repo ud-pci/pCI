@@ -35,7 +35,8 @@ Module matrix_io
         Integer                       :: mype, npes, i, mpierr, fh
         Integer(Kind=Int64)           :: start_time
         Real                          :: total_time
-        Integer, dimension(npes)      :: sizes, disps
+        Integer, Dimension(npes)      :: sizes
+        Integer(kind=MPI_OFFSET_KIND), Dimension(npes) :: disps
         Integer(kind=MPI_OFFSET_KIND) :: disp       
         Character(Len=*)              :: filename
         Character(Len=16)             :: timeStr
@@ -50,31 +51,31 @@ Module matrix_io
 
         sizes=0
         Call MPI_AllGather(num_elements_per_core, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
-        disps=0
+        disps=0_MPI_OFFSET_KIND
         Do i=2,npes
-          disps(i)=disps(i-1)+sizes(i-1)
+            disps(i)=disps(i-1)+sizes(i-1)
         End Do
     
         ! Open file
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh, mpierr) 
 
         ! Write number of matrix elements
-        disp = mype * 4
+        disp = mype * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPI_FILE_WRITE(fh, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
 
         ! Write mat%n
-        disp = npes * 4 + disps(mype+1) * 4
+        disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPI_FILE_WRITE(fh, mat%n, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
 
         ! Write mat%k
-        disp = npes * 4 + num_elements_total * 4 + disps(mype+1) * 4
+        disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPI_FILE_WRITE(fh, mat%k, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
 
         ! Write mat%t
-        disp = npes * 4 + 2 * num_elements_total * 4 + disps(mype+1) * 8
+        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPI_FILE_WRITE(fh, mat%t, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
         
@@ -101,7 +102,8 @@ Module matrix_io
         Integer                          :: mype, npes, npes_read, i, mpierr, fh
         Integer(kind=int64)              :: start_time
         Real                             :: total_time
-        Integer, dimension(npes)         :: sizes, disps
+        Integer, dimension(npes)         :: sizes
+        Integer(kind=MPI_OFFSET_KIND), Dimension(npes) :: disps
         Integer(kind=MPI_OFFSET_KIND)    :: disp       
         Character(Len=*)                 :: filename
         Character(Len=16)                :: timeStr
@@ -109,7 +111,7 @@ Module matrix_io
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, fh, mpierr) 
 
         ! Read number of processors
-        disp = 0
+        disp = 0_MPI_OFFSET_KIND
         If (mype == 0) then
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Read(66) npes_read
@@ -124,7 +126,7 @@ Module matrix_io
         End If
 
         ! Read counters
-        disp = mype * 4
+        disp = mype * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
 
         ! Allocate matrix if not allocated yet
@@ -135,23 +137,26 @@ Module matrix_io
         ! Calculate displacements
         sizes=0
         Call MPI_AllGather(num_elements_per_core, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(num_elements_per_core, num_elements_total, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
-        disps=0
+        Do i=1,npes
+            num_elements_total = num_elements_total + sizes(i)
+        End Do
+
+        disps=0_MPI_OFFSET_KIND
         Do i=2,npes
           disps(i)=disps(i-1)+sizes(i-1)
         End Do
 
         ! Read first indices of matrix elements mat%n
-        disp = npes * 4 + disps(mype+1) * 4
+        disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%n, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
 
         ! Read second indices of matrix elements mat%k
-        disp = npes * 4 + num_elements_total * 4 + disps(mype+1) * 4
+        disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%k, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
 
         ! Read values of matrix element mat%t
-        disp = npes * 4 + 2 * num_elements_total * 4 + disps(mype+1) * 8
+        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%t, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
 
         ! Close file

@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.17")'
+        strfmt = '(4X,"Program conf v0.3.18")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -159,7 +159,7 @@ Contains
         ! Kw determines whether CONF.HIJ will be written or not
         ! Kw=0 - CONF.HIJ will not be written
         ! Kw=1 - CONF.HIJ will be written
-        Write( 6,'(/4X,"Kw = (0-write CONF.HIJ, 2-no CONF.HIJ) ",I1)') Kw
+        Write( 6,'(/4X,"Kw = (0-write CONF.HIJ, 1-no CONF.HIJ) ",I1)') Kw
         Close(99)
 
         ! If starting new computation with MBPT
