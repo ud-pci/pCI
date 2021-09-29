@@ -27,7 +27,7 @@ Module davidson
         Character(Len=256) :: strfmt
 
         If (mype == 0) Then
-            strfmt = '(3X,"Starting approx. includes ",I3," conf.,",I4," det.")'
+            strfmt = '(3X,"Starting approx. includes ",I5," conf.,",I6," det.")'
             Write( 6,strfmt) Nc4,Nd0
             Write(11,strfmt) Nc4,Nd0
         End If
@@ -60,9 +60,11 @@ Module davidson
     Subroutine Hould(n,Ee,Dd,Zz,ifail)
         ! This subroutine diagonalizes the matrix Zz using 
         ! Householder's method of diagonalization.
+        ! n-dimension of matrix Zz
+        ! Ee-
         ! Dd-array of eigenvalues
         ! Zz-matrix of eigenvectors
-        ! n-dimension of matrix z
+        ! ifail-error status
         ! eps-criteria of diagonalization
         Implicit None
         Integer, Intent(In) :: n
