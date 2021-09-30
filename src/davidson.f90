@@ -48,13 +48,8 @@ Module davidson
             End If
         End Do
 
-        If (mype==0) Then
-            Call MPI_Reduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                MPI_COMM_WORLD, mpierr)
-          Else
-            Call MPI_Reduce(Z1, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                MPI_COMM_WORLD, mpierr)
-        End If
+        Call MPI_AllReduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+          
     End Subroutine Init4
 
     Subroutine Hould(n,Ee,Dd,Zz,ifail)
@@ -255,17 +250,21 @@ Module davidson
         ! Eigenvectors are written to CONF.XIJ 
         Use mpi
         Use formj2, Only : J_av
+        Use str_fmt, Only : startTimer, stopTimer
         Implicit None
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype, npes
+        Integer(kind=int64) :: s1
         Real(dp) :: dummy, xj
-        Character(Len=128) :: strfmt
+        Character(Len=128) :: strfmt, timeStr
 
         num=0
         nskip=0
         
+        Call startTimer(s1)
+
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
 
-        Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
+        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
@@ -300,7 +299,10 @@ Module davidson
         End If
  220    if (mype==0) Rewind(17)
         Nlv=num
+
+        Call stopTimer(s1, timeStr)
         If (mype == 0) Then
+            Write(*,'(2X,A)'), 'TIMING >>> Initial eigenvectors saved in '// trim(timeStr)
             Do j=1,Nlv
                 strfmt = '(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)'
                 Write( 6,strfmt) j,E(j),Tj(j)
@@ -336,7 +338,6 @@ Module davidson
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
         ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
-        Write ( 6,*) ' FormBskip: Vectors not saved'
         Return
     End Subroutine FormBskip
 
@@ -427,7 +428,8 @@ Module davidson
         Return
     End Subroutine FormP
     
-    Subroutine Dvdsn (j, cnx)
+    Subroutine Dvdsn (j, cnx, mype, npes)
+        Use mpi
         ! Main part of the Davidson algorithm. 
         ! Formation of the J-th residual vector and the corresponding new probe vector.
         ! New probe vectors are stored in the second block of ArrB.
@@ -435,7 +437,7 @@ Module davidson
         Integer, Intent(In) :: j
         Real(dp), Intent(InOut) :: cnx
 
-        Integer :: j1, i, l, k, n01
+        Integer :: j1, i, l, k, n01, mype, npes, mpierr
         Real(dp) :: val, t, cnorm, s
         character(len=9) :: char
 
@@ -453,6 +455,7 @@ Module davidson
             B1(i)=0.d0
             Cycle
         End Do
+        
         cnorm=dsqrt(dabs(cnorm))
         Iconverge(j)=0
         char='         '
@@ -464,8 +467,10 @@ Module davidson
                 char='converged'
             End If
         End If
+        If (mype == 0) Then
         Write ( 6,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
         Write (11,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
+        End If
         If (cnorm > cnx) cnx=cnorm
         If (Iconverge(j)==1) Then
             B1(1:Nd)=0.d0
@@ -488,9 +493,10 @@ Module davidson
         End If
         ! Normalization of vector B:
         s=0.d0
-        Do i=1,Nd
+        Do i=mype+1,Nd,npes
             s=s+B1(i)**2
         End Do
+        Call MPI_AllReduce(MPI_IN_PLACE, s, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
         Return
@@ -517,15 +523,12 @@ Module davidson
         i1min=i2min-Nlv
         i1max=i2max-Nlv
         kd=0
-        Call MPI_Bcast(Diag(1), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
         If (Diag(1)==0.d0) Then
             Diag(2:Nd)=0.d0
             kd=1
         End If
 
-        Do i=1,nlp ! 
-            Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        End Do
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8
             n=Hamil%n(l8)
@@ -540,34 +543,26 @@ Module davidson
         End Do
         ! Only master core needs ArrB for other calculations
         Do i=i2min,i2max
-            If (mype==0) Then
-                Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+            Call MPI_AllReduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, &
                                   MPI_COMM_WORLD, mpierr)
-            Else
-                Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                  MPI_COMM_WORLD, mpierr)
-            End If
         End Do
         If (kd==1) Then
-            If (mype==0) Then
-                Call MPI_Reduce(MPI_IN_PLACE, Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, & 
+            Call MPI_AllReduce(MPI_IN_PLACE, Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, & 
                                 MPI_COMM_WORLD, mpierr)
-            Else
-                Call MPI_Reduce(Diag(1:Nd), Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, & 
-                                MPI_COMM_WORLD, mpierr)
-            End If   
+            
         End If
         Return
     End Subroutine Mxmpy
 
-    Subroutine Ortn(j, ifail)
+    Subroutine Ortn(j, ifail, mype ,npes)
         ! Orthogonalization of J-th vector to J-1 previous ones.
         ! Normalization of the J-th vector.
+        Use mpi
         Implicit None
         Integer, Intent(In)  :: j
         Integer, Intent(Out) :: ifail
 
-        Integer :: i, l, jm, it
+        Integer :: i, l, jm, it, mype, npes, mpierr
         Real(dp) :: s, smax2, smax1, critN, ortho
         
         ! Orthogonality criteria:
@@ -579,15 +574,17 @@ Module davidson
         smax2=1.d10
 
         it=0
-        do
+        Do
             it=it+1
             smax1=0.d0
             Do l=1,jm
                 If (l > Nlv .and. Iconverge(l-Nlv)==1) Cycle
                 s=0.d0
-                Do i=1,Nd
+                Do i=mype+1,Nd,npes
                     s=s+ArrB(i,j)*ArrB(i,l)
                 End Do
+                Call MPI_AllReduce(MPI_IN_PLACE, s, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
                 If (dabs(s) > smax1) smax1=dabs(s)
                 ArrB(1:Nd,j)=ArrB(1:Nd,j)-s*ArrB(1:Nd,l)
             End Do
@@ -602,13 +599,16 @@ Module davidson
 
         ! Normalization of J-th vector:
         s=0.d0
-        Do i=1,Nd
+        Do i=mype+1,Nd,npes
             s=s+ArrB(i,j)*ArrB(i,j)
         End Do
+        Call MPI_AllReduce(MPI_IN_PLACE, s, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
         If (s < critN) Then
             Write (6,'(4X,"Fail of normalization of vector ",I2)') j
             ifail=j
         End If
+
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,j)=ArrB(1:Nd,j)*s
         Return
@@ -674,14 +674,8 @@ Module davidson
                 End Do
 
                 Do i=lout,lout+num-1
-                    If (mype==0) Then
-                        Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                    Call MPI_AllReduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, &
                                           MPI_COMM_WORLD, mpierr)
-                    Else
-                        Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                          MPI_COMM_WORLD, mpierr)
-                    End If
-                    Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 End Do
                 err1=0.d0
             

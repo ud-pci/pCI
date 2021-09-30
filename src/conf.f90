@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.18")'
+        strfmt = '(4X,"Program conf v0.3.19")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1290,6 +1290,8 @@ Contains
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If
+        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(E1, Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Do While (ifail /= 0)
@@ -1299,7 +1301,7 @@ Contains
            If (mype == 0) Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
         End Do
 
-        Call FormB0(mype,npes)
+        Call FormB0(mype,npes)        
 
         If (Nd0 == Nd) Return
         ! Davidson loop:
@@ -1308,36 +1310,29 @@ Contains
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
         ax = 1
         cnx = 1
+        lsym=K_prj == 1.OR.kskp == 1.OR.kskp == 3
         Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Do it=1,N_it
             iter=iter+1
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (ax > crit .and. iter <= n_it) Then
                 If (mype == 0) Then
-                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I2," levels **")'
+                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
                     Write( 6,strfmt) iter,Nlv
                     Write(11,strfmt) iter,Nlv
                 End if
                 ! Orthonormalization of Nlv probe vectors:
-                If (mype==0) Then
-                    Do i=1,Nlv
-                        Call Ortn(i,ifail)
-                        If (ifail /= 0) Then
-                            Write(*,*)' Fail of orthogonalization for ',i
-                            Stop
-                        End If
-                    End Do
-                End If
+                Do i=1,Nlv
+                    Call Ortn(i,ifail,mype,npes)
+                    If (ifail /= 0) Then
+                        Write(*,*)' Fail of orthogonalization for ',i
+                        Stop
+                    End If
+                End Do
                 ! Formation of the left-upper block of the energy matrix P:
                 Call Mxmpy(1, mype, npes)
-                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-                If (mype==0) Then ! start master core only block
-                  Call FormP(1, vmax)
-                  lsym=K_prj == 1.OR.kskp == 1.OR.kskp == 3
-                  If (iter == 1 .and. lsym) Then    !# averaging diagonal over confs
+                Call FormP(1, vmax)
+                
+                If (iter == 1 .and. lsym) Then    !# averaging diagonal over confs
                     id0=1
                     Do ic=1,Nc
                       id1=Ndc(ic)
@@ -1352,89 +1347,90 @@ Contains
                         id0=id0+id1
                       End If
                     End Do
-                    If (id2 == Nd) Then
-                      Write(*,*) ' Diagonal averaged over rel. configurations'
-                    Else
-                      Write(*,*) ' Error: id2=',id2,' Nc=',Nc
-                      Stop
+                    If (mype == 0) Then
+                        If (id2 == Nd) Then
+                          Write(*,*) ' Diagonal averaged over rel. configurations'
+                        Else
+                          Write(*,*) ' Error: id2=',id2,' Nc=',Nc
+                          Stop
+                        End If
                     End If
-                  End If 
-                  ! Formation of Nlv additional probe vectors:
-                  cnx=0.d0
-                  Do i=1,Nlv
-                    i1=i+Nlv
-                    Call Dvdsn(i,cnx)
-                    If (Iconverge(i)==0) Then
-                      Call Ortn(i1,ifail)
-                      If (ifail /= 0) Then
-                        Write(*,*)' Fail of orthogonalization for ',i1
-                        Stop
-                      End If
-                    End If
-                  End Do
                 End If
+
+                ! Formation of Nlv additional probe vectors:
+                cnx=0.d0
+                Do i=1,Nlv
+                  i1=i+Nlv
+                  Call Dvdsn(i,cnx,mype,npes)
+                  If (Iconverge(i)==0) Then
+                    Call Ortn(i1,ifail,mype,npes)
+                    If (mype == 0) Then
+                        If (ifail /= 0) Then
+                          Write(*,*)' Fail of orthogonalization for ',i1
+                          Stop
+                        End If
+                    End If
+                  End If
+                End Do
 
                 If (K_prj == 1) Then
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype,npes)
-                    If (mype == 0) Then
-                        Do i=Nlv+1,2*Nlv
-                          If (Iconverge(i-Nlv)==0) Then
-                            Call Ortn(i,ifail)
-                            If (ifail /= 0) Then
-                              If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
-                              If (kdavidson==1) Then
-                                Stop
-                              Else
-                                kdavidson=1
-                                If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
-                                ifail=0
-                                exit
-                              End If
-                            End If
+                    Do i=Nlv+1,2*Nlv
+                      If (Iconverge(i-Nlv)==0) Then
+                        Call Ortn(i,ifail,mype,npes)
+                        If (ifail /= 0) Then
+                          If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
+                          If (kdavidson==1) Then
+                            Stop
+                          Else
+                            kdavidson=1
+                            If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
+                            ifail=0
+                            exit
                           End If
-                        End Do
-                    End If
+                        End If
+                      End If
+                    End Do
                 End If
-                Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
-                    Call Mxmpy(2, mype, npes)
-                    If (mype==0) Then
-                        Call FormP(2,vmax)
-                        n1=2*Nlv
-                        ! Evaluation of Nlv eigenvectors:
-                        Call Hould(n1,D,E,P,ifail)
-                        !Call DSYEV('V','U',n1,P,n1,E,D,3*n1-1,ifail)
-                        ax=0.d0
-                        vmax=-1.d10
-                        Do i=1,Nlv
-                            xx=0.d0
-                            Do k=1,Nlv
-                                k1=k+Nlv
-                                x=dabs(P(k1,i))
-                                If (xx <= x) Then
-                                    xx=x
-                                    kx=k
-                                End If
-                            End Do
-                            If (ax < xx) ax=xx
-                            If (vmax < E(i)) vmax=E(i)
-                            If (mype == 0) Then
-                                strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
-                                Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
-                                Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
+                    Call Mxmpy(2,mype,npes)
+                    Call FormP(2,vmax)
+                    n1=2*Nlv
+                    ! Evaluation of Nlv eigenvectors:
+                    Call Hould(n1,D,E,P,ifail)
+                    !Call DSYEV('V','U',n1,P,n1,E,D,3*n1-1,ifail)
+                    ax=0.d0
+                    vmax=-1.d10
+                    Do i=1,Nlv
+                        xx=0.d0
+                        Do k=1,Nlv
+                            k1=k+Nlv
+                            x=dabs(P(k1,i))
+                            If (xx <= x) Then
+                                xx=x
+                                kx=k
                             End If
                         End Do
-                        If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
-                            If (mod(iter,kXIJ) == 0) Then
-                                Call FormB
-                            Else
-                                Call FormBskip
-                            End If
+                        If (ax < xx) ax=xx
+                        If (vmax < E(i)) vmax=E(i)
+                        If (mype == 0) Then
+                            strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
+                            Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
+                            Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
+                        End If
+                    End Do
+                    If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
+                        If (mype == 0 .and. mod(iter,kXIJ) == 0) Then
+                            Call FormB
                         Else
                             Call FormBskip
+                            If (mype == 0) Write ( 6,*) ' FormBskip: Vectors not saved'
                         End If
+                    Else
+                        Call FormBskip
+                        If (mype == 0) Write ( 6,*) ' FormBskip: Vectors not saved'
                     End If
                 Else
                     If (mype == 0) Then
@@ -1447,7 +1443,6 @@ Contains
                     Exit
                 End If
             End If
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End Do
 
         If (mype == 0) Then

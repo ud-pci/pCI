@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.18] - 2021-09-30
+- conf v0.3.19 - fully parallelized Davidson iterative procedure
+
 ## [0.7.17] - 2021-09-29
 - conf v0.3.18 - bug fix for writing/reading CONF.HIJ/CONF.JJJ for large scale runs 
 - changed disp and disps in matrix_io.f90 to kind=MPI_OFFSET_KIND
