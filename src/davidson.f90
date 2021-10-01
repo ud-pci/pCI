@@ -44,7 +44,7 @@ Module davidson
                 Z1(n,k)=t
                 Z1(k,n)=t
             Else
-                Exit
+                Cycle
             End If
         End Do
 

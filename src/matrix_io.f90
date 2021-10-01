@@ -134,12 +134,6 @@ Module matrix_io
         disp = mype * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
 
-        ! Allocate matrix if not allocated yet
-        If (.not. allocated(mat%n)) allocate(mat%n(num_elements_per_core))
-        If (.not. allocated(mat%k)) allocate(mat%k(num_elements_per_core))
-        If (.not. allocated(mat%t)) allocate(mat%t(num_elements_per_core))
-
-        ! Calculate displacements
         sizes=0
         Call MPI_AllGather(num_elements_per_core, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
 
@@ -147,10 +141,21 @@ Module matrix_io
             num_elements_total = num_elements_total + sizes(i)
         End Do
 
+        ! Distribute total number of matrix elements equally across all cores
+        num_elements_per_core = num_elements_total/npes
+        if (mype == 0) num_elements_per_core = num_elements_per_core + mod(num_elements_total,npes)
+        Call MPI_AllGather(num_elements_per_core, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
+
+        ! Calculate displacements
         disps=0_MPI_OFFSET_KIND
         Do i=2,npes
           disps(i)=disps(i-1)+sizes(i-1)
         End Do
+
+        ! Allocate matrix if not allocated yet
+        If (.not. allocated(mat%n)) allocate(mat%n(num_elements_per_core))
+        If (.not. allocated(mat%k)) allocate(mat%k(num_elements_per_core))
+        If (.not. allocated(mat%t)) allocate(mat%t(num_elements_per_core))
 
         ! Read first indices of matrix elements mat%n
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
