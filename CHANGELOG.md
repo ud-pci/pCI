@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.19] - 2021-10-04
+- conf v0.3.20 - changed MPI_Reduce of Z1 in Init4 to MPI_AllReduce, removing MPI_Bcast from FormB0
+
 ## [0.7.18] - 2021-10-01
 - conf v0.3.19 - subroutine ReadMatrix now distributes total number of matrix elements equally across cores
 

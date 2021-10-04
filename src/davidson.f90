@@ -48,20 +48,16 @@ Module davidson
             End If
         End Do
 
-        If (mype==0) Then
-            Call MPI_Reduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+        Call MPI_AllReduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, &
                                 MPI_COMM_WORLD, mpierr)
-          Else
-            Call MPI_Reduce(Z1, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                MPI_COMM_WORLD, mpierr)
-        End If
+
     End Subroutine Init4
 
     Subroutine Hould(n,Ee,Dd,Zz,ifail)
         ! This subroutine diagonalizes the matrix Zz using 
         ! Householder's method of diagonalization.
         ! n-dimension of matrix Zz
-        ! Ee-
+        ! Ee-work vector
         ! Dd-array of eigenvalues
         ! Zz-matrix of eigenvectors
         ! ifail-error status
@@ -264,8 +260,6 @@ Module davidson
         nskip=0
         
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
-
-        Call MPI_Bcast(Z1,Nd0*Nd0,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,mpierr)
 
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
@@ -578,6 +572,7 @@ Module davidson
         jm=j-1
         smax2=1.d10
 
+        ! Orthogonalization of J-th vector
         it=0
         do
             it=it+1
