@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.20")'
+        strfmt = '(4X,"Program conf v0.3.21")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1233,7 +1233,7 @@ Contains
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
-        If (.not. Allocated(P)) Allocate(P(IPlv,IPlv))
+        If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
         If (.not. Allocated(D)) Allocate(D(IPlv))
         If (.not. Allocated(E)) Allocate(E(IPlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(IPlv))
@@ -1266,7 +1266,7 @@ Contains
         Implicit None
         External DSYEV
 
-        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, kskp, iter, &
+        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
                     kx, i1, i2, it, mype, npes, mpierr, ifail=0
         Integer(Kind=int64) :: start_time, s1
         Real :: ttot
@@ -1286,16 +1286,13 @@ Contains
         If (mype == 0) Then
             Call startTimer(s1)
             Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
-            !Call Hould(Nd0,D1,E1,Z1,ifail)
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Do While (ifail /= 0)
-           If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I4," failed")') Nd0
+           If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I6," failed")') Nd0
            Call Init4(mype,npes)
-           !If (mype == 0) Call Hould(Nd0,D1,E1,Z1,ifail)
            If (mype == 0) Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
         End Do
 
@@ -1303,23 +1300,19 @@ Contains
 
         If (Nd0 == Nd) Return
         ! Davidson loop:
-        iter = 0
         kdavidson = 0
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
         ax = 1
         cnx = 1
-        Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
         Do it=1,N_it
-            iter=iter+1
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            If (ax > crit .and. iter <= n_it) Then
+            If (ax > crit .and. it <= n_it) Then
                 If (mype == 0) Then
-                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I2," levels **")'
-                    Write( 6,strfmt) iter,Nlv
-                    Write(11,strfmt) iter,Nlv
+                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
+                    Write( 6,strfmt) it,Nlv
+                    Write(11,strfmt) it,Nlv
                 End if
                 ! Orthonormalization of Nlv probe vectors:
                 If (mype==0) Then
@@ -1333,11 +1326,10 @@ Contains
                 End If
                 ! Formation of the left-upper block of the energy matrix P:
                 Call Mxmpy(1, mype, npes)
-                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 If (mype==0) Then ! start master core only block
                   Call FormP(1, vmax)
-                  lsym=K_prj == 1.OR.kskp == 1.OR.kskp == 3
-                  If (iter == 1 .and. lsym) Then    !# averaging diagonal over confs
+                  lsym=K_prj == 1
+                  If (it == 1 .and. lsym) Then    !# averaging diagonal over confs
                     id0=1
                     Do ic=1,Nc
                       id1=Ndc(ic)
@@ -1396,7 +1388,6 @@ Contains
                     End If
                 End If
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
                     Call Mxmpy(2, mype, npes)
@@ -1405,7 +1396,6 @@ Contains
                         n1=2*Nlv
                         ! Evaluation of Nlv eigenvectors:
                         Call Hould(n1,D,E,P,ifail)
-                        !Call DSYEV('V','U',n1,P,n1,E,D,3*n1-1,ifail)
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
@@ -1427,7 +1417,7 @@ Contains
                             End If
                         End Do
                         If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
-                            If (mod(iter,kXIJ) == 0) Then
+                            If (mod(it,kXIJ) == 0) Then
                                 Call FormB
                             Else
                                 Call FormBskip
@@ -1442,12 +1432,11 @@ Contains
                         Write( 6,strfmt)
                         Write(11,strfmt)
                         ! Assign values of Tk for case when Davidson procedure is already converged 
-                        If (Kl4 == 2 .and. iter == 1) Tk=E(1:Nlv) 
+                        If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
                     Exit
                 End If
             End If
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End Do
 
         If (mype == 0) Then

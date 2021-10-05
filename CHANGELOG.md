@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.20] - 2021-10-04
+- conf v0.3.21 - bug fix for Kv=3 - added MPI_Bcast of Z1 after diagonalization
+- more code documentation in Davidson procedure
+- refactored parts of Davidson procedure
+
 ## [0.7.19] - 2021-10-04
 - conf v0.3.20 - changed MPI_Reduce of Z1 in Init4 to MPI_AllReduce, removing MPI_Bcast from FormB0
 

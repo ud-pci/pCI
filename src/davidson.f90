@@ -258,22 +258,22 @@ Module davidson
 
         num=0
         nskip=0
-        
+
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
 
+        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+        B1=0.d0
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
-                Do i=1,Nd
-                    If (j == 1)   B1(i)=0.d0
-                    If (i <= Nd0) B1(i)=Z1(i,j)
-                End Do
+                B1(1:Nd0)=Z1(1:Nd0,j)
                 Call J_av(B1,Nd0,xj,ierr,mype,npes)
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hmin)
                     Tj(num)=xj
                     ArrB(1:Nd,num)=B1(1:Nd)
-                    If (num >= Nlv) goto 220
+                    If (num >= Nlv) Exit
                 Else
                     nskip=nskip+1
                     If (mype==0) Write(*,*) '  skip Ej =',-(E1(j)+Hmin)
@@ -281,7 +281,6 @@ Module davidson
             End Do
         Else ! Reading CONF.XIJ
             If (mype == 0) Then
-                B1=0.d0
                 Read(17,err=210) dummy,dummy,ndpt
  210            Write(*,*) ' Vector length = ',ndpt
                 Rewind(17)
@@ -294,6 +293,8 @@ Module davidson
         End If
  220    if (mype==0) Rewind(17)
         Nlv=num
+
+        ! Write eigenvalues and eigenvectors of initial approximation to CONF.XIJ
         If (mype == 0) Then
             Do j=1,Nlv
                 strfmt = '(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)'
@@ -327,9 +328,9 @@ Module davidson
             End Do
             t=-(E(k)+Hmin)
             Tk(k)=t
-            ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
+            ArrB(1:Nd,k)=B2(1:Nd)
         End Do
-        ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
+
         Write ( 6,*) ' FormBskip: Vectors not saved'
         Return
     End Subroutine FormBskip
@@ -353,9 +354,8 @@ Module davidson
             t=-(E(k)+Hmin)
             Tk(k)=t
             Write(17) t,Tj(k),Nd,(B2(i),i=1,Nd)
-            ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
+            ArrB(1:Nd,k)=B2(1:Nd)
         End Do
-        ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
         close (unit=17)
         Write ( 6,*) ' FormB: Vectors saved'
         Return
@@ -636,7 +636,7 @@ Module davidson
         Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jt, IPjd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iconverge, IPlv, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        call MPI_Barrier(MPI_COMM_WORLD, mpierr)        
+
         imin=lin
         imax=lout-1
         Do j=imin,imax

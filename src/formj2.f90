@@ -347,7 +347,7 @@ Module formj2
                 If (n /= k) r=r+r
                 xj=xj+r
             Else
-                Exit
+                Cycle
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
