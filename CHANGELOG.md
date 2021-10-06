@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.22] - 2021-10-06
+- conf v0.3.23 - replaced all Hould routines with LAPACK 'DSYEV'
+- removed global D, D1 work arrays and replaced with local W work array
+- initialize work array for diagonalizing P before iterative procedure
+- bug fix for Kl4=2 - broadcast Nlv in FormB0 after reading CONF.XIJ
+
 ## [0.7.21] - 2021-10-06
 - conf v0.3.22 - optimized DSYEV subroutine in Diag4
 

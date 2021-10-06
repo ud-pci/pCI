@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.22")'
+        strfmt = '(4X,"Program conf v0.3.23")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -712,7 +712,7 @@ Contains
             + bytesDP * IPlv * 2_dp   & ! D,E
             + bytesDP * Nd * 2_dp     & ! B1,B2
             + bytesDP * Nd0 ** 2_dp   & ! Z1
-            + bytesDP * Nd0 * 2_dp      ! D1,E1
+            + bytesDP * Nd0 * 1_dp      ! E1
     
         Call FormattedMemSize(mem, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
@@ -1234,18 +1234,16 @@ Contains
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
-        If (.not. Allocated(D)) Allocate(D(IPlv))
         If (.not. Allocated(E)) Allocate(E(IPlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(IPlv))
         If (.not. Allocated(B1)) Allocate(B1(Nd))
         If (.not. Allocated(B2)) Allocate(B2(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
-        If (.not. Allocated(D1)) Allocate(D1(3*Nd0-1))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
         If (mype==0) Then
             memDvdsn = 0_int64
-            memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(D)+sizeof(E) &
-                + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(D1)+sizeof(E1)
+            memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
+                + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(E1)
             memDvdsn = memDvdsn
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
@@ -1264,11 +1262,12 @@ Contains
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Implicit None
-        External :: DSYEV, ILAENV
+        External :: DSYEV
 
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, nb
+                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork
         Real(dp), Dimension(4) :: dptmp
+        Real(dp), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time, s1
         Real :: ttot
         Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
@@ -1286,34 +1285,45 @@ Contains
         Call Init4(mype,npes)
         If (mype == 0) Then
             Call startTimer(s1)
+
+            ! Query for the optimal work array size
             Call DSYEV('V','U',Nd0,Z1,Nd0,E1,dptmp,-1,ifail)
-            DEALLOCATE(D1)
-            NB = MAX(Int(dptmp(1)),3*Nd0-1)
-            ALLOCATE( D1(NB))
-            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,NB,ifail)
+            
+            ! Cast the returned dp to int to get length of work array W
+            lwork = Int(dptmp(1))
+
+            ! Allocate the work array W
+            ALLOCATE(W(lwork))
+
+            ! Compute the eigenvalues E1 and eigenvectors Z1
+            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+
+            ! Print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
+
+            ! Set up work array for diagonalization of energy matrix P during iterative procedure
+            n1 = 2*Nlv
+            Call DSYEV('V','U',n1,P,n1,E,dptmp,-1,ifail)
+            lwork = Int(dptmp(1))
+            Deallocate(W)
+            Allocate(W(lwork))
         End If
 
-        Do While (ifail /= 0)
-           If (mype == 0) Write(6,'(4X,"Starting approximation of dim ",I6," failed")') Nd0
-           Call Init4(mype,npes)
-           If (mype == 0) Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
-        End Do
-
+        ! Write initial approximation to file CONF.XIJ
         Call FormB0(mype,npes)
 
         If (Nd0 == Nd) Return
         ! Davidson loop:
         kdavidson = 0
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
-        ax = 1
-        cnx = 1
+        ax = 1.d0
+        cnx = 1.d0
 
         Do it=1,N_it
             Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            If (ax > crit .and. it <= n_it) Then
+            If (ax > crit) Then
                 If (mype == 0) Then
                     strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
                     Write( 6,strfmt) it,Nlv
@@ -1398,9 +1408,8 @@ Contains
                     Call Mxmpy(2, mype, npes)
                     If (mype==0) Then
                         Call FormP(2,vmax)
-                        n1=2*Nlv
                         ! Evaluation of Nlv eigenvectors:
-                        Call Hould(n1,D,E,P,ifail)
+                        Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
@@ -1439,6 +1448,7 @@ Contains
                         ! Assign values of Tk for case when Davidson procedure is already converged 
                         If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
+                    If (allocated(W)) Deallocate(W)
                     Exit
                 End If
             End If
@@ -1449,7 +1459,7 @@ Contains
             Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
         End If
 
-        Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, D, E, B1, B2, Z1, E1)
+        Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, E, B1, B2, Z1, E1)
 
         Return
     End Subroutine Diag4
@@ -1476,7 +1486,7 @@ Contains
             End If
         End Do
 
-        Deallocate(ArrB, Tk, Tj, D1, Iconverge)
+        Deallocate(ArrB, Tk, Tj, Iconverge)
 
         If (mype==0) close(unit=17)
 

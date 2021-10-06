@@ -290,6 +290,7 @@ Module davidson
                     ArrB(1:Nd,j)=B1(1:Nd)
                 End Do
             End If
+            Call MPI_Bcast(num, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
  220    if (mype==0) Rewind(17)
         Nlv=num
@@ -520,6 +521,7 @@ Module davidson
         Do i=1,nlp ! 
             Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
+
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8
             n=Hamil%n(l8)
@@ -635,7 +637,7 @@ Module davidson
 
         Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jt, IPjd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iconverge, IPlv, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iconverge, Nlv, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         imin=lin
         imax=lout-1
