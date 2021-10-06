@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.21")'
+        strfmt = '(4X,"Program conf v0.3.22")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1264,10 +1264,11 @@ Contains
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Implicit None
-        External DSYEV
+        External :: DSYEV, ILAENV
 
         Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail=0
+                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, nb
+        Real(dp), Dimension(4) :: dptmp
         Integer(Kind=int64) :: start_time, s1
         Real :: ttot
         Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
@@ -1285,7 +1286,11 @@ Contains
         Call Init4(mype,npes)
         If (mype == 0) Then
             Call startTimer(s1)
-            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,3*Nd0-1,ifail)
+            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,dptmp,-1,ifail)
+            DEALLOCATE(D1)
+            NB = MAX(Int(dptmp(1)),3*Nd0-1)
+            ALLOCATE( D1(NB))
+            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,D1,NB,ifail)
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If

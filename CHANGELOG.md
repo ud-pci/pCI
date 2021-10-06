@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.21] - 2021-10-06
+- conf v0.3.22 - optimized DSYEV subroutine in Diag4
+
 ## [0.7.20] - 2021-10-04
 - conf v0.3.21 - bug fix for Kv=3 - added MPI_Bcast of Z1 after diagonalization
 - more code documentation in Davidson procedure
