@@ -14,9 +14,9 @@ Module davidson
     Subroutine Init4(mype,npes)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
-        ! The initial approximation Hamil is stored in the 
+        ! The initial approximation Hamilonian is stored in the 
         ! matrix Z1 and is constructed by selecting the top-left 
-        ! block of the full Hamil matrix H.
+        ! block of the full Hamiltonian matrix H.
         ! The diagonal elements of H are stored in the array Diag.
         Use mpi
         Use determinants, Only : calcNd0
@@ -32,7 +32,7 @@ Module davidson
             Write(11,strfmt) Nc4,Nd0
         End If
 
-        ! Construct the Hamil in the initial approximation:
+        ! Construct the Hamilonian in the initial approximation
         Diag=0.d0
         Z1=0.d0
         Do l8=1,ih8

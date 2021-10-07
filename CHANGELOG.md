@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.24] - 2021-10-07
+- conf v0.3.25 - implemented ScaLAPACK subroutine PDSYEVD to replace DSYEV in initial diagonalization
+
 ## [0.7.23] - 2021-10-07
 - conf v0.3.24 - reduced size of arrays E and Iconverge from IPlv to Nlv
 

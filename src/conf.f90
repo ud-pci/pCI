@@ -51,7 +51,7 @@ Program conf
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
     Implicit None
-
+    External :: BLACS_PINFO
     Integer   :: n, k, i, j, ierr, mype, npes, mpierr
     Integer(kind=int64) :: start_time
     Real :: total_time
@@ -61,11 +61,12 @@ Program conf
     Character(Len=16)   :: memStr, timeStr
 
     ! Initialize MPI
-    Call MPI_Init(mpierr)
+    !Call MPI_Init(mpierr)
     ! Get process id
-    Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
+    !Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
-    Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+    !Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+    Call BLACS_PINFO(mype,npes)
 
     Call startTimer(start_time)
     
@@ -132,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.24")'
+        strfmt = '(4X,"Program conf v0.3.25")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -784,7 +785,7 @@ Contains
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,Ne
             Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End do  
+        End Do  
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Rsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
@@ -1033,7 +1034,7 @@ Contains
                     
                         Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End if
-                End do
+                End Do
             End If
 
             Call IVAccumulatorCopy(iva1, Hamil%n, counter1)
@@ -1262,18 +1263,24 @@ Contains
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Implicit None
-        External :: DSYEV
+        External :: DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD
 
-        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork
+        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, start, end, status(MPI_STATUS_SIZE), &
+                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork, rem, numroc, sender
         Real(dp), Dimension(4) :: dptmp
+        Integer, Dimension(4) :: itmp
         Real(dp), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time, s1
         Real :: ttot
         Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
         logical   :: lsym
         Character(Len=16) :: timeStr
+        Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA
+        Real(dp), Allocatable, Dimension(:,:) :: A, Z
+        Integer, Dimension(9) :: DESCA, DESCZ
+        INTEGER, ALLOCATABLE :: IWORK(:)
 
+        ! Start timer for Davidson procedure
         Call startTimer(start_time)
 
         If (mype == 0) Then
@@ -1282,23 +1289,56 @@ Contains
             Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
         End If
 
-        Call Init4(mype,npes)
+        ! Construct initial approximation from Hamiltonian matrix
+        Call Init4(mype, npes)
+
+        ! Start timer for initial diagonalization
+        Call startTimer(s1)
+
+        ! Set the number of rows, NPROW, and columns, NPCOL, of the processor grid
+        NPROW = 1
+        NPCOL = npes
+
+        ! Initialize BLACS context
+        CALL BLACS_GET(-1, 0, CONTEXT)
+        CALL BLACS_GRIDINIT(CONTEXT, 'R', NPROW, NPCOL)
+        CALL BLACS_GRIDINFO(CONTEXT, NPROW, NPCOL, MYROW, MYCOL)
+
+        ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
+        NROWSA = NUMROC(Nd0,Nd0,MYROW,0,NPROW)
+        NCOLSA = NUMROC(Nd0,Nd0,MYCOL,0,NPCOL)
+        ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
+
+        ! Initialize array descriptors DESCA and DESCZ
+        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
+        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
+
+        ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
+        A=0.0d0
+        Do I=1,Nd0
+            Do J=1,I
+                CALL PDELSET(A, J, I, DESCA, Z1(I,J))
+            End Do
+        End Do
+
+        ! Query for the optimal work array sizes
+        CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, dptmp, -1, itmp, 1, ifail)
+        LWORK = dptmp(1)
+        LIWORK = itmp(1)
+        ALLOCATE(IWORK(LIWORK), W(LWORK))
+
+        ! Compute the eigenvalues E1 and eigenvectors Z
+        CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
+        
+        ! Exit BLACS context
+        CALL BLACS_GRIDEXIT(CONTEXT)
+        CALL BLACS_EXIT(1)
+
         If (mype == 0) Then
-            Call startTimer(s1)
+            ! Set eigenvectors in matrix Z back to matrix Z1
+            Z1(1:NROWSA,1:NCOLSA) = Z(1:NROWSA,1:NCOLSA)
 
-            ! Query for the optimal work array size
-            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,dptmp,-1,ifail)
-            
-            ! Cast the returned dp to int to get length of work array W
-            lwork = Int(dptmp(1))
-
-            ! Allocate the work array W
-            ALLOCATE(W(lwork))
-
-            ! Compute the eigenvalues E1 and eigenvectors Z1
-            Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
-
-            ! Print time for initial diagonalization
+            ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
 
@@ -1558,9 +1598,9 @@ Contains
             REWIND (16)
             IMAX=J-1
             IF (IMAX < 1) GOTO 250
-            DO I=1,IMAX
+            Do I=1,IMAX
                 READ (16)
-            END DO
+            END Do
  250        READ (16) ER(j),xj,idum,(CC(I),I=1,ND)
             Er(j)=Er(j)+4.d0*Gj*xj*(xj+1.d0)
             E=ER(j)
@@ -1574,28 +1614,28 @@ Contains
         WRITE(11,45)
  45     FORMAT(4X,63('='))
         ! weights of configurations
-        DO J=1,JMAX
+        Do J=1,JMAX
             REWIND (16)
             IMAX=J-1
             IF (IMAX < 1) GOTO 270
-            DO I=1,IMAX
+            Do I=1,IMAX
                 READ (16)
-            END DO
+            END Do
  270        READ (16) D,DUMMY,idum,(CC(I),I=1,ND)
             I=0
-            DO IC=1,NC
+            Do IC=1,NC
                 D=0.d0
                 NDK=NDC(IC)
-                DO K=1,NDK
+                Do K=1,NDK
                     I=I+1
                     D=D+CC(I)**2
-                END DO
+                END Do
                 W(IC,J)=D
-            END DO
-        END DO
+            END Do
+        END Do
         N=(JMAX-1)/5+1
         J2=0
-        DO 130 K=1,N
+        Do 130 K=1,N
             NK=5
             IF (K == N) NK=JMAX-(N-1)*5
             J1=J2+1
@@ -1609,7 +1649,7 @@ Contains
             WRITE(11,85) (ER(I),I=J1,J2)
  85         FORMAT(4X,'ICONF',4X,5F11.5)
             WRITE(11,65) (ST2,I=J1,J3)
-            DO 140 IC=1,NC
+            Do 140 IC=1,NC
                 I=IC
                 WRITE(11,95) I,(W(I,J),J=J1,J2)
  95             FORMAT(2X,I6,'      ',5F11.6)

@@ -331,10 +331,8 @@ Module formj2
 
         Integer :: ierr, i, k, n, nx, mpierr
         Integer, optional :: mype, npes
-        Integer*8 :: mi, nj
-        Real(dp) :: r, t, xj, xj2
+        Real(dp) :: r, t, xj
         Real(dp), dimension(nx) :: X1
-        Integer, allocatable, dimension(:) :: idet1, idet2
 
         ierr=0
         xj=0.d0
