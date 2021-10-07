@@ -7,7 +7,7 @@ Module davidson
 
     Private
 
-    Public :: Init4, Hould, FormB0, FormB, FormBskip, FormP, Dvdsn, Mxmpy, Ortn, Prj_J, Vread, VWrite
+    Public :: Init4, Hould, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J, Vread, VWrite
 
   Contains
     
@@ -422,6 +422,39 @@ Module davidson
         Return
     End Subroutine FormP
     
+    Subroutine AvgDiag(iter)
+        ! This subroutine averages the diagonal over configurations
+        Implicit None
+
+        Integer :: iter, ic, id, id0, id1, id2
+        Real(dp) :: ss
+        Logical :: lsym
+
+        lsym=K_prj == 1
+        If (iter == 1 .and. lsym) Then
+          id0=1
+          Do ic=1,Nc
+            id1=Ndc(ic)
+            id2=id0+id1-1
+            If (id1 > 0) Then
+              ss=0.d0
+              Do id=id0,id2
+                ss=ss+Diag(id)
+              End Do
+              ss=ss/id1
+              Diag(id0:id2)=ss
+              id0=id0+id1
+            End If
+          End Do
+          If (id2 == Nd) Then
+            Write(*,*) ' Diagonal averaged over rel. configurations'
+          Else
+            Write(*,*) ' Error: id2=',id2,' Nc=',Nc
+            Stop
+          End If
+        End If 
+    End Subroutine AvgDiag
+
     Subroutine Dvdsn (j, cnx)
         ! Main part of the Davidson algorithm. 
         ! Formation of the J-th residual vector and the corresponding new probe vector.

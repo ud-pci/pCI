@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.26] - 2021-10-07
+- conf v0.3.27 - moved averaging of diagonal over configurations to its own subroutine AvgDiag
+
 ## [0.7.25] - 2021-10-07
 - conf v0.3.26 - moved initial diagonalization to its own subroutine DiagInitApprox
 

@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.26")'
+        strfmt = '(4X,"Program conf v0.3.27")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1342,7 +1342,7 @@ Contains
         Real(dp), Dimension(4) :: dptmp
         Real(dp), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time
-        Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
+        Real(dp)  :: crit=1.d-6, ax=1.d0, cnx=1.d0, x, xx, ss, vmax
         logical   :: lsym
         Character(Len=16) :: timeStr
 
@@ -1373,11 +1373,10 @@ Contains
         End If
 
         If (Nd0 == Nd) Return
+
         ! Davidson loop:
         kdavidson = 0
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
-        ax = 1.d0
-        cnx = 1.d0
 
         Do it=1,N_it
             Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1388,6 +1387,7 @@ Contains
                     Write( 6,strfmt) it,Nlv
                     Write(11,strfmt) it,Nlv
                 End if
+
                 ! Orthonormalization of Nlv probe vectors:
                 If (mype==0) Then
                     Do i=1,Nlv
@@ -1398,66 +1398,46 @@ Contains
                         End If
                     End Do
                 End If
-                ! Formation of the left-upper block of the energy matrix P:
+
+                ! Formation of the left-upper block of the energy matrix P
                 Call Mxmpy(1, mype, npes)
-                If (mype==0) Then ! start master core only block
-                  Call FormP(1, vmax)
-                  lsym=K_prj == 1
-                  If (it == 1 .and. lsym) Then    !# averaging diagonal over confs
-                    id0=1
-                    Do ic=1,Nc
-                      id1=Ndc(ic)
-                      id2=id0+id1-1
-                      If (id1 > 0) Then
-                        ss=0.d0
-                        Do id=id0,id2
-                          ss=ss+Diag(id)
-                        End Do
-                        ss=ss/id1
-                        Diag(id0:id2)=ss
-                        id0=id0+id1
-                      End If
+                If (mype==0) Then 
+                    Call FormP(1, vmax)
+                    ! Average diagonal over relativistic configurations
+                    Call AvgDiag(it)
+                    ! Formation of Nlv additional probe vectors:
+                    cnx=0.d0
+                    Do i=1,Nlv
+                        i1=i+Nlv
+                        Call Dvdsn(i,cnx)
+                        If (Iconverge(i)==0) Then
+                            Call Ortn(i1,ifail)
+                            If (ifail /= 0) Then
+                                Write(*,*)' Fail of orthogonalization for ',i1
+                                Stop
+                            End If
+                        End If
                     End Do
-                    If (id2 == Nd) Then
-                      Write(*,*) ' Diagonal averaged over rel. configurations'
-                    Else
-                      Write(*,*) ' Error: id2=',id2,' Nc=',Nc
-                      Stop
-                    End If
-                  End If 
-                  ! Formation of Nlv additional probe vectors:
-                  cnx=0.d0
-                  Do i=1,Nlv
-                    i1=i+Nlv
-                    Call Dvdsn(i,cnx)
-                    If (Iconverge(i)==0) Then
-                      Call Ortn(i1,ifail)
-                      If (ifail /= 0) Then
-                        Write(*,*)' Fail of orthogonalization for ',i1
-                        Stop
-                      End If
-                    End If
-                  End Do
                 End If
 
                 If (K_prj == 1) Then
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype,npes)
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
-                          If (Iconverge(i-Nlv)==0) Then
-                            Call Ortn(i,ifail)
-                            If (ifail /= 0) Then
-                              If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
-                              If (kdavidson==1) Then
-                                Stop
-                              Else
-                                kdavidson=1
-                                If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
-                                ifail=0
-                                exit
-                              End If
+                            If (Iconverge(i-Nlv)==0) Then
+                                Call Ortn(i,ifail)
+                                If (ifail /= 0) Then
+                                    If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
+                                    If (kdavidson==1) Then
+                                        Stop
+                                    Else
+                                        kdavidson=1
+                                        If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
+                                        ifail=0
+                                        Exit
+                                    End If
+                                End If
                             End If
-                          End If
                         End Do
                     End If
                 End If
@@ -1483,14 +1463,12 @@ Contains
                             End Do
                             If (ax < xx) ax=xx
                             If (vmax < E(i)) vmax=E(i)
-                            If (mype == 0) Then
-                                strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
-                                Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
-                                Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
-                            End If
+                            strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
+                            Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
+                            Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
                         End Do
                         If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
-                            If (mod(it,kXIJ) == 0) Then
+                            If (mod(it, kXIJ) == 0) Then
                                 Call FormB
                             Else
                                 Call FormBskip
