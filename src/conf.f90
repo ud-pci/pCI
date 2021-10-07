@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.25")'
+        strfmt = '(4X,"Program conf v0.3.26")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1255,42 +1255,21 @@ Contains
 
     End Subroutine AllocateDvdsnArrays
 
-    Subroutine Diag4(mype, npes)
-        ! this Subroutine executes the Davidson procedure for diagonalization
-        ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
-        ! all other Subroutines are performed by the master core
+    Subroutine DiagInitApprox(mype, npes)
         Use mpi
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
-        Use davidson
         Implicit None
-        External :: DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD
+        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD
 
-        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, start, end, status(MPI_STATUS_SIZE), &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork, rem, numroc, sender
+        Integer :: I, J, lwork, mype, npes, ifail
+        Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
+        Integer(Kind=int64) :: s1
         Real(dp), Dimension(4) :: dptmp
         Integer, Dimension(4) :: itmp
-        Real(dp), Allocatable, Dimension(:) :: W ! work array
-        Integer(Kind=int64) :: start_time, s1
-        Real :: ttot
-        Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
-        logical   :: lsym
-        Character(Len=16) :: timeStr
-        Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA
-        Real(dp), Allocatable, Dimension(:,:) :: A, Z
         Integer, Dimension(9) :: DESCA, DESCZ
-        INTEGER, ALLOCATABLE :: IWORK(:)
-
-        ! Start timer for Davidson procedure
-        Call startTimer(start_time)
-
-        If (mype == 0) Then
-            If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
-            If (Nc4 > Nc) Nc4=Nc
-            Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
-        End If
-
-        ! Construct initial approximation from Hamiltonian matrix
-        Call Init4(mype, npes)
+        Integer, Allocatable, Dimension(:)     :: IWORK ! integer work array
+        Real(dp), Allocatable, Dimension(:)    :: W     ! double precision work array
+        Real(dp), Allocatable, Dimension(:,:)  :: A, Z
 
         ! Start timer for initial diagonalization
         Call startTimer(s1)
@@ -1341,17 +1320,57 @@ Contains
             ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
-
-            ! Set up work array for diagonalization of energy matrix P during iterative procedure
-            n1 = 2*Nlv
-            Call DSYEV('V','U',n1,P,n1,E,dptmp,-1,ifail)
-            lwork = Int(dptmp(1))
-            Deallocate(W)
-            Allocate(W(lwork))
         End If
+
+        ! Clean up
+        Deallocate(IWORK, W, Z, A)
+
+    End Subroutine DiagInitApprox
+
+    Subroutine Diag4(mype, npes)
+        ! this Subroutine executes the Davidson procedure for diagonalization
+        ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
+        ! all other Subroutines are performed by the master core
+        Use mpi
+        Use str_fmt, Only : startTimer, stopTimer, FormattedTime
+        Use davidson
+        Implicit None
+        External :: DSYEV
+
+        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
+                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork
+        Real(dp), Dimension(4) :: dptmp
+        Real(dp), Allocatable, Dimension(:) :: W ! work array
+        Integer(Kind=int64) :: start_time
+        Real(dp)  :: crit=1.d-6, ax, x, xx, ss, cnx, vmax
+        logical   :: lsym
+        Character(Len=16) :: timeStr
+
+        ! Start timer for Davidson procedure
+        Call startTimer(start_time)
+
+        If (mype == 0) Then
+            If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
+            If (Nc4 > Nc) Nc4=Nc
+            Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
+        End If
+
+        ! Construct initial approximation from Hamiltonian matrix
+        Call Init4(mype, npes)
+
+        ! Diagonalize the initial approximation 
+        Call DiagInitApprox(mype, npes)
 
         ! Write initial approximation to file CONF.XIJ
         Call FormB0(mype,npes)
+
+        ! Set up work array for diagonalization of energy matrix P during iterative procedure
+        If (mype == 0) Then
+            n1 = 2*Nlv
+            Call DSYEV('V','U',n1,P,n1,E,dptmp,-1,ifail)
+            lwork = Int(dptmp(1))
+            Allocate(W(lwork))
+        End If
 
         If (Nd0 == Nd) Return
         ! Davidson loop:

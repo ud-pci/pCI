@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.25] - 2021-10-07
+- conf v0.3.26 - moved initial diagonalization to its own subroutine DiagInitApprox
+
 ## [0.7.24] - 2021-10-07
 - conf v0.3.25 - implemented ScaLAPACK subroutine PDSYEVD to replace DSYEV in initial diagonalization
 
