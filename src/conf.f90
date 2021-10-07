@@ -132,7 +132,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.23")'
+        strfmt = '(4X,"Program conf v0.3.24")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1234,8 +1234,8 @@ Contains
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
-        If (.not. Allocated(E)) Allocate(E(IPlv))
-        If (.not. Allocated(Iconverge)) Allocate(Iconverge(IPlv))
+        If (.not. Allocated(E)) Allocate(E(Nlv))
+        If (.not. Allocated(Iconverge)) Allocate(Iconverge(Nlv))
         If (.not. Allocated(B1)) Allocate(B1(Nd))
         If (.not. Allocated(B2)) Allocate(B2(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
