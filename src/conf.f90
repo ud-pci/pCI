@@ -1156,10 +1156,10 @@ Contains
         
         t=0.d0
         Select Case(nf)
-            Case(2) ! determinants dIffer by two functions
+            Case(2) ! determinants differ by two functions
                 t=t+Gint(i2,j2,i1,j1)*is 
                 t=t+Gj*F_J2(idet1,idet2,is,nf,i2,i1,j2,j1)
-            Case(1) ! determinants dIffer by one function
+            Case(1) ! determinants differ by one function
                 Do iq=1,Ne
                     i1=idet1(iq)
                     If (i1 /= j1) t=t+Gint(j2,i1,j1,i1)*is
@@ -1342,8 +1342,7 @@ Contains
         Real(dp), Dimension(4) :: dptmp
         Real(dp), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time
-        Real(dp)  :: crit=1.d-6, ax=1.d0, cnx=1.d0, x, xx, ss, vmax
-        logical   :: lsym
+        Real(dp)  :: crit=1.d-6, ax=1.d0, cnx=1.d0, x, xx, vmax
         Character(Len=16) :: timeStr
 
         ! Start timer for Davidson procedure
@@ -1403,8 +1402,9 @@ Contains
                 Call Mxmpy(1, mype, npes)
                 If (mype==0) Then 
                     Call FormP(1, vmax)
-                    ! Average diagonal over relativistic configurations
-                    Call AvgDiag(it)
+                    ! Average initial diagonal over relativistic configurations if projecting J
+                    If (it == 1 .and. K_prj == 1) Call AvgDiag
+                    
                     ! Formation of Nlv additional probe vectors:
                     cnx=0.d0
                     Do i=1,Nlv
@@ -1446,7 +1446,7 @@ Contains
                     ! Formation of other three blocks of the matrix P:
                     Call Mxmpy(2, mype, npes)
                     If (mype==0) Then
-                        Call FormP(2,vmax)
+                        Call FormP(2, vmax)
                         ! Evaluation of Nlv eigenvectors:
                         Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         ax=0.d0
@@ -1504,7 +1504,7 @@ Contains
     Subroutine WriteFinalXIJ(mype,npes)
         Use mpi
         Use formj2, Only : J_av
-        Use davidson, Only : Prj_J, FormBskip
+        Use davidson, Only : Prj_J
         Implicit None
         Integer :: i, n, ierr, mype, npes, mpierr
 

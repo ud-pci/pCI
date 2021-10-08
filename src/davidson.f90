@@ -7,7 +7,7 @@ Module davidson
 
     Private
 
-    Public :: Init4, Hould, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J, Vread, VWrite
+    Public :: Init4, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
 
   Contains
     
@@ -52,198 +52,6 @@ Module davidson
                                 MPI_COMM_WORLD, mpierr)
 
     End Subroutine Init4
-
-    Subroutine Hould(n,Ee,Dd,Zz,ifail)
-        ! This subroutine diagonalizes the matrix Zz using 
-        ! Householder's method of diagonalization.
-        ! n-dimension of matrix Zz
-        ! Ee-work vector
-        ! Dd-array of eigenvalues
-        ! Zz-matrix of eigenvectors
-        ! ifail-error status
-        ! eps-criteria of diagonalization
-        Implicit None
-        Integer, Intent(In) :: n
-        Integer, Intent(Out) :: ifail
-        Real(dp), dimension(:), allocatable, Intent(InOut) :: Ee, Dd
-        Real(dp), dimension(:,:), allocatable, Intent(InOut) :: Zz
-
-        Integer :: ii, k, j, l, i, jj, m1, im, im1, li, k1, l1
-        Real(dp) :: tol, f, g, b, r, em, h, hh, c, ei, s, p, di, eps
-
-
-        ifail=0
-        tol=2.0d0**(-1021) !-103 or -1021
-        eps=2.0d0**(-53) ! -24 or -53
-        If (n > 1) Then
-            Do ii=2,n
-                i=n-ii+2
-                l=i-2
-                f=Zz(i,i-1)
-                g=0.0d0
-                If (l > 0) Then
-                    Do k=1,l
-                        g=g+Zz(i,k)**2
-                    End Do
-                End If
-                h=f**2+g
-                If (g < tol) Then
-                    Ee(i)=f
-                    h=0.0d0
-                    Dd(i)=h
-                    Cycle
-                End If
-                l=l+1
-                g=-dsign(dsqrt(h),f)
-                Ee(i)=g
-                h=h-f*g
-                Zz(i,i-1)=f-g
-                f=0.0d0
-                Do j=1,l
-                    Zz(j,i)=Zz(i,j)/h
-                    g=0.0d0
-                    Do k=1,j
-                        g=g+Zz(j,k)*Zz(i,k)
-                    End Do
-                    k1=j+1
-                    If (k1 <= l) Then
-                        Do k=k1,l
-                            g=g+Zz(k,j)*Zz(i,k)
-                        End Do
-                    End If
-                    ee(j)=g/h
-                    f=f+g*Zz(j,i)
-                End Do
-                hh=f/(h+h)
-                Do j=1,l
-                    f=Zz(i,j)
-                    g=Ee(j)-hh*f
-                    Ee(j)=g
-                    Zz(j,1:j)=Zz(j,1:j)-f*Ee(1:j)-g*Zz(i,1:j)
-                End Do
-                Dd(i)=h
-            End Do
-        End If
-
-        Dd(1)=0.0d0
-        Ee(1)=0.0d0
-        Do i=1,n
-            l=i-1
-            If (Dd(i) /= 0.0d0 .and. l /= 0) Then
-                 Do j=1,l
-                     g=0.0d0
-                     Do k=1,l
-                         g=g+Zz(i,k)*Zz(k,j)
-                     End Do
-                     Zz(1:l,j)=Zz(1:l,j)-g*Zz(1:l,i)
-                 End Do
-            End If
-            Dd(i)=Zz(i,i)
-            Zz(i,i)=1.0d0
-            If (l /= 0) Then
-                Zz(i,1:l)=0.0d0
-                Zz(1:l,i)=0.0d0
-            End If
-         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! p matrix is formed
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (n /= 1) Then
-            Ee(1:n-1)=Ee(2:n)
-        End If
-        Ee(n)=0.0d0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! triadigonalisation is finished
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        b=0.0d0
-        f=0.0d0
-        Do l=1,n
-            jj=0
-            h=(dabs(Dd(l))+dabs(Ee(l)))*eps
-            If (b < h) b=h
-            Do m1=l,n
-                m=m1
-                em=dabs(Ee(m))
-                If (em <= b) Exit
-            End Do
-            If (m /= l) Then
-                Do while (dabs(Ee(l)) > b)
-                    If (jj == 30) Then
-                        ifail=1
-                        Return
-                    End If
-                    jj=jj+1
-                    g=Dd(l)
-                    p=(Dd(l+1)-g)/Ee(l)*0.5d0
-                    r=dsqrt(p**2+1.0d0)
-                    em=p+dsign(r,p)
-                    Dd(l)=Ee(l)/em
-                    h=g-Dd(l)
-                    l1=l+1
-                    Dd(l1:n)=Dd(l1:n)-h
-                    f=f+h
-                    p=Dd(m)
-                    c=1.0d0
-                    s=0.0d0
-                    im1=m-1
-                    If (im1 >= l) Then
-                        Do im=l,im1
-                            i=im1+l-im
-                            ei=Ee(i)
-                            g=c*ei
-                            h=c*p
-                            If (dabs(p) >= dabs(ei)) Then
-                                c=ei/p
-                                r=dsqrt(c**2+1.0d0)
-                                Ee(i+1)=s*p*r
-                                s=c/r
-                                c=1.0d0/r
-                            Else
-                                c=p/ei
-                                r=dsqrt(c**2+1.0d0)
-                                Ee(i+1)=s*ei*r
-                                s=1.0d0/r
-                                c=c/r
-                            End If
-                            di=Dd(i)
-                            p=c*di-s*g
-                            Dd(i+1)=h+s*(c*g+s*di)
-                            Do k=1,n
-                                h=Zz(k,i+1)
-                                ei=Zz(k,i)
-                                Zz(k,i+1)=s*ei+c*h
-                                Zz(k,i)=c*ei-s*h
-                            End Do
-                        End Do
-                    End If
-                    Ee(l)=s*p
-                    Dd(l)=c*p
-                End Do
-            End If
-            Dd(l)=Dd(l)+f
-        End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! eigenvalues in Dd; eigenvectors in Zz
-        ! ordering of Dd and Zz
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        i=0
-        Do while (i < n)
-            i=i+1
-            If (i >= n) Return
-            h=Dd(i)
-            f=Dd(i+1)
-            If (h <= f) Cycle
-            Dd(i)=f
-            Dd(i+1)=h
-            Do k=1,n
-                h=Zz(k,i)
-                Zz(k,i)=Zz(k,i+1)
-                Zz(k,i+1)=h
-            End Do
-            If (i /= 1) i=i-2
-        End Do
-        Return
-    End Subroutine Hould
 
     Subroutine FormB0(mype,npes)
         ! This subroutine constructs the initial eigenvectors for the Davidson iteration
@@ -422,37 +230,35 @@ Module davidson
         Return
     End Subroutine FormP
     
-    Subroutine AvgDiag(iter)
+    Subroutine AvgDiag
         ! This subroutine averages the diagonal over configurations
         Implicit None
 
-        Integer :: iter, ic, id, id0, id1, id2
+        Integer :: ic, id, id0, id1, id2
         Real(dp) :: ss
-        Logical :: lsym
 
-        lsym=K_prj == 1
-        If (iter == 1 .and. lsym) Then
-          id0=1
-          Do ic=1,Nc
+        id0=1
+        Do ic=1,Nc
             id1=Ndc(ic)
             id2=id0+id1-1
             If (id1 > 0) Then
-              ss=0.d0
-              Do id=id0,id2
-                ss=ss+Diag(id)
-              End Do
-              ss=ss/id1
-              Diag(id0:id2)=ss
-              id0=id0+id1
+                ss=0.d0
+                Do id=id0,id2
+                    ss=ss+Diag(id)
+                End Do
+                ss=ss/id1
+                Diag(id0:id2)=ss
+                id0=id0+id1
             End If
-          End Do
-          If (id2 == Nd) Then
+        End Do
+
+        If (id2 == Nd) Then
             Write(*,*) ' Diagonal averaged over rel. configurations'
-          Else
+        Else
             Write(*,*) ' Error: id2=',id2,' Nc=',Nc
             Stop
-          End If
-        End If 
+        End If
+
     End Subroutine AvgDiag
 
     Subroutine Dvdsn (j, cnx)
@@ -551,7 +357,7 @@ Module davidson
             kd=1
         End If
 
-        Do i=1,nlp ! 
+        Do i=1,nlp 
             Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
 
@@ -584,7 +390,7 @@ Module davidson
             Else
                 Call MPI_Reduce(Diag(1:Nd), Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, & 
                                 MPI_COMM_WORLD, mpierr)
-            End If   
+            End If 
         End If
         Return
     End Subroutine Mxmpy
@@ -609,7 +415,7 @@ Module davidson
 
         ! Orthogonalization of J-th vector
         it=0
-        do
+        Do
             it=it+1
             smax1=0.d0
             Do l=1,jm
@@ -764,25 +570,5 @@ Module davidson
         End If
         Return
     End Subroutine Prj_J
-
-    Subroutine Vread (b,j)
-        ! This subroutine reads eigenvector j from ArrB(:,j)
-        Implicit None
-        Integer :: i, j
-        Real(dp), dimension(Nd) :: b
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        b(1:Nd)=ArrB(1:Nd,j)
-        Return
-    End Subroutine Vread
-
-    Subroutine VWrite (b,j)
-        ! This subroutine writes eigenvector j to ArrB(:,j)
-        Implicit None
-        Integer :: i, j
-        Real(dp), dimension(Nd) :: b
-        !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        ArrB(1:Nd,j)=b(1:Nd)
-        Return
-    End Subroutine VWrite
     
 End Module davidson
