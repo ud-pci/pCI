@@ -13,6 +13,44 @@ Module matrix_io
 
   Contains
 
+    Subroutine MPIErrHandle(mpierr)
+        Use mpi
+        Implicit None
+        Integer, Intent(In) :: mpierr
+
+        Select Case(mpierr)
+        Case(MPI_ERR_BUFFER)
+            Print*, 'Invalid buffer pointer'
+            Stop
+        Case(MPI_ERR_COUNT)
+            Print*, 'Invalid count argument'
+            Stop
+        Case(MPI_ERR_TYPE)
+            Print*, 'Invalid datatype argument'
+            Stop
+        Case(MPI_ERR_FILE)
+            Print*, 'Invalid file handle'
+            Stop
+        Case(MPI_ERR_NO_SUCH_FILE)
+            Print*, 'File does not exist'
+            Stop
+        Case(MPI_ERR_FILE_EXISTS)
+            Print*, 'File exists'
+            Stop
+        Case(MPI_ERR_ACCESS)
+            Print*, 'Permission denied'
+            Stop
+        Case(MPI_ERR_NO_SPACE)
+            Print*, 'Not enough space on disk'
+            Stop
+        Case(MPI_ERR_QUOTA)
+            Print*, 'Quota exceeded'
+            Stop
+        Case(MPI_SUCCESS)
+            Continue
+        End Select
+    End Subroutine
+
     Subroutine WriteMatrix(mat,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
         !
         ! This subroutine writes a parallel file
@@ -58,29 +96,39 @@ Module matrix_io
     
         ! Open file
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Write number of matrix elements
         disp = mype * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
+        Call MPIErrHandle(mpierr)
         Call MPI_FILE_WRITE(fh, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Write mat%n
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
+        Call MPIErrHandle(mpierr)
         Call MPI_FILE_WRITE(fh, mat%n, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Write mat%k
         disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
+        Call MPIErrHandle(mpierr)
         Call MPI_FILE_WRITE(fh, mat%k, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Write mat%t
         disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
+        Call MPIErrHandle(mpierr)
         Call MPI_FILE_WRITE(fh, mat%t, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
-        
+        Call MPIErrHandle(mpierr)
+
         ! Close file
         Call MPI_FILE_CLOSE(fh, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Print time to write file
         If (mype == 0) Then
@@ -109,6 +157,7 @@ Module matrix_io
         Character(Len=16)                               :: timeStr
 
         Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, fh, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         If (mype == 0) then
             ! Stop program if file does not exist
@@ -133,6 +182,7 @@ Module matrix_io
         ! Read counters
         disp = mype * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
+        Call MPIErrHandle(mpierr)
 
         sizes=0
         Call MPI_AllGather(num_elements_per_core, 1, MPI_INTEGER, sizes, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
@@ -160,17 +210,21 @@ Module matrix_io
         ! Read first indices of matrix elements mat%n
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%n, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Read second indices of matrix elements mat%k
         disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%k, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Read values of matrix element mat%t
         disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, mat%t, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Close file
         Call MPI_FILE_CLOSE(fh, mpierr) 
+        Call MPIErrHandle(mpierr)
 
         ! Print time to write file
         If (mype == 0) Then

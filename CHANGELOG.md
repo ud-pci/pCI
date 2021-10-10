@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.28] - 2021-10-10
+- conf v0.3.28 - added mpi error handling for WriteMatrix and ReadMatrix subroutines
+
 ## [0.7.27] - 2021-10-08
 - cleaned up dead code in some conf subroutines
 
