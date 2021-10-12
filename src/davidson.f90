@@ -28,8 +28,8 @@ Module davidson
 
         If (mype == 0) Then
             strfmt = '(3X,"Starting approx. includes ",I5," conf.,",I6," det.")'
-            Write( 6,strfmt) Nc4,Nd0
-            Write(11,strfmt) Nc4,Nd0
+            Write( 6,strfmt) Nc1,Nd0
+            Write(11,strfmt) Nc1,Nd0
         End If
 
         ! Construct the Hamilonian in the initial approximation

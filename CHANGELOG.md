@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.29] - 2021-10-12
+- conf v0.3.29 - fixed print message for number of conf-s in starting approximation
+
 ## [0.7.28] - 2021-10-10
 - conf v0.3.28 - added mpi error handling for WriteMatrix and ReadMatrix subroutines
 

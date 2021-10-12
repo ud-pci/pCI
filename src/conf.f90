@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.28")'
+        strfmt = '(4X,"Program conf v0.3.29")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -834,7 +834,7 @@ Contains
 
         Call startTimer(stot)
         Call InitFormH(npes,mype) 
-        Call calcNd0(ic1, Nd0)
+        Call calcNd0(Nc1, Nd0)
 
         If (mype == 0) Then
             If (Ksig == 2) Write(*,*) 'Screening is included'
@@ -1405,7 +1405,7 @@ Contains
                     ! Average initial diagonal over relativistic configurations if projecting J
                     If (it == 1 .and. K_prj == 1) Call AvgDiag
                     
-                    ! Formation of Nlv additional probe vectors:
+                    ! Formation of Nlv additional probe vectors
                     cnx=0.d0
                     Do i=1,Nlv
                         i1=i+Nlv
