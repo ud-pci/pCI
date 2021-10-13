@@ -44,7 +44,13 @@ Module davidson
                 Z1(n,k)=t
                 Z1(k,n)=t
             Else
-                Cycle
+                ! If Kl=1, matrix elements will be spread among num_cores instead of num_cores-1,
+                ! so we must ensure that all determinants below Nd0 are accounted for
+                If (Kl == 1) Then
+                    Cycle
+                Else
+                    Exit
+                End If
             End If
         End Do
 

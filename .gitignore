@@ -24,4 +24,4 @@ test/
 
 # vscode
 .vscode
-.code-workspace
+*.code-workspace

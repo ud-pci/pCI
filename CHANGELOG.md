@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.30] - 2021-10-12
+- conf v0.3.30 - added conditional to optimize construction of initial approximation depending on Kl
+
 ## [0.7.29] - 2021-10-12
 - conf v0.3.29 - fixed print message for number of conf-s in starting approximation
 
