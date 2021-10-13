@@ -1418,7 +1418,6 @@ Module ine_aux
                 c2=c2+YY2(i)*XXn(i)
             End Do
             if (Klf.EQ.4) c2=c2/(E-E2)     !### V-gauge for E1
-            testwigner=777
             if (Kli.NE.1) then             !### transformation to reduced ME
                 k=tj-Jm+1.d-1
                 is=1

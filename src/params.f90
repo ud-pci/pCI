@@ -38,7 +38,7 @@ Module params
     
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj
-    Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, testwigner
+    Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel
     Real(dp) :: Z, H, Jm, Gj, gnuc, Rnuc, Qnuc, Cut0, Crt4, C_is, Am
 
     ! Global arrays

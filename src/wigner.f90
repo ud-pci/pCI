@@ -22,8 +22,6 @@ Module wigner
       Real(dp), Dimension(3)   :: Y, Z
       Integer, Dimension(3)    :: MA, NA
 
-      !if (testwigner == 777) print*,'A',A1,A2,A3,A4,A5,A6,A1+A2,A2-A3,A1-A3,&
-      !                      A1+A2-A3,dABS(A4+A5+A6),dABS(A4+A5+A6)-0.0001_dp
       IF(dABS(A4+A5+A6)-0.0001_dp) 20,2,2
 20    X(1)=A1+A2-A3
       X(2)=A1-A2+A3
@@ -36,16 +34,7 @@ Module wigner
       X(9)=A3-A6
       EPS=0.0001_dp
       X=ANINT(X*100.0)/100.0
-      !Do i=1,9
-      !  If (X(i)<EPS) X(i)=0.0_dp
-      !End Do
-      !if (testwigner == 777) print*,'A',A1,A2,A3,A4,A5,A6
-      !if (testwigner == 777) print*,'X',X
-      !if (testwigner == 777) X(1)=0.0_dp
-      !if (testwigner == 777) X(2)=0.0_dp
-      !if (testwigner == 777) X(9)=0.0_dp
       DO 1 K=1,9
-        !if (testwigner == 777) print*,'K',K
       IF(X(K)) 2,3,3
 3     LU(K)=X(K)
       IF(dABS(LU(K)-X(K))-EPS) 1,2,2
@@ -91,7 +80,6 @@ Module wigner
       KM=MA(1)-NA(3)+1
       DO 14 KU=1,KM
       K=NA(3)+KU-1
-      !if (testwigner == 777) print*,'K',NA(3),KU
       ALL=0._dp
       CALL NGFJ(-1,0,MA(1)-K)
       CALL NGFJ(-1,MA(2)-MA(1),MA(2)-K)
@@ -100,11 +88,9 @@ Module wigner
       CALL NGFJ(-1,NA(3)-NA(1),K-NA(1))
       CALL NGFJ(-1,NA(3)-NA(2),K-NA(2))
       L=K+A1-A2-A6
-      !if (testwigner == 777) print*,'L',L,K,A1,A2,A6
 14    FJ3=FJ3+(-1)**L*dEXP(ALL)
       FJ3=dEXP(UN)*FJ3
 5     CONTINUE
-      !if (testwigner == 777) print*,'wig',FJ3,L,K,dEXP(ALL),ALL,dEXP(UN)
       RETURN
     End Function FJ3
 

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.33] - 2021-10-13
+- removed dead code 'testwigner' used for testing from ine
+
 ## [0.7.32] - 2021-10-13
 - global change: replaced parameter IPgnt with global variable Ngaunt read in from CONF.GNT
 - basc v2.1 - number of tabulated gaunts Ngaunt is now written to CONF.GNT and read in by subsequent codes
