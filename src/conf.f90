@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.32")'
+        strfmt = '(4X,"Program conf v3.33")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1446,9 +1446,8 @@ Contains
                         End Do
                     End If
                 End If
+
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-
-
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
                     Call Mxmpy(2, mype, npes)
@@ -1474,23 +1473,34 @@ Contains
                             Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
                             Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
                         End Do
-                        If (kXIJ > 0) Then ! Write intermediate CONF.XIJ
-                            If (mod(it, kXIJ) == 0) Then
-                                Call FormB
-                            Else
-                                Call FormBskip
-                            End If
+                    End If
+
+                    ! Write intermediate CONF.XIJ in frequency of kXIJ
+                    If (kXIJ > 0) Then
+                        ! Only write each kXIJ iteration
+                        If (mod(it, kXIJ) == 0) Then 
+                            ! Calculate J for each energy level
+                            Do n=1,Nlv
+                                Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                                Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
+                            End Do
+                            If (mype == 0) Call FormB
                         Else
-                            Call FormBskip
+                            If (mype == 0) Call FormBskip
                         End If
+                    ! Else skip writing intermediate CONF.XIJ
+                    Else
+                        Call FormBskip
                     End If
                     Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                
+                ! Davidson procedure is converged - write message and exit loop
                 Else
                     If (mype == 0) Then
                         strfmt = '(" Davidson procedure converged")'
                         Write( 6,strfmt)
                         Write(11,strfmt)
-                        ! Assign values of Tk for case when Davidson procedure is already converged 
+                        ! Assign energies to array Tk for case when Davidson procedure is already converged 
                         If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
                     If (allocated(W)) Deallocate(W)
