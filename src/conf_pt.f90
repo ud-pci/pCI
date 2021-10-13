@@ -97,7 +97,7 @@ Contains
         Character(Len=512) :: strfmt
 
         ! Write name of program
-        strfmt = '(/4X,"Program CONF_PT", &
+        strfmt = '(/4X,"Program CONF_PT v2.1", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
@@ -330,8 +330,11 @@ Contains
         Write(11,'(" HF energies are Read from DAT file", /5(I5,F10.6))') (i,Eps(i),i=Nso+1,Nsu)
         Close(unit=12)
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        Read(16) (In(i),i=1,IPgnt)
-        Read(16) (Gnt(i),i=1,IPgnt)
+        Read(16) Ngaunt
+        Allocate(In(Ngaunt))
+        Allocate(Gnt(Ngaunt))
+        Read(16) (In(i),i=1,Ngaunt)
+        Read(16) (Gnt(i),i=1,Ngaunt)
         Close(unit=16)
 
     End Subroutine Init
@@ -345,6 +348,7 @@ Contains
         Call MPI_Bcast(Am, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jm, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -393,6 +397,8 @@ Contains
         If (.not. allocated(Ndcnr)) allocate(Ndcnr(Nc))
         If (.not. allocated(Jz)) allocate(Jz(Nst))
         If (.not. allocated(Nh)) allocate(Nh(Nst))
+        If (.not. Allocated(In)) Allocate(In(Ngaunt))
+        If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. allocated(Diag)) allocate(Diag(Nd))
         If (.not. allocated(Rint1)) allocate(Rint1(Nhint))
         If (.not. allocated(Iint1)) allocate(Iint1(Nhint))
@@ -434,8 +440,8 @@ Contains
         Do i=1,Ne
             Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End Do
-        Call MPI_Bcast(In, IPgnt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gnt, IPgnt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 

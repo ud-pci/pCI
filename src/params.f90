@@ -29,7 +29,6 @@ Module params
     Integer, Parameter :: IPjd  =     33         ! Njd - number of possible J's   
     Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
     Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for direct diagonalization   
-    Integer, Parameter :: IPgnt =   2891         ! Ngaunt - number of tabulated Gaunts
     Integer, Parameter :: IPbr  =      2         ! 1 - no valence Breit, 2 - valence Breit/Gaunt  
 
     ! defining parameters which determine dimensions of main arrays in hfd
@@ -38,7 +37,7 @@ Module params
                                                  ! =1 if word=4B (Alpha-processor)   
     
     ! Global variables 
-    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, M, Mj
+    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, testwigner
     Real(dp) :: Z, H, Jm, Gj, gnuc, Rnuc, Qnuc, Cut0, Crt4, C_is, Am
 

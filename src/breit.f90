@@ -10,16 +10,53 @@ Module breit
 
   Contains
 
+    Integer Function calcNumGaunts(IPlx)
+        Implicit None
+        Integer, Intent(In) :: IPlx ! max(l)
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i
+        Real(dp) :: J1,M1,J2,M2, x
+
+        l=0
+        lx=IPlx+1            !### = max(l)
+        jx=2*lx-1            !### = max(2j)
+        Do ij1=1,lx
+            j1=ij1-0.5
+            Do ij2=ij1,lx
+                j2=ij2-0.5
+                jj2=2*ij2
+                kmin=ij2-ij1+1
+                kmax=ij1+ij2
+                If (kmin < 2) kmin=2
+                If (kmax < kmin) Cycle
+                Do kk=kmin,kmax
+                    k=kk-1
+                    Do im1=1,ij1
+                        m1=im1-0.5
+                        Do im2=1,jj2
+                            m2=im2-j2-1
+                            mk=(m2-m1)
+                            If(iabs(mk) > k) Cycle
+                            l=l+1
+                        End Do
+                    End Do
+                End Do
+            End Do
+        End Do
+        calcNumGaunts = l
+    End Function calcNumGaunts
+
     Subroutine Gaunt
         Use wigner
         Implicit None
 
-        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, IPlx
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, IPlx, Ngaunt
         Real(dp) :: J1,M1,J2,M2, x
 
-        Open (unit=12,file='CONF.GNT',status='UNKNOWN',form='unformatted')
+        IPlx = 5                           ! max(l)
+        Ngaunt = calcNumGaunts(IPlx)       ! number of tabulated Gaunts
 
-        IPlx = 5            ! max(l)
+        Allocate(In(Ngaunt))
+        Allocate(Gnt(Ngaunt))
 
         l=0
         lx=IPlx+1            !### = max(l)
@@ -52,14 +89,14 @@ Module breit
                 End Do
             End Do
         End Do
-        If (l.NE.IPgnt) Then
-           Write (*,*) ' number of gaunts ',l,' NE IPgnt'
-           Stop
-        End If
-        Write(12) (in(i),i=1,l)
-        Write(12) (gnt(i),i=1,l)
 
+        Open (unit=12,file='CONF.GNT',status='UNKNOWN',form='unformatted')
+        Write(12) Ngaunt
+        Write(12) (in(i),i=1,Ngaunt)
+        Write(12) (gnt(i),i=1,Ngaunt)
         Close(unit=12)
+
+        Deallocate(In, Gnt)
 
         Return
     End Subroutine Gaunt

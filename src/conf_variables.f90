@@ -19,16 +19,14 @@ Module conf_variables
     Integer(Kind=Int64) :: memTotalPerCPU=0_int64, memDvdsn=0_int64, memFormH=0_int64, memStaticArrays=0_int64, memEstimate=0_int64
     Real(dp)            :: Ecore=0_dp, Hmin=0_dp, XJ_av, dR_N, E_k, xscr=0_dp, K_gnt, E_0
 
-    Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2
+    Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2, In
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real,     Allocatable, Dimension(:,:)  :: Rint2
-    Real(dp), Allocatable, Dimension(:)    :: Rint1, Tk, Tj, Tl, Ts, Diag, D, E
+    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tk, Tj, Tl, Ts, Diag, D, E
     Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W
 
-    Integer,  Dimension(IPgnt) :: In
     Real(dp), Dimension(IPs)   :: Eps
-    Real(dp), Dimension(IPgnt) :: Gnt
     Real(dp), Dimension(IP1)   :: C
 
     Type Matrix

@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.32] - 2021-10-13
+- global change: replaced parameter IPgnt with global variable Ngaunt read in from CONF.GNT
+- basc v2.1 - number of tabulated gaunts Ngaunt is now written to CONF.GNT and read in by subsequent codes
+- conf v3.32 - reads in Ngaunt from CONF.GNT
+- conf_lsj v2.2 - reads in Ngaunt from CONF.GNT
+- conf_pt v2.1 - reads in Ngaunt from CONF.GNT
+
 ## [0.7.31] - 2021-10-12
 - conf v0.3.31 - moved Bcast of ax to end of loop
 

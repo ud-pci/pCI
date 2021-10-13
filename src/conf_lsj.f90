@@ -74,7 +74,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v0.2.1")'
+        strfmt = '(4X,"Program conf_lsj v2.2")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -88,8 +88,11 @@ Contains
         Call ReadConfigurations
 
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        Read(16) (In(i),i=1,IPgnt)
-        Read(16) (Gnt(i),i=1,IPgnt)
+        Read(16) Ngaunt
+        Allocate(In(Ngaunt))
+        Allocate(Gnt(Ngaunt))
+        Read(16) (In(i),i=1,Ngaunt)
+        Read(16) (Gnt(i),i=1,Ngaunt)
         Close(unit=16)
         Return
     End Subroutine Input
@@ -344,6 +347,7 @@ Contains
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -357,6 +361,8 @@ Contains
         If (.not. Allocated(Nh)) Allocate(Nh(Nst))
         If (.not. Allocated(Nh0)) Allocate(Nh0(Nst))
         If (.not. Allocated(Diag)) Allocate(Diag(Nd))
+        If (.not. Allocated(In)) Allocate(In(Ngaunt))
+        If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
         If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
         If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
@@ -427,9 +433,9 @@ Contains
         Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Eps(1:IPs), IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(In(1:IPgnt), IPgnt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In(1:Ngaunt), Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gnt(1:IPgnt), IPgnt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt(1:Ngaunt), Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh0(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)

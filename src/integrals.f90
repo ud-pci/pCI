@@ -586,7 +586,7 @@ Module integrals
         Implicit None
         Integer  :: i, is, ind, ib1, ib2, im, k, ij, IPlx
         Real(dp)   :: g, x, xj1, xj2, xm1, xm2, j1, j2, m1, m2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         IPlx = 5 ! max l
         j1=xj1
         j2=xj2
@@ -621,7 +621,7 @@ Module integrals
                 ib1=2*IPlx+1
                 ib2=ib1*ib1
                 ind = ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2)
-                Do i=1,IPgnt
+                Do i=1,Ngaunt
                    If(In(i) == ind) Then
                       g = Gnt(i)
                       gaunt = g*is
