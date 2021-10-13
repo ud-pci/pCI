@@ -133,7 +133,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v0.3.30")'
+        strfmt = '(4X,"Program conf v0.3.31")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1378,8 +1378,7 @@ Contains
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
 
         Do it=1,N_it
-            Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            ! Compare lowest admixture of an unconverged vector to convergence criteria
             If (ax > crit) Then
                 If (mype == 0) Then
                     strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
@@ -1442,6 +1441,8 @@ Contains
                     End If
                 End If
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
                     Call Mxmpy(2, mype, npes)
@@ -1477,6 +1478,7 @@ Contains
                             Call FormBskip
                         End If
                     End If
+                    Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 Else
                     If (mype == 0) Then
                         strfmt = '(" Davidson procedure converged")'

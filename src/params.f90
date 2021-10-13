@@ -27,7 +27,7 @@ Module params
     !                     Array dimension          Associated variable
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
     Integer, Parameter :: IPjd  =     33         ! Njd - number of possible J's   
-    Integer, Parameter :: IPx   =    400         ! Nx - used for indexation of integrals   
+    Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
     Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for direct diagonalization   
     Integer, Parameter :: IPgnt =   2891         ! Ngaunt - number of tabulated Gaunts
     Integer, Parameter :: IPbr  =      2         ! 1 - no valence Breit, 2 - valence Breit/Gaunt  
