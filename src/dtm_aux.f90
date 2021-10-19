@@ -89,14 +89,14 @@ Module dtm_aux
         Select Case(Kl1)
             Case(1) ! regime of Density matrix & expectation values
                 Read (99,*) nterm1, nterm2
-                strfmt = '(/4X,"Program DTM: Density matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program DTM v2.1: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('DM.RES',0,11,1)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
                 Read (99,*) nterm1, nterm2, nterm2f
-                strfmt = '(/4X,"Program DTM: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program DTM v2.1: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
@@ -108,14 +108,15 @@ Module dtm_aux
         Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         If ((Kl1-1)*(Kl1-2) /= 0) Stop
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Trd=1.d-10
         Kdm=0
         K_M1=2
-        Kl=Kout                    !# Kl is used in DTM instead of Kout
 
         call ReadConfInp
         call ReadConfigurations
+
+        Kl=Kout                    !# Kl is used in DTM instead of Kout
 
         If (Am < 1.d0) Then
             Write(6,*) ' Give nuclear parameter A: '

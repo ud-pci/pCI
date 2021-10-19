@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.35] - 2021-10-19
+- dtm v2.1 - bug fix for Kout /= 0
+
 ## [0.7.34] - 2021-10-13
 - conf v3.33 - added calculation of J for energy levels if writing CONF.XIJ file
 
