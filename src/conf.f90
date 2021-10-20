@@ -115,7 +115,8 @@ Program conf
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call PrintEnergies
-
+        Call PrintWeights
+        
         Call stopTimer(start_time, timeStr)
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
@@ -133,7 +134,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.33")'
+        strfmt = '(4X,"Program conf v3.34")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1514,7 +1515,7 @@ Contains
             Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
         End If
 
-        Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, E, B1, B2, Z1, E1)
+        Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, B1, B2, Z1, E1)
 
         Return
     End Subroutine Diag4
@@ -1541,140 +1542,145 @@ Contains
             End If
         End Do
 
-        Deallocate(ArrB, Tk, Tj, Iconverge)
+        Deallocate(Iconverge)
 
-        If (mype==0) close(unit=17)
+        If (mype==0) Then
+            Print*, 'Final CONF.XIJ has been written'
+            close(unit=17)
+        End If
 
         Return
     End Subroutine WriteFinalXIJ
 
     Subroutine PrintEnergies
+        ! This subroutine prints eigenvalues in increasing order
         Implicit None
 
-        Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
-                   j3
-        real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
-        real(dp), allocatable, dimension(:)  :: Cc, Dd, Er
-        Character(Len=1), dimension(11) :: st1, st2 
-        Character(Len=1), dimension(10)  :: stecp*7
-        Character(Len=1), dimension(2)  :: st3*3
+        Integer :: nk, k, n, ndk, ic, i, j, idum, ist, jmax, imax
+        real(dp) :: cutoff, xj, dt, del, dummy, wmx, D
+        Character(Len=1), dimension(10) :: stecp*7
         Character(Len=1), dimension(4)  :: strsms*6
         Character(Len=1), dimension(3)  :: strms*3
-        data st1/11*'='/,st2/11*'-'/,st3/' NO','YES'/
+        Character(Len=512) :: strfmt
         data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
                    'GAUNT  ','G+MBPT1','G+MBPT2', &
                    'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
 
-        Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv), Er(Nlv))
-        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
+        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is used for output
         If (K_is == 3) K_sms=4       !### Used for output
         If (Kecp == 1) ist=7
-        Open(unit=16,file='CONF.XIJ',status='UNKNOWN',form='unformatted')
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! printing eigenvalues in increasing order
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        WRITE( 6,5)
-        WRITE(11,5)
-  5     FORMAT(4X,63('='))
+
+        ! Print line of "=" for top of table
+        strfmt = '(4X,63("="))'
+        Write( 6,strfmt)
+        Write(11,strfmt)
+
+        ! If pure CI, print Nc, Nd, Gj
         If (Ksig*Kdsig == 0) Then
-           WRITE( 6,15) stecp(ist),Nc,Nd,Gj
-           WRITE(11,15) stecp(ist),Nc,Nd,Gj
- 15        FORMAT(4X,'Energy levels (',A7,' Nc=',I6,' Nd=',I9, &
-                 ');  Gj =',F7.4,/4X,'N',6X,'JTOT',12X, &
-                 'EV',16X,'ET',9X,'DEL(CM**-1)')
+            strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
+                        /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
+            Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
+            Write(11,strfmt) stecp(ist),Nc,Nd,Gj
+        ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
         Else
-           WRITE( 6,25) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-           WRITE(11,25) stecp(ist),E_0,Kexn,Nc,Nd,Gj
- 25        FORMAT(4X,'Energy levels ',A7,', Sigma(E =', &
-                 F10.4,') extrapolation var.',I2,/4X,'(Nc=',I6, &
-                 ' Nd=',I9,');  Gj =',F7.4,/4X,'N',6X,'JTOT',12X, &
-                 'EV',16X,'ET',9X,'DEL(CM**-1)')
+            strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
+                    I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
+                    "EV",16X,"ET",9X,"DEL(CM**-1)")'
+            Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
+            Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
         End If
+
         If (C_is /= 0.d0) Then
             If (K_is == 1) Then
-                Write( *,251) C_is,Rnuc
-                Write(11,251) C_is,Rnuc
- 251            format(4X,'Volume shIft: dR_N/R_N=',F9.5,' Rnuc=',F10.7)
+                strfmt = 'format(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
+                Write( *,strfmt) C_is,Rnuc
+                Write(11,strfmt) C_is,Rnuc
             Else
-                Write( *,253) strms(K_is-1),C_is,strsms(K_sms),Klow
-                Write(11,253) strms(K_is-1),C_is,strsms(K_sms),Klow
- 253            format(4X,A3,':',E9.2,'*(P_i Dot P_k) ',A6, &
-                     ' Lower component key =',I2)
+                strfmt = '(4X,A3,":",E9.2,"*(P_i Dot P_k) ",A6," Lower component key =",I2)'
+                Write( *,strfmt) strms(K_is-1),C_is,strsms(K_sms),Klow
+                Write(11,strfmt) strms(K_is-1),C_is,strsms(K_sms),Klow
             End If
         End If
-        Write( 6,255)
-        Write(11,255)
- 255    format(4X,63('-'))
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        JMAX=min(Nlv,Nd)
-        Do J=1,JMAX
-            REWIND (16)
-            IMAX=J-1
-            IF (IMAX < 1) GOTO 250
-            Do I=1,IMAX
-                READ (16)
-            END Do
- 250        READ (16) ER(j),xj,idum,(CC(I),I=1,ND)
-            Er(j)=Er(j)+4.d0*Gj*xj*(xj+1.d0)
-            E=ER(j)
-            DT=E-ECORE
-            ! Rydberg constant is taken from "phys.par"
-            DEL=(ER(1)-ER(J))*2*DPRy
-            WRITE( 6,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,xj,E,DT,DEL
-            WRITE(11,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,xj,E,DT,DEL
+
+        ! Print line of "-" to close header
+        strfmt = '(4X,63("-"))'
+        Write( 6,strfmt)
+        Write(11,strfmt)
+
+        ! For each energy level, print the following:
+        ! j = index for energy level
+        ! Tj(j) = total angular momentum
+        ! Tk(j) = valence energy of jth level
+        ! DT = E-Ecore = total energy
+        ! DEL = E(1)-E(j) = energy difference between jth level and 1st level in cm**-1
+        Do j=1,Nlv
+            Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
+            DT=Tk(j)-Ecore
+            DEL=(Tk(1)-Tk(j))*2*DPRy
+            Write( 6,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+            Write(11,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
         End Do
-        WRITE( 6,45)
-        WRITE(11,45)
- 45     FORMAT(4X,63('='))
-        ! weights of configurations
-        Do J=1,JMAX
-            REWIND (16)
-            IMAX=J-1
-            IF (IMAX < 1) GOTO 270
-            Do I=1,IMAX
-                READ (16)
-            END Do
- 270        READ (16) D,DUMMY,idum,(CC(I),I=1,ND)
-            I=0
-            Do IC=1,NC
-                D=0.d0
-                NDK=NDC(IC)
-                Do K=1,NDK
-                    I=I+1
-                    D=D+CC(I)**2
-                END Do
-                W(IC,J)=D
-            END Do
-        END Do
-        N=(JMAX-1)/5+1
-        J2=0
-        Do 130 K=1,N
-            NK=5
-            IF (K == N) NK=JMAX-(N-1)*5
-            J1=J2+1
-            J2=J2+NK
-            J3=J2+1
-            WRITE(11,65) (ST1,I=J1,J3)
- 65         FORMAT(3X,66A1)
-            WRITE(11,75) (I,I=J1,J2)
- 75         FORMAT(15X,5(3X,I2,6X))
-            WRITE(11,65) (ST2,I=J1,J3)
-            WRITE(11,85) (ER(I),I=J1,J2)
- 85         FORMAT(4X,'ICONF',4X,5F11.5)
-            WRITE(11,65) (ST2,I=J1,J3)
-            Do 140 IC=1,NC
-                I=IC
-                WRITE(11,95) I,(W(I,J),J=J1,J2)
- 95             FORMAT(2X,I6,'      ',5F11.6)
- 140        CONTINUE
-            WRITE(11,65) (ST1,I=J1,J3)
- 130    CONTINUE
-        CLOSE(unit=16)
-        close(unit=6)
-        close(unit=11)
-        Deallocate(Cc, Dd, W, Ndc, Er)
-        RETURN
+
+        ! Print line of "=" for bottom of table
+        strfmt = '(4X,63("="))'
+        Write( 6,strfmt)
+        Write(11,strfmt)
+
     End Subroutine PrintEnergies
+
+    Subroutine PrintWeights
+        ! This subroutine prints the weights of configurations
+        Implicit None
+        Integer :: j, k, j1, j2, j3, ic, i, nk, ndk
+        Real(dp) :: D
+        real(dp), allocatable, dimension(:)  :: C
+        real(dp), allocatable, dimension(:,:)  :: W
+        Character(Len=1), dimension(11) :: st1, st2 
+        Character(Len=1), dimension(2)  :: st3*3
+        Character(Len=512) :: strfmt, strfmt2
+        data st1/11*'='/, st2/11*'-'/, st3/' NO','YES'/
+
+        Allocate(C(Nd), W(Nc,Nlv))
+
+        Do j=1,Nlv
+            C(1:Nd)=ArrB(1:Nd,j)
+            i=0
+            Do ic=1,Nc
+                d=0.d0
+                ndk=Ndc(ic)
+                Do k=1,ndk
+                    i=i+1
+                    d=d+C(i)**2
+                End Do
+                W(ic,j)=d
+            End Do
+        End Do
+
+        n=(Nlv-1)/5+1
+        j2=0
+        Do k=1,n
+            nk=5
+            If (k == n) nk=Nlv-(n-1)*5
+            j1=j2+1
+            j2=j2+nk
+            j3=j2+1
+            strfmt = '(3X,66A1)'
+            Write(11,strfmt) (st1,i=j1,j3)
+            strfmt2 = '(15X,5(3X,I2,6X))'
+            Write(11,strfmt2) (i,i=j1,j2)
+            Write(11,strfmt) (st2,i=j1,j3)
+            strfmt2 = '(4X,"ICONF",4X,5F11.5)'
+            Write(11,strfmt2) (Tk(i),i=j1,j2)
+            Write(11,strfmt) (st2,i=j1,j3)
+            strfmt2 = '(2X,I6,"      ",5F11.6)'
+            Do ic=1,Nc
+                Write(11,strfmt2) ic,(W(ic,j),j=j1,j2)
+            End Do
+            Write(11,strfmt) (st1,i=j1,j3)
+        End Do
+        Deallocate(C, W, Ndc, Tk, Tj, ArrB)
+    End Subroutine
+
 End Program conf

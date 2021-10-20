@@ -98,8 +98,8 @@ Module davidson
                 Read(17,err=210) dummy,dummy,ndpt
  210            Write(*,*) ' Vector length = ',ndpt
                 Rewind(17)
-                Do J=1,Nlv
-                    Read(17,end=220,err=220) E(J),Tj(J),idum,(B1(i),i=1,ndpt)
+                Do j=1,Nlv
+                    Read(17,end=220,err=220) E(j),Tj(j),idum,(B1(i),i=1,ndpt)
                     num=j
                     ArrB(1:Nd,j)=B1(1:Nd)
                 End Do
@@ -132,7 +132,7 @@ Module davidson
         ! Eigenvectors are not written to CONF.XIJ.
         Implicit None
         Integer :: i, idum, k, l
-        Real(dp) :: t, tjk, ek
+        Real(dp) :: t
 
         ! Eigenvectors obtained by Davidson procedure are not written to CONF.XIJ file
         Do k=1,Nlv
@@ -156,7 +156,7 @@ Module davidson
         ! Eigenvectors are written to CONF.XIJ.
         Implicit None
         Integer :: i, idum, k, l
-        Real(dp) :: t, tjk, ek
+        Real(dp) :: t
 
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
         Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.36] - 2021-10-20
+- conf v3.34 - removed reading of CONF.XIJ from PrintEnergies subroutine
+- moved the printing of weights from PrintEnergies subroutine to a new PrintWeights subroutine
+- cleaned up formatting of PrintEnergies and PrintWeight subroutine
+
 ## [0.7.35] - 2021-10-19
 - dtm v2.1 - bug fix for Kout /= 0
 
