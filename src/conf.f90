@@ -109,9 +109,6 @@ Program conf
     ! Davidson diagonalization
     Call Diag4(mype,npes) 
     
-    ! Write final eigenvectors to file CONF.XIJ
-    Call WriteFinalXIJ(mype,npes)
-
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call PrintEnergies
@@ -826,10 +823,10 @@ Contains
                    n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd, minme, maxme
         logical :: finished
-        Integer, allocatable, dimension(:) :: idet1, idet2, cntarray
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate, numzero=0
-        real :: ttime, ttot
-        real(dp)  :: t, tt
+        Real :: ttime, ttot
+        Real(dp)  :: t, tt
         Integer(Kind=int64) :: statmem, mem, memsum, maxmem, mesplit
         Character(Len=16)     :: memStr, memStr2, memTotStr, memTotStr2, npesStr, counterStr, counterStr2, filename, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
@@ -1149,17 +1146,17 @@ Contains
         Return
     End Subroutine FormH
 
-    real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
+    Real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
         Use formj2, Only : F_J0, F_J2
         Implicit None
-        Integer, allocatable, dimension(:), intent(inout)   :: idet1, idet2
-        Integer, intent(inout)                              :: is, nf, i1, i2, j1, j2
+        Integer, Allocatable, Dimension(:), Intent(InOut)   :: idet1, idet2
+        Integer, Intent(InOut)                              :: is, nf, i1, i2, j1, j2
         
         Integer     :: iq, jq, jq0, k
-        real(dp)    :: t
+        Real(dp)    :: t
         
         t=0.d0
         Select Case(nf)
@@ -1378,8 +1375,6 @@ Contains
             Allocate(W(lwork))
         End If
 
-        If (Nd0 == Nd) Return
-
         ! Davidson loop:
         kdavidson = 0
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
@@ -1393,7 +1388,7 @@ Contains
                     Write(11,strfmt) it,Nlv
                 End if
 
-                ! Orthonormalization of Nlv probe vectors:
+                ! Orthonormalization of Nlv probe vectors
                 If (mype==0) Then
                     Do i=1,Nlv
                         Call Ortn(i,ifail)
@@ -1504,7 +1499,8 @@ Contains
                         ! Assign energies to array Tk for case when Davidson procedure is already converged 
                         If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
-                    If (allocated(W)) Deallocate(W)
+                    ! Write final eigenvalues and eigenvectors to file CONF.XIJ
+                    Call WriteFinalXIJ(mype,npes)
                     Exit
                 End If
             End If
@@ -1515,6 +1511,7 @@ Contains
             Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
         End If
 
+        If (allocated(W)) Deallocate(W)
         Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, B1, B2, Z1, E1)
 
         Return
@@ -1533,7 +1530,7 @@ Contains
         If (mype == 0) Then
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         End If
-
+        
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
@@ -1557,10 +1554,10 @@ Contains
         Implicit None
 
         Integer :: nk, k, n, ndk, ic, i, j, idum, ist, jmax, imax
-        real(dp) :: cutoff, xj, dt, del, dummy, wmx, D
-        Character(Len=1), dimension(10) :: stecp*7
-        Character(Len=1), dimension(4)  :: strsms*6
-        Character(Len=1), dimension(3)  :: strms*3
+        Real(dp) :: cutoff, xj, dt, del, dummy, wmx
+        Character(Len=1), Dimension(10) :: stecp*7
+        Character(Len=1), Dimension(4)  :: strsms*6
+        Character(Len=1), Dimension(3)  :: strms*3
         Character(Len=512) :: strfmt
         data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
                    'GAUNT  ','G+MBPT1','G+MBPT2', &
@@ -1613,8 +1610,8 @@ Contains
         ! j = index for energy level
         ! Tj(j) = total angular momentum
         ! Tk(j) = valence energy of jth level
-        ! DT = E-Ecore = total energy
-        ! DEL = E(1)-E(j) = energy difference between jth level and 1st level in cm**-1
+        ! DT = Tk(j)-Ecore = total energy
+        ! DEL = Tk(1)-Tk(j) = energy difference between jth level and 1st level in cm**-1
         Do j=1,Nlv
             Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
             DT=Tk(j)-Ecore
@@ -1634,30 +1631,31 @@ Contains
         ! This subroutine prints the weights of configurations
         Implicit None
         Integer :: j, k, j1, j2, j3, ic, i, nk, ndk
-        Real(dp) :: D
-        real(dp), allocatable, dimension(:)  :: C
-        real(dp), allocatable, dimension(:,:)  :: W
-        Character(Len=1), dimension(11) :: st1, st2 
-        Character(Len=1), dimension(2)  :: st3*3
+        Real(dp) :: d
+        Real(dp), Allocatable, Dimension(:)  :: C
+        Real(dp), Allocatable, Dimension(:,:)  :: W
+        Character(Len=1), Dimension(11) :: st1, st2 
+        Character(Len=1), Dimension(2)  :: st3*3
         Character(Len=512) :: strfmt, strfmt2
         data st1/11*'='/, st2/11*'-'/, st3/' NO','YES'/
 
         Allocate(C(Nd), W(Nc,Nlv))
 
+        ! Form matrix of weights of each configuration for each energy level
         Do j=1,Nlv
             C(1:Nd)=ArrB(1:Nd,j)
             i=0
             Do ic=1,Nc
-                d=0.d0
+                W(ic,j)=0.d0
                 ndk=Ndc(ic)
                 Do k=1,ndk
                     i=i+1
-                    d=d+C(i)**2
+                    W(ic,j)=W(ic,j)+C(i)**2
                 End Do
-                W(ic,j)=d
             End Do
         End Do
 
+        ! Print the weights of each configuration
         n=(Nlv-1)/5+1
         j2=0
         Do k=1,n
@@ -1681,6 +1679,7 @@ Contains
             Write(11,strfmt) (st1,i=j1,j3)
         End Do
         Deallocate(C, W, Ndc, Tk, Tj, ArrB)
+        Close(11)
     End Subroutine
 
 End Program conf
