@@ -35,7 +35,7 @@ Program basc
         Call Rint0(nsx,nsx2,lsx)
     End If
 
-    Call AllocateRintArrays(nsx,nsx2,lsx,mype,npes)
+    Call AllocateRintArrays(nsx,nsx2,lsx)
     Call Rint(nsx,nsx2,lsx,mype,npes)
 
     If (mype == 0) Then
@@ -90,9 +90,7 @@ Contains
         Implicit None
 
         Integer           :: Ncci, key
-        Character(Len=1)  :: NAME(16),str2(2)*3,str4*5
         Character(Len=32) :: strfmt
-        data str2 /' NO','YES'/
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
@@ -130,7 +128,7 @@ Contains
 
         Integer :: i, i0, ic, imax, j, n, n0, ni, nmin, nsmax, nsmax1, If
         Integer :: nsb, kkj, llj, jjj, nj, ng, nnj, err_stat
-        Real(dp) :: c1, c2, r1, a2, z1, d
+        Real(dp) :: c1, c2, r1, z1, d
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IP6) ::  P, Q, P1, Q1
         Real(dp), Dimension(4*IP6) :: PQ
@@ -370,7 +368,7 @@ Contains
         Integer :: ih, i, nigd, irr, ni, na, la, ja, ir, ir1, ir2, ir3, ir4, igm, m, m1, im
         Integer :: ik, nj, k, nb, lb, jb, k1, ip, kmin, kmax
         Real(dp) :: hh, Hcore, err1, err2, qa, t, r1, gm, dgm, cpp, cqq, qb, s, d, xk, xja, xjb, ds, yy
-        Real(dp), Dimension(IP6) :: A, B, CP, CQ, CC, Y
+        Real(dp), Dimension(IP6) :: A, B, CP, CQ, Y
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
@@ -559,8 +557,7 @@ Contains
         ! This subroutine counts the number of radial integrals
         Implicit None
         Integer, Intent(Out) :: nsx, nsx2, lsx ! nsx and lsx are used to eliminate integrals:
-        Integer :: ngint2=0, i, is, nmin, n0, na, nb, nc, nd, la, lb, lc, ld
-        Integer :: ja, jb, jc, jd, n1, n2, n3, n4, iis, kmin, kmax, k1, k, ierr
+        Integer :: ngint2=0, i, is, nmin
         Character(Len=128) :: strfmt
 
         nsx=0
@@ -585,7 +582,7 @@ Contains
             nmin=Nso+1
 
             ! counting of one-electron integrals
-            Call countNhint(nmin,nsx,nhint)
+            Call countNhint(nmin,nhint)
 
             ! counting of two-electron integrals R(K;NA,NB,NC,ND)
             If (Ne > 1) then
@@ -653,10 +650,10 @@ Contains
         Return
     End Subroutine Nxt_to_max
 
-    Subroutine AllocateRintArrays(nsx,nsx2,lsx,mype,npes)
+    Subroutine AllocateRintArrays(nsx,nsx2,lsx)
         Use mpi
         Implicit None
-        Integer, Intent(InOut) :: nsx, nsx2, lsx, mype, npes
+        Integer, Intent(InOut) :: nsx, nsx2, lsx
         
         Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -684,11 +681,10 @@ Contains
 
     End Subroutine AllocateRintArrays
 
-    Subroutine AllocateRint2Arrays(mype,npes)
+    Subroutine AllocateRint2Arrays
         Use mpi
         Use readfff, Only : ArrP, ArrQ
         Implicit None
-        Integer, Intent(InOut) :: mype, npes
         
         Call MPI_Bcast(ii, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(kt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -708,9 +704,9 @@ Contains
 
     End Subroutine AllocateRint2Arrays
 
-    Subroutine countNhint(nmin,End,nhint)
+    Subroutine countNhint(nmin,nhint)
         Implicit None
-        Integer, Intent(In) :: nmin, End
+        Integer, Intent(In) :: nmin
         Integer, Intent(Out) :: nhint
 
         Integer :: na, nb
@@ -802,7 +798,7 @@ Contains
         Integer :: nsx2, kmin, kmax, k, k1, lc, ld, ja, jb, jc, jd, Iab, nm_br
         Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, ngint2
         Real(dp) :: dint1, r_e1, r_e2, fis, tab_br, tad_br, r_br, rabcd, r_c, tad
-        Real(dp), Dimension(IP6) :: p, q, a, b, cp, cq, ca, cb
+        Real(dp), Dimension(IP6) :: cp, cq, ca, cb
         Integer, Dimension(11) :: ilogr
         Real(dp), Dimension(20) :: Rint_br
         Integer(kind=int64) :: start_time
@@ -892,7 +888,7 @@ Contains
                             tad=tad+dint1-Dint                !## nucleus for j=1/2
                         End If
                         If (K_is == 1) fis = dV_nuc(Pa,Qa,Pd,Qd)     !### Volume IS
-                        If (Kbrt >= 1) tad_br=Br_core(na,nd,12)      !### Core Breit
+                        If (Kbrt >= 1) tad_br=Br_core(na,nd)         !### Core Breit
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
                         Write(11,'(I6,8X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",3F15.8)') &
@@ -910,7 +906,7 @@ Contains
             If (K_is == 1) num_is=nhint            
 
             ! Allocate arrays required for calculating Rint2
-            Call AllocateRint2Arrays(mype, npes)
+            Call AllocateRint2Arrays
 
             ! Evaluation of two-electron integrals R(K;NA,NB,NC,ND)
             Call startTimer(start_time)

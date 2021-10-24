@@ -4,7 +4,7 @@ Program dtm
     Use determinants, Only : Dinit, Jterm
     Implicit None
     
-    Integer :: nsu2, mpierr, mype, npes
+    Integer :: mpierr, mype, npes
     Real    :: start_time_total, end_time_total
 
     Call MPI_Init(mpierr)
@@ -20,7 +20,7 @@ Program dtm
         Call Jterm   ! produces table of levels and generates basis set of determinants from CONF.INP
     End If
 
-    Call InitTDM(mype,npes)
+    Call InitTDM
 
     Select Case(Kl1)
         Case(1) 

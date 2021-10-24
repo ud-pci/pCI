@@ -9,16 +9,12 @@ Program conf_lsj
 
     Implicit None
 
-    Integer   :: n, k, i, j, ierr, mype, npes, mpierr, nnd, rec1, rec2, nlvs
-    Integer(kind=int64) :: clock_rate, s1
-    Integer(kind=int64) :: start_time, end_time
-    Real :: total_time
-    Real(dp)  :: t, xtj, xtl, xts
+    Integer   :: i, mype, npes, mpierr, nnd, rec1, rec2, nlvs
+    Integer(kind=int64) :: s1, start_time
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
     Real(dp), Allocatable, Dimension(:,:) :: B1h
-    Character(Len=1024) :: strFromEnv
-    Character(Len=255)  :: eValue, strfmt
-    Character(Len=16)   :: memStr, timeStr
+    Character(Len=255)  :: eValue
+    Character(Len=16)   :: timeStr
 
     ! Initialize MPI
     Call MPI_Init(mpierr)
@@ -42,8 +38,8 @@ Program conf_lsj
         Call ReadXIJ(B1h)   ! reads relevant wavefunctions from CONF.XIJ
     End If
 
-    Call AllocateLSJArrays(mype,npes)
-    Call InitLSJ(mype,npes) 
+    Call AllocateLSJArrays(mype)
+    Call InitLSJ
     Call startTimer(s1)
     Call lsj(B1h,xj,xl,xs,mype,npes)
 
@@ -331,13 +327,12 @@ Contains
         Close(16)
     End Subroutine ReadXIJ
 
-    Subroutine AllocateLSJArrays(mype, npes)
+    Subroutine AllocateLSJArrays(mype)
         Use mpi
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
-        Integer :: mpierr, mype, npes
-        Character(Len=16) :: memStr
+        Integer :: mpierr, mype
 
         Call MPI_Bcast(nlvs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -392,12 +387,12 @@ Contains
         Return
     End Subroutine AllocateLSJArrays
 
-    Subroutine InitLSJ(npes,mype)
+    Subroutine InitLSJ
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
         Use mpi
         Implicit None
-        Integer :: npes, mype, mpierr, i
+        Integer :: mpierr, i
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(rec1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -464,10 +459,10 @@ Contains
         Return
     End subroutine InitLSJ
 
-    Subroutine calcLSJ(startnc,endnc,cc,xj,xl,xs,nst,plj,pls,p0s,pll,p0l)
+    Subroutine calcLSJ(startnc,endnc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
         Use determinants, Only : Gdet, CompC, CompNRC
         Implicit None
-        Integer, Intent(In) :: startnc, endnc, nst
+        Integer, Intent(In) :: startnc, endnc
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
         Integer, Allocatable, Dimension(:) :: idet1, idet2
@@ -506,7 +501,7 @@ Contains
                     Do k1=k1n,ndk
                         k=k+1
                         call Gdet(k,idet2)
-                        call lsj_det(idet1,idet2,tj,tl,ts,nst,plj,pls,p0s,pll,p0l)
+                        call lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
                         do m=1,nlvs
                             ckn=cc(n,m)*cc(k,m)
                             if (n.ne.k) ckn=2*ckn
@@ -526,13 +521,11 @@ Contains
         Implicit None
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
-        Integer, Allocatable, Dimension(:) :: idet1, idet2
         Integer(Kind=int64) :: s1, s2
-        Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, maxme, an_id, ncGrowBy, endnc, num_done
-        Integer :: n, n1, ic1, ic2, j, k, k1, k1n, ndn, ndk, status(MPI_STATUS_SIZE), sender
+        Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, an_id, ncGrowBy, endnc, num_done
+        Integer :: n, j, status(MPI_STATUS_SIZE), sender
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
-        Real(dp) :: ckn
-        Character(Len=16) :: counterStr, timeStr
+        Character(Len=16) :: timeStr
         Logical :: moreTimers
         real(dp), dimension(:,:), allocatable :: plj, pls, p0s, pll, p0l
 
@@ -565,7 +558,7 @@ Contains
 
         ! If only 1 processor is available (serial job)
         If (npes == 1) Then
-            Call calcLSJ(1,Nc,cc,xj,xl,xs,nst,plj,pls,p0s,pll,p0l)
+            Call calcLSJ(1,Nc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
         ! If more than 1 processor is available 
         Else
             n=0 
@@ -579,7 +572,7 @@ Contains
                    !print*,nnc,'to',an_id
                 End Do
 
-                Call calcLSJ(1,ncGrowBy,cc,xj,xl,xs,nst,plj,pls,p0s,pll,p0l)
+                Call calcLSJ(1,ncGrowBy,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
 
                 num_done = 0
                 ncsplit = Nc/10
@@ -626,7 +619,7 @@ Contains
                             endnc = nnc+ncGrowBy-1
                         End If
 
-                        Call calcLSJ(nnc,endnc,cc,xj,xl,xs,nst,plj,pls,p0s,pll,p0l)
+                        Call calcLSJ(nnc,endnc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
 
                         Call MPI_SEND( msg, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                         Call stopTimer(s2,timeStr)
@@ -650,13 +643,13 @@ Contains
         Return
     End Subroutine lsj
 
-    Subroutine lsj_det(idet1,idet2,tj,tl,ts,nst,plj,pls,p0s,pll,p0l)
+    Subroutine lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
         Use determinants, Only : Rspq
         Implicit None
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Real(dp) :: tj, tl, ts
-        Integer :: ic, id, is, nf, i1, i2, j1, j2, iq, ja, la, ma, j, jq0, jq
-        Integer :: ia, ib, nst, ka, kb, kc, kd, na, nb, nc, nd
+        Integer :: ic, id, is, nf, i1, i2, j1, j2, iq, ja, la, ma, jq0, jq
+        Integer :: ia, ib, ka, kb, kc, kd, na, nb, nc, nd
         Real(dp), Allocatable, Dimension(:,:) :: plj, pls, p0s, pll, p0l
 
         tj=0.d0
@@ -942,14 +935,13 @@ Contains
 
         Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
                    j3
-        real(dp) :: cutoff, xj, dt, del, dummy, wmx, E, D
+        real(dp) :: xj, dt, del, dummy, E, D
         real(dp), allocatable, dimension(:)  :: Cc, Dd, Er
         Character(Len=1), dimension(11) :: st1, st2 
         Character(Len=1), dimension(10)  :: stecp*7
-        Character(Len=1), dimension(2)  :: st3*3
         Character(Len=1), dimension(4)  :: strsms*6
         Character(Len=1), dimension(3)  :: strms*3
-        data st1/11*'='/,st2/11*'-'/,st3/' NO','YES'/
+        data st1/11*'='/,st2/11*'-'/
         data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
                    'GAUNT  ','G+MBPT1','G+MBPT2', &
                    'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/

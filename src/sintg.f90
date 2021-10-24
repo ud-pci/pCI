@@ -120,7 +120,7 @@ Module sintg
         Use readfff
         Implicit None
 
-        Integer :: i0, ih, ni, igm, i, km, ki, kil, imax, i1, k1, j, ki1, im, im1
+        Integer :: i0, ih, ni, igm, i, km, ki, imax, i1, k1, j, ki1, im, im1
         Real(dp) :: hh, r1, qa, gm, rg, s, gm1, t, t1, t2, fr, p1, p2, rg1, ri1, q1, ri, rgi
         Real(dp), Dimension(IP6) :: Y
 

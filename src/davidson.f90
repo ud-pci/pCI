@@ -7,11 +7,11 @@ Module davidson
 
     Private
 
-    Public :: Init4, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
+    Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
 
   Contains
     
-    Subroutine Init4(mype,npes)
+    Subroutine Init4(mype)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
         ! The initial approximation Hamilonian is stored in the 
@@ -21,7 +21,7 @@ Module davidson
         Use mpi
         Use determinants, Only : calcNd0
         Implicit None
-        Integer  :: k, ierr, n, n1, n2, ic, ic1, mype, npes, mpierr
+        Integer  :: k, n, mype, mpierr
         Integer(Kind=int64) :: l8
         Real(dp) :: t
         Character(Len=256) :: strfmt
@@ -59,14 +59,14 @@ Module davidson
 
     End Subroutine Init4
 
-    Subroutine FormB0(mype,npes)
+    Subroutine FormB0(mype)
         ! This subroutine constructs the initial eigenvectors for the Davidson iteration
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are written to CONF.XIJ 
         Use mpi
         Use formj2, Only : J_av
         Implicit None
-        Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype, npes
+        Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
         Real(dp) :: dummy, xj
         Character(Len=128) :: strfmt
 
@@ -81,7 +81,7 @@ Module davidson
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
                 B1(1:Nd0)=Z1(1:Nd0,j)
-                Call J_av(B1,Nd0,xj,ierr,mype,npes)
+                Call J_av(B1,Nd0,xj,ierr)
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hmin)
@@ -131,7 +131,7 @@ Module davidson
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are not written to CONF.XIJ.
         Implicit None
-        Integer :: i, idum, k, l
+        Integer :: k, l
         Real(dp) :: t
 
         ! Eigenvectors obtained by Davidson procedure are not written to CONF.XIJ file
@@ -155,7 +155,7 @@ Module davidson
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are written to CONF.XIJ.
         Implicit None
-        Integer :: i, idum, k, l
+        Integer :: i, k, l
         Real(dp) :: t
 
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
@@ -176,6 +176,18 @@ Module davidson
         Return
     End Subroutine FormB
 
+    Subroutine WriteXIJ
+        Implicit None
+        Integer :: i, k
+        ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
+        Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+        Do k=1,Nlv
+            Write(17) Tk(k),Tj(k),Nd,(ArrB(i,k),i=1,Nd)
+        End Do
+        Close(17)
+        Write ( 6,*) ' WriteXIJ: Vectors saved'
+    End Subroutine WriteXIJ
+
     Subroutine FormP(kp, vmax)
         ! Calculation of upper-left block (Nlv X Nlv) of matrix P for kp=1 
         ! Calculation of other three blocks (2Nlv X 2Nlv) of matrix P for kp=2
@@ -183,7 +195,7 @@ Module davidson
         Integer, Intent(In) :: kp
         Real(dp), Intent(In) :: vmax
 
-        Integer :: ix, i, kx, k1, k2, j, k, i1
+        Integer :: i, kx, k1, j, k, i1
         Real(dp) :: x
 
         If (kp == 1) Then
@@ -275,7 +287,7 @@ Module davidson
         Integer, Intent(In) :: j
         Real(dp), Intent(InOut) :: cnx
 
-        Integer :: j1, i, l, k, n01
+        Integer :: j1, i, k, n01
         Real(dp) :: val, t, cnorm, s
         character(len=9) :: char
 
@@ -336,17 +348,15 @@ Module davidson
         Return
     End Subroutine Dvdsn
 
-    Subroutine Mxmpy(ip, mype, npes)
+    Subroutine Mxmpy(ip, mype)
         ! This subroutine evaluates the products Q_i = H_ij * B_j
         ! if ip=1, products are stored in the second block of ArrB
         ! if ip=2, products are stored in the third block of ArrB
         Use mpi
         Implicit None
-        Integer, Intent(In) :: ip
+        Integer, Intent(In) :: ip, mype
 
-        Integer :: i, i1, i2, k, ierr, nlp, n, mype, npes, mpierr, &
-                    i2min, i2max, i1min, i1max, kd
-        Real :: start_time, end_time
+        Integer :: i, k, nlp, n, mpierr, i2min, i2max, i1min, i1max, kd
         Real(dp) :: t
         Integer(Kind=int64) :: l8
 
@@ -425,7 +435,9 @@ Module davidson
             it=it+1
             smax1=0.d0
             Do l=1,jm
-                If (l > Nlv .and. Iconverge(l-Nlv)==1) Cycle
+                If (l > Nlv) Then
+                    If (Iconverge(l-Nlv)==1) Cycle
+                End If
                 s=0.d0
                 Do i=1,Nd
                     s=s+ArrB(i,j)*ArrB(i,l)
@@ -456,13 +468,13 @@ Module davidson
         Return
     End Subroutine Ortn
 
-    Subroutine Prj_J(lin, num, lout, trsd, mype, npes) 
+    Subroutine Prj_J(lin, num, lout, trsd, mype) 
         Use mpi
         Use determinants, Only : Gdet
         Implicit None
-        Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, nsj, lout, num, lin, jav, j_av, mpierr, imin, imax
-        Integer, optional :: mype, npes
-        Real(dp) :: err1, err, sj, t, f, s, s1, a, aj, trsd, start, end
+        Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, lout, num, lin, jav, mpierr, imin, imax
+        Integer, optional :: mype
+        Real(dp) :: err1, err, sj, t, f, s, s1, a, aj, trsd
         logical :: proceed
         Character(Len=256) :: strfmt
 

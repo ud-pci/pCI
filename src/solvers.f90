@@ -11,9 +11,9 @@ Module solvers
 
   Contains
 
-    Subroutine DECOMP(NA,A,N,SCALES,MPS)
+    Subroutine DECOMP(A,N,SCALES,MPS)
         Implicit None
-        Integer :: I, IP, IP1, IKK, IDXPIV, JK, J, N1, K, KK, KP, KP1, NA, N
+        Integer :: I, IP, IP1, IKK, IDXPIV, JK, J, N1, K, KK, KP, KP1, N
         Real(dp) :: ROWNRM, RR, BIG, SIZE, PIVOT, EM
         Integer, Allocatable, Dimension(:) :: MPS
         Real(dp), Allocatable, Dimension(:) :: A, SCALES
@@ -71,9 +71,9 @@ Module solvers
         Return
     End Subroutine DECOMP
     
-    Subroutine FLSOLV(NA,NB,A,B,X,MPS)
+    Subroutine FLSOLV(NB,A,B,X,MPS)
         Implicit None
-        Integer :: NA, NB, NP1, I, IP, IP1, IM1, J, JK, IBACK
+        Integer :: NB, NP1, I, IP, IP1, IM1, J, JK, IBACK
         Real(dp) :: SUM
         Integer, Allocatable, Dimension(:) :: MPS
         Real(dp), Allocatable, Dimension(:) :: A, B, X

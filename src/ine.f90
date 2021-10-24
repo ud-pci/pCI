@@ -57,7 +57,6 @@ Program ine
 
     Implicit None
     Integer :: i, n, Nd2, Nddir, nsu2, icyc, nlamb, kIters
-    Real(dp) :: lambda
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
     logical :: ok
@@ -248,7 +247,6 @@ Contains
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
     
-        character(Len=1), Dimension(70) :: name
         character(Len=5), Dimension(5) :: str
         Character(Len=128) :: strfmt
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
@@ -318,20 +316,16 @@ Contains
     Subroutine Init
         Implicit None
         Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, If, &
-                    ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
+                    ii, nmin, jlj, i0, err_stat
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
-        Integer, Dimension(33)  ::  nnn ,jjj ,nqq 
         Character(Len=256) :: strfmt, err_msg
-        Character(Len=1), Dimension(9) :: Let 
-        Character(Len=1), Dimension(33):: lll
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        Data Let/'s','p','d','f','g','h','i','k','l'/
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
@@ -865,7 +859,7 @@ Contains
         Use str_fmt, Only : FormattedTime
         Implicit None
         External ZSPSV
-        Integer :: i, ic, id, info, i8, j, n, k, k1, k2, kl, ierr, nd1, err_stat
+        Integer :: i, ic, id, info, i8, j, k, k1, k2, kl, nd1, err_stat
         Integer(Kind=int64) :: start1, end1, start2, end2, clock_rate
         Real :: ttime, ttime2
         Real(dp) :: t, e0n, e2n, tj0n, tj2n, err
@@ -980,9 +974,9 @@ Contains
 
         Call system_clock(start1)
         If (Khe.EQ.0) Then
-            call Decomp(IP1*IP1,Z1,Ntr,scales,Mps)          !### decomposition
+            call Decomp(Z1,Ntr,scales,Mps)          !### decomposition
             Write(*,*)' decomposition finished'            !### of the matrix
-            call Flsolv(IP1*IP1,Ntr,Z1,YY1,X1,Mps)          !### solution of the
+            call Flsolv(Ntr,Z1,YY1,X1,Mps)          !### solution of the
             Write(*,*)' flsolv finished'                   !### inhom-s equation
         Else
             k = 1
@@ -1149,8 +1143,8 @@ Contains
                     end do
                 end do
             end do
-            call Decomp(100,Z1,num,scales,Mps)
-            call Flsolv(100,num,Z1,Vr,Vl,Mps)
+            call Decomp(Z1,num,scales,Mps)
+            call Flsolv(num,Z1,Vr,Vl,Mps)
             !     New vector X1:
             do i=1,Nd
                 X1(i)=Vl(1)*X1(i)
@@ -1205,13 +1199,13 @@ Contains
 
     Subroutine Prj(str,tj0,X1,X1J)
         Implicit None
-        Integer :: i, j, j2, jj, n, k, m, err_stat
+        Integer :: i, j, j2, jj, n, k
         Real(dp) :: trsd, tj, tj0, tjm, tjp, tjj, t, sm, sj, x, y, &
                     ap, aj, sum, ds, smin, sp, sn
         Real(dp), Allocatable, Dimension(:) :: X1
         Real(dp), Allocatable, Dimension(:,:) :: X1J
         Character(Len=6) :: str
-        Character(Len=256) :: strfmt, err_msg
+        Character(Len=256) :: strfmt
 
         If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
 
@@ -1821,7 +1815,7 @@ Contains
         Implicit None
         Integer :: i, isk, k, n, is
         Real(dp) :: f0, tj, w3j, f, al0, alp
-        Real(dp), Dimension(5) :: sk0, sk2
+        Real(dp), Dimension(5) :: sk0
         Real(dp), Dimension(2) :: s0, ss
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
@@ -1899,8 +1893,8 @@ Contains
     Subroutine RdcPNC
         Use wigner, Only : FJ3
         Implicit None
-        Integer :: i, k, is, isk, id, kmin, kmax, kf, ix
-        Real(dp) :: gap, nuc, a, f0, f, s, ss, tj, w2, w3j, Fn0, Fx0
+        Integer :: i, k, is, id, kmin, kmax, kf
+        Real(dp) :: gap, nuc, a, f0, f, s, ss, tj, w3j
         Real(dp), Dimension(3) :: s1
         Character(Len=9), Dimension(4) :: str 
         Character(Len=256) :: strfmt
@@ -2231,7 +2225,7 @@ Contains
 
     Subroutine FormV(n)       !### Additional vectors for minimization of residue
         Implicit None
-        Integer :: i, j, n, ndd, err_stat
+        Integer :: i, n, ndd, err_stat
         Real(dp) :: dj, tj
         Character(Len=256) :: strfmt, err_msg
 

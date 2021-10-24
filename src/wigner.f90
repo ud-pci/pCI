@@ -15,7 +15,7 @@ Module wigner
     Real(dp) Function FJ3(A1,A2,A3,A4,A5,A6)
       Implicit None
 
-      Integer                  :: i, K, L, KU, KM
+      Integer                  :: K, L, KU, KM
       Real(dp)                 :: A1, A2, A3, A4, A5, A6, EPS, UN
       Real(dp), Dimension(9)   :: X
       Integer, Dimension(9)    :: LU, LI

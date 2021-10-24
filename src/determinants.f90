@@ -342,9 +342,9 @@ Module determinants
         ! This subroutine writes the basis set of determinants to the file 'str'.
         !
         Implicit None
-        Integer  :: i, n
+        Integer  :: i
         Character(Len=*) :: str
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Open (16,file=str,status='UNKNOWN',form='UNFORMATTED')
         Write(16) Nd,Nsu
         Do i=1,Nd
@@ -358,8 +358,8 @@ Module determinants
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
         !
         Implicit None
-        Integer :: i, n
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Integer :: i
+
         Open (16,file='CONF.DET',status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
         Do i=1,Nd
@@ -487,7 +487,7 @@ Module determinants
         Integer, intent(InOut)                            :: i(3), j(3)
         
         Integer                                           :: l0, l1, l2, ni, nj, n, ic, nn0, &
-                                                             nn1, ll0, ll1, jj0, jj1, ndi, iconf, imax
+                                                             nn1, ll0, ll1, jj0, jj1, ndi, iconf
         Character(Len=1), Dimension(5) :: let
         data let/'s','p','d','f','g'/
 
@@ -606,7 +606,7 @@ Module determinants
     Subroutine Gdet(n,idet)
         ! this subroutine generates the determinant with index n
         Implicit None
-        Integer :: i, n
+        Integer :: n
         Integer, allocatable, dimension(:)  :: idet
 
         idet(1:Ne)=Iarr(1:Ne,n)
@@ -615,8 +615,8 @@ Module determinants
 
     Subroutine CompCD(idet1,idet2,icomp)
         Implicit None
-        Integer  :: i, i1, i2, icomp, m
-        Integer, allocatable, dimension(:)  :: idet1, idet2
+        Integer, Intent(Out)  :: icomp
+        Integer, allocatable, dimension(:), Intent(In)  :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         iconf1(1:Ne)=Nh(idet1(1:Ne))   ! iconf1(i) = No of the orbital occupied by the electron i
         iconf2(1:Ne)=Nh(idet2(1:Ne))    
@@ -628,7 +628,7 @@ Module determinants
         ! this subroutine compares determinants and counts number of differences in orbitals
         ! return the number of differences nf
         Implicit None
-        Integer  :: ni, nj, nf, i, j, l1, l2, k, imax
+        Integer  :: nf, i, imax
         Integer, allocatable, dimension(:)   :: id1, id2
         Integer, dimension(Nsu) :: det1, det2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -656,7 +656,7 @@ Module determinants
         ! this subroutine compares determinants and counts number of differences in orbitals
         ! return the number of differences nf
         Implicit None
-        Integer  :: ni, nj, nf, i, j, l1, l2, k
+        Integer  :: ni, nj, nf, i, j, l1, l2
         Integer, allocatable, dimension(:)   :: id1, id2
 
         ni=0
@@ -689,7 +689,7 @@ Module determinants
         ! this subroutine compares configurations and counts number of differences in orbitals
         ! return the number of differences nf
         Implicit None
-        Integer  :: i, i1, i2, j1, j2, icomp, is, m
+        Integer  :: i1, i2, j1, j2, icomp, is
         Integer, allocatable, dimension(:)  :: idet1, idet2
 
         Jdel=0
@@ -706,7 +706,7 @@ Module determinants
         ! compares two determinants and determines the difference between
         ! corresponding non-relativistic configurations
         Implicit None
-        Integer  :: i, i1, i2, j1, j2, icomp, is, m
+        Integer, Intent(Out) :: icomp
         Integer, Allocatable, Dimension(:) :: idet1, idet2
 
         iconf1(1:Ne)=Nh0(idet1(1:Ne))   !### iconf1(i) = No of the NR orbital occupied by the electron i

@@ -176,7 +176,7 @@ Module amp_ops
       Use wigner   
       Implicit None
       Integer :: nk, lk, nl, ll, is, k
-      Real(dp) :: Ro, xjk, xjl, AE, xlk, xll
+      Real(dp) :: Ro, xjk, xjl, AE
       ! - - - - - - - - - - - - - - - - - - - - - - - - -
       AE=Ro*Fint(12,nk,nl,+1)
       If (AE /= 0.d0) Then
@@ -216,7 +216,7 @@ Module amp_ops
         ! this function calculates the amplitude of the P, T-odd interaction 
         ! of the electron electric dipole moment <k|D|l>
         Implicit None
-        Integer :: nk, lk, nl, ll, is, k, lx
+        Integer :: nk, lk, nl, ll
         Real(dp) :: Ro, xjk, xjl, A
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         A=-2*Ro*Fint(4,nk,nl,+1)
@@ -229,7 +229,7 @@ Module amp_ops
         ! this function calculates the nuclear spin independent 
         ! parity nonconserving (PNC) amplitude <k|W|l>
         Implicit None
-        Integer :: nk, lk, nl, ll, is, k, lx
+        Integer :: nk, lk, nl, ll
         Real(dp) :: Ro, xjk, xjl, A
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         A=-Ro*Fint(5,nk,nl,-1)
@@ -261,7 +261,7 @@ Module amp_ops
         ! magnetic quadrupole moment <k|MQM|l>
         Use wigner
         Implicit None
-        Integer :: nk, lk, nl, ll, is, k, lx, is1, is2
+        Integer :: nk, lk, nl, ll, k, is1, is2
         Real(dp) :: Ro, xjk, xjl, B, tll, xlk, xll, g
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         B=Ro*Fint(8,nk,nl,+1)

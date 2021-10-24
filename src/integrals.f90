@@ -12,7 +12,7 @@ Module integrals
 
     subroutine Rint
         Implicit None
-        Integer     :: i, nsh, nx, ns1, nso1, nsu1, Nsul, nsp1, Nlist, &
+        Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
                        k, mlow, m_is
         Character*7 :: str(3),str1(4)*4
         Data str /'Coulomb','Gaunt  ','Breit  '/

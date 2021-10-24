@@ -44,21 +44,17 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     use mpi
-    use davidson, only : Prj_J
     use determinants, only : Wdet, Dinit, Jterm
     Use integrals, only : Rint
-    use formj2, only : FormJ, J_av
+    use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
     Implicit None
     External :: BLACS_PINFO
-    Integer   :: n, k, i, j, ierr, mype, npes, mpierr
+    Integer   :: n, i, ierr, mype, npes, mpierr
     Integer(kind=int64) :: start_time
-    Real :: total_time
-    Real(dp)  :: t
-    Character(Len=1024) :: strFromEnv
     Character(Len=255)  :: eValue, strfmt
-    Character(Len=16)   :: memStr, timeStr
+    Character(Len=16)   :: timeStr
 
     ! Initialize MPI
     !Call MPI_Init(mpierr)
@@ -92,7 +88,7 @@ Program conf
     End If
 
     ! Allocate global arrays used in formation of Hamiltonian
-    Call AllocateFormHArrays(mype,npes)
+    Call AllocateFormHArrays(mype)
     
     ! Formation of Hamiltonian matrix
     Call FormH(npes,mype)
@@ -101,10 +97,10 @@ Program conf
     Call FormJ(mype, npes)   
     
     ! Deallocate arrays that are no longer used in FormH
-    Call DeAllocateFormHArrays(mype,npes)
+    Call DeAllocateFormHArrays(mype)
 
     ! Allocate arrays that are used in Davidson procedure
-    Call AllocateDvdsnArrays(mype,npes)
+    Call AllocateDvdsnArrays(mype)
     
     ! Davidson diagonalization
     Call Diag4(mype,npes) 
@@ -131,7 +127,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.34")'
+        strfmt = '(4X,"Program conf v3.35")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -611,13 +607,12 @@ Contains
 
     End Subroutine FormD
     
-    Subroutine AllocateFormHArrays(mype, npes)
+    Subroutine AllocateFormHArrays(mype)
         Use mpi
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
-        Integer :: mpierr, mype, npes
-        Character(Len=16) :: memStr
+        Integer :: mpierr, mype
 
         vaBinSize = 10000000
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -684,8 +679,6 @@ Contains
     Subroutine calcMemStaticArrays
         Use str_fmt, Only : FormattedMemSize
         Implicit None
-
-        Character(Len=16) :: memStr
         
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
@@ -732,12 +725,12 @@ Contains
         Return
     End Subroutine calcMemReqs
 
-    Subroutine InitFormH(npes,mype)
+    Subroutine InitFormH
         ! this subroutine initializes variables used for FormH and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
         Use mpi
         Implicit None
-        Integer :: npes, mype, mpierr, i
+        Integer :: mpierr, i
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -769,18 +762,18 @@ Contains
         Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Eps(1:IPs), IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Eps, IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(In(1:Ngaunt), Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gnt(1:Ngaunt), Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -818,26 +811,22 @@ Contains
 
         Implicit None
 
-        Integer :: npes, mype, mpierr, interval, remainder, maxNumElementsPerCore=0
-        Integer :: is, nf, i1, i2, j1, j2, k1, kx, n, ic, ic1, n1, n2, ihmax, &
-                   n0, jq, jq0, iq, i, j, icomp, k, ih4, counter1, counter2, counter3, diff, k2, totsize
-        Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, return_msg, endnd, minme, maxme
-        logical :: finished
+        Integer :: npes, mype, mpierr, maxNumElementsPerCore, mesplit
+        Integer :: k1, kx, n, ic, ihmax, j, k, ih4, counter1, counter2, counter3, diff, icomp
+        Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, endnd, maxme
         Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
-        Integer(Kind=int64)     :: start_time, end_time, stot, etot, s1, e1, s2, e2, clock_rate, numzero=0
-        Real :: ttime, ttot
+        Integer(Kind=int64)     :: stot, s1, s2, numzero=0
         Real(dp)  :: t, tt
-        Integer(Kind=int64) :: statmem, mem, memsum, maxmem, mesplit
-        Character(Len=16)     :: memStr, memStr2, memTotStr, memTotStr2, npesStr, counterStr, counterStr2, filename, timeStr
+        Integer(Kind=int64) :: statmem, mem, maxmem
+        Character(Len=16)     :: memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: growBy, vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
-        Integer(Kind=MPI_OFFSET_KIND) :: disp       
 
         Call startTimer(stot)
-        Call InitFormH(npes,mype) 
+        Call InitFormH 
         Call calcNd0(Nc1, Nd0)
 
         If (mype == 0) Then
@@ -910,7 +899,7 @@ Contains
                                     kk=k
                                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                                    tt=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                    tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                     If (tt /= 0) Then
                                         cntarray = cntarray + 1
                                         Call IVAccumulatorAdd(iva1, nn)
@@ -1068,7 +1057,7 @@ Contains
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                    t=Hmltn(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                    t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                     Hamil%t(n)=t
                     If (t == 0) numzero=numzero+1
 
@@ -1146,53 +1135,53 @@ Contains
         Return
     End Subroutine FormH
 
-    Real(dp) function Hmltn(idet1, idet2, is, nf, i2, i1, j2, j1) 
+    Real(dp) function Hmltn(idet, is, nf, i2, i1, j2, j1) 
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
         Use formj2, Only : F_J0, F_J2
         Implicit None
-        Integer, Allocatable, Dimension(:), Intent(InOut)   :: idet1, idet2
+        Integer, Allocatable, Dimension(:), Intent(InOut)   :: idet
         Integer, Intent(InOut)                              :: is, nf, i1, i2, j1, j2
         
-        Integer     :: iq, jq, jq0, k
+        Integer     :: iq, jq, jq0
         Real(dp)    :: t
         
         t=0.d0
         Select Case(nf)
             Case(2) ! determinants differ by two functions
                 t=t+Gint(i2,j2,i1,j1)*is 
-                t=t+Gj*F_J2(idet1,idet2,is,nf,i2,i1,j2,j1)
+                t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
             Case(1) ! determinants differ by one function
                 Do iq=1,Ne
-                    i1=idet1(iq)
+                    i1=idet(iq)
                     If (i1 /= j1) t=t+Gint(j2,i1,j1,i1)*is
                 End Do
                 t=t+Hint(j2,j1)*is
             Case(0) ! determinants are equal
                 Do iq=1,Ne
-                    i1=idet1(iq)
+                    i1=idet(iq)
                     jq0=iq+1
                     If (jq0 <= Ne) Then
                         Do jq=jq0,Ne
-                            j1=idet1(jq)
+                            j1=idet(jq)
                             t=t+Gint(i1,j1,i1,j1)*is
                         End Do
                     End If
                     t=t+Hint(i1,i1)*is
                 End Do
-                t=t+Gj*F_J2(idet1,idet2,is,nf,i2,i1,j2,j1)
+                t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
         End Select
         Hmltn=t
         Return
     End function Hmltn
 
-    Subroutine DeAllocateFormHArrays(mype, npes)
+    Subroutine DeAllocateFormHArrays(mype)
         Use mpi
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
-        Integer :: mpierr, mype, npes
+        Integer :: mpierr, mype
         Character(Len=16) :: memStr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -1227,11 +1216,11 @@ Contains
 
     End Subroutine DeAllocateFormHArrays
 
-    Subroutine AllocateDvdsnArrays(mype, npes)
+    Subroutine AllocateDvdsnArrays(mype)
         Use mpi
         Use str_fmt, Only : FormattedMemSize
         Implicit None
-        Integer :: mpierr, mype, npes
+        Integer :: mpierr, mype
         Character(Len=16) :: memStr
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1338,16 +1327,22 @@ Contains
         Use mpi
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
+        Use formj2, Only : J_av
         Implicit None
         External :: DSYEV
 
-        Integer  :: k1, k, i, j, n1, iyes, id, id2, id1, ic, id0, &
-                    kx, i1, i2, it, mype, npes, mpierr, ifail=0, lwork
+        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork
         Real(dp), Dimension(4) :: dptmp
         Real(dp), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time
-        Real(dp)  :: crit=1.d-6, ax=1.d0, cnx=1.d0, x, xx, vmax
+        Real(dp)  :: crit, ax, cnx, x, xx, vmax
         Character(Len=16) :: timeStr
+
+        ! Initialize parameters and arrays
+        Iconverge = 0
+        crit=1.d-6
+        ax=1.d0
+        cnx=1.d0
 
         ! Start timer for Davidson procedure
         Call startTimer(start_time)
@@ -1359,13 +1354,13 @@ Contains
         End If
 
         ! Construct initial approximation from Hamiltonian matrix
-        Call Init4(mype, npes)
+        Call Init4(mype)
 
         ! Diagonalize the initial approximation 
         Call DiagInitApprox(mype, npes)
 
         ! Write initial approximation to file CONF.XIJ
-        Call FormB0(mype,npes)
+        Call FormB0(mype)
 
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
         If (mype == 0) Then
@@ -1400,7 +1395,7 @@ Contains
                 End If
 
                 ! Formation of the left-upper block of the energy matrix P
-                Call Mxmpy(1, mype, npes)
+                Call Mxmpy(1, mype)
                 If (mype==0) Then 
                     Call FormP(1, vmax)
                     ! Average initial diagonal over relativistic configurations if projecting J
@@ -1422,7 +1417,7 @@ Contains
                 End If
 
                 If (K_prj == 1) Then
-                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype,npes)
+                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
                             If (Iconverge(i-Nlv)==0) Then
@@ -1446,11 +1441,14 @@ Contains
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
-                    Call Mxmpy(2, mype, npes)
+                    Call Mxmpy(2, mype)
                     If (mype==0) Then
                         Call FormP(2, vmax)
                         ! Evaluation of Nlv eigenvectors:
+                        print*,'before',Jsq%n
                         Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                        print*,'after',Jsq%n
+
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
@@ -1470,6 +1468,7 @@ Contains
                             Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
                         End Do
                     End If
+                    Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
                     ! Write intermediate CONF.XIJ in frequency of kXIJ
                     If (kXIJ > 0) Then
@@ -1478,7 +1477,7 @@ Contains
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-                                Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
+                                Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
                             If (mype == 0) Call FormB
                         Else
@@ -1488,7 +1487,6 @@ Contains
                     Else
                         Call FormBskip
                     End If
-                    Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 
                 ! Davidson procedure is converged - write message and exit loop
                 Else
@@ -1500,7 +1498,7 @@ Contains
                         If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
                     ! Write final eigenvalues and eigenvectors to file CONF.XIJ
-                    Call WriteFinalXIJ(mype,npes)
+                    Call WriteFinalXIJ(mype)
                     Exit
                 End If
             End If
@@ -1512,20 +1510,20 @@ Contains
         End If
 
         If (allocated(W)) Deallocate(W)
-        Deallocate(Hamil%n, Hamil%k, Hamil%t, Diag, P, B1, B2, Z1, E1)
+        Deallocate(Hamil%n, Hamil%k, Hamil%t, Jsq%n, Jsq%k, Jsq%t, Diag, P, B1, B2, Z1, E1)
 
         Return
     End Subroutine Diag4
 
-    Subroutine WriteFinalXIJ(mype,npes)
+    Subroutine WriteFinalXIJ(mype)
         Use mpi
-        Use formj2, Only : J_av
         Use davidson, Only : Prj_J
+        Use formj2, Only : J_av
         Implicit None
-        Integer :: i, n, ierr, mype, npes, mpierr
+        Integer :: i, n, ierr, mype, mpierr
 
         If (K_prj == 1) Then
-            Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype,npes)
+            Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype)
         End If
         If (mype == 0) Then
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
@@ -1533,7 +1531,7 @@ Contains
         
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call J_av(ArrB(1,n),Nd,Tj(n),ierr,mype,npes)  ! calculates expectation values for J^2
+            Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
             If (mype==0) Then
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
@@ -1553,8 +1551,8 @@ Contains
         ! This subroutine prints eigenvalues in increasing order
         Implicit None
 
-        Integer :: nk, k, n, ndk, ic, i, j, idum, ist, jmax, imax
-        Real(dp) :: cutoff, xj, dt, del, dummy, wmx
+        Integer :: j, ist
+        Real(dp) :: dt, del
         Character(Len=1), Dimension(10) :: stecp*7
         Character(Len=1), Dimension(4)  :: strsms*6
         Character(Len=1), Dimension(3)  :: strms*3
@@ -1631,13 +1629,11 @@ Contains
         ! This subroutine prints the weights of configurations
         Implicit None
         Integer :: j, k, j1, j2, j3, ic, i, nk, ndk
-        Real(dp) :: d
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W
         Character(Len=1), Dimension(11) :: st1, st2 
-        Character(Len=1), Dimension(2)  :: st3*3
         Character(Len=512) :: strfmt, strfmt2
-        data st1/11*'='/, st2/11*'-'/, st3/' NO','YES'/
+        data st1/11*'='/, st2/11*'-'/
 
         Allocate(C(Nd), W(Nc,Nlv))
 

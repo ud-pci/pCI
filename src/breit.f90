@@ -13,8 +13,8 @@ Module breit
     Integer Function calcNumGaunts(IPlx)
         Implicit None
         Integer, Intent(In) :: IPlx ! max(l)
-        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i
-        Real(dp) :: J1,M1,J2,M2, x
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, im1, im2, mk
+        Real(dp) :: J1,M1,J2,M2
 
         l=0
         lx=IPlx+1            !### = max(l)
@@ -105,7 +105,7 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: i, is, K
+        Integer :: is, K
         Real(dp) :: J1, M1, J2, M2, xk, q
 
         is=dabs(m1+0.5d0)+0.1d0
@@ -123,7 +123,7 @@ Module breit
         Return
     End Function Gaun
 
-    Real(dp) Function Br_core(na,nb,kfl) 
+    Real(dp) Function Br_core(na,nb) 
         !### exchange breit core potential
         !### kfl - file with derivatives
         !     Exchange core potential:
@@ -132,9 +132,8 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: la, lb, lc, kmin, kmax, k, na, nb, nc, ja, jb, jc, kfl
+        Integer :: la, lb, lc, kmin, kmax, k, na, nb, nc, ja, jb, jc
         Real(dp) :: z12, z00,  xja, a_ab, xjc, s, xj, gac, ds
-        Real(dp), Dimension(10) :: Rint1, Rint2 !### Radial integrals after regrouping
         Character(Len=512) :: strfmt
 
         Qb = Qd
@@ -226,7 +225,7 @@ Module breit
         Integer :: lb, ld, k, l, i, nb, nd
         Real(dp) :: s1, s2, ds1, ds2
         Real(dp), Dimension(IP6) :: pb,qb,pd,qd
-        Real(dp), Dimension(IP6) :: c, ro
+        Real(dp), Dimension(IP6) :: c
 
         lb=Ll(nb)
         ld=Ll(nd)

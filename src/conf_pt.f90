@@ -11,10 +11,8 @@ Program conf_pt
     Use integrals, Only : Rint
     Use determinants, Only : Dinit, Jterm, Wdet
     Implicit None
-    Character(Len=8) cdiag(2)
-    Integer  :: Nc_0, i, mpierr, mype, npes
+    Integer  :: Nc_0, mpierr, mype, npes
     Real :: start_time, stop_time
-    Data cdiag /'diag(H) ','diag(H0)'/
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -52,9 +50,9 @@ Program conf_pt
         Call Weight_CI
     End If
     
-    Call BcastParams(mype, npes)
-    Call AllocatePTArrays(mype, npes)
-    Call BcastPTArrays(mype, npes)
+    Call BcastParams
+    Call AllocatePTArrays
+    Call BcastPTArrays
 
     Call cpu_time(start_time)
     Call PT_Init(npes, mype)
@@ -92,8 +90,6 @@ Contains
         ! This subroutine reads in parameters and configurations from CONF.INP
         Use conf_init, Only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
-        Integer :: i, j, k, i1, i2, ic, icc, ne0, nx, ny, nz, istr
-        Character(Len=1) :: name(16)
         Character(Len=512) :: strfmt
 
         ! Write name of program
@@ -339,10 +335,10 @@ Contains
 
     End Subroutine Init
 
-    Subroutine BcastParams(mype,npes)
+    Subroutine BcastParams
         Use mpi
         Implicit None
-        Integer :: mype, npes, mpierr
+        Integer :: mpierr
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Z, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Am, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -384,10 +380,10 @@ Contains
         Return
     End Subroutine BcastParams
 
-    Subroutine AllocatePTArrays(mype,npes)
+    Subroutine AllocatePTArrays
         Use mpi
         Implicit None
-        Integer :: i, mpierr, mype, npes
+        Integer :: mpierr
         
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
@@ -418,10 +414,10 @@ Contains
         Return
     End Subroutine AllocatePTArrays
 
-    Subroutine BcastPTArrays(mype,npes)
+    Subroutine BcastPTArrays
         Use mpi
     	Implicit None
-        Integer :: i, mype, npes, mpierr
+        Integer :: i, mpierr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -457,8 +453,7 @@ Contains
 
     Subroutine NR_Init
         Implicit None
-        Integer  :: inr, nrel, ndet, nshell, k, ier, knr1, knr2, ic, inq
-        Real(dp)     :: x
+        Integer  :: inr, nrel, ndet, nshell, k, ier, knr1, knr2, ic
         Logical  :: dIf
         Integer, Dimension(20)   ::  inl1, inl2, inq1, inq2
 
@@ -705,23 +700,21 @@ Contains
     900 Write(*,*)' File CONF.XIJ is absent.'
         Stop
     End Subroutine PT_Init
-    ! =============================================================================
+
     Subroutine PTE(npes,mype)
         Use mpi
         Implicit None
-        Integer  :: n, ic, l, i, k, ncoef, Ifrac, ix, j
+        Integer  :: n, ic, l, i, k, ix
         Integer, Dimension(Nc)  :: Ndic
-        Integer  :: npes, mype, mpierr, interval, remainder, start, End, size, xstart
-        Integer  :: xEnd, xsize, Ndcount, istart, iEnd, disp, lastsize
-        Real  :: start_time, Stop_time
+        Integer  :: npes, mype, mpierr, interval, remainder, start, End, size
+        Integer  :: istart, iEnd, lastsize
         Real(dp)  :: ei, x, e0, del, ci, x2, des, des0, dEx, dVs
         Real(dp), Dimension(IPPT)  :: E1
         Real(dp), Dimension(Nlv,Nc) :: dE, dV, dE1, dV1
         Integer, Dimension(2,Nc) :: sizeNcNd
-        Integer     :: totalNcNd, pecounter, counter
-        Integer, Dimension(npes) :: sizes, sizes1, idisp
-        Logical     :: first
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Integer     :: totalNcNd
+        Integer, Dimension(npes) :: sizes, idisp
+
         allocate(Ey(Nlv),Ndirc(Nc),DEnr(Nc))
 
         If (mype == 0) Then
@@ -1226,10 +1219,9 @@ Contains
     Subroutine Squeeze(ic,knr,inl,inq)
         Implicit None
         Integer  :: i1, i2, knr, i, ic, nl, mq, nl0, mq0
-        Logical :: dIf
         Real(dp)  :: x
         Integer, Dimension(20)  :: inl, inq
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         i1=Nc0(ic)
         i2=i1+Nvc(ic)
         knr=0            
@@ -1363,7 +1355,7 @@ Contains
     	Use mpi
         Use determinants, Only : Gdet
         Implicit None
-        Integer   :: n, i, nd0, start, End, pe, j
+        Integer   :: n, i, nd0, start, End, j
         Integer   :: npes, mype, interval, remainder, mpierr, size, count
         Integer, Allocatable, Dimension(:)  :: idet1, idet2
         Integer, Dimension(npes) :: disp, sizes, Ends

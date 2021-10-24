@@ -52,7 +52,7 @@ Module dtm_aux
     Subroutine OpenFS(fnam,iform,kan,ntype)
         Implicit None
 
-        Integer :: i, iform, kan, ntype, imax
+        Integer :: iform, kan, ntype
         Character(Len=*) :: fnam
 
         ! NTYPE = 0 - OLD; NTYPE = 1 - NEW, UNKNOWN
@@ -78,12 +78,9 @@ Module dtm_aux
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
     
-        Integer :: i, i1, i2, ic, istr, nx, ny, nz, ne0
-        Real(dp) :: x
-        Character(Len=1), Dimension(16) :: name
         Character(Len=4), Dimension(2) :: yes*3
         Character(Len=512) :: strfmt
-        ! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Open(unit=99,file='dtm.in')
         Read (99,*) Kl1
         Select Case(Kl1)
@@ -491,7 +488,7 @@ Module dtm_aux
         Implicit None
         Integer :: kab, na, nb, ja, jb, la, lb, i, in, nmin, ih, k, &
                   lg, lbs, is, las, ip, jab, n12
-        Real(dp) :: x, c1, c2, c3, s1, s2, w1, w2, w3, ga, gb, gab, dn, tab, Alfd, qe
+        Real(dp) :: x, c3, s1, s2, w1, w2, w3, ga, gb, gab, dn, tab, Alfd, qe
         Real(dp), Dimension(IP6)  :: p, q, a, b, ro
         Real(dp), Dimension(10) :: rcut
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -845,10 +842,10 @@ Module dtm_aux
         Return
     End Subroutine NclInt
 
-    Subroutine BcastDMArrays(mype, npes)
+    Subroutine BcastDMArrays(mype)
         Use mpi_f08
         Implicit None
-        Integer :: mype, npes, mpierr, i
+        Integer :: mype, mpierr, i
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         If (mype/=0) Allocate(Iarr(Ne,Nd1))
@@ -871,7 +868,7 @@ Module dtm_aux
         Implicit None
         Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, &
                    ic2, kx, n1, ic1, imin, nx, Ndpt, j1, j2, i1, iab2, &
-                   imax, nn, ntrm, ntrm1, ntrms, start, End, mpierr, pgs0, pgs, pct, size
+                   imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, size
         Integer :: npes,mype
         Integer*8 :: mem, memsum
         Real(dp) :: s, bn, bk, Tj, Etrm
@@ -919,7 +916,7 @@ Module dtm_aux
             Close(16)
         End If
     
-        Call BcastDMArrays(mype,npes)
+        Call BcastDMArrays(mype)
     
         ! Divide workload into npes
         If (mype==0) Then
@@ -1046,11 +1043,11 @@ Module dtm_aux
         Return
     End Subroutine FormDM
 
-    Subroutine InitTDM(mype,npes)
+    Subroutine InitTDM
         Use mpi_f08
         Implicit None
-        Integer :: mype, npes, mpierr
-        !----------------------------------------------
+        Integer :: mpierr
+
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kl1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1085,10 +1082,10 @@ Module dtm_aux
         Return
     End Subroutine InitTDM
 
-    Subroutine BcastTMArrays(mype, npes)
+    Subroutine BcastTMArrays(mype)
         Use mpi_f08
         Implicit None
-        Integer :: mype, npes, mpierr, i
+        Integer :: mype, mpierr, i
         Call MPI_Bcast(tj1, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1112,15 +1109,14 @@ Module dtm_aux
         ! calculates transition matrix & amplitudes
         Implicit None
         Integer :: lf, imax, k, i, n2, n21, n22, k1, icomp, ic, &
-                  iq, j, ju, iu, nf, is, kx, ks, mx, kxx, ixx, j1, j2, &
+                  iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
                   imin, i1, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
         Integer :: mype, npes, mpierr, size
         Integer*8 :: mem, memsum
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
-        Real(dp), Allocatable, Dimension(:) :: ro1
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Character(Len=16)     :: memStr, npesStr
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
         Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
         If (mype==0) Write (*,'(1X," TM from term",I2," to terms",I2," - ",I2)') &
@@ -1191,7 +1187,7 @@ Module dtm_aux
         End If
         
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call BcastTMArrays(mype, npes)
+        Call BcastTMArrays(mype)
     
         ! Divide workload by npes
         If (mype==0) Then
@@ -1379,7 +1375,7 @@ Module dtm_aux
         Use amp_ops
         Implicit None
         Integer :: k, kmax, no, i, imin1, imax1, lf, n1, n2, &
-                   lk, jk, ik2, ik1, imin, imax, kx, n, l, ml, il, &
+                   lk, jk, ik2, ik1, imin, imax, l, ml, il, &
                    mk, ik, mc, lll, l1, icc, nok, il1, il2, nol, jl
         Real(dp) :: ppl, delE, q12, tm1, tj2, tj1, e1, e2, &
                    s, xjk, c, tl, AM3, AM2, AE3, AE2, QM, PNC, EDM, &
@@ -1604,9 +1600,9 @@ Module dtm_aux
         Use wigner
         Use amp_ops
         Implicit None
-        Integer :: n, kmax, k, no, i, imax1, imin1, lf, imax, imin, mk, ik, &
+        Integer :: kmax, k, no, i, imax1, imin1, lf, imax, imin, mk, ik, &
                    lll, il1, il2, nk, nol, jl, ml, lk, jk, ippx, il, ik1, ik2, l, &
-                   kx, nok, l1, ipp, nk0, lk0, jt, mj, ntr, ntrm
+                   nok, l1, ipp, nk0, lk0, jt, mj, ntrm
         Real(dp) :: A, B, G, ppl, tj, tm, tj1, Etrm, s, g1, xjl, xmk, &
                     xpp, dme, c, xjk, tl, x
         Integer, Dimension(3*IPx) :: ind

@@ -127,7 +127,7 @@ Module diff
         !     >> variant with four terms of Taylor expansion <<
         !# we now match P(1),P(2), dP/dr(1), and dP/dr(2)
         Implicit None
-        Integer :: i, k, kap, ier, iyes, ierr
+        Integer :: k, kap, ier, iyes, ierr
         Real(dp) :: gam, rn, g, dp1, dp2, p1, p2, d2, r1, y, p21, p11, d1
         Real(dp) :: p22, p2111, p2211, c2, c3, c1, c0, rk, pr1, dr1, pr2, dr2
         Real(dp), Dimension(IP6) :: P

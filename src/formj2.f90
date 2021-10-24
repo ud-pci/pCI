@@ -9,7 +9,7 @@ Module formj2
     Real(dp) Function F_J0(idet)
         Implicit None
     
-        Integer :: ia, na, ja, ma, jq0, iq, ib, ic, id, nf, jq, is
+        Integer :: ia, na, ja, ma, jq0, iq, ib, nf, jq
         Integer, allocatable, dimension(:) :: idet
         Real(dp)  :: t
     
@@ -35,9 +35,9 @@ Module formj2
         Return
     End Function F_J0
 
-    Real(dp) Function F_J2(idet1, idet2, is, nf, ia, ic, ib, id) 
+    Real(dp) Function F_J2(idet, is, nf, ia, ic, ib, id) 
         Implicit None
-        Integer, allocatable, dimension(:), intent(InOut) :: idet1, idet2
+        Integer, allocatable, dimension(:), intent(InOut) :: idet
         Integer, intent(InOut)                            :: is, nf, ia, ib, ic, id
 
         Integer :: na, ja, ma, jq0, iq, jq
@@ -48,7 +48,7 @@ Module formj2
             Case(0) 
                 t=mj*mj
                 Do iq=1,Ne
-                    ia=idet1(iq)
+                    ia=idet(iq)
                     na=Nh(ia)
                     ja=Jj(na)
                     ma=Jz(ia)
@@ -56,7 +56,7 @@ Module formj2
                     jq0=iq+1
                     If (jq0 <= Ne) Then
                         Do jq=jq0,Ne
-                            ib=idet1(jq)
+                            ib=idet(jq)
                             t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
                         End Do
                     End If
@@ -99,19 +99,17 @@ Module formj2
         Use matrix_io
         Implicit None
 
-        Integer :: k1, n1, ic1, ndn, i, j, ij4, ijmax, n, k, nn, kk, counter1, counter2, counter3, diff
-        Real :: ttime, ttot
-        Real(dp) :: t, tt
-        Integer(kind=int64) :: stot, etot, s1, e1, clock_rate, jstart, jend, memsum, mem, maxmem, statmem
-        Integer, allocatable, dimension(:) :: idet1, idet2, nk, cntarray
+        Integer :: k1, n1, ic1, ndn, j, ij4, ijmax, n, k, nn, kk, counter1, counter2, counter3, diff
+        Real(dp) :: tt
+        Integer(kind=int64) :: stot, s1, mem, maxmem, statmem
+        Integer, allocatable, dimension(:) :: idet1, idet2, cntarray
         Integer :: npes, mype, mpierr, msg, maxme, endNc
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ncGrowBy, nccnt, ncsplit
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
-        Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, return_msg, status(MPI_STATUS_SIZE)
-        Integer :: fh, sender
-        Integer(kind=MPI_OFFSET_KIND) :: disp 
+        Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, status(MPI_STATUS_SIZE)
+        Integer :: sender
         Character(Len=16) :: timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2, strfmt
 
         Call startTimer(stot)
@@ -176,7 +174,7 @@ Module formj2
                                 nn=n
                                 kk=k
                                 Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                tt=F_J2(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                tt=F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                 If (tt /= 0) Then
                                     cntarray = cntarray + 1
                                     Call IVAccumulatorAdd(iva1, nn)
@@ -274,7 +272,7 @@ Module formj2
                                     nn=n
                                     kk=k
                                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                    tt=F_J2(idet1, idet2, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                    tt=F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                                     If (tt /= 0) Then
                                         cntarray = cntarray + 1
                                         Call IVAccumulatorAdd(iva1, nn)
@@ -324,13 +322,11 @@ Module formj2
 
     End Subroutine FormJ
     
-    Subroutine J_av(X1, nx, xj, ierr, mype, npes)    !# <x1|J**2|x1>
+    Subroutine J_av(X1, nx, xj, ierr)    !# <x1|J**2|x1>
         Use mpi
-        Use determinants, Only : Gdet
         Implicit None
 
         Integer :: ierr, i, k, n, nx, mpierr
-        Integer, optional :: mype, npes
         Real(dp) :: r, t, xj
         Real(dp), dimension(nx) :: X1
 
@@ -349,7 +345,7 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        If (Present(mype)) Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         xj=0.5d0*(dsqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then
