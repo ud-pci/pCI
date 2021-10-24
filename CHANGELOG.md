@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.37] - 2021-10-24
+- conf v3.35 - added exception to set Ngaunt if not in CONF.GNT
+- added temporary fix for value of Jsq%n changing during LAPACK ZSYEV subroutine
+- all programs - removed all unused variables and arrays determined by compiler flag "--check all --warn all"
+
 ## [0.7.36] - 2021-10-20
 - conf v3.34 - removed reading of CONF.XIJ from PrintEnergies subroutine
 - moved the printing of weights from PrintEnergies subroutine to a new PrintWeights subroutine

@@ -123,6 +123,7 @@ Contains
         ! This subroutine reads in parameters and configurations from CONF.INP
         Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
+        Integer :: err_stat
         Character(Len=32) :: strfmt
 
         ! Write name of program
@@ -191,7 +192,10 @@ Contains
 
         ! Read angular factors from file CONF.GNT
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        Read(16) Ngaunt
+        Read(16,iostat=err_stat) Ngaunt
+        If (err_stat /= 0) Then
+            Ngaunt = 2891
+        End If
         Allocate(In(Ngaunt))
         Allocate(Gnt(Ngaunt))
         Read(16) (In(i),i=1,Ngaunt)
@@ -1331,9 +1335,9 @@ Contains
         Implicit None
         External :: DSYEV
 
-        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork
+        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
         Real(dp), Dimension(4) :: dptmp
-        Real(dp), Allocatable, Dimension(:) :: W ! work array
+        Real(dp), Allocatable, Dimension(:) :: W, Jn ! work array
         Integer(Kind=int64) :: start_time
         Real(dp)  :: crit, ax, cnx, x, xx, vmax
         Character(Len=16) :: timeStr
@@ -1368,6 +1372,13 @@ Contains
             Call DSYEV('V','U',n1,P,n1,E,dptmp,-1,ifail)
             lwork = Int(dptmp(1))
             Allocate(W(lwork))
+        End If
+
+        ! temporary solution for value of Jsq%n changing during LAPACK ZSYEV subroutine
+        If (mype == 0) Then
+            js = size(Jsq%n)
+            Allocate(Jn(js))
+            Jn=Jsq%n
         End If
 
         ! Davidson loop:
@@ -1445,9 +1456,7 @@ Contains
                     If (mype==0) Then
                         Call FormP(2, vmax)
                         ! Evaluation of Nlv eigenvectors:
-                        print*,'before',Jsq%n
                         Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-                        print*,'after',Jsq%n
 
                         ax=0.d0
                         vmax=-1.d10
@@ -1497,12 +1506,20 @@ Contains
                         ! Assign energies to array Tk for case when Davidson procedure is already converged 
                         If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
                     End If
-                    ! Write final eigenvalues and eigenvectors to file CONF.XIJ
-                    Call WriteFinalXIJ(mype)
+                    
                     Exit
                 End If
             End If
         End Do
+
+        ! temporary solution for value of Jsq%n changing during LAPACK ZSYEV subroutine
+        If (mype == 0) Then
+            Jsq%n=Jn
+            Deallocate(Jn)
+        End If
+        
+        ! Write final eigenvalues and eigenvectors to file CONF.XIJ
+        Call WriteFinalXIJ(mype)
 
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
