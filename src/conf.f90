@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.35")'
+        strfmt = '(4X,"Program conf v3.36")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1225,7 +1225,7 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Implicit None
         Integer :: mpierr, mype
-        Character(Len=16) :: memStr
+        Character(Len=16) :: memStr, memTotStr
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
@@ -1248,6 +1248,20 @@ Contains
             memEstimate = memEstimate - memFormH + memDvdsn
             Call FormattedMemSize(memEstimate, memStr)
             Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' of memory per core' 
+            Call FormattedMemSize(memTotalPerCPU, memTotStr)
+            If (memTotalPerCPU /= 0) Then
+                If (memEstimate > memTotalPerCPU) Then
+                    Write(*,'(A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, but only ', &
+                                            Trim(memTotStr) ,' is available.'
+                    Stop
+                Else If (memEstimate < memTotalPerCPU) Then
+                    Write(*,'(A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, and ' , &
+                                            Trim(memTotStr) ,' is available.'
+                End If
+            Else
+                Write(*,'(2X,A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, &
+                                            but available memory was not saved to environment'
+            End If
         End If   
 
     End Subroutine AllocateDvdsnArrays

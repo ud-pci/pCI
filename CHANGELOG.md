@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.38] - 2021-10-25
+- conf v3.36 - added memory check after allocating arrays for Davidson procedure
+
 ## [0.7.37] - 2021-10-24
 - conf v3.35 - added exception to set Ngaunt if not in CONF.GNT
 - added temporary fix for value of Jsq%n changing during LAPACK ZSYEV subroutine
