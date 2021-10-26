@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.36")'
+        strfmt = '(4X,"Program conf v3.37")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -206,7 +206,7 @@ Contains
 
     Subroutine Init
         Implicit None
-        Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, If, &
+        Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, if, &
                     ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
@@ -732,9 +732,10 @@ Contains
     Subroutine InitFormH
         ! this subroutine initializes variables used for FormH and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
         Implicit None
-        Integer :: mpierr, i
+        Integer :: mpierr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -778,29 +779,27 @@ Contains
         Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastR(Rint2, IPbr*Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End Do  
+        Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iarr, Ne*Nd, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Rsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Dsig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Esig(1:NhintS), NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Iint1S(1:NhintS), NhintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Iint2S(1:NgintS), NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Iint3S(1:NgintS), NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Rint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Dint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Eint2S(1:NgintS), NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Esig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint1S, NhintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint2S, NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Iint3S, NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Eint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(IntOrdS, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(R_is(1:num_is), num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(I_is(1:num_is), num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(R_is, num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return

@@ -352,7 +352,8 @@ Module davidson
         ! This subroutine evaluates the products Q_i = H_ij * B_j
         ! if ip=1, products are stored in the second block of ArrB
         ! if ip=2, products are stored in the third block of ArrB
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils, Only : BroadcastD
         Implicit None
         Integer, Intent(In) :: ip, mype
 
@@ -373,9 +374,7 @@ Module davidson
             kd=1
         End If
 
-        Do i=1,nlp 
-            Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        Call BroadcastD(ArrB, Nd*nlp, 0, 0, MPI_COMM_WORLD, mpierr)
 
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8
