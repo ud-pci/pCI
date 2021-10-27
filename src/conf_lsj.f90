@@ -70,7 +70,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v2.2")'
+        strfmt = '(4X,"Program conf_lsj v2.3")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -935,7 +935,7 @@ Contains
 
         Integer :: j1, nk, k, j2, n, ndk, ic, i, j, idum, ist, jmax, imax, &
                    j3
-        real(dp) :: xj, dt, del, dummy, E, D
+        real(dp) :: xj, dt, del, dummy, E, D, gfactor
         real(dp), allocatable, dimension(:)  :: Cc, Dd, Er
         Character(Len=1), dimension(11) :: st1, st2 
         Character(Len=1), dimension(10)  :: stecp*7
@@ -950,31 +950,23 @@ Contains
         Character(Len=256) :: strfmt, strfmt2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Allocate(Cc(Nd), Dd(Nd), W(Nc,IPlv), Er(Nlv))
-        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is Used for output
+        ist=1+3*Kbrt          !### stecp(ist) is Used for output
         If (K_is == 3) K_sms=4       !### Used for output
         If (Kecp == 1) ist=7
         Open(unit=16,file='CONF.XIJ',status='UNKNOWN',form='unformatted')
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! printing eigenvalues in increasing order
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        strfmt = '(4X,82("="))'
+        strfmt = '(1X,80("="))'
         Write( 6,strfmt)
         Write(11,strfmt)
 
-        If (Ksig*Kdsig == 0) Then
-            strfmt = '(4X," Energy levels (",A7," Nc=",I7," Nd=",I9,"); &
-                    Gj =",F7.4,/,4X,"  N",6X,"JTOT",9X,"L",9X,"S",12X, &
-                    "EV",14X,"ET",7X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),Nc,Nd,Gj
-        Else
-            strfmt = '(4X,"Energy levels ",A7,", Sigma(E =", &
-                 F10.4,") extrapolation var.",I2,/4X,"(Nc=",I6, &
-                 " Nd=",I9,");  Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
-                 "EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-        End If
+        strfmt = '(" Energy levels (",A7," Nc=",I7," Nd=",I9,"); &
+                      Gj =",F7.4, & 
+                    /"  N",5X,"JTOT",5X,"L",7X,"S",4X,"G-factor", &
+                    5X,"EV",15X,"ET",8X,"DEL(CM**-1)")'
+        Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
+        Write(11,strfmt) stecp(ist),Nc,Nd,Gj
 
         If (C_is /= 0.d0) Then
             If (K_is == 1) Then
@@ -989,7 +981,7 @@ Contains
             End If
         End If
 
-        strfmt = '(4X,82("-"))'
+        strfmt = '(1X,80("-"))'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1009,15 +1001,16 @@ Contains
             DT=E-Ecore
             ! Rydberg constant is taken from "phys.par"
             DEL=(ER(1)-ER(J))*2*DPRy
-            strfmt = '(4X,I3,F14.9,2F10.5,F14.8,F15.6,F15.2)'
+            gfactor=(3*xj*(xj+1)-Xl(j)*(Xl(j)+1)+Xs(j)*(Xs(j)+1))/(2*xj*(xj+1))
+            strfmt = '(I3,F10.6,3F8.4,F14.8,F15.6,F15.2)'
             If (j >= rec1 .and. j <= rec2) Then
-                Write( 6,strfmt) j,xj,Xl(n),Xs(n),E,DT,DEL
-                Write(11,strfmt) j,xj,Xl(n),Xs(n),E,DT,DEL
+                Write( 6,strfmt) j,xj,Xl(n),Xs(n),gfactor,E,DT,DEL
+                Write(11,strfmt) j,xj,Xl(n),Xs(n),gfactor,E,DT,DEL
                 n=n+1
             End If
         End Do
 
-        strfmt = '(4X,82("="))'
+        strfmt = '(1X,80("="))'
         Write( 6,strfmt)
         Write(11,strfmt)
 

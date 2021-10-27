@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.40] - 2021-10-27
+- conf_lsj v2.3 - added g-factors to final table
+
 ## [0.7.39] - 2021-10-26
 - conf v3.37 - re-implemented Jeff's Broadcast subroutines for MPI_Bcast calls for 2d arrays
 
