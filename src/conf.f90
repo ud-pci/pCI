@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.37")'
+        strfmt = '(4X,"Program conf v3.38")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -193,8 +193,9 @@ Contains
         ! Read angular factors from file CONF.GNT
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
         Read(16,iostat=err_stat) Ngaunt
-        If (err_stat /= 0) Then
+        If (err_stat /= 0 .or. Ngaunt /= 2891) Then
             Ngaunt = 2891
+            Rewind(16)
         End If
         Allocate(In(Ngaunt))
         Allocate(Gnt(Ngaunt))
