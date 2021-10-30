@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.42] - 2021-10-30
+- conf v3.39 - bug fix in conf resolving slow down of convergence during Davidson procedure
+
 ## [0.7.41] - 2021-10-27
 - conf v3.38 - bug fix in conf when reading old version of CONF.GNT
 
