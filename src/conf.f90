@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.39")'
+        strfmt = '(4X,"Program conf v3.40")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
