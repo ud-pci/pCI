@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.44] - 2021-10-31
+- ine v1.7 - fixed formatting error in RdcE1
+
 ## [0.7.43] - 2021-10-31
 - conf v3.40 - added if allocated statement when deallocating arrays after Diag4
 

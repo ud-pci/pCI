@@ -303,7 +303,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.6",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.7",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1714,11 +1714,11 @@ Contains
 
         f0=-2.d0
         ss(n)= 0.d0
+        strfmt = '(3X,"alpha(J=",F4.1," M=",F4.1,")=",E12.5," (no Prj)")'
         if (dabs(Q).LT.1.d-5) then        !### summation without
           do i=1,Nd                       !#### Prj decomposition
             ss(n)= ss(n)+YY2(i)*X1(i)*f0  !#### requires JM=JM0, Q=0
           end do                          !### ss = alpha(J0,M0)
-          strfmt = '(3X,"alpha(J=",F4.1," M=",F4.1,")=",E12.5," (no Prj)")'
           write(*,*)
           write( 6,strfmt) Tj0,Jm0,ss(n)
           write(11,strfmt) Tj0,Jm0,ss(n)
@@ -1775,12 +1775,12 @@ Contains
           s(n)= s0(n)
         end if
         ! - - - - - - - - - - Tensor polarizability - - - - - - - - - - -
-        if (isk.EQ.0) then
-            strfmt3 = '(3X,"Polarizability Alpha( J=",F4.1, &
+        strfmt3 = '(3X,"Polarizability Alpha( J=",F4.1, &
                  " M=",F4.1,") =",E12.5," a.u. (with Prj)", &
                  /3X,"=",E12.5," +(",E12.5, & 
                  ") (3M^2-J(J+1))/J*(2J-1) a.u.", &
                  /3X,"Alpha_1 =",E12.5," a.u.")'
+        if (isk.EQ.0) then
           write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
           write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
         end if
