@@ -1541,8 +1541,19 @@ Contains
         End If
 
         If (allocated(W)) Deallocate(W)
-        Deallocate(Hamil%n, Hamil%k, Hamil%t, Jsq%n, Jsq%k, Jsq%t, Diag, P, B1, B2, Z1, E1)
-
+        If (allocated(W)) Deallocate(W)
+        If (allocated(Hamil%n)) Deallocate(Hamil%n)
+        If (allocated(Hamil%k)) Deallocate(Hamil%k)
+        If (allocated(Hamil%t)) Deallocate(Hamil%t)
+        If (allocated(Jsq%n)) Deallocate(Jsq%n)
+        If (allocated(Jsq%k)) Deallocate(Jsq%k)
+        If (allocated(Jsq%t)) Deallocate(Jsq%t)
+        If (allocated(Diag)) Deallocate(Diag)
+        If (allocated(P)) Deallocate(P)
+        If (allocated(B1)) Deallocate(B1)
+        If (allocated(B2)) Deallocate(B2)
+        If (allocated(Z1)) Deallocate(Z1)
+        If (allocated(E1)) Deallocate(E1)
         Return
     End Subroutine Diag4
 

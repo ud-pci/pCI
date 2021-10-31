@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.43] - 2021-10-31
+- conf v3.40 - added if allocated statement when deallocating arrays after Diag4
+
 ## [0.7.42] - 2021-10-30
 - conf v3.39 - bug fix in conf resolving slow down of convergence during Davidson procedure
 
