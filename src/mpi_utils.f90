@@ -1,5 +1,7 @@
 Module mpi_utils
     !
+    !   Written by Jeffrey Frey, UD IT-RCI, 2/12/21
+    !
     ! This module implements MPI broadcast functions that break a buffer
     ! that may be too large into multiple chunks.  The <stride> passed
     ! to each of the subroutines dictates how many 8-byte elements should
