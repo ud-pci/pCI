@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.45] - 2021-10-31
+- ine v1.8 - increased number of significant figures in final result in RdcE1
+
 ## [0.7.44] - 2021-10-31
 - ine v1.7 - fixed formatting error in RdcE1
 
