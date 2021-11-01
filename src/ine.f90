@@ -303,7 +303,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.8",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.9",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1803,7 +1803,7 @@ Contains
           write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
           write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
-          strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"      alpha_0=    ",F9.4,"  alpha_2=    ",F9.4)'
+          strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4)'
           write( 6,strfmt2) abs(xlamb),al0,al2
           write(11,strfmt2) abs(xlamb),al0,al2
         End If
