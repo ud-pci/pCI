@@ -1,6 +1,7 @@
 Module mpi_utils
     !
     !   Written by Jeffrey Frey, UD IT-RCI, 2/12/21
+    !   Editted by Charles Cheung, 11/10/21
     !
     ! This module implements MPI broadcast functions that break a buffer
     ! that may be too large into multiple chunks.  The <stride> passed
@@ -19,6 +20,7 @@ Module mpi_utils
     Public :: BroadcastI, BroadcastR, BroadcastD
 
     Integer, Parameter :: MaxStride8Byte = 134217728
+    Integer, Parameter :: MaxStride4Byte = 67108864
     
   Contains
 
@@ -36,11 +38,11 @@ Module mpi_utils
         If (stride .le. 0) Then
             Call GetEnv('CONF_BROADCAST_MAX', envvar)
             Read(envvar, '(i)') use_stride
-            If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
+            If (use_stride .le. 0) use_stride = MaxStride4Byte * 2
         Else
             use_stride = stride
         End If
-        If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
+        If (stride .gt. MaxStride4Byte * 2) use_stride = MaxStride4Byte * 2
         count_remain = count
         i = 1
         mpierr = 0
