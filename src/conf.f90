@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.41")'
+        strfmt = '(4X,"Program conf v3.42")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -737,6 +737,7 @@ Contains
         Use mpi_utils
         Implicit None
         Integer :: mpierr
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -780,13 +781,15 @@ Contains
         Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call BroadcastR(Rint2, IPbr*Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        count=IPbr*Ngint
+        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call BroadcastI(Iarr, Ne*Nd, 0, 0, MPI_COMM_WORLD, mpierr)
+        count=Ne*Nd
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Rsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)

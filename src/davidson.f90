@@ -361,7 +361,7 @@ Module davidson
 
         Integer :: i, k, nlp, n, mpierr, i2min, i2max, i1min, i1max, kd
         Real(dp) :: t
-        Integer(Kind=int64) :: l8
+        Integer(Kind=int64) :: l8, count
 
         nlp=ip*Nlv
 
@@ -376,7 +376,8 @@ Module davidson
             kd=1
         End If
 
-        Call BroadcastD(ArrB, Nd*nlp, 0, 0, MPI_COMM_WORLD, mpierr)
+        count=Nd*nlp
+        Call BroadcastD(ArrB, count, 0, 0, MPI_COMM_WORLD, mpierr)
 
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8
@@ -425,7 +426,7 @@ Module davidson
         ! Orthogonality criteria:
         ortho=1.d-6
 
-        ! Critical value for norma of new vector:
+        ! Critical value for normalization of new vector:
         critN=1.d-9
         jm=j-1
         smax2=1.d10

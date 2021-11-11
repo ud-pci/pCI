@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [0.7.47] - 2021-11-10
+- conf v3.42 - fixed integer overflow in mpi_utils subroutines
+- increased data size of count_remain and i to integer(kind=int64)
+- mpi_utils subroutine now take in int*8 argument for count
+
+## [0.7.47] - 2021-11-10
 - conf v3.41 - bug fix for mpi_utils subroutine BroadcastI for extra large integer arrays
 
 ## [0.7.46] - 2021-11-1

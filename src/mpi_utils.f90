@@ -1,7 +1,7 @@
-Module mpi_utils
+Module mpi_utils    
     !
     !   Written by Jeffrey Frey, UD IT-RCI, 2/12/21
-    !   Editted by Charles Cheung, 11/10/21
+    !   Editted by Charles Cheung, 11/10/21    
     !
     ! This module implements MPI broadcast functions that break a buffer
     ! that may be too large into multiple chunks.  The <stride> passed
@@ -13,6 +13,8 @@ Module mpi_utils
     ! exceeds the maximum threshold, the maximum threshold is used.  The
     ! maximum equates to 1 GiB worth of elements.
     !
+    Use, intrinsic :: iso_fortran_env
+
     Implicit None
     
     Private
@@ -20,7 +22,6 @@ Module mpi_utils
     Public :: BroadcastI, BroadcastR, BroadcastD
 
     Integer, Parameter :: MaxStride8Byte = 134217728
-    Integer, Parameter :: MaxStride4Byte = 67108864
     
   Contains
 
@@ -29,22 +30,24 @@ Module mpi_utils
         Implicit None
 
         Type(MPI_Comm), Intent(In)                  :: comm
-        Integer, Intent(In)                         :: count, stride, rank
+        Integer(Kind=int64), Intent(In)             :: count
+        Integer, Intent(In)                         :: stride, rank
         Integer, Dimension(*), Intent(InOut)        :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
-        Integer                                     :: use_stride, count_remain, i
+        Integer(Kind=int64)                         :: count_remain, i
+        Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
             Call GetEnv('CONF_BROADCAST_MAX', envvar)
             Read(envvar, '(i)') use_stride
-            If (use_stride .le. 0) use_stride = MaxStride4Byte * 2
+            If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
         End If
-        If (stride .gt. MaxStride4Byte * 2) use_stride = MaxStride4Byte * 2
+        If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
         count_remain = count
-        i = 1
+        i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
             Call MPI_Bcast(buffer(i:i+use_stride), use_stride, MPI_INTEGER, rank, comm, mpierr) 
@@ -56,7 +59,8 @@ Module mpi_utils
             i = i + use_stride
         End Do
         If (count_remain .gt. 0) Then
-            Call MPI_Bcast(buffer(i:i+count_remain), count_remain, MPI_INTEGER, rank, comm, mpierr)
+            count_remain2 = count_remain
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, MPI_INTEGER, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting integer range ',i,':',i+use_stride
                 Return
@@ -69,11 +73,13 @@ Module mpi_utils
         Implicit None
 
         Type(MPI_Comm), Intent(In)                  :: comm
-        Integer, Intent(In)                         :: count, stride, rank
+        Integer(Kind=int64), Intent(In)             :: count
+        Integer, Intent(In)                         :: stride, rank
         Real, Dimension(*), Intent(InOut)           :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
-        Integer                                     :: use_stride, count_remain, i
+        Integer(Kind=int64)                         :: count_remain, i
+        Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
             Call GetEnv('CONF_BROADCAST_MAX', envvar)
@@ -85,7 +91,7 @@ Module mpi_utils
         If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
         count_remain = count
 
-        i = 1
+        i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
             Call MPI_Bcast(buffer(i:i+use_stride), use_stride, MPI_REAL, rank, comm, mpierr)
@@ -97,7 +103,8 @@ Module mpi_utils
             i = i + use_stride
         End Do
         If (count_remain .gt. 0) Then
-            Call MPI_Bcast(buffer(i:i+count_remain), count_remain, MPI_REAL, rank, comm, mpierr)
+            count_remain2 = count_remain
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, MPI_REAL, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
@@ -107,15 +114,16 @@ Module mpi_utils
 
     Subroutine BroadcastD(buffer, count, stride, rank, comm, mpierr)
         Use mpi_f08
-        Use, intrinsic :: iso_fortran_env
         Implicit None
 
         Type(MPI_Comm), Intent(In)                  :: comm
-        Integer, Intent(In)                         :: count, stride, rank
+        Integer(Kind=int64), Intent(In)             :: count
+        Integer, Intent(In)                         :: stride, rank
         Real(real64), Dimension(*), Intent(InOut)   :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
-        Integer                                     :: use_stride, count_remain, i
+        Integer(Kind=int64)                         :: count_remain, i
+        Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
             Call GetEnv('CONF_BROADCAST_MAX', envvar)
@@ -126,7 +134,7 @@ Module mpi_utils
         End If
         If (stride .gt. MaxStride8Byte) use_stride = MaxStride8Byte
         count_remain = count
-        i = 1
+        i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
             Call MPI_Bcast(buffer(i:i+use_stride), use_stride, MPI_DOUBLE_PRECISION, rank, comm, mpierr)
@@ -138,7 +146,8 @@ Module mpi_utils
             i = i + use_stride
         End Do
         If (count_remain .gt. 0) Then
-            Call MPI_Bcast(buffer(i:i+count_remain), count_remain, MPI_DOUBLE_PRECISION, rank, comm, mpierr)
+            count_remain2 = count_remain
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, MPI_DOUBLE_PRECISION, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
