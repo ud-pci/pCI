@@ -736,6 +736,7 @@ Contains
         Use mpi_f08
         Use mpi_utils
         Implicit None
+        
         Integer :: mpierr
         Integer(Kind=int64) :: count
 
@@ -781,14 +782,14 @@ Contains
         Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        count=IPbr*Ngint
+        count = IPbr*Int(Ngint,kind=int64)
         Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        count=Ne*Nd
+        count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -923,10 +924,10 @@ Contains
 
                 NumH = cntarray(1)
                 num_done = 0
-                ndsplit = Nd/10
+                ndsplit = Nd/100
                 ndcnt = ndsplit
                 maxme = cntarray(2)
-                j=9
+                j=99
 
                 Do 
                     Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
@@ -949,12 +950,12 @@ Contains
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
-                    If (nnd == ndcnt .and. nnd /= ndsplit*10) Then
+                    If (nnd == ndcnt .and. nnd /= ndsplit*100) Then
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumH
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', 100-j, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
                                                     ', MaxMemPerCore='//trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
@@ -1030,8 +1031,8 @@ Contains
                                     End If
                                 End If
                             End Do
-                        End Do
-                    
+                        End Do 
+                        
                         Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End if
                 End Do
@@ -1544,7 +1545,6 @@ Contains
         End If
 
         If (allocated(W)) Deallocate(W)
-        If (allocated(W)) Deallocate(W)
         If (allocated(Hamil%n)) Deallocate(Hamil%n)
         If (allocated(Hamil%k)) Deallocate(Hamil%k)
         If (allocated(Hamil%t)) Deallocate(Hamil%t)
@@ -1557,6 +1557,7 @@ Contains
         If (allocated(B2)) Deallocate(B2)
         If (allocated(Z1)) Deallocate(Z1)
         If (allocated(E1)) Deallocate(E1)
+
         Return
     End Subroutine Diag4
 
