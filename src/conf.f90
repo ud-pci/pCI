@@ -924,10 +924,10 @@ Contains
 
                 NumH = cntarray(1)
                 num_done = 0
-                ndsplit = Nd/100
+                ndsplit = Nd/10
                 ndcnt = ndsplit
                 maxme = cntarray(2)
-                j=99
+                j=9
 
                 Do 
                     Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
@@ -950,12 +950,12 @@ Contains
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
-                    If (nnd == ndcnt .and. nnd /= ndsplit*100) Then
+                    If (nnd == ndcnt .and. nnd /= ndsplit*10) Then
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumH
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', 100-j, '% done in '// trim(timeStr)// '; '// &
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
                                                     ', MaxMemPerCore='//trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
