@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.47] - 2021-11-10
+## [0.7.49] - 2021-11-22
+- conf v3.43 - bug fix for temporary fix for Jsq%n changing during LAPACK ZSYEV subroutine
+
+## [0.7.48] - 2021-11-10
 - conf v3.42 - fixed integer overflow in mpi_utils subroutines
 - increased data size of count_remain and i to integer(kind=int64)
 - mpi_utils subroutine now take in int*8 argument for count

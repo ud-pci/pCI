@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.42")'
+        strfmt = '(4X,"Program conf v3.43")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1504,6 +1504,9 @@ Contains
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                                If (mype == 0) Then
+                                    Jsq%n=Jn
+                                End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
                             If (mype == 0) Call FormB
