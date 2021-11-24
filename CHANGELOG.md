@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.50] - 2021-11-24
+- conf v3.44 - updated memory routines for FormH
+
 ## [0.7.49] - 2021-11-22
 - conf v3.43 - bug fix for temporary fix for Jsq%n changing during LAPACK ZSYEV subroutine
 
