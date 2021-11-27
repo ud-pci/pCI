@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.51] - 2021-11-26
+- conf v3.45 - updated Rint/RintS errors if IPx was changed
+- split memCalcReqs FormH message into static arrays and FormH arrays
+- removed FormH memory from comparison stage of FormH
+- added memory summary after comparison stage of FormH
+
 ## [0.7.50] - 2021-11-24
 - conf v3.44 - updated memory routines for FormH
 

@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.44")'
+        strfmt = '(4X,"Program conf v3.45")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -548,15 +548,17 @@ Contains
             If (NmaxS < Nmax1 .or. LmaxS < Lmax1) ierr=ierr+1
         End If
         Read (13) NgintS,nrd
-        Allocate(Rint2S(NgintS),Iint2S(NgintS),Iint3S(NgintS),Dint2S(NgintS),Eint2S(NgintS),IntOrdS(nrd))
         If (nrd /= nx*nx) Then
-            Write(*,*)' RintS: IPx was changed from nrd=',nrd,'to nx*nx=',nx*nx
+            Write(*,*)' RintS: IPx was changed from IPx=',int(sqrt(real(nrd))),'to ',nx
             ierr=ierr+1
         End If
         If (ierr > 0) Then
             Write(*,*) ierr,' error(s) detected'
             Stop
         End If
+
+        Allocate(Rint2S(NgintS),Iint2S(NgintS),Iint3S(NgintS),Dint2S(NgintS),Eint2S(NgintS),IntOrdS(nrd))
+
         If (nsx2 == 0) Then ! Nsum is used to skip screening integrals
             Nsum=4*nav
         Else
@@ -674,8 +676,6 @@ Contains
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
                 + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(R_is)+sizeof(I_is)+sizeof(IntOrdS)
-            !Call FormattedMemSize(memFormH, memStr)
-            !Write(*,'(A,A,A)') 'Allocating arrays for FormH requires ',Trim(memStr),' of memory per core' 
         End If   
 
         Return
@@ -689,8 +689,7 @@ Contains
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
                         + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(C)+16*vaBinSize
-        !Call FormattedMemSize(memStaticArrays, memStr)
-        !Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays requires ',Trim(memStr),' of memory per core' 
+
     End Subroutine calcMemStaticArrays
 
     Subroutine calcMemReqs
@@ -705,9 +704,13 @@ Contains
         bytesDP = 8
     
         Call calcMemStaticArrays
-        memEstimate = memFormH + memStaticArrays
-        Call FormattedMemSize(memEstimate, memStr)
+        Call FormattedMemSize(memStaticArrays, memStr)
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr),' of memory per core. (These will not be deallocated)' 
+
+        Call FormattedMemSize(memFormH, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr),' of memory per core' 
+        
+        memEstimate = memFormH + memStaticArrays
     
         mem = bytesDP * Nd * IPlv     & ! ArrB
             + bytesDP * Nlv * 2_dp    & ! Tk,Tj
@@ -827,7 +830,7 @@ Contains
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0
         Real(dp)  :: t, tt
         Integer(Kind=int64) :: statmem, mem, maxmem
-        Character(Len=16)     :: memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
+        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
@@ -947,7 +950,7 @@ Contains
                     maxme = max(cntarray(2),maxme)
                     mem = NumH * 16_int64
                     maxmem = maxme * 16_int64
-                    statmem = memEstimate + memDvdsn + maxmem
+                    statmem = memEstimate + memDvdsn - memFormH + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
@@ -955,10 +958,11 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
+                        Call FormattedMemSize(NumH*16, memStr3)
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
-                        Write(*,'(4X,A)'), 'Memory: (HamiltonianMaxMemPerCore='// trim(memStr2)//', TotalConfMemPerCore='//Trim(memTotStr)//')'
+                        Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
                             Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
                                                     Trim(memTotStr2) ,' is available.'
@@ -972,11 +976,18 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        memEstimate = memEstimate + memDvdsn + maxmem
+                        Call FormattedMemSize(NumH*16, memStr3)
+                        Call FormattedMemSize(memStaticArrays, memStr4)
+                        Call FormattedMemSize(memDvdsn, memStr5)
+                        mem = memEstimate + memDvdsn - memFormH + maxmem
+                        memEstimate = memEstimate + maxmem
                         Write(counterStr,fmt='(I16)') NumH
+                        Call FormattedMemSize(mem, memStr)
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
-                        Write(*,'(4X,A)'), 'Memory: (HamiltonianMaxMemPerCore='// trim(memStr2)//', TotalConfMemPerCore='//Trim(memTotStr)//')'
+                        Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+                        Write(*,'(A)'), 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                                            // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
                         If (memTotalPerCPU /= 0) Then
                             If (statmem > memTotalPerCPU) Then
                                 Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
