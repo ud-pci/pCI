@@ -12,12 +12,12 @@ Module vaccumulator
     
     Type IVAccumulator
         Integer, Allocatable, Dimension(:)  :: vAccum
-        Integer                             :: vLen, vSize, vGrowBy
+        Integer(kind=int64)                 :: vLen, vSize, vGrowBy
     End Type IVAccumulator
     
     Type RVAccumulator
         Real(dp), Allocatable, Dimension(:) :: vAccum
-        Integer                             :: vLen, vSize, vGrowBy
+        Integer(kind=int64)                 :: vLen, vSize, vGrowBy
     End Type RVAccumulator
 
   Contains
@@ -56,7 +56,7 @@ Module vaccumulator
             this%vSize = this%vSize + this%vGrowBy
         End If
     
-        this%vLen = this%vLen + 1
+        this%vLen = this%vLen + 1_int64
         this%vAccum(this%vLen) = iVal
     End Subroutine
     
@@ -118,7 +118,7 @@ Module vaccumulator
             this%vSize = this%vSize + this%vGrowBy
         End If
     
-        this%vLen = this%vLen + 1
+        this%vLen = this%vLen + 1_int64
         this%vAccum(this%vLen) = rVal
     End Subroutine
     

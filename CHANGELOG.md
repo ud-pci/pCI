@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.52] - 2021-11-30
+- changed type of vLen, vSize, vGrowBy in vaccumulator.f90 to int64
+
 ## [0.7.51] - 2021-11-26
 - conf v3.45 - updated Rint/RintS errors if IPx was changed
 - split memCalcReqs FormH message into static arrays and FormH arrays
