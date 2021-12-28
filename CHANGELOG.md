@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.53] - 2021-12-27
+- ine v1.10 - small components of J-decomposition are no longer put to 0
+
 ## [0.7.52] - 2021-11-30
 - changed type of vLen, vSize, vGrowBy in vaccumulator.f90 to int64
 

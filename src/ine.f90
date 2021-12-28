@@ -303,7 +303,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.9",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.10",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1276,13 +1276,13 @@ Contains
            read(*,*)
         end if
         smin=dmin1(sm/sum,sj/sum,sp/sum)
-        if (smin.LT.trsd) then                   !### Small components of
-           do n=1,Nd                             !#### the J-decomposition
-             if (sm/sum.LT.trsd) X1J(n,1)=0.d0   !#### are put to zero
-             if (sj/sum.LT.trsd) X1J(n,2)=0.d0
-             if (sp/sum.LT.trsd) X1J(n,3)=0.d0
-           end do
-        end if
+        !if (smin.LT.trsd) then                   !### Small components of
+        !   do n=1,Nd                             !#### the J-decomposition
+        !     if (sm/sum.LT.trsd) X1J(n,1)=0.d0   !#### are put to zero
+        !     if (sj/sum.LT.trsd) X1J(n,2)=0.d0
+        !     if (sp/sum.LT.trsd) X1J(n,3)=0.d0
+        !   end do
+        !end if
         Return
     End Subroutine Prj
 
