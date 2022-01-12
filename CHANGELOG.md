@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.54] - 2022-01-11
+- ine v1.11 - ine now accepts a list of wavelengths to be entered with different step sizes
+- formatting of ine input file is now: Kl, Kli, Klf, N0, N2, nlambda, (xlambda1, xlambda2, xlambdastep), ...
+
 ## [0.7.53] - 2021-12-27
 - ine v1.10 - small components of J-decomposition are no longer put to 0
 

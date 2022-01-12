@@ -56,7 +56,8 @@ Program ine
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
-    Integer :: i, n, Nd2, Nddir, nsu2, icyc, nlamb, kIters
+    Integer :: i, n, k, Nd2, Nddir, nsu2, icyc, nlamb, kIters
+    Real(dp) :: dlamb
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
     logical :: ok
@@ -80,64 +81,79 @@ Program ine
         icyc=2
     End If
 
-    If (xlamb1==xlamb2) xlambstep=1
+    Do k=1,nrange
+        xlamb1 = xlamb1s(k)
+        xlamb2 = xlamb2s(k)
+        xlambstep = xlambsteps(k)
+        If (k > 1) Then
+            If (xlamb1 == xlamb2s(k-1)) xlamb1 = xlamb1+xlambstep
+            If (xlamb2 - xlamb1 < xlambstep) xlamb1 = xlamb2
+        End If
+        If (xlamb1==xlamb2) xlambstep=1
 
-    nlamb=(xlamb2-xlamb1)/xlambstep+1
-    xlamb=xlamb1
-    Do n=1,nlamb
-        If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
-        Do i=1,icyc
-            Ndir=Nddir
-            If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
-            If (i.EQ.2) W0= -W0
-            If (dabs(xlamb).GT.1.d-8) Then
-                If (i.EQ.2) xlamb= -xlamb
-                Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
-                Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.2,/3X,34("-")/)') xlamb
-            Else
-                Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-            End If
-            Select Case(kIters)
-                Case(0)
-                    Call SolEq1(kl) ! Direct solution
-                    If (Ndir.LT.Nd) Then
-                        Call SolEq4(ok)                 !### Iterative solution
-                        If (Nd.LE.IP1 .AND. .NOT.ok) Then
-                          Ndir= Nd
-                          Write(*,*)
-                          Call SolEq1(kl)
-                          ok=.TRUE.
+        dlamb = (xlamb2-xlamb1)/xlambstep
+        dlamb = Anint(dlamb*100.0)/100.0
+        nlamb = dlamb+1
+        print*, xlamb2, xlamb1, xlambstep, dlamb
+        print*,'nlamb=',nlamb
+        xlamb=xlamb1
+        Do n=1,nlamb
+            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            print*, 'xlamb=',xlamb
+            Do i=1,icyc
+                Ndir=Nddir
+                If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
+                If (i.EQ.2) W0= -W0
+                If (dabs(xlamb).GT.1.d-8) Then
+                    If (i.EQ.2) xlamb= -xlamb
+                    Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
+                    Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
+                Else
+                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                End If
+                Select Case(kIters)
+                    Case(0)
+                        Call SolEq1(kl) ! Direct solution
+                        If (Ndir.LT.Nd) Then
+                            Call SolEq4(ok)                 !### Iterative solution
+                            If (Nd.LE.IP1 .AND. .NOT.ok) Then
+                              Ndir= Nd
+                              Write(*,*)
+                              Call SolEq1(kl)
+                              ok=.TRUE.
+                            End If
                         End If
-                    End If
-                Case(1)
-                    Ndir=Nd
-                    IP1=Nd
-                    Call SolEq1(kl) ! Direct solution
-            End Select
-            If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
-            If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
-            Call RdcX1J                                       !### Transforms and saves X1J
-            If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
-            If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
-            Call Prin                                  !### Output of the results
-            If (Kli.EQ.2.AND.Klf.EQ.2) Then
-              Call RdcE1(i)                            !### Evaluation of E1 polarizability
-              If (W0.EQ.0.d0 .OR. i.EQ.2) Call C_3     !### C_3 coefficient for X2 state
-            End If
-            If (Kli.EQ.5) Call RdcE2(i)                !### Evaluation of E2 polarizabilty
-            If (Kli.EQ.1.OR.Klf.EQ.1) Call RdcPNC      !### Final numbers for Q_w
-            If (Klf.EQ.3) Call RdcAM                   !### Final numbers for AM
-            If (Int_err.NE.0) Then
-              Write( *,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
-              Write(11,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
-            End If
-            If (.NOT.ok) Then
-              Write( *,'(4X,"Convergence was not reached.")')
-              Write(11,'(4X,"Convergence was not reached.")')
-            End If
+                    Case(1)
+                        Ndir=Nd
+                        IP1=Nd
+                        Call SolEq1(kl) ! Direct solution
+                End Select
+                If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
+                If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
+                Call RdcX1J                                       !### Transforms and saves X1J
+                If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
+                If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
+                Call Prin                                  !### Output of the results
+                If (Kli.EQ.2.AND.Klf.EQ.2) Then
+                  Call RdcE1(i)                            !### Evaluation of E1 polarizability
+                  If (W0.EQ.0.d0 .OR. i.EQ.2) Call C_3     !### C_3 coefficient for X2 state
+                End If
+                If (Kli.EQ.5) Call RdcE2(i)                !### Evaluation of E2 polarizabilty
+                If (Kli.EQ.1.OR.Klf.EQ.1) Call RdcPNC      !### Final numbers for Q_w
+                If (Klf.EQ.3) Call RdcAM                   !### Final numbers for AM
+                If (Int_err.NE.0) Then
+                  Write( *,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
+                  Write(11,'(4X,">>>> NOTE:",I7," radial integrals were absent")') Int_err
+                End If
+                If (.NOT.ok) Then
+                  Write( *,'(4X,"Convergence was not reached.")')
+                  Write(11,'(4X,"Convergence was not reached.")')
+                End If
+            End Do
+            xlamb=abs(xlamb)+xlambstep
+            print*,'xlamb_next=',xlamb
         End Do
-        xlamb=abs(xlamb)+xlambstep
     End Do
 
     Close(unit=11)
@@ -247,8 +263,10 @@ Contains
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
     
+        Integer :: i, err_stat
+        logical :: finished
         character(Len=5), Dimension(5) :: str
-        Character(Len=128) :: strfmt
+        Character(Len=128) :: strfmt, err_msg
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
         Call recunit
@@ -281,15 +299,23 @@ Contains
         Write(*,'(A)')' X2 is in file CONF0.XIJ, record number:'
         Read (*,*) N2
         Write(*,'(A,I2)')' N2=',N2
+        Read (*,*) nrange
 
         W0= 0.d0
         If (Kli.EQ.2 .AND. Klf.EQ.2 .OR. Kli.EQ.5) Then
-            Write(*,'(A)')' Give range of wavelengths (nm) followed by step size (e.g. 535 537 0.5):'
+            allocate(xlamb1s(nrange),xlamb2s(nrange),xlambsteps(nrange))
+            Write(*,'(A)')' Give a list of ranges of wavelengths (nm) followed by step size (e.g. 535 537 0.5):'
             Write(*,'(A)')' (for static polarizability give 0 0 0)'
-            Read (*,*) xlamb1, xlamb2, xlambstep
+            Do i=1,nrange
+                Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
+                Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
+            End Do
+            
+            xlamb1 = xlamb1s(1)
+            xlamb2 = xlamb2s(1)
+            xlambstep = xlambsteps(1)
             If (dabs(xlamb1).GT.1.d-8) Then
               W0 = 1.d+7/(xlamb1*219474.63d0)
-              Write(*,'(A,F11.2,A,F11.2,A,F11.2)')' lambda=',xlamb1,' nm to ',xlamb2,' in steps of ',xlambstep
             Else
               Write(*,'(A)')' W0 = 0'
             End If
@@ -303,7 +329,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.10",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.11",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
