@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v3.45")'
+        strfmt = '(4X,"Program conf v3.46")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -1458,6 +1458,7 @@ Contains
                 End If
 
                 If (K_prj == 1) Then
+                    If (mype == 0) Jsq%n=Jn
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
