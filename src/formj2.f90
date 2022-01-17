@@ -118,7 +118,7 @@ Module formj2
         ! If continuing from previous calculation or J^2 matrix has already been constructed
         If (Kl == 1) Then 
             ! Read the matrix J^2 from file CONFp.JJJ
-            Call ReadMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+            Call ReadMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
 
             ! Add maximum memory per core from storing J^2 to total memory count
             Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
@@ -308,7 +308,7 @@ Module formj2
         Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
         ! Write J^2 matrix to file CONFp.JJJ
-        If (Kl /= 1) Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
+        If (Kl /= 1) Call WriteMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
 
         If (mype == 0) Then
             Write(counterStr,fmt='(I16)') NumJ

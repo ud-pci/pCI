@@ -849,13 +849,24 @@ Contains
         ! If continuing calculation or Hamiltonian has already been constructed
         If (Kl == 1) Then 
             ! Read the Hamiltonian from file CONFp.HIJ
-            Call ReadMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            Call ReadMatrix(Hamil%n,Hamil%k,Hamil%t,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
             numzero = Count(Hamil%t(1:ih4) == 0)
 
             ! Add maximum memory per core from storing H to total memory count
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             memEstimate = memEstimate + ihmax*16
 
+        ! If continuing calculation and Hamiltonian is to be extended with more configurations
+        Else If (Kl == 3) Then
+            ! Read the previous Hamiltonian from file CONFp.HIJ
+            !!! Details of future implementation:
+            !!!    the matrix elements will have to be saved to arrays iva1, iva2, rva1
+            !!!    so those arrays can be extended when calculating new matrix elements 
+            Call ReadMatrix(Hamil%n,Hamil%k,Hamil%t,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            numzero = Count(Hamil%t(1:ih4) == 0)
+
+
+        
         ! If starting a new computation and Hamiltonian has not been constructed
         Else 
             Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
@@ -1106,7 +1117,7 @@ Contains
         Call MPI_AllReduce(MPI_IN_PLACE, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
         ! Write Hamiltonian to file CONFp.HIJ
-        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%n,Hamil%k,Hamil%t,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
         Call MPI_AllReduce(Hamil%t(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
