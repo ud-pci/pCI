@@ -48,6 +48,8 @@ Module davidson
                 ! so we must ensure that all determinants below Nd0 are accounted for
                 If (Kl == 1) Then
                     Cycle
+                Else If (Kl == 3) Then
+                    Cycle
                 Else
                     Exit
                 End If

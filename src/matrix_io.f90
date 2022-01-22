@@ -79,7 +79,12 @@ Module matrix_io
         Character(Len=*)              :: filename
         Character(Len=16)             :: timeStr
     
-        If (mype == 0) Then            
+        If (mype == 0) Then    
+            If (filename == 'CONFp.HIJ') Then     
+                Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+                Write(66) Nc, Nd
+                Close(66)   
+            End If
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Write(66) npes
             Close(66)
@@ -167,6 +172,9 @@ Module matrix_io
             End If
 
             ! Read number of processors
+            Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+            Read(66) Nc_prev, Nd_prev
+            Close(66)  
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Read(66) npes_read
             Close(66)
@@ -178,6 +186,9 @@ Module matrix_io
             print*, 'Reading ' // filename // '...'
             Call startTimer(start_time)
         End If
+
+        Call MPI_Bcast(Nd_prev, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nc_prev, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         ! Read counters
         disp = mype * 4_MPI_OFFSET_KIND

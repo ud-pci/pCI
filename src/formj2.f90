@@ -124,6 +124,15 @@ Module formj2
             Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             memEstimate = memEstimate + ijmax*16
 
+        ! If continuing calculation and Hamiltonian is to be extended with more configurations
+        !Else If (Kl == 3) Then
+        !    ! Read the matrix J^2 from file CONFp.JJJ
+        !    Call ReadMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+
+        !    ! Add maximum memory per core from storing J^2 to total memory count
+        !    Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+        !    memEstimate = memEstimate + ijmax*16
+
         ! If starting a new computation and J^2 matrix has not been constructed
         Else
             vaGrowBy = 1000000

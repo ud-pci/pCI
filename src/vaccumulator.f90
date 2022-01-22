@@ -9,6 +9,7 @@ Module vaccumulator
     Public :: IVAccumulator, RVAccumulator
     Public :: IVAccumulatorInit, IVAccumulatorAdd, IVAccumulatorCopy, IVAccumulatorReset
     Public :: RVAccumulatorInit, RVAccumulatorAdd, RVAccumulatorCopy, RVAccumulatorReset
+    Public :: IVAccumulatorContinue, RVAccumulatorContinue
     
     Type IVAccumulator
         Integer, Allocatable, Dimension(:)  :: vAccum
@@ -29,6 +30,21 @@ Module vaccumulator
         Integer, Intent(In)                 :: growBy
         
         this%vLen = 0
+        If (growBy <= 0) then
+            this%vGrowBy = 1000
+        Else
+            this%vGrowBy = growBy
+        End If
+    End Subroutine
+
+    Subroutine IVAccumulatorContinue(this, growBy)
+        Implicit None
+        
+        Type(IVAccumulator), Intent(InOut)  :: this
+        Integer, Intent(In)                 :: growBy
+        
+        this%vLen = size(this%vAccum)
+        this%vSize = size(this%vAccum)
         If (growBy <= 0) then
             this%vGrowBy = 1000
         Else
@@ -91,6 +107,21 @@ Module vaccumulator
         Integer, Intent(In)                 :: growBy
         
         this%vLen = 0
+        If (growBy <= 0) then
+            this%vGrowBy = 1000
+        Else
+            this%vGrowBy = growBy
+        End If
+    End Subroutine
+
+    Subroutine RVAccumulatorContinue(this, growBy)
+        Implicit None
+        
+        Type(RVAccumulator), Intent(InOut)  :: this
+        Integer, Intent(In)                 :: growBy
+        
+        this%vLen = size(this%vAccum)
+        this%vSize = size(this%vAccum)
         If (growBy <= 0) then
             this%vGrowBy = 1000
         Else

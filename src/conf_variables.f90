@@ -12,7 +12,7 @@ Module conf_variables
 
     Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0
     Integer             :: NmaxS=0, LmaxS=0, Ngint=0, Nhint=0, NhintS=0, NgintS=0
-    Integer             :: IPlv, nrd, kdavidson, num_is, Nc1
+    Integer             :: IPlv, nrd, kdavidson, num_is, Nc1, Nc_prev, Nd_prev
     Integer             :: Kherr=0, Kgerr=0, Lmax, Kmax, Ksym, Nsum
     Integer             :: Nd0=0, vaBinSize
     Integer(Kind=Int64) :: iscr=0_int64, NumH=0_int64, NumJ=0_int64, counter1=0_int64, ij8=0_int64, ih8=0_int64

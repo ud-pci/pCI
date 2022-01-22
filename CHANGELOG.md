@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2022-01-21
+- conf v4.0 - implementation of Kl=3 - additional configurations
+- added global variables Nc_prev and Nd_prev to conf_variables.f90
+- added subroutines IVAccumultorContinue and RVAccumulatorContinue to vaccumulator.f90
+- added condition for Kl=3 to cycle when constructing initial approximation
+- added new conditional under FormH for Kl=3
+- changed arguments of ReadMatrix and WriteMatrix to take in three 1d arrays instead of a matrix
+- added conditional to read and write previous Nc and Nd in subroutines ReadMatrix and WriteMatrix 
+
 ## [0.7.54] - 2022-01-11
 - ine v1.11 - ine now accepts a list of wavelengths to be entered with different step sizes
 - formatting of ine input file is now: Kl, Kli, Klf, N0, N2, nlambda, (xlambda1, xlambda2, xlambdastep), ...
