@@ -30,8 +30,8 @@ Module conf_variables
     Real(dp), Dimension(IP1)   :: C
 
     Type Matrix
-        Integer,  Allocatable, Dimension(:) :: n, k
-        Real(dp), Allocatable, Dimension(:) :: t
+        Integer,  Allocatable, Dimension(:) :: indices1, indices2
+        Real(dp), Allocatable, Dimension(:) :: values
     End Type Matrix
 
     Type(Matrix) :: Hamil, Jsq

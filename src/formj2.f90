@@ -118,7 +118,7 @@ Module formj2
         ! If continuing from previous calculation or J^2 matrix has already been constructed
         If (Kl == 1) Then 
             ! Read the matrix J^2 from file CONFp.JJJ
-            Call ReadMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+            Call ReadMatrix(Jsq%indices1,Jsq%indices2,Jsq%values,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
 
             ! Add maximum memory per core from storing J^2 to total memory count
             Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
@@ -127,7 +127,7 @@ Module formj2
         ! If continuing calculation and Hamiltonian is to be extended with more configurations
         !Else If (Kl == 3) Then
         !    ! Read the matrix J^2 from file CONFp.JJJ
-        !    Call ReadMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+        !    Call ReadMatrix(Jsq%indices1,Jsq%indices2,Jsq%values,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
 
         !    ! Add maximum memory per core from storing J^2 to total memory count
         !    Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
@@ -298,9 +298,9 @@ Module formj2
                 End Do
             End If
         
-            Call IVAccumulatorCopy(iva1, Jsq%n, counter1)
-            Call IVAccumulatorCopy(iva2, Jsq%k, counter2)
-            Call RVAccumulatorCopy(rva1, Jsq%t, counter3)
+            Call IVAccumulatorCopy(iva1, Jsq%indices1, counter1)
+            Call IVAccumulatorCopy(iva2, Jsq%indices2, counter2)
+            Call RVAccumulatorCopy(rva1, Jsq%values, counter3)
             
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
@@ -311,13 +311,13 @@ Module formj2
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End If
 
-        ij8=size(Jsq%t)
+        ij8=size(Jsq%values)
         ij4 = ij8
 
         Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
         ! Write J^2 matrix to file CONFp.JJJ
-        If (Kl /= 1) Call WriteMatrix(Jsq%n,Jsq%k,Jsq%t,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
+        If (Kl /= 1) Call WriteMatrix(Jsq%indices1,Jsq%indices2,Jsq%values,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
 
         If (mype == 0) Then
             Write(counterStr,fmt='(I16)') NumJ
@@ -342,9 +342,9 @@ Module formj2
         ierr=0
         xj=0.d0
         Do i=1,ij8
-            n=Jsq%n(i)
-            k=Jsq%k(i)
-            t=Jsq%t(i)
+            n=Jsq%indices1(i)
+            k=Jsq%indices2(i)
+            t=Jsq%values(i)
             If (max(k,n) <= nx) Then
                 r=t*X1(k)*X1(n)
                 If (n /= k) r=r+r

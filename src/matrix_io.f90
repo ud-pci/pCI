@@ -51,7 +51,7 @@ Module matrix_io
         End Select
     End Subroutine MPIErrHandle
 
-    Subroutine WriteMatrix(matn,matk,matt,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
+    Subroutine WriteMatrix(indices1,indices2,values,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
         !
         ! This subroutine writes a parallel file
         ! Matrix 'mat' is written to the file 'filename'
@@ -66,8 +66,8 @@ Module matrix_io
         !
         Use mpi
         Implicit None
-        Integer, Allocatable, Dimension(:)  :: matn, matk
-        Real(dp), Allocatable, Dimension(:) :: matt
+        Integer, Allocatable, Dimension(:)  :: indices1, indices2
+        Real(dp), Allocatable, Dimension(:) :: values
         Integer, Intent(In)             :: num_elements_per_core
         Integer(Kind=int64), Intent(In) :: num_elements_total
 
@@ -114,21 +114,21 @@ Module matrix_io
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
-        Call MPI_FILE_WRITE(fh, matn, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_WRITE(fh, indices1, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Write mat%k
         disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
-        Call MPI_FILE_WRITE(fh, matk, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_WRITE(fh, indices2, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Write mat%t
         disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
-        Call MPI_FILE_WRITE(fh, matt, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_WRITE(fh, values, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Close file
@@ -142,14 +142,14 @@ Module matrix_io
         End If
     End Subroutine WriteMatrix
 
-    Subroutine ReadMatrix(matn,matk,matt,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
+    Subroutine ReadMatrix(indices1,indices2,values,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
         !
         ! This subroutine reads a parallel matrix file 
         !
         Use mpi
         Implicit None
-        Integer, Allocatable, Dimension(:)  :: matn, matk
-        Real(dp), Allocatable, Dimension(:) :: matt
+        Integer, Allocatable, Dimension(:)  :: indices1, indices2
+        Real(dp), Allocatable, Dimension(:) :: values
         Integer, Intent(Out)             :: num_elements_per_core
         Integer(Kind=int64), Intent(Out) :: num_elements_total
 
@@ -172,9 +172,11 @@ Module matrix_io
             End If
 
             ! Read number of processors
-            Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
-            Read(66) Nc_prev, Nd_prev
-            Close(66)  
+            If (Kl == 3) Then
+                Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+                Read(66) Nc_prev, Nd_prev
+                Close(66) 
+            End If 
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Read(66) npes_read
             Close(66)
@@ -214,23 +216,23 @@ Module matrix_io
         End Do
 
         ! Allocate matrix if not allocated yet
-        If (.not. allocated(matn)) allocate(matn(num_elements_per_core))
-        If (.not. allocated(matk)) allocate(matk(num_elements_per_core))
-        If (.not. allocated(matt)) allocate(matt(num_elements_per_core))
+        If (.not. allocated(indices1)) allocate(indices1(num_elements_per_core))
+        If (.not. allocated(indices2)) allocate(indices2(num_elements_per_core))
+        If (.not. allocated(values)) allocate(values(num_elements_per_core))
 
         ! Read first indices of matrix elements mat%n
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
-        Call MPI_FILE_READ_AT(fh, disp, matn, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_READ_AT(fh, disp, indices1, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Read second indices of matrix elements mat%k
         disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
-        Call MPI_FILE_READ_AT(fh, disp, matk, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_READ_AT(fh, disp, indices2, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Read values of matrix element mat%t
         disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
-        Call MPI_FILE_READ_AT(fh, disp, matt, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_READ_AT(fh, disp, values, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
         ! Close file

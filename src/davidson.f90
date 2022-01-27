@@ -36,9 +36,9 @@ Module davidson
         Diag=0.d0
         Z1=0.d0
         Do l8=1,ih8
-            n=Hamil%n(l8)
-            k=Hamil%k(l8)
-            t=Hamil%t(l8)
+            n=Hamil%indices1(l8)
+            k=Hamil%indices2(l8)
+            t=Hamil%values(l8)
             If (n == k) t=t-Hmin
             If (n <= Nd0) Then
                 Z1(n,k)=t
@@ -383,9 +383,9 @@ Module davidson
 
         ArrB(1:Nd,i2min:i2max)=0.d0
         Do l8=1, ih8
-            n=Hamil%n(l8)
-            k=Hamil%k(l8)
-            t=Hamil%t(l8)
+            n=Hamil%indices1(l8)
+            k=Hamil%indices2(l8)
+            t=Hamil%values(l8)
             If (n == k) Then
                 t=t-Hmin
                 If (kd == 1) Diag(n)=t
@@ -517,9 +517,9 @@ Module davidson
                     ArrB(1:Nd,i2)=0.d0
                 End Do
                 Do j=1,ij8
-                    n=Jsq%n(j)
-                    k=Jsq%k(j)
-                    t=Jsq%t(j)
+                    n=Jsq%indices1(j)
+                    k=Jsq%indices2(j)
+                    t=Jsq%values(j)
                     Do i=1,num
                         proceed=(lin-1)*Iconverge(i)==0
                         If (proceed) Then
