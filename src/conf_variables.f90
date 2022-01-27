@@ -24,14 +24,14 @@ Module conf_variables
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real,     Allocatable, Dimension(:,:)  :: Rint2
     Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tk, Tj, Tl, Ts, Diag, D, E
-    Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W
+    Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W, ArrB
 
     Real(dp), Dimension(IPs)   :: Eps
     Real(dp), Dimension(IP1)   :: C
 
     Type Matrix
         Integer,  Allocatable, Dimension(:) :: indices1, indices2
-        Real(dp), Allocatable, Dimension(:) :: values
+        Real, Allocatable, Dimension(:) :: values
     End Type Matrix
 
     Type(Matrix) :: Hamil, Jsq

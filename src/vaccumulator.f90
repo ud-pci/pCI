@@ -17,7 +17,7 @@ Module vaccumulator
     End Type IVAccumulator
     
     Type RVAccumulator
-        Real(dp), Allocatable, Dimension(:) :: vAccum
+        Real, Allocatable, Dimension(:) :: vAccum
         Integer(kind=int64)                 :: vLen, vSize, vGrowBy
     End Type RVAccumulator
 
@@ -133,8 +133,8 @@ Module vaccumulator
         Implicit None
         
         Type(RVAccumulator), Intent(InOut)  :: this
-        Real(dp), Intent(In)                :: rVal
-        Real(dp), Dimension(:), Allocatable :: vTmp
+        Real, Intent(In)                :: rVal
+        Real, Dimension(:), Allocatable :: vTmp
         
         If (.not. Allocated(this%vAccum)) then
             ! Initial allocation of vAccum:
@@ -157,7 +157,7 @@ Module vaccumulator
         Implicit None
         
         Type(RVAccumulator), Intent(InOut)                  :: this
-        Real(dp), Dimension(:), Allocatable, Intent(Out)    :: outV
+        Real, Dimension(:), Allocatable, Intent(Out)    :: outV
         Integer, Intent(Out)                                :: outVLen
         
         outVLen = this%vLen

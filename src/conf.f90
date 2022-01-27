@@ -63,7 +63,7 @@ Program conf
     ! Get number of processes
     !Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
     Call BLACS_PINFO(mype,npes)
-
+    
     Call startTimer(start_time)
     
     ! Give ConfFilePaths a chance to decide what filenames/paths to use:
@@ -73,7 +73,7 @@ Program conf
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
     Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU", eValue)
     read(eValue,'(I12)') memTotalPerCPU  
-
+    
     ! Initialization subroutines
     ! master processor will read input files and broadcast parameters and arrays to all processors
     If (mype == 0) Then
@@ -124,11 +124,11 @@ Contains
         Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
         Implicit None
         Integer :: err_stat
-        Character(Len=32) :: strfmt
+        Character(Len=64) :: strfmt
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v4.0 - Kl3")'
+        strfmt = '(4X,"Program conf v4.0 - Kl3 with single precision")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -835,7 +835,7 @@ Contains
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, endnd, maxme
         Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0
-        Real(dp)  :: t, tt
+        Real  :: t, tt
         Integer(Kind=int64) :: statmem, mem, maxmem
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
@@ -955,8 +955,8 @@ Contains
             
                     NumH = NumH + cntarray(1)
                     maxme = max(cntarray(2),maxme)
-                    mem = NumH * 16_int64
-                    maxmem = maxme * 16_int64
+                    mem = NumH * 12_int64
+                    maxmem = maxme * 12_int64
                     statmem = memEstimate + memDvdsn - memFormH + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -1197,8 +1197,8 @@ Contains
             
                     NumH = NumH + cntarray(1)
                     maxme = max(cntarray(2),maxme)
-                    mem = NumH * 16_int64
-                    maxmem = maxme * 16_int64
+                    mem = NumH * 12_int64
+                    maxmem = maxme * 12_int64
                     statmem = memEstimate + memDvdsn - memFormH + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -1207,7 +1207,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*16, memStr3)
+                        Call FormattedMemSize(NumH*12, memStr3)
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
@@ -1225,7 +1225,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*16, memStr3)
+                        Call FormattedMemSize(NumH*12, memStr3)
                         Call FormattedMemSize(memStaticArrays, memStr4)
                         Call FormattedMemSize(memDvdsn, memStr5)
                         mem = memEstimate + memDvdsn - memFormH + maxmem
