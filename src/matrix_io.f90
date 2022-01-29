@@ -125,7 +125,7 @@ Module matrix_io
         Call MPIErrHandle(mpierr)
 
         ! Write mat%t
-        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
+        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
         Call MPI_FILE_WRITE(fh, values, num_elements_per_core, MPI_REAL, MPI_STATUS_IGNORE, mpierr) 
@@ -231,7 +231,7 @@ Module matrix_io
         Call MPIErrHandle(mpierr)
 
         ! Read values of matrix element mat%t
-        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
+        disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_READ_AT(fh, disp, values, num_elements_per_core, MPI_REAL, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
