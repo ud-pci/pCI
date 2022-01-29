@@ -1358,7 +1358,7 @@ Contains
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%indices1,Hamil%indices2,Hamil%values,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(Hamil%values(1:ih8), Hmin, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%values(1:ih8), Hmin, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype==0) Then
             ! Write number of non-zero matrix elements

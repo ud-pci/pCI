@@ -17,7 +17,8 @@ Module conf_variables
     Integer             :: Nd0=0, vaBinSize
     Integer(Kind=Int64) :: iscr=0_int64, NumH=0_int64, NumJ=0_int64, counter1=0_int64, ij8=0_int64, ih8=0_int64
     Integer(Kind=Int64) :: memTotalPerCPU=0_int64, memDvdsn=0_int64, memFormH=0_int64, memStaticArrays=0_int64, memEstimate=0_int64
-    Real(dp)            :: Ecore=0_dp, Hmin=0_dp, XJ_av, dR_N, E_k, xscr=0_dp, K_gnt, E_0
+    Real(dp)            :: Ecore=0_dp, XJ_av, dR_N, E_k, xscr=0_dp, K_gnt, E_0
+    Real                :: Hmin
 
     Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2, In
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
