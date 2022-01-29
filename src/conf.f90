@@ -1833,9 +1833,9 @@ Contains
         Implicit None
         Integer :: i, n, ierr, mype, mpierr
 
-        If (K_prj == 1) Then
-            Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype)
-        End If
+        !If (K_prj == 1) Then
+        !    Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype)
+        !End If
         If (mype == 0) Then
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         End If
