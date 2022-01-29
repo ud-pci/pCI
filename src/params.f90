@@ -4,7 +4,7 @@ Module params
     !                      parameters determining dimensions of arrays,
     !                      and global variables and arrays used in parallel programs
     !
-    Use, Intrinsic :: iso_fortran_env, Only : dp => real64, int64
+    Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, int64
 
     Implicit None
     

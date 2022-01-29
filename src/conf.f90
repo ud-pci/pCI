@@ -861,7 +861,7 @@ Contains
 
             ! Add maximum memory per core from storing H to total memory count
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            memEstimate = memEstimate + ihmax*16
+            memEstimate = memEstimate + ihmax*12
 
         ! If continuing calculation and Hamiltonian is to be extended with more configurations
         Else If (Kl == 3) Then
@@ -1404,7 +1404,7 @@ Contains
         Return
     End Subroutine FormH
 
-    Real(dp) function Hmltn(idet, is, nf, i2, i1, j2, j1) 
+    Real function Hmltn(idet, is, nf, i2, i1, j2, j1) 
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
@@ -1441,7 +1441,7 @@ Contains
                 End Do
                 t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
         End Select
-        Hmltn=t
+        Hmltn=Real(t,kind=sp)
         Return
     End function Hmltn
 
@@ -1707,6 +1707,7 @@ Contains
                 End If
 
                 If (K_prj == 1) Then
+                    If (mype == 0) Jsq%indices1=Jn
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
