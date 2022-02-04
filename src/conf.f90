@@ -1948,8 +1948,17 @@ Contains
 
         Allocate(C(Nd), W(Nc,Nlv))
 
+        If (kWeights == 1) Then
+            Open(88,file='CONF.WGT',status='UNKNOWN')
+            strfmt = '(I8,I6,F11.7)'
+        End If
         ! Form matrix of weights of each configuration for each energy level
         Do j=1,Nlv
+            If (kWeights == 1) Then
+                Write(88,'(A,I3)') 'Level #',j
+                Write(88,'(A25)') '========================='
+                Write(88,'(A25)') '      ID    IC     W     '
+            End If
             C(1:Nd)=ArrB(1:Nd,j)
             i=0
             Do ic=1,Nc
@@ -1958,9 +1967,12 @@ Contains
                 Do k=1,ndk
                     i=i+1
                     W(ic,j)=W(ic,j)+C(i)**2
+                    If (kWeights == 1) Write(88,strfmt) i, ic, C(i)**2
                 End Do
             End Do
+            If (kWeights == 1) Write(88,'(A25)') '========================='
         End Do
+        If (kWeights == 1) Close(88)
 
         ! Print the weights of each configuration
         n=(Nlv-1)/5+1
