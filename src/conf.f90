@@ -128,7 +128,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v4.0 - Kl3 with single precision")'
+        strfmt = '(4X,"Program conf v4.1 - Kl3 with single precision")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -835,13 +835,13 @@ Contains
         Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, endnd, maxme
         Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0
-        Real  :: t, tt
+        Real(kind=Hamil%knd)  :: t, tt
         Integer(Kind=int64) :: statmem, mem, maxmem
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt, memkind
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         Call startTimer(stot)
@@ -861,7 +861,7 @@ Contains
 
             ! Add maximum memory per core from storing H to total memory count
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            memEstimate = memEstimate + ihmax*12
+            memEstimate = memEstimate + ihmax*(8+Hamil%knd)
 
         ! If continuing calculation and Hamiltonian is to be extended with more configurations
         Else If (Kl == 3) Then
@@ -955,8 +955,8 @@ Contains
             
                     NumH = NumH + cntarray(1)
                     maxme = max(cntarray(2),maxme)
-                    mem = NumH * 12_int64
-                    maxmem = maxme * 12_int64
+                    mem = NumH * (8_int64+Hamil%knd)
+                    maxmem = maxme * (8_int64+Hamil%knd)
                     statmem = memEstimate + memDvdsn - memFormH + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -965,7 +965,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*16, memStr3)
+                        Call FormattedMemSize(NumH*(8+Hamil%knd), memStr3)
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
@@ -983,7 +983,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*16, memStr3)
+                        Call FormattedMemSize(NumH*(8+Hamil%knd), memStr3)
                         Call FormattedMemSize(memStaticArrays, memStr4)
                         Call FormattedMemSize(memDvdsn, memStr5)
                         mem = memEstimate + memDvdsn - memFormH + maxmem
@@ -1197,8 +1197,8 @@ Contains
             
                     NumH = NumH + cntarray(1)
                     maxme = max(cntarray(2),maxme)
-                    mem = NumH * 12_int64
-                    maxmem = maxme * 12_int64
+                    mem = NumH * (8_int64+Hamil%knd)
+                    maxmem = maxme * (8_int64+Hamil%knd)
                     statmem = memEstimate + memDvdsn - memFormH + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -1207,7 +1207,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*12, memStr3)
+                        Call FormattedMemSize(NumH*(8+Hamil%knd), memStr3)
                         Write(counterStr,fmt='(I16)') NumH
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
@@ -1225,7 +1225,7 @@ Contains
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
-                        Call FormattedMemSize(NumH*12, memStr3)
+                        Call FormattedMemSize(NumH*(8+Hamil%knd), memStr3)
                         Call FormattedMemSize(memStaticArrays, memStr4)
                         Call FormattedMemSize(memDvdsn, memStr5)
                         mem = memEstimate + memDvdsn - memFormH + maxmem
@@ -1358,7 +1358,7 @@ Contains
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%indices1,Hamil%indices2,Hamil%values,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(Hamil%values(1:ih8), Hmin, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%values(1:ih8), Hamil%minval, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype==0) Then
             ! Write number of non-zero matrix elements
@@ -1374,7 +1374,7 @@ Contains
             Write(11,strfmt) Trim(AdjustL(counterStr))
 
             ! Write value of lowest matrix element
-            Write(counterStr,fmt='(F14.8)') Hmin
+            Write(counterStr,fmt='(F14.8)') Hamil%minval
             strfmt = '(4X,"Hmin = ",A)'
             Write( 6,strfmt) Trim(AdjustL(counterStr))
             Write(11,strfmt) Trim(AdjustL(counterStr))
@@ -1404,7 +1404,7 @@ Contains
         Return
     End Subroutine FormH
 
-    Real function Hmltn(idet, is, nf, i2, i1, j2, j1) 
+    Real(kind=Hamil%knd) function Hmltn(idet, is, nf, i2, i1, j2, j1) 
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
@@ -1414,7 +1414,7 @@ Contains
         Integer, Intent(InOut)                              :: is, nf, i1, i2, j1, j2
         
         Integer     :: iq, jq, jq0
-        Real(dp)    :: t
+        Real(kind=Hamil%knd)    :: t
         
         t=0.d0
         Select Case(nf)
@@ -1441,7 +1441,7 @@ Contains
                 End Do
                 t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
         End Select
-        Hmltn=Real(t,kind=sp)
+        Hmltn=t
         Return
     End function Hmltn
 
@@ -1753,8 +1753,8 @@ Contains
                             If (ax < xx) ax=xx
                             If (vmax < E(i)) vmax=E(i)
                             strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
-                            Write( 6,strfmt) i,-(E(i)+Hmin),kx,xx
-                            Write(11,strfmt) i,-(E(i)+Hmin),kx,xx
+                            Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
+                            Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                         End Do
                     End If
                     Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)

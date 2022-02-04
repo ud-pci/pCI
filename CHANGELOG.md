@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2022-02-04
+- conf v4.1 - implementation of parameterized derived type for matrices to switch between single and double precision
+- added minimum value of matrix in type Matrix
+
 ## [0.8.0] - 2022-01-21
 - conf v4.0 - implementation of Kl=3 - additional configurations
 - added global variables Nc_prev and Nd_prev to conf_variables.f90

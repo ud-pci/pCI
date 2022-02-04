@@ -39,7 +39,7 @@ Module davidson
             n=Hamil%indices1(l8)
             k=Hamil%indices2(l8)
             t=Hamil%values(l8)
-            If (n == k) t=t-Hmin
+            If (n == k) t=t-Hamil%minval
             If (n <= Nd0) Then
                 Z1(n,k)=t
                 Z1(k,n)=t
@@ -86,13 +86,13 @@ Module davidson
                 Call J_av(B1,Nd0,xj,ierr)
                 If (ierr == 0) Then
                     num=num+1
-                    E(num)=-(E1(j)+Hmin)
+                    E(num)=-(E1(j)+Hamil%minval)
                     Tj(num)=xj
                     ArrB(1:Nd,num)=B1(1:Nd)
                     If (num >= Nlv) Exit
                 Else
                     nskip=nskip+1
-                    If (mype==0) Write(*,*) '  skip Ej =',-(E1(j)+Hmin)
+                    If (mype==0) Write(*,*) '  skip Ej =',-(E1(j)+Hamil%minval)
                 End If
             End Do
         Else ! Reading CONF.XIJ
@@ -143,7 +143,7 @@ Module davidson
                 t=P(l,k)
                 B2(1:Nd)=B2(1:Nd)+t*ArrB(1:Nd,l)
             End Do
-            t=-(E(k)+Hmin)
+            t=-(E(k)+Hamil%minval)
             Tk(k)=t
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
@@ -169,7 +169,7 @@ Module davidson
                 t=P(l,k)
                 B2(1:Nd)=B2(1:Nd)+t*ArrB(1:Nd,l)
             End Do
-            t=-(E(k)+Hmin)
+            t=-(E(k)+Hamil%minval)
             Tk(k)=t
             Write(17) t,Tj(k),Nd,(B2(i),i=1,Nd)
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
@@ -387,7 +387,7 @@ Module davidson
             k=Hamil%indices2(l8)
             t=Hamil%values(l8)
             If (n == k) Then
-                t=t-Hmin
+                t=t-Hamil%minval
                 If (kd == 1) Diag(n)=t
             End If
             ArrB(n,i2min:i2max)=ArrB(n,i2min:i2max)+t*ArrB(k,i1min:i1max)
