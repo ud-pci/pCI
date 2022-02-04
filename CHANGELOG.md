@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.56] - 2022-02-04
+- ine v1.12 - increased limit of NumH from integer to integer*8
+
 ## [0.7.55] - 2022-01-13
 - conf v3.46 - bug fix for Jsq%n for Kv=3
 

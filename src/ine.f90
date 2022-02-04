@@ -329,7 +329,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.11",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.12",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -859,7 +859,8 @@ Contains
 
     Subroutine ReadHIJ
         Implicit None
-        Integer :: i8, err_stat
+        Integer :: err_stat
+        Integer(kind=int64) :: i8
         Character(Len=256) :: err_msg
 
         Open(unit=15,file='CONF.HIJ',status='UNKNOWN',form='unformatted',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -871,6 +872,7 @@ Contains
         End If
 
         Read(15) NumH
+        print*,'NumH=',NumH
         If (.not. Allocated(Hamil%n)) Allocate(Hamil%n(NumH))
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
