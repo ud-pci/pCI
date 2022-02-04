@@ -128,7 +128,14 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF.RES')
-        strfmt = '(4X,"Program conf v4.1 - Kl3 with single precision")'
+
+        Select Case(type_real)
+        Case(sp)
+            strfmt = '(4X,"Program conf v4.1 - Kl3 with single precision")'
+        Case(dp)
+            strfmt = '(4X,"Program conf v4.1 - Kl3 with double precision")'
+        End Select
+        
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -856,8 +863,8 @@ Contains
         ! If continuing calculation or Hamiltonian has already been constructed
         If (Kl == 1) Then 
             ! Read the Hamiltonian from file CONFp.HIJ
-            Call ReadMatrix(Hamil%indices1,Hamil%indices2,Hamil%values,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-            numzero = Count(Hamil%values(1:ih4) == 0)
+            Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            numzero = Count(Hamil%val(1:ih4) == 0)
 
             ! Add maximum memory per core from storing H to total memory count
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
@@ -869,7 +876,7 @@ Contains
             !!! Details of future implementation:
             !!!    the matrix elements will have to be saved to arrays iva1, iva2, rva1
             !!!    so those arrays can be extended when calculating new matrix elements 
-            !Call ReadMatrix(Hamil%indices1,Hamil%indices2,Hamil%values,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            !Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
             Call ReadMatrix(iva1%vAccum,iva2%vAccum,rva1%vAccum,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
 
             nz0 = count(rva1%vAccum==0)
@@ -1059,9 +1066,9 @@ Contains
                 End Do
             End If
 
-            Call IVAccumulatorCopy(iva1, Hamil%indices1, counter1)
-            Call IVAccumulatorCopy(iva2, Hamil%indices2, counter2)
-            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%values, counter3)
+            Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
+            Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
+            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
 
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
@@ -1076,19 +1083,19 @@ Contains
             j=1
 
             If (mype /= 0) Then
-                Allocate(Hamil%values(counter1))
-                Hamil%values(1:ih4) = rva1%vAccum(1:ih4)
+                Allocate(Hamil%val(counter1))
+                Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
                 Call startTimer(s2)
                 Do n=ih4+1,counter1
-                    nn=Hamil%indices1(n)
-                    kk=Hamil%indices2(n)
+                    nn=Hamil%ind1(n)
+                    kk=Hamil%ind2(n)
                     Call Gdet(nn,idet1)
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                     t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                    Hamil%values(n)=t
+                    Hamil%val(n)=t
 
                     If (counter1 == maxNumElementsPerCore .and. mod(n,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
@@ -1101,7 +1108,7 @@ Contains
             Else
                 print*, '========== Starting calculation stage of FormH =========='
             End If
-            numzero = count(Hamil%values==0)
+            numzero = count(Hamil%val==0)
             !print*, mype, numzero
             Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -1299,9 +1306,9 @@ Contains
                 End Do
             End If
 
-            Call IVAccumulatorCopy(iva1, Hamil%indices1, counter1)
-            Call IVAccumulatorCopy(iva2, Hamil%indices2, counter2)
-            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%values, counter3)
+            Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
+            Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
+            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
 
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
@@ -1316,18 +1323,18 @@ Contains
             j=1
 
             If (mype /= 0) Then
-                Allocate(Hamil%values(counter1))
+                Allocate(Hamil%val(counter1))
                 Call startTimer(s2)
                 Do n=1,counter1
-                    nn=Hamil%indices1(n)
-                    kk=Hamil%indices2(n)
+                    nn=Hamil%ind1(n)
+                    kk=Hamil%ind2(n)
                     Call Gdet(nn,idet1)
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                     t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                    Hamil%values(n)=t
+                    Hamil%val(n)=t
                     If (t == 0) numzero=numzero+1
 
                     If (counter1 == maxNumElementsPerCore .and. mod(n,mesplit)==0) Then
@@ -1346,7 +1353,7 @@ Contains
             If (mype==0) print*, '========== Formation of Hamiltonian matrix completed =========='
         End If
 
-        ih8=size(Hamil%values)
+        ih8=size(Hamil%val)
         ih4=ih8
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1355,10 +1362,10 @@ Contains
         Call MPI_AllReduce(MPI_IN_PLACE, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
         ! Write Hamiltonian to file CONFp.HIJ
-        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%indices1,Hamil%indices2,Hamil%values,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(Hamil%values(1:ih8), Hamil%minval, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype==0) Then
             ! Write number of non-zero matrix elements
@@ -1653,11 +1660,11 @@ Contains
             Allocate(W(lwork))
         End If
 
-        ! temporary solution for value of Jsq%indices1 changing during LAPACK ZSYEV subroutine
+        ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
-            js = size(Jsq%indices1)
+            js = size(Jsq%ind1)
             Allocate(Jn(js))
-            Jn=Jsq%indices1
+            Jn=Jsq%ind1
         End If
 
         ! Davidson loop:
@@ -1707,7 +1714,7 @@ Contains
                 End If
 
                 If (K_prj == 1) Then
-                    If (mype == 0) Jsq%indices1=Jn
+                    If (mype == 0) Jsq%ind1=Jn
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Do i=Nlv+1,2*Nlv
@@ -1767,7 +1774,7 @@ Contains
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                                 If (mype == 0) Then
-                                    Jsq%indices1=Jn
+                                    Jsq%ind1=Jn
                                 End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
@@ -1795,9 +1802,9 @@ Contains
             End If
         End Do
 
-        ! temporary solution for value of Jsq%indices1 changing during LAPACK ZSYEV subroutine
+        ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
-            Jsq%indices1=Jn
+            Jsq%ind1=Jn
             Deallocate(Jn)
         End If
         
@@ -1810,12 +1817,12 @@ Contains
         End If
 
         If (allocated(W)) Deallocate(W)
-        If (allocated(Hamil%indices1)) Deallocate(Hamil%indices1)
-        If (allocated(Hamil%indices2)) Deallocate(Hamil%indices2)
-        If (allocated(Hamil%values)) Deallocate(Hamil%values)
-        If (allocated(Jsq%indices1)) Deallocate(Jsq%indices1)
-        If (allocated(Jsq%indices2)) Deallocate(Jsq%indices2)
-        If (allocated(Jsq%values)) Deallocate(Jsq%values)
+        If (allocated(Hamil%ind1)) Deallocate(Hamil%ind1)
+        If (allocated(Hamil%ind2)) Deallocate(Hamil%ind2)
+        If (allocated(Hamil%val)) Deallocate(Hamil%val)
+        If (allocated(Jsq%ind1)) Deallocate(Jsq%ind1)
+        If (allocated(Jsq%ind2)) Deallocate(Jsq%ind2)
+        If (allocated(Jsq%val)) Deallocate(Jsq%val)
         If (allocated(Diag)) Deallocate(Diag)
         If (allocated(P)) Deallocate(P)
         If (allocated(B1)) Deallocate(B1)
