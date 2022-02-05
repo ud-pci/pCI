@@ -885,8 +885,8 @@ Contains
         Use str_fmt, Only : FormattedTime
         Implicit None
         External ZSPSV
-        Integer :: i, ic, id, info, i8, j, k, k1, k2, kl, nd1, err_stat
-        Integer(Kind=int64) :: start1, end1, start2, end2, clock_rate
+        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat
+        Integer(Kind=int64) :: i8, start1, end1, start2, end2, clock_rate
         Real :: ttime, ttime2
         Real(dp) :: t, e0n, e2n, tj0n, tj2n, err
         Real(dp), Allocatable, Dimension(:) :: scales
