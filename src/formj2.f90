@@ -100,7 +100,7 @@ Module formj2
         Implicit None
 
         Integer :: k1, n1, ic1, ndn, j, ij4, ijmax, n, k, nn, kk, counter1, counter2, counter3, diff
-        Real(kind=Jsq%knd) :: tt
+        Real(kind=type_real) :: tt
         Integer(kind=int64) :: stot, s1, mem, maxmem, statmem
         Integer, allocatable, dimension(:) :: idet1, idet2, cntarray
         Integer :: npes, mype, mpierr, msg, maxme, endNc
