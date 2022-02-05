@@ -362,7 +362,7 @@ Module davidson
         Integer, Intent(In) :: ip, mype
 
         Integer :: i, k, nlp, n, mpierr, i2min, i2max, i1min, i1max, kd
-        Real(dp) :: t
+        Real(type_real) :: t
         Integer(Kind=int64) :: l8, count
 
         nlp=ip*Nlv

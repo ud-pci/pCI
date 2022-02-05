@@ -67,7 +67,7 @@ Module matrix_io
         Use mpi
         Implicit None
         Integer, Allocatable, Dimension(:)  :: indices1, indices2
-        Real(kind=Hamil%knd), Allocatable, Dimension(:) :: values
+        Real(kind=type_real), Allocatable, Dimension(:) :: values
         Integer, Intent(In)             :: num_elements_per_core
         Integer(Kind=int64), Intent(In) :: num_elements_total
 
@@ -125,7 +125,7 @@ Module matrix_io
         Call MPIErrHandle(mpierr)
 
         ! Write mat%t
-        Select Case(Hamil%knd)
+        Select Case(type_real)
         Case(sp)
             disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 4_MPI_OFFSET_KIND
             Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
@@ -161,7 +161,7 @@ Module matrix_io
         Use mpi
         Implicit None
         Integer, Allocatable, Dimension(:)  :: indices1, indices2
-        Real(kind=Hamil%knd), Allocatable, Dimension(:) :: values
+        Real(kind=type_real), Allocatable, Dimension(:) :: values
         Integer, Intent(Out)             :: num_elements_per_core
         Integer(Kind=int64), Intent(Out) :: num_elements_total
 
@@ -243,7 +243,7 @@ Module matrix_io
         Call MPIErrHandle(mpierr)
 
         ! Read values of matrix element mat%t
-        Select Case(Hamil%knd)
+        Select Case(type_real)
         Case(sp)
             disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 4_MPI_OFFSET_KIND
             Call MPI_FILE_READ_AT(fh, disp, values, num_elements_per_core, MPI_REAL, MPI_STATUS_IGNORE, mpierr) 
