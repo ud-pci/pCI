@@ -43,7 +43,7 @@ Program conf
     !   IPmr    - equivalent of 4 Bytes for the DIRECT files
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
-    use mpi
+    Use mpi_f08
     use determinants, only : Wdet, Dinit, Jterm
     Use integrals, only : Rint
     use formj2, only : FormJ
@@ -66,6 +66,14 @@ Program conf
     
     Call startTimer(start_time)
     
+    ! Set MPI type for type_real
+    Select Case(type_real)
+    Case(sp)
+        mpi_type_real = MPI_REAL
+    Case(dp)
+        mpi_type_real = MPI_DOUBLE_PRECISION
+    End Select
+
     ! Give ConfFilePaths a chance to decide what filenames/paths to use:
     !Call ConfFileInit()
 
@@ -806,7 +814,7 @@ Contains
         Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then

@@ -1,6 +1,7 @@
 Module conf_variables
 
     Use params
+    Use mpi_f08, Only : MPI_Datatype
 
     Implicit None
     
@@ -16,7 +17,8 @@ Module conf_variables
     Integer, Parameter :: kWeights=0
 
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
-    Integer, Parameter :: type_real=sp
+    Integer, Parameter :: type_real=dp
+    Type(MPI_Datatype) :: mpi_type_real
 
     Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw
     Integer             :: NmaxS=0, LmaxS=0, Ngint=0, Nhint=0, NhintS=0, NgintS=0
@@ -31,8 +33,10 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real,     Allocatable, Dimension(:,:)  :: Rint2
-    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tk, Tj, Tl, Ts, Diag, D, E
+    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tk, Tj, Tl, Ts, D, E
     Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W, ArrB
+
+    Real(type_real), Allocatable, Dimension(:) :: Diag
 
     Real(dp), Dimension(IPs)   :: Eps
     Real(dp), Dimension(IP1)   :: C

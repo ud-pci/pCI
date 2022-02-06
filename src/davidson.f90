@@ -372,7 +372,7 @@ Module davidson
         i1min=i2min-Nlv
         i1max=i2max-Nlv
         kd=0
-        Call MPI_Bcast(Diag(1), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag(1), 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         If (Diag(1)==0.d0) Then
             Diag(2:Nd)=0.d0
             kd=1
@@ -405,10 +405,10 @@ Module davidson
         End Do
         If (kd==1) Then
             If (mype==0) Then
-                Call MPI_Reduce(MPI_IN_PLACE, Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, & 
+                Call MPI_Reduce(MPI_IN_PLACE, Diag(1:Nd), Nd, mpi_type_real, MPI_SUM, 0, & 
                                 MPI_COMM_WORLD, mpierr)
             Else
-                Call MPI_Reduce(Diag(1:Nd), Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, & 
+                Call MPI_Reduce(Diag(1:Nd), Diag(1:Nd), Nd, mpi_type_real, MPI_SUM, 0, & 
                                 MPI_COMM_WORLD, mpierr)
             End If 
         End If
