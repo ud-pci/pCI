@@ -626,9 +626,9 @@ Contains
                 x=x+Eps(ke)
             End Do
             x=E_0-x
-            Diag(n)=x
-            Emin=dmin1(Emin,x)
-            Emax=dmax1(Emax,x)
+            Diag(n)=Real(x,kind=type_real)
+            Emin=min1(Emin,x)
+            Emax=max1(Emax,x)
         End Do
         strfmt = '(4X,"FormD: min(E0-Ek)=",F12.6," max(E0-Ek)=",F12.6)'
         write( 6,strfmt) Emin,Emax
@@ -734,11 +734,11 @@ Contains
         
         memEstimate = memFormH + memStaticArrays
     
-        mem = bytesDP * Nd * IPlv     & ! ArrB
+        mem = type_real * Nd * IPlv     & ! ArrB
             + bytesDP * Nlv * 2_dp    & ! Tk,Tj
             + bytesDP * IPlv ** 2_dp  & ! P
             + bytesDP * IPlv * 2_dp   & ! D,E
-            + bytesDP * Nd * 2_dp     & ! B1,B2
+            + type_real * Nd * 2_dp     & ! B1,B2
             + bytesDP * Nd0 ** 2_dp   & ! Z1
             + bytesDP * Nd0 * 1_dp      ! E1
     
@@ -769,7 +769,7 @@ Contains
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Crt4, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1622,7 +1622,7 @@ Contains
         ! this Subroutine executes the Davidson procedure for diagonalization
         ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
         ! all other Subroutines are performed by the master core
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
         Use formj2, Only : J_av
@@ -1631,9 +1631,11 @@ Contains
 
         Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
         Real(dp), Dimension(4) :: dptmp
-        Real(dp), Allocatable, Dimension(:) :: W, Jn ! work array
+        Real(dp), Allocatable, Dimension(:) :: W
+        Real(kind=type_real), Allocatable, Dimension(:) :: Jn ! work array
         Integer(Kind=int64) :: start_time
-        Real(dp)  :: crit, ax, cnx, x, xx, vmax
+        Real(type_real)  :: crit, ax, x, xx, vmax
+        Real(dp) :: cnx
         Character(Len=16) :: timeStr
 
         ! Initialize parameters and arrays
@@ -1720,7 +1722,6 @@ Contains
                         End If
                     End Do
                 End If
-
                 If (K_prj == 1) Then
                     If (mype == 0) Jsq%ind1=Jn
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
@@ -1743,7 +1744,6 @@ Contains
                         End Do
                     End If
                 End If
-
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
@@ -1752,14 +1752,14 @@ Contains
                         Call FormP(2, vmax)
                         ! Evaluation of Nlv eigenvectors:
                         Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-
+                        
                         ax=0.d0
                         vmax=-1.d10
                         Do i=1,Nlv
                             xx=0.d0
                             Do k=1,Nlv
                                 k1=k+Nlv
-                                x=dabs(P(k1,i))
+                                x=abs(P(k1,i))
                                 If (xx <= x) Then
                                     xx=x
                                     kx=k
@@ -1772,6 +1772,7 @@ Contains
                             Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                         End Do
                     End If
+                 
                     Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
                     ! Write intermediate CONF.XIJ in frequency of kXIJ
@@ -1780,7 +1781,7 @@ Contains
                         If (mod(it, kXIJ) == 0) Then 
                             ! Calculate J for each energy level
                             Do n=1,Nlv
-                                Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                                Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                                 If (mype == 0) Then
                                     Jsq%ind1=Jn
                                 End If
@@ -1842,7 +1843,7 @@ Contains
     End Subroutine Diag4
 
     Subroutine WriteFinalXIJ(mype)
-        Use mpi
+        Use mpi_f08
         Use davidson, Only : Prj_J
         Use formj2, Only : J_av
         Implicit None
@@ -1856,7 +1857,7 @@ Contains
         End If
         
         Do n=1,Nlv
-            Call MPI_Bcast(ArrB(1:Nd,n), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
             Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
             If (mype==0) Then
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
@@ -1878,7 +1879,7 @@ Contains
         Implicit None
 
         Integer :: j, ist
-        Real(dp) :: dt, del
+        Real(kind=type_real) :: dt, del
         Character(Len=1), Dimension(10) :: stecp*7
         Character(Len=1), Dimension(4)  :: strsms*6
         Character(Len=1), Dimension(3)  :: strms*3

@@ -23,7 +23,7 @@ Module davidson
         Implicit None
         Integer  :: k, n, mype, mpierr
         Integer(Kind=int64) :: l8
-        Real(dp) :: t
+        Real(type_real) :: t
         Character(Len=256) :: strfmt
 
         If (mype == 0) Then
@@ -41,8 +41,8 @@ Module davidson
             t=Hamil%val(l8)
             If (n == k) t=t-Hamil%minval
             If (n <= Nd0) Then
-                Z1(n,k)=t
-                Z1(k,n)=t
+                Z1(n,k)=Real(t,kind=dp)
+                Z1(k,n)=Real(t,kind=dp)
             Else
                 ! If Kl=1, matrix elements will be spread among num_cores instead of num_cores-1,
                 ! so we must ensure that all determinants below Nd0 are accounted for
@@ -69,7 +69,8 @@ Module davidson
         Use formj2, Only : J_av
         Implicit None
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
-        Real(dp) :: dummy, xj
+        Real(dp) :: dummy
+        Real(type_real) :: xj
         Character(Len=128) :: strfmt
 
         num=0
@@ -82,7 +83,7 @@ Module davidson
         B1=0.d0
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
-                B1(1:Nd0)=Z1(1:Nd0,j)
+                B1(1:Nd0)=Real(Z1(1:Nd0,j),kind=type_real)
                 Call J_av(B1,Nd0,xj,ierr)
                 If (ierr == 0) Then
                     num=num+1
@@ -134,7 +135,7 @@ Module davidson
         ! Eigenvectors are not written to CONF.XIJ.
         Implicit None
         Integer :: k, l
-        Real(dp) :: t
+        Real(type_real) :: t
 
         ! Eigenvectors obtained by Davidson procedure are not written to CONF.XIJ file
         Do k=1,Nlv
@@ -159,7 +160,7 @@ Module davidson
         ! Eigenvectors are written to CONF.XIJ.
         Implicit None
         Integer :: i, k, l
-        Real(dp) :: t
+        Real(type_real) :: t
 
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
         Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
@@ -197,10 +198,10 @@ Module davidson
         ! Calculation of other three blocks (2Nlv X 2Nlv) of matrix P for kp=2
         Implicit None
         Integer, Intent(In) :: kp
-        Real(dp), Intent(In) :: vmax
+        Real(type_real), Intent(In) :: vmax
 
         Integer :: i, kx, k1, j, k, i1
-        Real(dp) :: x
+        Real(type_real) :: x
 
         If (kp == 1) Then
             Do i=1,Nlv
@@ -257,7 +258,7 @@ Module davidson
         Implicit None
 
         Integer :: ic, id, id0, id1, id2
-        Real(dp) :: ss
+        Real(type_real) :: ss
 
         id0=1
         Do ic=1,Nc
@@ -292,7 +293,7 @@ Module davidson
         Real(dp), Intent(InOut) :: cnx
 
         Integer :: j1, i, k, n01
-        Real(dp) :: val, t, cnorm, s
+        Real(type_real) :: val, t, cnorm, s
         character(len=9) :: char
 
         cnorm=0.d0
@@ -309,7 +310,7 @@ Module davidson
             B1(i)=0.d0
             Cycle
         End Do
-        cnorm=dsqrt(dabs(cnorm))
+        cnorm=sqrt(abs(cnorm))
         Iconverge(j)=0
         char='         '
         If (cnorm < Crt4) Then
@@ -322,7 +323,7 @@ Module davidson
         End If
         Write ( 6,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
         Write (11,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
-        If (cnorm > cnx) cnx=cnorm
+        If (cnorm > cnx) cnx=Real(cnorm,kind=dp)
         If (Iconverge(j)==1) Then
             B1(1:Nd)=0.d0
             Return
@@ -335,11 +336,11 @@ Module davidson
             Do i=n01,Nd0
                 s=0.d0
                 Do k=1,Nd0
-                    s=s+Z1(k,i)*C(k)
+                    s=s+Real(Z1(k,i)*C(k),kind=type_real)
                 End Do
                 t=val-E1(i)
-                If (dabs(t) < 1.d-6) Cycle
-                B1(1:Nd0)=B1(1:Nd0)+(s/t)*Z1(1:Nd0,i)
+                If (abs(t) < 1.d-6) Cycle
+                B1(1:Nd0)=B1(1:Nd0)+(s/t)*Real(Z1(1:Nd0,i),kind=type_real)
             End Do
         End If
         ! Normalization of vector B:
@@ -347,7 +348,7 @@ Module davidson
         Do i=1,Nd
             s=s+B1(i)**2
         End Do
-        s=1.d0/dsqrt(s)
+        s=1.d0/sqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
         Return
     End Subroutine Dvdsn
@@ -393,13 +394,14 @@ Module davidson
             ArrB(n,i2min:i2max)=ArrB(n,i2min:i2max)+t*ArrB(k,i1min:i1max)
             If (n /= k) ArrB(k,i2min:i2max)=ArrB(k,i2min:i2max)+t*ArrB(n,i1min:i1max)
         End Do
+
         ! Only master core needs ArrB for other calculations
         Do i=i2min,i2max
             If (mype==0) Then
-                Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
             Else
-                Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
             End If
         End Do
@@ -423,7 +425,8 @@ Module davidson
         Integer, Intent(Out) :: ifail
 
         Integer :: i, l, jm, it
-        Real(dp) :: s, smax2, smax1, critN, ortho
+        Real(dp) :: smax2, smax1, critN, ortho
+        Real(type_real) :: s
         
         ! Orthogonality criteria:
         ortho=1.d-6
@@ -446,7 +449,7 @@ Module davidson
                 Do i=1,Nd
                     s=s+ArrB(i,j)*ArrB(i,l)
                 End Do
-                If (dabs(s) > smax1) smax1=dabs(s)
+                If (abs(s) > smax1) smax1=abs(s)
                 ArrB(1:Nd,j)=ArrB(1:Nd,j)-s*ArrB(1:Nd,l)
             End Do
             If (smax1 < ortho) Exit
@@ -467,18 +470,19 @@ Module davidson
             Write (6,'(4X,"Fail of normalization of vector ",I2)') j
             ifail=j
         End If
-        s=1.d0/dsqrt(s)
+        s=1.d0/sqrt(s)
         ArrB(1:Nd,j)=ArrB(1:Nd,j)*s
         Return
     End Subroutine Ortn
 
     Subroutine Prj_J(lin, num, lout, trsd, mype) 
-        Use mpi
+        Use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
         Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, lout, num, lin, jav, mpierr, imin, imax
         Integer, optional :: mype
-        Real(dp) :: err1, err, sj, t, f, s, s1, a, aj, trsd
+        Real(dp) :: err1, err, f, trsd
+        Real(type_real) :: t, sj, aj, s, s1, a
         logical :: proceed
         Character(Len=256) :: strfmt
 
@@ -503,7 +507,7 @@ Module davidson
         imin=lin
         imax=lout-1
         Do j=imin,imax
-            Call MPI_Bcast(ArrB(1:Nd,j), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ArrB(1:Nd,j), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         End Do
         Do iter=1,Njd+1          !# each iteration eliminates one J
             it=Njd+1-iter        !## starting from J_max down to J_min
@@ -533,13 +537,13 @@ Module davidson
 
                 Do i=lout,lout+num-1
                     If (mype==0) Then
-                        Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                        Call MPI_Reduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, 0, &
                                           MPI_COMM_WORLD, mpierr)
                     Else
-                        Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
+                        Call MPI_Reduce(ArrB(1:Nd,i), ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, 0, &
                                           MPI_COMM_WORLD, mpierr)
                     End If
-                    Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+                    Call MPI_Bcast(ArrB(1:Nd,i), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                 End Do
                 err1=0.d0
             
@@ -552,9 +556,9 @@ Module davidson
                         Do n=1,Nd                       
                             sj=sj+ArrB(n,i1)*ArrB(n,i2) 
                         End Do
-                        aj=dsqrt(1+sj) - 1               !# eigenvalue for 2*J
-                        err=dabs(aj-jav)                 !# difference from target
-                        err1=dmax1(err1,err)
+                        aj=sqrt(1+sj) - 1               !# eigenvalue for 2*J
+                        err=abs(aj-jav)                 !# difference from target
+                        err1=max1(err1,err)
                     End If
                 End Do
                 If (err1 < trsd) Then             !# convergency check
@@ -573,7 +577,7 @@ Module davidson
                                 s=s+a*a
                                 ArrB(n,i1)=a
                             End Do
-                            s1=1.d0/dsqrt(s)
+                            s1=1.d0/sqrt(s)
                             ArrB(1:Nd,i1)=ArrB(1:Nd,i1)*s1  !# normalization of X1
                         End If
                     End Do

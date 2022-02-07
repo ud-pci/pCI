@@ -217,8 +217,8 @@ Module formj2
                     
                     NumJ = NumJ + cntarray(1)
                     maxme = max(cntarray(2),maxme)
-                    mem = NumJ * 16_int64
-                    maxmem = maxme * 16_int64
+                    mem = NumJ * (8_int64+type_real)
+                    maxmem = maxme * (8_int64+type_real)
                     statmem = memEstimate + maxmem
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -332,12 +332,12 @@ Module formj2
     End Subroutine FormJ
     
     Subroutine J_av(X1, nx, xj, ierr)    !# <x1|J**2|x1>
-        Use mpi
+        Use mpi_f08
         Implicit None
 
         Integer :: ierr, i, k, n, nx, mpierr
-        Real(dp) :: r, t, xj
-        Real(dp), dimension(nx) :: X1
+        Real(type_real) :: r, t, xj
+        Real(type_real), dimension(nx) :: X1
 
         ierr=0
         xj=0.d0
@@ -354,11 +354,11 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
         xj=0.5d0*(dsqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then
-            If (dabs(xj-XJ_av) > 1.d-1) ierr=1
+            If (abs(xj-XJ_av) > 1.d-1) ierr=1
         End If
         Return
     End Subroutine J_av

@@ -5,6 +5,7 @@ Module params
     !                      and global variables and arrays used in parallel programs
     !
     Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, int64
+    Use mpi_f08, Only : MPI_Datatype
 
     Implicit None
     
@@ -35,18 +36,25 @@ Module params
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
     Integer, Parameter :: IPmr  =      1         ! =4 if word=1B (Pentium)
                                                  ! =1 if word=4B (Alpha-processor)   
+
+    ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
+    Integer, Parameter :: type_real=sp
+    Type(MPI_Datatype) :: mpi_type_real
     
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel
-    Real(dp) :: Z, H, Jm, Gj, gnuc, Rnuc, Qnuc, Cut0, Crt4, C_is, Am
+    Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm
+    Real(type_real) :: Crt4
 
     ! Global arrays
     Integer, Dimension(IPjd)              :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
-    Real(dp), Allocatable, Dimension(:)   :: D1, E1, B1, B2, Qnl
+    Real(dp), Allocatable, Dimension(:)   :: D1, E1, Qnl
     Integer, Allocatable, Dimension(:,:)  :: Iarr
+
+    Real(type_real), Allocatable, Dimension(:) :: B1, B2
 
     Save
                                        

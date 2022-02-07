@@ -13,7 +13,7 @@ Module mpi_utils
     ! exceeds the maximum threshold, the maximum threshold is used.  The
     ! maximum equates to 1 GiB worth of elements.
     !
-    Use, intrinsic :: iso_fortran_env
+    Use params
 
     Implicit None
     
@@ -119,7 +119,7 @@ Module mpi_utils
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
-        Real(real64), Dimension(*), Intent(InOut)   :: buffer
+        Real(type_real), Dimension(*), Intent(InOut)   :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
         Integer(Kind=int64)                         :: count_remain, i
@@ -128,16 +128,24 @@ Module mpi_utils
         If (stride .le. 0) Then
             Call GetEnv('CONF_BROADCAST_MAX', envvar)
             Read(envvar, '(i)') use_stride
-            If (use_stride .le. 0) use_stride = MaxStride8Byte
+            If (use_stride .le. 0) Then
+                use_stride = MaxStride8Byte
+                If (type_real == sp) use_stride = use_stride * 2
+            End If
         Else
             use_stride = stride
         End If
-        If (stride .gt. MaxStride8Byte) use_stride = MaxStride8Byte
+        Select Case(type_real)
+        Case(sp)
+            If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
+        Case(dp)
+            If (stride .gt. MaxStride8Byte) use_stride = MaxStride8Byte
+        End Select
         count_remain = count
         i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
-            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, MPI_DOUBLE_PRECISION, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_type_real, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
@@ -147,7 +155,7 @@ Module mpi_utils
         End Do
         If (count_remain .gt. 0) Then
             count_remain2 = count_remain
-            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, MPI_DOUBLE_PRECISION, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_type_real, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
