@@ -1,5 +1,6 @@
 import struct 
 import time
+import sys
 
 filename = input("Enter the name of the file you would like to convert: ")
 fnproc = open("nprocs.conf", "rb")
@@ -7,11 +8,8 @@ fnproc = open("nprocs.conf", "rb")
 try:
     f = open(filename, "rb")
 except OSError:
-    print("Could not open/read file:" + filename)
+    print("Could not open/read file: " + filename)
     sys.exit()
-except FileNotFoundError:
-    print(f"File {filename} not found.  Aborting")
-    sys.exit(1)
 
 with f:
 	num_cores = struct.unpack('i', fnproc.read(4))[0]
