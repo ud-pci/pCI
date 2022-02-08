@@ -44,14 +44,13 @@ Module params
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel
-    Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm
-    Real(type_real) :: Crt4
+    Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm, Crt4
 
     ! Global arrays
     Integer, Dimension(IPjd)              :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
-    Real(dp), Allocatable, Dimension(:)   :: D1, E1, Qnl
+    Real(dp), Allocatable, Dimension(:)   :: D1, Qnl
     Integer, Allocatable, Dimension(:,:)  :: Iarr
 
     Real(type_real), Allocatable, Dimension(:) :: B1, B2

@@ -18,7 +18,7 @@ Module davidson
         ! matrix Z1 and is constructed by selecting the top-left 
         ! block of the full Hamiltonian matrix H.
         ! The diagonal elements of H are stored in the array Diag.
-        Use mpi
+        Use mpi_f08
         Use determinants, Only : calcNd0
         Implicit None
         Integer  :: k, n, mype, mpierr
@@ -33,16 +33,16 @@ Module davidson
         End If
 
         ! Construct the Hamilonian in the initial approximation
-        Diag=0.d0
-        Z1=0.d0
+        Diag=0_type_real
+        Z1=0_type_real
         Do l8=1,ih8
             n=Hamil%ind1(l8)
             k=Hamil%ind2(l8)
             t=Hamil%val(l8)
             If (n == k) t=t-Hamil%minval
             If (n <= Nd0) Then
-                Z1(n,k)=Real(t,kind=dp)
-                Z1(k,n)=Real(t,kind=dp)
+                Z1(n,k)=t
+                Z1(k,n)=t
             Else
                 ! If Kl=1, matrix elements will be spread among num_cores instead of num_cores-1,
                 ! so we must ensure that all determinants below Nd0 are accounted for
@@ -56,7 +56,7 @@ Module davidson
             End If
         End Do
 
-        Call MPI_AllReduce(MPI_IN_PLACE, Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        Call MPI_AllReduce(MPI_IN_PLACE, Z1, Nd0*Nd0, mpi_type_real, MPI_SUM, &
                                 MPI_COMM_WORLD, mpierr)
 
     End Subroutine Init4
@@ -65,7 +65,7 @@ Module davidson
         ! This subroutine constructs the initial eigenvectors for the Davidson iteration
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are written to CONF.XIJ 
-        Use mpi
+        Use mpi_f08
         Use formj2, Only : J_av
         Implicit None
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
@@ -78,12 +78,12 @@ Module davidson
 
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
 
-        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Z1, Nd0*Nd0, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
 
-        B1=0.d0
+        B1=0_type_real
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
-                B1(1:Nd0)=Real(Z1(1:Nd0,j),kind=type_real)
+                B1(1:Nd0)=Z1(1:Nd0,j)
                 Call J_av(B1,Nd0,xj,ierr)
                 If (ierr == 0) Then
                     num=num+1
@@ -139,7 +139,7 @@ Module davidson
 
         ! Eigenvectors obtained by Davidson procedure are not written to CONF.XIJ file
         Do k=1,Nlv
-            B2=0.d0
+            B2=0_type_real
             Do l=1,2*Nlv
                 t=P(l,k)
                 B2(1:Nd)=B2(1:Nd)+t*ArrB(1:Nd,l)
@@ -165,7 +165,7 @@ Module davidson
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
         Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         Do k=1,Nlv
-            B2=0.d0
+            B2=0_type_real
             Do l=1,2*Nlv
                 t=P(l,k)
                 B2(1:Nd)=B2(1:Nd)+t*ArrB(1:Nd,l)
@@ -207,7 +207,7 @@ Module davidson
             Do i=1,Nlv
               Do k=1,i
                 k1=k+Nlv
-                x=0.d0
+                x=0_type_real
                 Do j=1,Nd
                     x=x+ArrB(j,i)*ArrB(j,k1)
                 End Do
@@ -220,7 +220,7 @@ Module davidson
                 kx=2*Nlv
                 Do k=Nlv+1,kx
                     k1=k+Nlv
-                    x=0.d0
+                    x=0_type_real
                     Do j=1,Nd
                         x=x+ArrB(j,i)*ArrB(j,k1)
                     End Do
@@ -231,7 +231,7 @@ Module davidson
             Do i=Nlv+1,2*Nlv
                 Do k=Nlv+1,i
                     k1=k+Nlv
-                    x=0.d0
+                    x=0_type_real
                     Do j=1,Nd
                         x=x+ArrB(j,i)*ArrB(j,k1)
                     End Do
@@ -243,8 +243,8 @@ Module davidson
               If (Iconverge(i) == 1) Then
                 i1=i+Nlv
                 Do k=1,2*Nlv
-                    P(i1,k)=0.d0
-                    P(k,i1)=0.d0
+                    P(i1,k)=0_type_real
+                    P(k,i1)=0_type_real
                 End Do
                 P(i1,i1)=2*vmax-P(i,i)+1.d0
               End If
@@ -265,7 +265,7 @@ Module davidson
             id1=Ndc(ic)
             id2=id0+id1-1
             If (id1 > 0) Then
-                ss=0.d0
+                ss=0_type_real
                 Do id=id0,id2
                     ss=ss+Diag(id)
                 End Do
@@ -296,7 +296,7 @@ Module davidson
         Real(type_real) :: val, t, cnorm, s
         character(len=9) :: char
 
-        cnorm=0.d0
+        cnorm=0_type_real
         j1=j+Nlv
         val=P(j,j)
         Do i=1,Nd
@@ -307,7 +307,7 @@ Module davidson
                 B1(i)=t/(val-Diag(i))
                 Cycle
             End If
-            B1(i)=0.d0
+            B1(i)=0_type_real
             Cycle
         End Do
         cnorm=sqrt(abs(cnorm))
@@ -325,7 +325,7 @@ Module davidson
         Write (11,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
         If (cnorm > cnx) cnx=Real(cnorm,kind=dp)
         If (Iconverge(j)==1) Then
-            B1(1:Nd)=0.d0
+            B1(1:Nd)=0_type_real
             Return
         End If
         n01=Nlv+1
@@ -334,17 +334,17 @@ Module davidson
             continue
         Else
             Do i=n01,Nd0
-                s=0.d0
+                s=0_type_real
                 Do k=1,Nd0
-                    s=s+Real(Z1(k,i)*C(k),kind=type_real)
+                    s=s+Z1(k,i)*C(k)
                 End Do
                 t=val-E1(i)
                 If (abs(t) < 1.d-6) Cycle
-                B1(1:Nd0)=B1(1:Nd0)+(s/t)*Real(Z1(1:Nd0,i),kind=type_real)
+                B1(1:Nd0)=B1(1:Nd0)+(s/t)*Z1(1:Nd0,i)
             End Do
         End If
         ! Normalization of vector B:
-        s=0.d0
+        s=0_type_real
         Do i=1,Nd
             s=s+B1(i)**2
         End Do
@@ -374,15 +374,15 @@ Module davidson
         i1max=i2max-Nlv
         kd=0
         Call MPI_Bcast(Diag(1), 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-        If (Diag(1)==0.d0) Then
-            Diag(2:Nd)=0.d0
+        If (Diag(1)==0_type_real) Then
+            Diag(2:Nd)=0_type_real
             kd=1
         End If
 
         count=Nd*nlp
         Call BroadcastD(ArrB, count, 0, 0, MPI_COMM_WORLD, mpierr)
 
-        ArrB(1:Nd,i2min:i2max)=0.d0
+        ArrB(1:Nd,i2min:i2max)=0_type_real
         Do l8=1, ih8
             n=Hamil%ind1(l8)
             k=Hamil%ind2(l8)
@@ -440,12 +440,12 @@ Module davidson
         it=0
         Do
             it=it+1
-            smax1=0.d0
+            smax1=0_type_real
             Do l=1,jm
                 If (l > Nlv) Then
                     If (Iconverge(l-Nlv)==1) Cycle
                 End If
-                s=0.d0
+                s=0_type_real
                 Do i=1,Nd
                     s=s+ArrB(i,j)*ArrB(i,l)
                 End Do
@@ -462,7 +462,7 @@ Module davidson
         End Do
 
         ! Normalization of J-th vector:
-        s=0.d0
+        s=0_type_real
         Do i=1,Nd
             s=s+ArrB(i,j)*ArrB(i,j)
         End Do
@@ -518,7 +518,7 @@ Module davidson
             If (jx /= jav .or. it == 0) Then
                 Do i=1,num
                     i2=lout+i-1
-                    ArrB(1:Nd,i2)=0.d0
+                    ArrB(1:Nd,i2)=0_type_real
                 End Do
                 Do j=1,ij8
                     n=Jsq%ind1(j)
@@ -545,7 +545,7 @@ Module davidson
                     End If
                     Call MPI_Bcast(ArrB(1:Nd,i), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                 End Do
-                err1=0.d0
+                err1=0_type_real
             
                 Do i=1,num
                     proceed=(lin-1)*Iconverge(i)==0
@@ -571,7 +571,7 @@ Module davidson
                         If (proceed) Then
                             i1=lin+i-1
                             i2=lout+i-1
-                            s=0.d0
+                            s=0_type_real
                             Do n=1,Nd                        !# X1 = X1 - f*Xj
                                 a=ArrB(n,i1)-f*ArrB(n,i2)      !## f=1/(2j*(2j+2))
                                 s=s+a*a

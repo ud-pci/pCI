@@ -28,13 +28,11 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real,     Allocatable, Dimension(:,:)  :: Rint2
-    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tk, Tl, Ts, D, E
-    Real(dp), Allocatable, Dimension(:,:)  :: Z1, P, W
+    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D
+    Real(dp), Allocatable, Dimension(:,:)  :: W
     
-    Real(type_real), Allocatable, Dimension(:,:) :: ArrB
-    
-
-    Real(type_real), Allocatable, Dimension(:) :: Diag, Tj
+    Real(type_real), Allocatable, Dimension(:,:) :: ArrB, P, Z1
+    Real(type_real), Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
 
     Real(dp), Dimension(IPs)   :: Eps
     Real(dp), Dimension(IP1)   :: C

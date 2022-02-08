@@ -6,14 +6,14 @@ Module formj2
 
   Contains
 
-    Real(dp) Function F_J0(idet)
+    Real(type_real) Function F_J0(idet)
         Implicit None
     
         Integer :: ia, na, ja, ma, jq0, iq, ib, nf, jq
         Integer, allocatable, dimension(:) :: idet
-        Real(dp)  :: t
+        Real(type_real)  :: t
     
-        t=0.d0
+        t=0_type_real
         If (nf == 0) Then !determinants are equal
             t=mj*mj
             Do iq=1,Ne
@@ -35,15 +35,15 @@ Module formj2
         Return
     End Function F_J0
 
-    Real(dp) Function F_J2(idet, is, nf, ia, ic, ib, id) 
+    Real(type_real) Function F_J2(idet, is, nf, ia, ic, ib, id) 
         Implicit None
         Integer, allocatable, dimension(:), intent(InOut) :: idet
         Integer, intent(InOut)                            :: is, nf, ia, ib, ic, id
 
         Integer :: na, ja, ma, jq0, iq, jq
-        Real(dp)  :: t
+        Real(type_real)  :: t
 
-        t=0.d0
+        t=0_type_real
         Select Case(nf)
             Case(0) 
                 t=mj*mj
@@ -70,13 +70,13 @@ Module formj2
         Return
     End Function F_J2
 
-    Real(dp) Function Plj(ia, ib)
+    Real(type_real) Function Plj(ia, ib)
         Implicit None
 
         Integer :: ia, ib, na, nb, ma, mb, ja
-        Real(dp) :: t
+        Real(type_real) :: t
 
-        t=0.d0
+        t=0_type_real
         na=Nh(ia)
         nb=Nh(ib)
         If (na == nb) Then
@@ -84,7 +84,7 @@ Module formj2
             mb=Jz(ib)
             If (ma == mb+2) Then
                 ja=Jj(na)
-                t=dsqrt(ja*(ja+2)-ma*mb+0.d0)
+                t=sqrt(real(ja*(ja+2)-ma*mb,kind=type_real))
             End If
         End If
         Plj=t
@@ -340,7 +340,7 @@ Module formj2
         Real(type_real), dimension(nx) :: X1
 
         ierr=0
-        xj=0.d0
+        xj=0_type_real
         Do i=1,ij8
             n=Jsq%ind1(i)
             k=Jsq%ind2(i)
@@ -355,7 +355,7 @@ Module formj2
         End Do
         ! MPI Reduce sum all xj to master core here 
         Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        xj=0.5d0*(dsqrt(1.d0+xj)-1.d0)
+        xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then
             If (abs(xj-XJ_av) > 1.d-1) ierr=1

@@ -15,7 +15,7 @@ Module ine_variables
     Integer, Parameter :: IPad = 8
 
     Integer, Allocatable, Dimension(:) :: Int
-    Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag
+    Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
 
     Character(Len=1), Dimension(9)          :: Let

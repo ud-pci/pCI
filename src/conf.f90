@@ -735,12 +735,12 @@ Contains
         memEstimate = memFormH + memStaticArrays
     
         mem = type_real * Nd * IPlv     & ! ArrB
-            + bytesDP * Nlv * 2_dp    & ! Tk,Tj
-            + bytesDP * IPlv ** 2_dp  & ! P
-            + bytesDP * IPlv * 2_dp   & ! D,E
+            + type_real * Nlv * 2_dp    & ! Tk,Tj
+            + type_real * IPlv ** 2_dp  & ! P
+            + type_real * IPlv * 2_dp   & ! D,E
             + type_real * Nd * 2_dp     & ! B1,B2
-            + bytesDP * Nd0 ** 2_dp   & ! Z1
-            + bytesDP * Nd0 * 1_dp      ! E1
+            + type_real * Nd0 ** 2_dp   & ! Z1
+            + type_real * Nd0 * 1_dp      ! E1
     
         memDvdsn = mem
         Call FormattedMemSize(mem, memStr)
@@ -769,7 +769,7 @@ Contains
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Crt4, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1434,14 +1434,14 @@ Contains
         t=0.d0
         Select Case(nf)
             Case(2) ! determinants differ by two functions
-                t=t+Gint(i2,j2,i1,j1)*is 
+                t=t+Real(Gint(i2,j2,i1,j1),kind=type_real)*is 
                 t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
             Case(1) ! determinants differ by one function
                 Do iq=1,Ne
                     i1=idet(iq)
-                    If (i1 /= j1) t=t+Gint(j2,i1,j1,i1)*is
+                    If (i1 /= j1) t=t+Real(Gint(j2,i1,j1,i1),kind=type_real)*is
                 End Do
-                t=t+Hint(j2,j1)*is
+                t=t+Real(Hint(j2,j1),kind=type_real)*is
             Case(0) ! determinants are equal
                 Do iq=1,Ne
                     i1=idet(iq)
@@ -1449,12 +1449,12 @@ Contains
                     If (jq0 <= Ne) Then
                         Do jq=jq0,Ne
                             j1=idet(jq)
-                            t=t+Gint(i1,j1,i1,j1)*is
+                            t=t+Real(Gint(i1,j1,i1,j1),kind=type_real)*is
                         End Do
                     End If
-                    t=t+Hint(i1,i1)*is
+                    t=t+Real(Hint(i1,i1),kind=type_real)*is
                 End Do
-                t=t+Gj*F_J2(idet,is,nf,i2,i1,j2,j1)
+                t=t+Real(Gj,kind=type_real)*F_J2(idet,is,nf,i2,i1,j2,j1)
         End Select
         Hmltn=t
         Return
@@ -1550,17 +1550,17 @@ Contains
         Use mpi
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
-        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD
+        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
         Integer :: I, J, lwork, mype, npes, ifail
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
         Integer(Kind=int64) :: s1
-        Real(dp), Dimension(4) :: dptmp
+        Real(type_real), Dimension(4) :: realtmp
         Integer, Dimension(4) :: itmp
         Integer, Dimension(9) :: DESCA, DESCZ
         Integer, Allocatable, Dimension(:)     :: IWORK ! integer work array
-        Real(dp), Allocatable, Dimension(:)    :: W     ! double precision work array
-        Real(dp), Allocatable, Dimension(:,:)  :: A, Z
+        Real(type_real), Allocatable, Dimension(:)    :: W     ! double precision work array
+        Real(type_real), Allocatable, Dimension(:,:)  :: A, Z
 
         ! Start timer for initial diagonalization
         Call startTimer(s1)
@@ -1585,21 +1585,40 @@ Contains
 
         ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
         A=0.0d0
-        Do I=1,Nd0
-            Do J=1,I
-                CALL PDELSET(A, J, I, DESCA, Z1(I,J))
+        Select Case(type_real)
+        Case(sp)
+            Do I=1,Nd0
+                Do J=1,I
+                    CALL PSELSET(A, J, I, DESCA, Z1(I,J))
+                End Do
             End Do
-        End Do
+        Case(dp)
+            Do I=1,Nd0
+                Do J=1,I
+                    CALL PDELSET(A, J, I, DESCA, Z1(I,J))
+                End Do
+            End Do
+        End Select
 
         ! Query for the optimal work array sizes
-        CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, dptmp, -1, itmp, 1, ifail)
-        LWORK = dptmp(1)
+        Select Case(type_real)
+        Case(sp)
+            CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
+        Case(dp)
+            CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
+        End Select
+        LWORK = realtmp(1)
         LIWORK = itmp(1)
         ALLOCATE(IWORK(LIWORK), W(LWORK))
 
         ! Compute the eigenvalues E1 and eigenvectors Z
-        CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
-        
+        Select Case(type_real)
+        Case(sp)
+            CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
+        Case(dp)
+            CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
+        End Select
+
         ! Exit BLACS context
         CALL BLACS_GRIDEXIT(CONTEXT)
         CALL BLACS_EXIT(1)
@@ -1627,12 +1646,11 @@ Contains
         Use davidson
         Use formj2, Only : J_av
         Implicit None
-        External :: DSYEV
+        External :: DSYEV, SSYEV
 
         Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
-        Real(dp), Dimension(4) :: dptmp
-        Real(dp), Allocatable, Dimension(:) :: W
-        Real(kind=type_real), Allocatable, Dimension(:) :: Jn ! work array
+        Real(kind=type_real), Dimension(4) :: realtmp
+        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jn ! work array
         Integer(Kind=int64) :: start_time
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
@@ -1665,8 +1683,13 @@ Contains
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
         If (mype == 0) Then
             n1 = 2*Nlv
-            Call DSYEV('V','U',n1,P,n1,E,dptmp,-1,ifail)
-            lwork = Int(dptmp(1))
+            Select Case(type_real)
+            Case(sp)
+                Call SSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
+            Case(dp)
+                Call DSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
+            End Select
+            lwork = Int(realtmp(1))
             Allocate(W(lwork))
         End If
 
@@ -1751,7 +1774,12 @@ Contains
                     If (mype==0) Then
                         Call FormP(2, vmax)
                         ! Evaluation of Nlv eigenvectors:
-                        Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                        Select Case(type_real)
+                        Case(sp)
+                            Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                        Case(dp)
+                            Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                        End Select
                         
                         ax=0.d0
                         vmax=-1.d10
