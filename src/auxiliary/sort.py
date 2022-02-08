@@ -10,9 +10,6 @@ try:
 except OSError:
     print("Could not open/read file: " + filename)
     sys.exit()
-except FileNotFoundError:
-    print(f"File {filename} not found.  Aborting")
-    sys.exit(1)
 
 with f:
 	num_cores = struct.unpack('i', fnproc.read(4))[0]
