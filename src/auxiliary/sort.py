@@ -53,7 +53,7 @@ with f:
 	print("Sorting " + filename + f" took {toc - tic:0.4f} seconds ")
 
 with open(filename[0:4] + filename[5:9], "wb") as f:
-	f.write(struct.pack('i',len(new_matrix)))
+	f.write(struct.pack('q',len(new_matrix)))
 	print("# of matrix elements=" + str(len(new_matrix)))
 	for num in range(len(new_matrix)):
 		f.write(struct.pack('iid', new_matrix[num][0], new_matrix[num][1], new_matrix[num][2]))
