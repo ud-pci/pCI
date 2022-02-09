@@ -329,7 +329,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.12",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.13",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1205,7 +1205,8 @@ Contains
 
     Subroutine ReadJJJ
         Implicit None
-        Integer :: j, err_stat
+        Integer :: err_stat
+        Integer(kind=int64) :: j
         Character(Len=256) :: err_msg
 
         open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
