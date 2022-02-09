@@ -859,7 +859,8 @@ Contains
 
     Subroutine ReadHIJ
         Implicit None
-        Integer :: i8, err_stat
+        Integer :: err_stat
+        Integer(kind=int64) :: i8
         Character(Len=256) :: err_msg
 
         Open(unit=15,file='CONF.HIJ',status='UNKNOWN',form='unformatted',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -877,6 +878,7 @@ Contains
         Do i8=1,NumH
             Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
         End Do
+        print*,'NumH=',NumH
         Return
     End Subroutine
 
@@ -1203,7 +1205,8 @@ Contains
 
     Subroutine ReadJJJ
         Implicit None
-        Integer :: j, err_stat
+        Integer :: err_stat
+        Integer(kind=int64) :: j8
         Character(Len=256) :: err_msg
 
         open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -1217,9 +1220,10 @@ Contains
         If (.not. Allocated(Jsq%n)) Allocate(Jsq%n(NumJ))
         If (.not. Allocated(Jsq%k)) Allocate(Jsq%k(NumJ))
         If (.not. Allocated(Jsq%t)) Allocate(Jsq%t(NumJ))
-        Do j=1,NumJ
-            read(18) Jsq%k(j),Jsq%n(j),Jsq%t(j)
+        Do j8=1,NumJ
+            read(18) Jsq%k(j8),Jsq%n(j8),Jsq%t(j8)
         End Do
+        print*, 'NumJ=',NumJ
         close(18)
     End Subroutine ReadJJJ
 

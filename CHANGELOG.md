@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ## [0.8.1] - 2022-02-04
 - conf v4.1 - implementation of parameterized derived type for matrices to switch between single and double precision
 - added minimum value of matrix in type Matrix
@@ -18,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - added new conditional under FormH for Kl=3
 - changed arguments of ReadMatrix and WriteMatrix to take in three 1d arrays instead of a matrix
 - added conditional to read and write previous Nc and Nd in subroutines ReadMatrix and WriteMatrix 
+
+## [0.7.56] - 2022-02-08
+- ine v1.13 - increased limit of NumJ from integer to integer*8
+
+## [0.7.56] - 2022-02-04
+- ine v1.12 - increased limit of NumH from integer to integer*8
+
+## [0.7.55] - 2022-01-13
+- conf v3.46 - bug fix for Jsq%n for Kv=3
 
 ## [0.7.54] - 2022-01-11
 - ine v1.11 - ine now accepts a list of wavelengths to be entered with different step sizes
