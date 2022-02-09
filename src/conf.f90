@@ -837,7 +837,7 @@ Contains
     End subroutine InitFormH
 
     Subroutine FormH(npes, mype)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : FormattedMemSize, FormattedTime
         Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2
         Use matrix_io
@@ -847,7 +847,8 @@ Contains
 
         Integer :: npes, mype, mpierr, maxNumElementsPerCore, mesplit
         Integer :: k1, kx, n, ic, ihmax, j, k, ih4, counter1, counter2, counter3, diff, icomp
-        Integer :: nn, kk, msg, status(MPI_STATUS_SIZE), sender, num_done, an_id, endnd, maxme
+        Integer :: nn, kk, msg, sender, num_done, an_id, endnd, maxme
+        Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0
         Real(kind=type_real)  :: t, tt
@@ -956,7 +957,7 @@ Contains
 
                 Do 
                     Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    sender = status%MPI_SOURCE
              
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
@@ -1199,7 +1200,7 @@ Contains
 
                 Do 
                     Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    sender = status%MPI_SOURCE
              
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
@@ -1373,7 +1374,7 @@ Contains
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, MPI_REAL, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype==0) Then
             ! Write number of non-zero matrix elements

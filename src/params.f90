@@ -38,7 +38,7 @@ Module params
                                                  ! =1 if word=4B (Alpha-processor)   
 
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
-    Integer, Parameter :: type_real=sp
+    Integer, Parameter :: type_real=dp
     Type(MPI_Datatype) :: mpi_type_real
     
     ! Global variables 
