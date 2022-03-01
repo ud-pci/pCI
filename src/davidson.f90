@@ -380,7 +380,12 @@ Module davidson
         End If
 
         count=Nd*nlp
-        Call BroadcastD(ArrB, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        !Call BroadcastD(ArrB, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        If (mype /= 0) ArrB = Real(0, kind=type_real)
+        Do i=1,nlp
+            Call MPI_AllReduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, &
+                                  MPI_COMM_WORLD, mpierr)
+        End Do
 
         ArrB(1:Nd,i2min:i2max)=0_type_real
         Do l8=1, ih8
