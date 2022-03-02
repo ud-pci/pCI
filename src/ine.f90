@@ -872,6 +872,7 @@ Contains
         End If
 
         Read(15) NumH
+        print*,'NumH=',NumH
         If (.not. Allocated(Hamil%n)) Allocate(Hamil%n(NumH))
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))

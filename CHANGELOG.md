@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2022-03-01
+- conf v4.2 - changed BroadcastD to MPI_AllReduce 
 
 ## [0.8.1] - 2022-02-04
 - conf v4.1 - implementation of parameterized derived type for matrices to switch between single and double precision

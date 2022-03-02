@@ -7,9 +7,8 @@ Module ine_variables
     Public
 
     Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
-    Integer  :: IPlv, IP4, Kt
+    Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
-    Integer  :: Nlev, N0, N2, nrange
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
 
