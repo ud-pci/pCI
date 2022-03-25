@@ -139,9 +139,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v4.2 with single precision")'
+            strfmt = '(4X,"Program conf v5.0 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v4.2")'
+            strfmt = '(4X,"Program conf v5.0")'
         End Select
         
         Write( 6,strfmt)

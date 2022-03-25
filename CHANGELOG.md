@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2022-03-25
+- conf v5.0.0 - initial import of version 5.0 - parallelization of Davidson
+
 ## [0.8.2] - 2022-03-01
 - conf v4.2 - changed BroadcastD to MPI_AllReduce 
 
