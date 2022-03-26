@@ -78,8 +78,6 @@ Module davidson
 
         If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
 
-        Call MPI_Bcast(Z1, Nd0*Nd0, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-
         B1=0_type_real
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
@@ -380,7 +378,7 @@ Module davidson
         End If
 
         count=Nd*nlp
-        !Call BroadcastD(ArrB, count, 0, 0, MPI_COMM_WORLD, mpierr)
+
         If (mype /= 0) ArrB = Real(0, kind=type_real)
         Do i=1,nlp
             Call MPI_AllReduce(MPI_IN_PLACE, ArrB(1:Nd,i), Nd, mpi_type_real, MPI_SUM, &
