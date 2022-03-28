@@ -40,6 +40,9 @@ Module params
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
     Integer, Parameter :: type_real=dp
     Type(MPI_Datatype) :: mpi_type_real
+
+    ! Set key to turn on extra outputs for developing
+    Integer, Parameter :: devmode=1
     
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj

@@ -984,8 +984,10 @@ Contains
 
                 Call startTimer(s1)
 
-                !print*, '      #dets', '         #eles', '        pid'
-                !print*, n, cntarray(1), mype
+                If (devmode == 1) Then
+                    print*, '      #dets', '         #eles', '        pid'
+                    print*, n, cntarray(1), mype
+                End If
 
                 NumH =  NumH + cntarray(1)
                 num_done = 0
@@ -1003,7 +1005,7 @@ Contains
                     Call MPI_RECV( cntarray, 3, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
              
-                    !print*, cntarray(3), cntarray(1), sender
+                    If (devmode == 1) print*, cntarray(3), cntarray(1), sender
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
                         Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
