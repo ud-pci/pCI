@@ -869,7 +869,21 @@ Contains
             Call calcMemReqs
         End If
 
-        ! If continuing calculation or Hamiltonian has already been constructed
+        ! Read number of processors
+        If (Kl == 3) Then
+            Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
+            Read(66) Nc_prev, Nd_prev
+            Close(66) 
+            If (Nd == Nd_prev) Then
+                Kl = 1
+                If (mype == 0) Then
+                    print*, 'previously: Nc=',Nc_prev, ' Nd=', Nd_prev
+                    print*, 'No new configurations to include'
+                End If
+            End If
+        End If
+
+        ! If Hamiltonian has already been fully constructed
         If (Kl == 1) Then 
             ! Read the Hamiltonian from file CONFp.HIJ
             Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
@@ -879,7 +893,7 @@ Contains
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             memEstimate = memEstimate + ihmax*(8+type_real)
 
-        ! If starting a new computation and Hamiltonian has not been fully constructed
+        ! If Hamiltonian has not been fully constructed
         Else 
             ! Read the previous Hamiltonian from file CONFp.HIJ
             !!! Details of future implementation:

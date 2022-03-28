@@ -184,11 +184,6 @@ Module matrix_io
             End If
 
             ! Read number of processors
-            If (Kl == 3) Then
-                Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
-                Read(66) Nc_prev, Nd_prev
-                Close(66) 
-            End If 
             Open(66,file='nprocs.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
             Read(66) npes_read
             Close(66)
