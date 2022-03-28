@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2022-03-28
+- conf v5.0.1 - bug fixes for ArrB vectorization
+- added determinant number in cntarray
+
 ## [0.9.0] - 2022-03-25
 - conf v5.0.0 - initial import of version 5.0 - parallelization of Davidson
 

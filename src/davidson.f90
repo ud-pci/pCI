@@ -146,7 +146,10 @@ Module davidson
             Tk(k)=t
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
-        ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
+
+        Do k=1,Nlv
+            ArrB(1:Nd,k)=ArrB(1:Nd,2*Nlv+k)
+        End Do
 
         Write ( 6,*) ' FormBskip: Vectors not saved'
         Return
@@ -173,8 +176,12 @@ Module davidson
             Write(17) t,Tj(k),Nd,(B2(i),i=1,Nd)
             ArrB(1:Nd,k+2*Nlv)=B2(1:Nd)
         End Do
-        ArrB(1:Nd,1:Nlv)=ArrB(1:Nd,2*Nlv+1:3*Nlv)
-        close (unit=17)
+
+        Do k=1,Nlv
+            ArrB(1:Nd,k)=ArrB(1:Nd,2*Nlv+k)
+        End Do
+
+        Close (unit=17)
         Write ( 6,*) ' FormB: Vectors saved'
         Return
     End Subroutine FormB

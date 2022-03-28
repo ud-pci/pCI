@@ -909,7 +909,7 @@ Contains
                 If (mype == 0) print*, 'previously: Nc=',Nc_prev, ' Nd=', Nd_prev, ' NumH=', NumH-nz0, ' numzero=', nz0
             End If
 
-            Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(2))
+            Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(3))
             vaGrowBy = vaBinSize
             ndGrowBy = 1
 
@@ -984,6 +984,9 @@ Contains
 
                 Call startTimer(s1)
 
+                !print*, '      #dets', '         #eles', '        pid'
+                !print*, n, cntarray(1), mype
+
                 NumH =  NumH + cntarray(1)
                 num_done = 0
                 If (Kl == 3) Then
@@ -997,9 +1000,10 @@ Contains
                 j=9
 
                 Do 
-                    Call MPI_RECV( cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV( cntarray, 3, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
              
+                    !print*, cntarray(3), cntarray(1), sender
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
                         Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
@@ -1108,8 +1112,9 @@ Contains
                                 End If
                             End Do
                         End Do 
-                        
-                        Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+
+                        cntarray(3) = nnd
+                        Call MPI_SEND(cntarray, 3, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End if
                 End Do
             End If
@@ -1517,7 +1522,6 @@ Contains
                     Write( 6,strfmt) it,Nlv
                     Write(11,strfmt) it,Nlv
                 End if
-
                 ! Orthonormalization of Nlv probe vectors
                 If (mype==0) Then
                     Do i=1,Nlv
@@ -1606,8 +1610,7 @@ Contains
                         End Do
                     End If
                  
-                    Call MPI_Bcast(ax, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-
+                    Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                     ! Write intermediate CONF.XIJ in frequency of kXIJ
                     If (kXIJ > 0) Then
                         ! Only write each kXIJ iteration
@@ -1628,7 +1631,6 @@ Contains
                     Else
                         Call FormBskip
                     End If
-                
                 ! Davidson procedure is converged - write message and exit loop
                 Else
                     If (mype == 0) Then
