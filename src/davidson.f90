@@ -20,13 +20,16 @@ Module davidson
         ! The diagonal elements of H are stored in the array Diag.
         Use mpi_f08
         Use determinants, Only : calcNd0
+        Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
         Integer  :: k, n, mype, mpierr
-        Integer(Kind=int64) :: l8
+        Integer(Kind=int64) :: l8, s1
         Real(type_real) :: t
         Character(Len=256) :: strfmt
+        Character(Len=16) :: timeStr
 
         If (mype == 0) Then
+            Call startTimer(s1)
             strfmt = '(3X,"Starting approx. includes ",I5," conf.,",I6," det.")'
             Write( 6,strfmt) Nc1,Nd0
             Write(11,strfmt) Nc1,Nd0
@@ -59,6 +62,11 @@ Module davidson
         Call MPI_AllReduce(MPI_IN_PLACE, Z1, Nd0*Nd0, mpi_type_real, MPI_SUM, &
                                 MPI_COMM_WORLD, mpierr)
 
+        If (mype == 0) Then
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> Initial approximation constructed in '// trim(timeStr)
+        End If
+
     End Subroutine Init4
 
     Subroutine FormB0(mype)
@@ -67,16 +75,22 @@ Module davidson
         ! Eigenvectors are written to CONF.XIJ 
         Use mpi_f08
         Use formj2, Only : J_av
+        Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
+        Integer(kind=int64) :: s1
         Real(dp) :: dummy
         Real(type_real) :: xj
         Character(Len=128) :: strfmt
+        Character(Len=16) :: timeStr
 
         num=0
         nskip=0
 
-        If (mype==0) Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        If (mype==0) Then
+            Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Call startTimer(s1)
+        End If
 
         B1=0_type_real
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
@@ -123,7 +137,10 @@ Module davidson
                 Write(*,*) ' Selection is done', nskip,' vectors skiped'
                 Write(11,*) ' Selection is done', nskip,' vectors skiped'
             End If
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> Initial eigenvectors constructed in '// trim(timeStr) // '.'
         End If
+        
         Return
     End Subroutine FormB0
 
@@ -401,6 +418,7 @@ Module davidson
                 t=t-Hamil%minval
                 If (kd == 1) Diag(n)=t
             End If
+            !If (devmode == 1 .and. mype == 1) print*, n, k, t, ArrB(n,i2min:i2max)
             ArrB(n,i2min:i2max)=ArrB(n,i2min:i2max)+t*ArrB(k,i1min:i1max)
             If (n /= k) ArrB(k,i2min:i2max)=ArrB(k,i2min:i2max)+t*ArrB(n,i1min:i1max)
         End Do

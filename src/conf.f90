@@ -139,9 +139,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.0 with single precision")'
+            strfmt = '(4X,"Program conf v4.4 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.0")'
+            strfmt = '(4X,"Program conf v4.4")'
         End Select
         
         Write( 6,strfmt)
@@ -985,8 +985,8 @@ Contains
                 Call startTimer(s1)
 
                 If (devmode == 1) Then
-                    print*, '      #dets', '         #eles', '        pid'
-                    print*, n, cntarray(1), mype
+                    !print*, '      #dets', '         #eles', '        pid'
+                    !print*, n, cntarray(1), mype
                 End If
 
                 NumH =  NumH + cntarray(1)
@@ -1005,7 +1005,7 @@ Contains
                     Call MPI_RECV( cntarray, 3, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
              
-                    If (devmode == 1) print*, cntarray(3), cntarray(1), sender
+                    !If (devmode == 1) print*, cntarray(3), cntarray(1), sender
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
                         Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
@@ -1463,10 +1463,10 @@ Contains
         Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
         Real(kind=type_real), Dimension(4) :: realtmp
         Real(kind=type_real), Allocatable, Dimension(:) :: W, Jn ! work array
-        Integer(Kind=int64) :: start_time
+        Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
-        Character(Len=16) :: timeStr
+        Character(Len=16) :: timeStr, iStr
 
         ! Initialize parameters and arrays
         Iconverge = 0
@@ -1481,6 +1481,7 @@ Contains
             If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
             If (Nc4 > Nc) Nc4=Nc
             Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
+            Open(77,file='CONF.PRG',status='REPLACE',form='FORMATTED',action='WRITE')
         End If
 
         ! Construct initial approximation from Hamiltonian matrix
@@ -1517,6 +1518,8 @@ Contains
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
 
         Do it=1,N_it
+            Write(iStr,'(A)') it
+            If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' ==========' 
             ! Compare lowest admixture of an unconverged vector to convergence criteria
             If (ax > crit) Then
                 If (mype == 0) Then
@@ -1526,6 +1529,7 @@ Contains
                 End if
                 ! Orthonormalization of Nlv probe vectors
                 If (mype==0) Then
+                    Call startTimer(s1)
                     Do i=1,Nlv
                         Call Ortn(i,ifail)
                         If (ifail /= 0) Then
@@ -1533,16 +1537,25 @@ Contains
                             Stop
                         End If
                     End Do
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'Orthonormalization of Nlv probe vectors took ' // timeStr
+                    Call startTimer(s1)
                 End If
 
                 ! Formation of the left-upper block of the energy matrix P
                 Call Mxmpy(1, mype)
                 If (mype==0) Then 
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'Mxmpy1 took ' // timeStr
+                    Call startTimer(s1)
                     Call FormP(1, vmax)
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'FormP1 took ' // timeStr
                     ! Average initial diagonal over relativistic configurations if projecting J
                     If (it == 1 .and. K_prj == 1) Call AvgDiag
                     
                     ! Formation of Nlv additional probe vectors
+                    Call startTimer(s1)
                     cnx=0.d0
                     Do i=1,Nlv
                         i1=i+Nlv
@@ -1555,11 +1568,14 @@ Contains
                             End If
                         End If
                     End Do
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
                 If (K_prj == 1) Then
                     If (mype == 0) Jsq%ind1=Jn
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
+                        Call startTimer(s1)
                         Do i=Nlv+1,2*Nlv
                             If (Iconverge(i-Nlv)==0) Then
                                 Call Ortn(i,ifail)
@@ -1576,21 +1592,32 @@ Contains
                                 End If
                             End If
                         End Do
+                        Call stopTimer(s1, timeStr)
+                        Write(77,*) 'Orthogonalization of Nlv additional probe vectors took ' // timeStr
                     End If
                 End If
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
+                    Call startTimer(s1)
                     Call Mxmpy(2, mype)
                     If (mype==0) Then
+                        Call stopTimer(s1, timeStr)
+                        Write(77,*) 'Mxmpy2 took ' // timeStr
+                        Call startTimer(s1)
                         Call FormP(2, vmax)
+                        Call stopTimer(s1, timeStr)
+                        Write(77,*) 'FormP2 took ' // timeStr
                         ! Evaluation of Nlv eigenvectors:
+                        Call startTimer(s1)
                         Select Case(type_real)
                         Case(sp)
                             Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         Case(dp)
                             Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         End Select
+                        Call stopTimer(s1, timeStr)
+                        Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
                         
                         ax=0.d0
                         vmax=-1.d10
@@ -1614,6 +1641,7 @@ Contains
                  
                     Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                     ! Write intermediate CONF.XIJ in frequency of kXIJ
+                    Call startTimer(s1)
                     If (kXIJ > 0) Then
                         ! Only write each kXIJ iteration
                         If (mod(it, kXIJ) == 0) Then 
@@ -1633,6 +1661,8 @@ Contains
                     Else
                         Call FormBskip
                     End If
+                    Call stopTimer(s1, timeStr)
+                    If (mype == 0) Write(77,*) 'Formation of next iteration of eigenvectors took ' // timeStr
                 ! Davidson procedure is converged - write message and exit loop
                 Else
                     If (mype == 0) Then
@@ -1660,6 +1690,7 @@ Contains
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
+            Close(77)
         End If
 
         If (allocated(W)) Deallocate(W)
