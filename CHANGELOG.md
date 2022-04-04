@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2022-04-04
+- added serial modernized add program
+
 ## [0.8.4] - 2022-04-04
 - conf v4.4 - merged Kl=3 and Kl=4 routines to single block
 - added exception for when no additional configurations were added with key Kl=3
