@@ -19,6 +19,26 @@ To switch to the devel branch:
 $ git checkout devel
 ```
 
+## Installing with VALET
+
+VALET is a tool developed by Dr. Jeffrey Frey that is available on the UD clusters. VALET provides the ability to modify your environment without modifying your startup files like ```.bashrc``` and ```.bash_profile``` as it prevents jobs from failing by keeping a clean login environment. To install the ```pCI``` package using VALET, simply load with:
+```
+vpkg_require pci
+```
+
+The programs are then loaded into the environment.
+To run the programs, just run the command for program:
+```
+add
+ine
+```
+```
+mpirun -n <nprocs> conf
+mpirun -n <nprocs> basc
+mpirun -n <nprocs> dtm
+mpirun -n <nprocs> conf_pt
+```
+
 ## Building with CMake
 
 The codes are built using CMake with the 'CMakeLists.txt' file and OpenMPI with Intel compiler. 

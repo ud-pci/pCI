@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2022-04-04
+- added serial modernized add program
+
+## [0.8.4] - 2022-04-04
+- conf v4.4 - merged Kl=3 and Kl=4 routines to single block
+- added exception for when no additional configurations were added with key Kl=3
+- added additional timing tests to file CONF.PRG
+
+## [0.8.3] - 2022-03-28
+- conf v4.3 - bug fixes for ArrB vectorization
+- added determinant number in cntarray
+
 ## [0.8.2] - 2022-03-01
 - conf v4.2 - changed BroadcastD to MPI_AllReduce 
 
