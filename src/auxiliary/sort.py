@@ -62,6 +62,6 @@ def sortMatrix(filename):
 	
 	print(filename + " has been sorted")
 	
-
-sortMatrix("CONFp.JJJ")
-sortMatrix("CONFp.HIJ")
+if __name__ == '__main__':
+	sortMatrix("CONFp.JJJ")
+	sortMatrix("CONFp.HIJ")
