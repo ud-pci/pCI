@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2022-05-14
+- conf v5.1 - implemented writing of energies every N davidson iteration
+- conf_init.f90: fixed out-of-bound error for array Nrnrc in subroutine ReadConfigurations
+- conf.f90: new subroutine PrintEnergiesDvdsn that writes table of energies to file CONF.ENG whenever CONF.XIJ is written
+- conf.f90: updated all mpi subroutines to use mpi_f08
+- conf.f90: fixed out-of-bound error for array Wsave, Wpsave, strcsave in subroutine PrintWeights
+- conf.f90: updated CONFLEVELS.RES file to print energies with more digits
+
 ## [0.9.0] - 2022-05-13
 - conf v5.0 - implemented ikarus and conf_lsj into conf
 - new energy table with weights (and optionally, LSJ) are written to file CONFFINAL.RES

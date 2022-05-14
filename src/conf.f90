@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.0 with single precision")'
+            strfmt = '(4X,"Program conf v5.1 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.0")'
+            strfmt = '(4X,"Program conf v5.1")'
         End Select
         
         Write( 6,strfmt)
@@ -654,7 +654,7 @@ Contains
     End Subroutine FormD
     
     Subroutine AllocateFormHArrays(mype)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
@@ -1291,7 +1291,7 @@ Contains
     End function Hmltn
 
     Subroutine DeAllocateFormHArrays(mype)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
@@ -1331,7 +1331,7 @@ Contains
     End Subroutine DeAllocateFormHArrays
 
     Subroutine AllocateDvdsnArrays(mype)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
         Integer :: mpierr, mype
@@ -1377,7 +1377,7 @@ Contains
     End Subroutine AllocateDvdsnArrays
 
     Subroutine DiagInitApprox(mype, npes)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
         External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
@@ -1671,7 +1671,10 @@ Contains
                                 End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
-                            If (mype == 0) Call FormB
+                            If (mype == 0) Then
+                                Call FormB
+                                Call PrintEnergiesDvdsn(it)
+                            End If
                         Else
                             If (mype == 0) Call FormBskip
                         End If
@@ -1728,6 +1731,86 @@ Contains
         Return
     End Subroutine Diag4
 
+    Subroutine PrintEnergiesDvdsn(iter)
+        ! This subroutine prints eigenvalues in increasing order
+        Implicit None
+
+        Integer :: j, ist, iter
+        Real(kind=type_real) :: dt, del
+        Character(Len=1), Dimension(10) :: stecp*7
+        Character(Len=1), Dimension(4)  :: strsms*6
+        Character(Len=1), Dimension(3)  :: strms*3
+        Character(Len=512) :: strfmt
+        data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
+                   'GAUNT  ','G+MBPT1','G+MBPT2', &
+                   'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/
+        data strsms/'(1-e) ','(2-e) ','(full)','      '/
+        data strms/'SMS','NMS',' MS'/
+
+        If (iter == 1) Then
+            Open(unit=81,status='UNKNOWN',file='CONF.ENG')
+        Else
+            Open(unit=81,status='UNKNOWN',POSITION='APPEND',file='CONF.ENG')
+            strfmt = '(A)'
+            Write(81,strfmt) ''
+        End If
+
+        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is used for output
+        If (K_is == 3) K_sms=4       !### Used for output
+        If (Kecp == 1) ist=7
+
+        ! Print line of "=" for top of table
+        strfmt = '(A,I3)'
+        Write(81,strfmt) 'Davidson Iteration #', iter
+        strfmt = '(4X,63("="))'
+        Write(81,strfmt)
+
+        ! If pure CI, print Nc, Nd, Gj
+        If (Ksig*Kdsig == 0) Then
+            strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
+                        /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
+            Write(81,strfmt) stecp(ist),Nc,Nd,Gj
+        ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
+        Else
+            strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
+                    I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
+                    "EV",16X,"ET",9X,"DEL(CM**-1)")'
+            Write(81,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
+        End If
+
+        If (C_is /= 0.d0) Then
+            If (K_is == 1) Then
+                strfmt = 'format(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
+                Write(81,strfmt) C_is,Rnuc
+            Else
+                strfmt = '(4X,A3,":",E9.2,"*(P_i Dot P_k) ",A6," Lower component key =",I2)'
+                Write(81,strfmt) strms(K_is-1),C_is,strsms(K_sms),Klow
+            End If
+        End If
+
+        ! Print line of "-" to close header
+        strfmt = '(4X,63("-"))'
+        Write(81,strfmt)
+
+        ! For each energy level, print the following:
+        ! j = index for energy level
+        ! Tj(j) = total angular momentum
+        ! Tk(j) = valence energy of jth level
+        ! DT = Tk(j)-Ecore = total energy
+        ! DEL = Tk(1)-Tk(j) = energy difference between jth level and 1st level in cm**-1
+        Do j=1,Nlv
+            Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
+            DT=Tk(j)-Ecore
+            DEL=(Tk(1)-Tk(j))*2*DPRy
+            Write(81,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+        End Do
+
+        ! Print line of "=" for bottom of table
+        strfmt = '(4X,63("="))'
+        Write(81,strfmt)
+        Close(81)
+    End Subroutine PrintEnergiesDvdsn
+
     Subroutine WriteFinalXIJ(mype)
         Use mpi_f08
         Use davidson, Only : Prj_J
@@ -1761,26 +1844,12 @@ Contains
     End Subroutine WriteFinalXIJ
 
     Subroutine AllocateLSJArrays(mype)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
         Integer :: mpierr, mype
 
-        Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -1810,9 +1879,12 @@ Contains
     Subroutine InitLSJ
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
         Implicit None
-        Integer :: mpierr, i
+
+        Integer :: mpierr
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1844,47 +1916,45 @@ Contains
         Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Eps(1:IPs), IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Eps, IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(In(1:Ngaunt), Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gnt(1:Ngaunt), Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nh0(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh0, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        count = IPbr*Int(Ngint,kind=int64)
+        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End do  
-        Call MPI_Bcast(Tj(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Nlv
-            Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Tj, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Tk, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
     End subroutine InitLSJ
 
     Subroutine lsj(cc,xj,xl,xs,mype,npes)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer
         Implicit None
+
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
         Integer(Kind=int64) :: s1, s2
         Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, an_id, ncGrowBy, endnc, num_done
-        Integer :: n, j, status(MPI_STATUS_SIZE), sender
+        Type(MPI_STATUS) :: status
+        Integer :: n, j, sender
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Character(Len=16) :: timeStr
         Logical :: moreTimers
@@ -1940,7 +2010,7 @@ Contains
 
                 Do 
                     Call MPI_RECV(msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    sender = status%MPI_SOURCE
 
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy
@@ -2437,7 +2507,8 @@ Contains
         data st1/11*'='/, st2/11*'-'/
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
-        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(10), Wpsave(10), strcsave(10))
+        nconfs = 20
+        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs), Wpsave(nconfs), strcsave(nconfs))
         strsp = ''
 
         If (kWeights == 1) Then
@@ -2477,7 +2548,6 @@ Contains
                 End Do
             End Do
 
-            nconfs = 20
             Wsave = 0_dp
             Do i=1,nconfs
                 Wsave(i) = maxval(W2(1:Nnr,j),1)
@@ -2583,7 +2653,7 @@ Contains
             ! Write LEVELS.RES
             Write(98,'(A)') '****************************************************'
             write(98,'(A)') ''
-            strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f12.8)'
+            strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f14.8)'
             Write(98, strfmt) j, Tj(j), Tk(j)
             Write(98,'(A)') ''
             Write(98,'(A)') ' Weight     Configuration'
@@ -2630,6 +2700,7 @@ Contains
         End Do
         Deallocate(C, W, W2, Wsave, Wpsave, strcsave, Ndc, Tk, Tj, ArrB)
         Close(11)
+        
     End Subroutine PrintWeights
 
     Real(dp) Function g_factor(L, S, J)
