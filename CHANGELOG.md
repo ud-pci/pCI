@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2022-05-13
+- conf v5.0 - implemented ikarus and conf_lsj into conf
+- new energy table with weights (and optionally, LSJ) are written to file CONFFINAL.RES
+- list of top contributing configurations to each energy level are written to file CONFLEVELS.RES
+- conf_variables.f90: global variable kLSJ added to allow user to decide whether L, S, J are printed
+- conf_variables.f90: global variable Nnr added to count number of non-relativistic configurations required by subroutine PrintWeights
+- conf_variables.f90: global array Nrnrc added to store number of relativistic configurations in each non-relativistic configuration
+- determinants.f90: deallocation statements for Nq and Nip have been removed for subsequent LSJ calculations
+- determinants.f90: subroutine Rdet has been revamped to take in the name of the file to read determinants Iarr from
+- conf_init.f90: added code in subroutine ReadConfigurations to count number of non-rel. configurations Nnr and number of rel. configurations in each nr configuration Nrnrc
+- formj2.f90: deallocation statements for Jz and Nh have been removed for subsequent LSJ calculations
+- conf.f90: added code to calculate LSJ if key kLSJ = 1
+- conf.f90: removed deallocation statements for Nvc and Nc0 in subroutine DeAllocateFormHArrays
+- conf.f90: new subroutine AllocateLSJArrays and InitLSJ added to allocate and initialize arrays required to calculate LSJ
+- conf.f90: new subroutines lsj, calcLSJ, lsj_det, plus_s, plus_l, p0_s, p0_l, and plus_j added to calculate LSJ
+- conf.f90: new array W2 added to store weights of non-relativistic configurations
+- conf.f90: new array Wsave and Wpsave added to store the top weights and indices of top weights
+- conf.f90: new code written to write a table of main configuration, S, L, J, gfactor, energy in eV, energy from ground state in cm-1, weight% for main configuration, secondary configuration and secondary weight if the weight for main configuration is < 70%, for each energy level
+- conf.f90: new code written to write list of top weights and configurations for each energy level
+- conf.f90: new function g_factor to calculate g-factors given L, S, J
+
 ## [0.8.5] - 2022-04-04
 - added serial modernized add program
 

@@ -327,7 +327,7 @@ Module formj2
             Call stopTimer(stot, timeStr)
             write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If
-        Deallocate(idet1,idet2,Jz,Nh,cntarray)
+        Deallocate(idet1,idet2,cntarray)
 
     End Subroutine FormJ
     

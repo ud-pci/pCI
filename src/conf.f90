@@ -44,7 +44,7 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    use determinants, only : Wdet, Dinit, Jterm
+    use determinants, only : Wdet, Dinit, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -55,6 +55,7 @@ Program conf
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
+    Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
 
     ! Initialize MPI
     !Call MPI_Init(mpierr)
@@ -113,9 +114,19 @@ Program conf
     ! Davidson diagonalization
     Call Diag4(mype,npes) 
     
+    ! Print table of final energies
+    If (mype==0) Call PrintEnergies
+
+    ! Call LSJ routines if kLSJ=1
+    If (kLSJ == 1) Then
+        If (mype == 0) Call Rdet('CONF.DET')
+        Call AllocateLSJArrays(mype)
+        Call InitLSJ
+        Call lsj(ArrB,xj,xl,xs,mype,npes)
+    End If
+    
     ! Print table of final results and total computation time
     If (mype==0) Then
-        Call PrintEnergies
         Call PrintWeights
         
         Call stopTimer(start_time, timeStr)
@@ -139,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v4.4 with single precision")'
+            strfmt = '(4X,"Program conf v5.0 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v4.4")'
+            strfmt = '(4X,"Program conf v5.0")'
         End Select
         
         Write( 6,strfmt)
@@ -159,7 +170,7 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw
+        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
@@ -171,6 +182,12 @@ Contains
         ! Kw=0 - CONF.HIJ will not be written
         ! Kw=1 - CONF.HIJ will be written
         Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
+        Close(99)
+
+        ! kLSJ determines whether CONF.HIJ will be written or not
+        ! kLSJ=0 - LSJ will not be written in CONFFINAL.RES
+        ! kLSJ=1 - LSJ will be written CONFFINAL.RES
+        Write( 6,'(/4X,"kLSJ = (0-do not calculate LSJ, 1-calculate LSJ) ",I1)') kLSJ
         Close(99)
 
         ! If starting new computation with MBPT
@@ -292,18 +309,18 @@ Contains
                 Jj(ni)=IQN(4*ni)
             End Do
         Else
-            If=20
+            if=20
             Do ni=1,Ns
-                If=If+1
-                Nn(ni)=pq(If)+c1
-                If=If+1
-                Ll(ni)=pq(If)+c1
-                If=If+3
-                c2=dsign(c1,pq(If))
-                Kk(ni)=pq(If)+c2
-                If=If+1
-                c2=dsign(c1,pq(If))
-                Jj(ni)=pq(If)+c2
+                if=if+1
+                Nn(ni)=pq(if)+c1
+                if=if+1
+                Ll(ni)=pq(if)+c1
+                if=if+3
+                c2=dsign(c1,pq(if))
+                Kk(ni)=pq(if)+c2
+                if=if+1
+                c2=dsign(c1,pq(if))
+                Jj(ni)=pq(if)+c2
             End Do
         End If
 
@@ -767,6 +784,7 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(kLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1287,8 +1305,8 @@ Contains
             Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' of memory per core from arrays for FormH'  
         End If
     
-        If (Allocated(Nvc)) Deallocate(Nvc)
-        If (Allocated(Nc0)) Deallocate(Nc0)
+        !If (Allocated(Nvc)) Deallocate(Nvc)
+        !If (Allocated(Nc0)) Deallocate(Nc0)
         If (Allocated(Rint1)) Deallocate(Rint1)
         If (Allocated(Rint2)) Deallocate(Rint2)
         If (Allocated(Iint1)) Deallocate(Iint1)
@@ -1742,6 +1760,587 @@ Contains
         Return
     End Subroutine WriteFinalXIJ
 
+    Subroutine AllocateLSJArrays(mype)
+        Use mpi
+        Use str_fmt, Only : FormattedMemSize
+        Implicit None
+
+        Integer :: mpierr, mype
+
+        Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
+        If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
+        If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
+        If (.not. Allocated(Jz)) Allocate(Jz(Nst))
+        If (.not. Allocated(Nh)) Allocate(Nh(Nst))
+        If (.not. Allocated(Nh0)) Allocate(Nh0(Nst))
+        If (.not. Allocated(Diag)) Allocate(Diag(Nd))
+        If (.not. Allocated(In)) Allocate(In(Ngaunt))
+        If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
+        If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
+        If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
+        If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
+        If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
+        If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
+        If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
+        If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
+        If (.not. Allocated(Xj)) Allocate(Xj(Nlv))
+        If (.not. Allocated(Xl)) Allocate(Xl(Nlv))
+        If (.not. Allocated(Xs)) Allocate(Xs(Nlv))
+        If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,Nlv))
+
+        Return
+    End Subroutine AllocateLSJArrays
+
+    Subroutine InitLSJ
+        ! this subroutine initializes variables used for LSJ and subsequent subroutines
+        ! All necessary variables are broadcasted from root to all cores
+        Use mpi
+        Implicit None
+        Integer :: mpierr, i
+
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kl4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kherr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kgerr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_prj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Mj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(NmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(LmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ksym, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsum, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Eps(1:IPs), IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(In(1:Ngaunt), Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Gnt(1:Ngaunt), Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh0(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Do i=1,Ne
+            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End do  
+        Call MPI_Bcast(Tj(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Tk(1:Nlv), Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Do i=1,Nlv
+            Call MPI_Bcast(ArrB(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        End Do
+
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Return
+    End subroutine InitLSJ
+
+    Subroutine lsj(cc,xj,xl,xs,mype,npes)
+        Use mpi
+        Use str_fmt, Only : startTimer, stopTimer
+        Implicit None
+        Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
+        Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
+        Integer(Kind=int64) :: s1, s2
+        Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, an_id, ncGrowBy, endnc, num_done
+        Integer :: n, j, status(MPI_STATUS_SIZE), sender
+        Integer, Parameter    :: send_tag = 2001, return_tag = 2002
+        Character(Len=16) :: timeStr
+        Logical :: moreTimers
+        real(dp), dimension(:,:), allocatable :: plj, pls, p0s, pll, p0l
+
+        ! Set moreTimers to .true. to display progress of each lsj iteration (default is .false.)
+        moreTimers = .false.
+
+        allocate(plj(nst,nst))
+        allocate(pls(nst,nst))
+        allocate(p0s(nst,nst))
+        allocate(pll(nst,nst))
+        allocate(p0l(nst,nst))
+        
+        If (mype == 0) write(*,*) ' calculating ME of l, s, & j...'
+        do i=1,nst
+            do j=1,nst
+               plj(i,j)=plus_j(i,j)
+               pls(i,j)=plus_s(i,j)
+               p0s(i,j)=p0_s(i,j)
+               pll(i,j)=plus_l(i,j)
+               p0l(i,j)=p0_l(i,j)
+            end do
+        end do
+        If (mype == 0) write(*,*) '              ... done'
+
+        xj=0.d0
+        xl=0.d0
+        xs=0.d0
+
+        Call startTimer(s1)
+
+        ! If only 1 processor is available (serial job)
+        If (npes == 1) Then
+            Call calcLSJ(1,Nc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
+        ! If more than 1 processor is available 
+        Else
+            n=0 
+            ncGrowBy = 1
+
+            If (mype == 0) Then
+                ! Distribute a portion of the workload of size ncGrowBy to each worker process
+                Do an_id = 1, npes - 1
+                   nnc = ncGrowBy*an_id + 1
+                   Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                End Do
+
+                Call calcLSJ(1,ncGrowBy,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
+                num_done = 0
+                ncsplit = Nc/10
+                nccnt = ncsplit
+                j=9
+
+                Do 
+                    Call MPI_RECV(msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    sender = status(MPI_SOURCE)
+
+                    If (nnc + ncGrowBy <= Nc) Then
+                        nnc = nnc + ncGrowBy
+                        Call MPI_SEND( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                    Else
+                        msg = -1
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+
+                    If (nnc == nccnt .and. nnc /= ncsplit*10) Then
+                        Call stopTimer(s1, timeStr)
+                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        j=j-1
+                        nccnt = nccnt + ncsplit
+                    End If
+
+                    If (num_done == npes-1) Then
+                        Call stopTimer(s1, timeStr)
+                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        Exit
+                    End If
+                End Do
+            Else
+                Do 
+                    Call MPI_RECV ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call startTimer(s2)
+                    If (nnc == -1) Then
+                        Exit
+                    Else
+                        If (Nc - nnc < ncGrowBy) Then
+                            endnc = Nc
+                        Else
+                            endnc = nnc+ncGrowBy-1
+                        End If
+
+                        Call calcLSJ(nnc,endnc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
+
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        Call stopTimer(s2,timeStr)
+                    End If
+                End Do
+            End If
+            Call MPI_AllReduce(MPI_IN_PLACE, xj, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call MPI_AllReduce(MPI_IN_PLACE, xl, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call MPI_AllReduce(MPI_IN_PLACE, xs, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        End If
+
+        Deallocate(plj, pls, p0s, pll, p0l)        
+
+        Xj=0.5d0*(dsqrt(Xj+1)-1)
+        Xl=0.5d0*(dsqrt(Xl+1)-1)
+        Xs=0.5d0*(dsqrt(Xs+1)-1)
+            
+        Return
+    End Subroutine lsj
+
+    Subroutine calcLSJ(startnc,endnc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
+        Use determinants, Only : Gdet, CompC, CompNRC
+        Implicit None
+        Integer, Intent(In) :: startnc, endnc
+        Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
+        Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer :: ic1, ic2, n1, ndn, n, k, k1n, ndk, k1, icomp
+        Real(dp) :: ckn, tj, tl, ts
+        real(dp), dimension(:,:), allocatable :: plj, pls, p0s, pll, p0l
+
+
+        if (.not. allocated(idet1)) Allocate(idet1(Ne))
+        if (.not. allocated(idet2)) Allocate(idet2(Ne))
+        if (.not. allocated(iconf1)) Allocate(iconf1(Ne))
+        if (.not. allocated(iconf2)) Allocate(iconf2(Ne))
+        Do ic1=startnc, endnc
+            ndn=Ndc(ic1)
+            n=sum(Ndc(1:ic1-1))
+            Do n1=1,ndn
+                n=n+1
+                call Gdet(n,idet1)
+                k=n-1
+                Do ic2=ic1,Nc
+                    ndk=Ndc(ic2)
+                    k1n=1
+                    If (ic2.EQ.ic1) k1n=n1
+                    call Gdet(k+1,idet2)
+                    call CompNRC(idet1,idet2,icomp)
+                    if (icomp.GT.0) then
+                        k=k+ndk
+                        Cycle
+                    end if
+                    call CompC(idet1,idet2,icomp)
+                    if (icomp.GT.2) then
+                        k=k+ndk
+                        Cycle
+                    end if
+                    Do k1=k1n,ndk
+                        k=k+1
+                        call Gdet(k,idet2)
+                        call lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
+                        do m=1,Nlv
+                            ckn=cc(n,m)*cc(k,m)
+                            if (n.ne.k) ckn=2*ckn
+                            xj(m)=xj(m)+ckn*tj
+                            xl(m)=xl(m)+ckn*tl
+                            xs(m)=xs(m)+ckn*ts
+                        end do
+                    End Do
+                End Do
+            End Do
+        End Do
+    End Subroutine calcLSJ
+
+    Subroutine lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
+        Use determinants, Only : Rspq
+        Implicit None
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Real(dp) :: tj, tl, ts
+        Integer :: ic, id, is, nf, i1, i2, j1, j2, iq, ja, la, ma, jq0, jq
+        Integer :: ia, ib, ka, kb, kc, kd, na, nb, nc, nd
+        Real(dp), Allocatable, Dimension(:,:) :: plj, pls, p0s, pll, p0l
+
+        tj=0.d0
+        tl=0.d0
+        ts=0.d0
+        call Rspq(idet1,idet2,is,nf,i1,j1,i2,j2)
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+!        Determinants are equal
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (nf.EQ.0) then
+          tj=mj*mj
+          Do iq=1,Ne
+            ia=idet1(iq)
+            na=Nh(ia)
+            ja=Jj(na)
+            la=Ll(na)
+            ma=Jz(ia)
+            tj=tj+ja*(ja+2)-ma**2
+            ts=ts+0.75d0
+            tl=tl+la*(la+1)
+            jq0=iq+1
+            If (jq0.LE.Ne) then
+              Do jq=jq0,Ne
+                ib=idet1(jq)
+                tj=tj-plj(ia,ib)**2-plj(ib,ia)**2
+                ts=ts+2*(p0s(ia,ia)*p0s(ib,ib)-p0s(ia,ib)**2)
+                ts=ts-2*(pls(ia,ib)**2+pls(ib,ia)**2)
+                tl=tl+2*(p0l(ia,ia)*p0l(ib,ib)-p0l(ia,ib)**2)
+                tl=tl-2*(pll(ia,ib)**2+pll(ib,ia)**2)
+              End Do
+            End If
+          End Do
+        End If
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+!       One function differs in the Determinants.
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (nf.EQ.1) then 
+            ia=i2
+            ib=j2
+            ka=Nh(ia)
+            kb=Nh(ib)
+            na=Nn(ka)
+            nb=Nn(kb)
+            if (na.EQ.nb) then
+                do iq=1,ne
+                    ic=idet1(iq)
+                    if (ic.eq.i2) Cycle
+                    ts=ts+2*(p0s(ia,ib)*p0s(ic,ic)-p0s(ia,ic)*p0s(ib,ic))
+                    ts=ts-2*(pls(ia,ic)*pls(ib,ic)+pls(ic,ia)*pls(ic,ib))
+                    tl=tl+2*(p0l(ia,ib)*p0l(ic,ic)-p0l(ia,ic)*p0l(ib,ic))
+                    tl=tl-2*(pll(ia,ic)*pll(ib,ic)+pll(ic,ia)*pll(ic,ib))
+                end do
+                ts=ts*is
+                tl=tl*is
+            end if
+        End If
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+!        Determinants differ by two functions
+!       - - - - - - - - - - - - - - - - - - - - - - - - -
+        If (nf.EQ.2) then
+            ia=i1
+            ic=j1
+            ib=i2
+            id=j2
+            ka=Nh(ia)
+            kc=Nh(ic)
+            kb=Nh(ib)
+            kd=Nh(id)
+            na=Nn(ka)
+            nc=Nn(kc)
+            nb=Nn(kb)
+            nd=Nn(kd)
+            if (na.EQ.nc.AND.nb.EQ.nd.OR.na.EQ.nd.AND.nb.EQ.nc) then
+                 tj=plj(ia,ic)*plj(id,ib)+plj(ic,ia)*plj(ib,id)- &
+                   plj(ia,id)*plj(ic,ib)-plj(id,ia)*plj(ib,ic)
+                 ts=ts+2*(p0s(ia,ic)*p0s(id,ib)-p0s(ia,id)*p0s(ic,ib))
+                 ts=ts+2*(pls(ia,ic)*pls(id,ib)+pls(ic,ia)*pls(ib,id)- &
+                    pls(ia,id)*pls(ic,ib)-pls(id,ia)*pls(ib,ic))
+                 tl=tl+2*(p0l(ia,ic)*p0l(id,ib)-p0l(ia,id)*p0l(ic,ib))
+                 tl=tl+2*(pll(ia,ic)*pll(id,ib)+pll(ic,ia)*pll(ib,id)- &
+                    pll(ia,id)*pll(ic,ib)-pll(id,ia)*pll(ib,ic))
+                 tj=tj*is
+                 ts=ts*is
+                 tl=tl*is
+            end if
+        End If
+        ts=ts*4
+        tl=tl*4
+
+        Return
+    End Subroutine lsj_det
+
+    Real(dp) Function plus_s(ia,ib)
+        Implicit None
+        Integer :: ia, ib, na, nb, ja, jb, la, lb, msa, msb, mja, mjb, mla, mlb
+        Real(dp) :: t, ta, tb
+!       We suggest that Int(Pa*Pb)=1.d0 for na=nb and la=lb
+!       but maybe different ja and jb.
+        t=0.
+        If (jz(ia).ne.jz(ib)+2) goto 1000
+        na=nh(ia)
+        nb=nh(ib)
+        If (nn(na).ne.nn(nb)) goto 1000
+        If (ll(na).ne.ll(nb)) goto 1000
+        ja=jj(na)
+        jb=jj(nb)
+        la=ll(na)
+        lb=ll(nb)
+        msa=1
+        msb=-1
+        mja=jz(ia)
+        mjb=jz(ib)
+        mla=(mja-msa)/2
+        mlb=mla
+        If (iabs(mla).gt.la) goto 1000
+        ta=0.d0
+        If (ja.eq.2*la+1) ta= dsqrt((ja+mja)/(2.d0*ja))
+        If (ja.eq.2*la-1) ta=-dsqrt((ja-mja+2.d0)/(2.d0*ja+4.d0))
+        tb=0.d0
+        If (jb.eq.2*lb+1) tb= dsqrt((jb-mjb)/(2.d0*jb))
+        If (jb.eq.2*lb-1) tb= dsqrt((jb+mjb+2.d0)/(2.d0*jb+4.d0))
+        t=-dsqrt(0.5d0)*ta*tb
+
+1000    plus_s=t
+        Return
+    End Function plus_s
+
+    Real(dp) Function plus_l(ia,ib)
+        Implicit None
+        Integer :: ia, ib, na, nb, ja, jb, la, lb, msa, msb, mja, mjb, mla, mlb
+        Real(dp) :: t, ta, tb
+!       We suggest that Int(Pa*Pb)=1.d0 for na=nb and la=lb
+!       but maybe different ja and jb.
+        t=0.
+        If (jz(ia).ne.jz(ib)+2) goto 1000
+        na=nh(ia)
+        nb=nh(ib)
+        If (nn(na).ne.nn(nb)) goto 1000
+        If (ll(na).ne.ll(nb)) goto 1000
+        ja=jj(na)
+        jb=jj(nb)
+        la=ll(na)
+        lb=ll(nb)
+        mja=jz(ia)
+        mjb=jz(ib)
+        Do msa=-1,1,2
+            msb=msa
+            mla=(mja-msa)/2
+            mlb=(mjb-msb)/2
+            If (iabs(mla).gt.la) Cycle
+            If (iabs(mlb).gt.lb) Cycle
+            ta=0.d0
+            tb=0.d0
+            If (msa.eq.1) then
+                If (ja.eq.2*la+1) ta= dsqrt((ja+mja)/(2.d0*ja))
+                If (ja.eq.2*la-1) ta=-dsqrt((ja-mja+2.d0)/(2.d0*ja+4.d0))
+                If (jb.eq.2*lb+1) tb= dsqrt((jb+mjb)/(2.d0*jb))
+                If (jb.eq.2*lb-1) tb=-dsqrt((jb-mjb+2.d0)/(2.d0*jb+4.d0))
+            End If
+            If (msa.eq.-1) then
+                If (ja.eq.2*la+1) ta=dsqrt((ja-mja)/(2.d0*ja))
+                If (ja.eq.2*la-1) ta=dsqrt((ja+mja+2.d0)/(2.d0*ja+4.d0))
+                If (jb.eq.2*lb+1) tb=dsqrt((jb-mjb)/(2.d0*jb))
+                If (jb.eq.2*lb-1) tb=dsqrt((jb+mjb+2.d0)/(2.d0*jb+4.d0))
+            End If
+            t=t-dsqrt(0.5d0*(lb*(lb+1.d0)-mlb*(mlb+1.d0)))*ta*tb
+        End Do
+1000    plus_l=t
+        Return
+    End Function plus_l
+
+    Real(dp) Function p0_s(ia,ib)
+        Implicit None
+        Integer :: ia, ib, na, nb, ja, jb, la, lb, msa, msb, mja, mjb, mla, mlb
+        Real(dp) :: t, ta, tb
+        ! We suggest that Int(Pa*Pb)=1.d0 for na=nb and la=lb
+        ! but maybe different ja and jb.
+        t=0.
+        If (jz(ia).ne.jz(ib)) goto 1000
+        na=nh(ia)
+        nb=nh(ib)
+        If (nn(na).ne.nn(nb)) goto 1000
+        If (ll(na).ne.ll(nb)) goto 1000
+        ja=jj(na)
+        jb=jj(nb)
+        la=ll(na)
+        lb=ll(nb)
+        Do msa=-1,1,2
+            msb=msa
+            mja=jz(ia)
+            mjb=jz(ib)
+            mla=(mja-msa)/2
+            mlb=mla
+            If (iabs(mla).gt.la) Cycle
+                ta=0.d0
+                tb=0.d0
+                If (msa.eq.1) Then
+                    If (ja.eq.2*la+1) ta= dsqrt((ja+mja)/(2.d0*ja))
+                    If (ja.eq.2*la-1) ta=-dsqrt((ja-mja+2.d0)/(2.d0*ja+4.d0))
+                    If (jb.eq.2*lb+1) tb= dsqrt((jb+mjb)/(2.d0*jb))
+                    If (jb.eq.2*lb-1) tb=-dsqrt((jb-mjb+2.d0)/(2.d0*jb+4.d0))
+                End If
+                If (msa.eq.-1) then
+                    If (ja.eq.2*la+1) ta=dsqrt((ja-mja)/(2.d0*ja))
+                    If (ja.eq.2*la-1) ta=dsqrt((ja+mja+2.d0)/(2.d0*ja+4.d0))
+                    If (jb.eq.2*lb+1) tb=dsqrt((jb-mjb)/(2.d0*jb))
+                    If (jb.eq.2*lb-1) tb=dsqrt((jb+mjb+2.d0)/(2.d0*jb+4.d0))
+            End If
+            t=t+0.5d0*msa*(ta*tb)
+        End Do
+
+1000    p0_s=t
+        Return
+    End Function p0_s
+
+    Real(dp) Function p0_l(ia,ib)
+        Implicit None
+        Integer :: ia, ib, na, nb, ja, jb, la, lb, msa, msb, mja, mjb, mla, mlb
+        Real(dp) :: t, ta, tb
+!       We suggest that Int(Pa*Pb)=1.d0 for na=nb and la=lb
+!       but maybe different ja and jb.
+
+        t=0.
+        If (jz(ia).ne.jz(ib)) goto 1000
+        na=nh(ia)
+        nb=nh(ib)
+        If (nn(na).ne.nn(nb)) goto 1000
+        If (ll(na).ne.ll(nb)) goto 1000
+        ja=jj(na)
+        jb=jj(nb)
+        la=ll(na)
+        lb=ll(nb)
+        mja=jz(ia)
+        mjb=jz(ib)
+        Do msa=-1,1,2
+            msb=msa
+            mla=(mja-msa)/2
+            mlb=mla
+            If (iabs(mla).gt.la) Cycle
+            ta=0.d0
+            tb=0.d0
+            If (msa.eq.1) then
+                If (ja.eq.2*la+1) ta= dsqrt((ja+mja)/(2.d0*ja))
+                If (ja.eq.2*la-1) ta=-dsqrt((ja-mja+2.d0)/(2.d0*ja+4.d0))
+                If (jb.eq.2*lb+1) tb= dsqrt((jb+mjb)/(2.d0*jb))
+                If (jb.eq.2*lb-1) tb=-dsqrt((jb-mjb+2.d0)/(2.d0*jb+4.d0))
+            End If
+            If (msa.eq.-1) then
+                If (ja.eq.2*la+1) ta=dsqrt((ja-mja)/(2.d0*ja))
+                If (ja.eq.2*la-1) ta=dsqrt((ja+mja+2.d0)/(2.d0*ja+4.d0))
+                If (jb.eq.2*lb+1) tb=dsqrt((jb-mjb)/(2.d0*jb))
+                If (jb.eq.2*lb-1) tb=dsqrt((jb+mjb+2.d0)/(2.d0*jb+4.d0))
+            End If
+            t=t+mla*(ta*tb)
+        End Do
+
+1000    p0_l=t
+        Return
+    End Function p0_l
+
+    Real(dp) Function Plus_j(ia,ib)
+        Implicit None    
+        Integer :: ia, ib, na, nb, ma, mb, ja
+        Real(dp) :: t     
+
+        t=0.d0
+        na=Nh(ia)
+        nb=Nh(ib)
+        if (na.EQ.nb) then
+           ma=Jz(ia)
+           mb=Jz(ib)
+           if (ma.EQ.mb+2) then
+              ja=Jj(na)
+              t=dsqrt(ja*(ja+2)-ma*mb+0.d0)
+           end if
+        end if
+        Plus_j=t
+        Return
+    End Function Plus_j
+
     Subroutine PrintEnergies
         ! This subroutine prints eigenvalues in increasing order
         Implicit None
@@ -1823,20 +2422,33 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, nk, ndk
-        Real(dp), Allocatable, Dimension(:)  :: C
-        Real(dp), Allocatable, Dimension(:,:)  :: W
-        Character(Len=1), Dimension(11) :: st1, st2 
-        Character(Len=512) :: strfmt, strfmt2
+        Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nconfs, q0
+        Real(dp) :: wsum, gfactor
+        Integer, Allocatable, Dimension(:) :: Wpsave
+        Real(dp), Allocatable, Dimension(:)  :: C, Wsave
+        Real(dp), Allocatable, Dimension(:,:)  :: W, W2
+        Character(Len=1), Dimension(11) :: st1, st2, l0
+        Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
+        Character(Len=512), Allocatable, Dimension(:) :: strcsave
+        Character(Len=3) :: strc, strq
+        Integer, Dimension(33)  ::  nnn, jjj, nqq 
+        Character(Len=1), Dimension(9) :: Let 
+        Character(Len=1), Dimension(33):: lll
         data st1/11*'='/, st2/11*'-'/
+        Data Let/'s','p','d','f','g','h','i','k','l'/
 
-        Allocate(C(Nd), W(Nc,Nlv))
+        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(10), Wpsave(10), strcsave(10))
+        strsp = ''
 
         If (kWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
             strfmt = '(I8,I6,F11.7)'
         End If
         ! Form matrix of weights of each configuration for each energy level
+        W2=0_dp
+        Open(99,file='CONFFINAL.RES',status='UNKNOWN')
+        Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
+        
         Do j=1,Nlv
             If (kWeights == 1) Then
                 Write(88,'(A,I3)') 'Level #',j
@@ -1855,7 +2467,142 @@ Contains
                 End Do
             End Do
             If (kWeights == 1) Write(88,'(A25)') '========================='
+            k=0
+
+            ! Calculate weights of non-relativistic configurations and store in array W2
+            Do ic=1,Nnr
+                Do i=1,Nrnrc(ic)
+                    k=k+1
+                    W2(ic,j) = W2(ic,j) + W(k,j)
+                End Do
+            End Do
+
+            nconfs = 20
+            Wsave = 0_dp
+            Do i=1,nconfs
+                Wsave(i) = maxval(W2(1:Nnr,j),1)
+                Wpsave(i) = maxloc(W2(1:Nnr,j),1)
+                W2(maxloc(W2(1:Nnr,j)),j) = 0
+            End Do
+            Do k=1,nconfs
+                strconfig = ''
+                m1=sum(Nrnrc(1:Wpsave(k)))
+                n1=Nc0(m1)+1
+                n2=Nc0(m1)+Nvc(m1)
+                Do i=n1,n2
+                    i1=i-n1+1
+                    ni=Nip(i)
+                    l=Ll(ni)+1
+                    lll(i1)=let(l)
+                    nnn(i1)=Nn(ni)
+                    nqq(i1)=Nq(i)
+                End Do
+                n=n2-n1+1
+                n0=0
+                Do i=2,n
+                    If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                        nqq(i-1) = nqq(i-1) + nqq(i)
+                        nqq(i) = 0
+                    End If
+                End Do
+                Do i=1,n
+                    If (nqq(i) == 0) Cycle
+                    Write(strc,'(I2)') nnn(i)
+                    If (nqq(i) > 1) Then
+                        Write(strq,'(I2)') nqq(i)
+                    Else
+                        strq = ''
+                    End If
+                    strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                End Do
+                strcsave(k) = strconfig
+            End Do
+            nspaces = 0
+            do k=2,1,-1
+                W2(Wpsave(k),j) = Wsave(k)
+                If (nspaces < (len(Trim(AdjustL(strcsave(k)))) - 4)) nspaces = len(Trim(AdjustL(strcsave(k)))) - 4
+            end do
+            
+            ! Calculate g-factors if including L, S, J
+            If (kLSJ == 1) gfactor = g_factor(Xl(j),Xs(j),Tj(j))
+
+            ! If L, S, J is needed
+            If (kLSJ == 1) Then
+                ! Write column names if first iteration
+                If (j == 1) Write(99, '(A)') '  #   ' // strsp(1:nspaces-1) // 'conf     S     L     J    gf                 EV      Δ(cm^-1)   conf%    '// strsp(1:nspaces-1) // 'conf2  conf2%'
+
+                ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
+                If (Wsave(1) < 0.7) Then
+                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
+                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1))))
+                        strfmt = '(I3,2X,A,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                    Else
+                        strfmt = '(I3,2X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                    End If
+                ! Else we include only the main configuration
+                Else
+                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
+                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1)))) 
+                        strfmt = '(I3,2X,A,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    Else
+                        strfmt = '(I3,2X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    End If
+                End If
+            ! If L, S, J is not needed
+            Else
+                ! Write column names if first iteration
+                If (j == 1) Write(99, '(A)') '  #   ' // strsp(1:nspaces-1) // 'conf     J                 EV      Δ(cm^-1)   conf%    '// strsp(1:nspaces-1) // 'conf2  conf2%'
+
+                ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
+                If (Wsave(1) < 0.7) Then
+                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
+                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1))))
+                        strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                    Else
+                        strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                    End If
+                ! Else we include only the main configuration
+                Else
+                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
+                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1)))) 
+                        strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    Else
+                        strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    End If
+                End If
+            End If
+
+            ! Write LEVELS.RES
+            Write(98,'(A)') '****************************************************'
+            write(98,'(A)') ''
+            strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f12.8)'
+            Write(98, strfmt) j, Tj(j), Tk(j)
+            Write(98,'(A)') ''
+            Write(98,'(A)') ' Weight     Configuration'
+            Write(98,'(A)') ''
+            strfmt = '(F9.6,5X,A)'
+            wsum=0_dp
+            i=0
+            Do While (wsum < 0.99 .and. i < nconfs)
+                i=i+1
+                Write(98, strfmt) Wsave(i), strcsave(i)
+                wsum = wsum + Wsave(i)
+            End Do
+            Write(98,'(A)') '_______'
+            Write(98,'(F9.6)') wsum
+            Write(98,'(A)') ''
+            
         End Do
+        Close(98)
+        Close(99)
         If (kWeights == 1) Close(88)
 
         ! Print the weights of each configuration
@@ -1881,8 +2628,17 @@ Contains
             End Do
             Write(11,strfmt) (st1,i=j1,j3)
         End Do
-        Deallocate(C, W, Ndc, Tk, Tj, ArrB)
+        Deallocate(C, W, W2, Wsave, Wpsave, strcsave, Ndc, Tk, Tj, ArrB)
         Close(11)
-    End Subroutine
+    End Subroutine PrintWeights
+
+    Real(dp) Function g_factor(L, S, J)
+        ! This function returns the g-factor, given L, S and J
+        Implicit None
+        Real(dp) :: L, S, J
+
+        g_factor = 1 + (J*(J+1)-L*(L+1)+S*(S+1))/(2*J*(J+1))
+
+    End Function g_factor
 
 End Program conf

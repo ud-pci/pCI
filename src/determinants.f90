@@ -235,7 +235,7 @@ Module determinants
             ndj=Njt(n)
         End Do
 
-        Deallocate(idet, Nq, Nip, Jtc, Nq0)
+        Deallocate(idet, Jtc, Nq0)
 
         Return
     End Subroutine Jterm
@@ -354,13 +354,15 @@ Module determinants
         Return
     End Subroutine Wdet
 
-    Subroutine Rdet
+    Subroutine Rdet(str)
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
         !
         Implicit None
         Integer :: i
+        Character(Len=*) :: str
 
-        Open (16,file='CONF.DET',status='OLD',form='UNFORMATTED')
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        Open (16,file=str,status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
         Do i=1,Nd
            Read(16,end=710) Iarr(1:Ne,i)
