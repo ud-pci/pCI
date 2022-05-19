@@ -1575,7 +1575,11 @@ Contains
                     Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
                 If (K_prj == 1) Then
-                    If (mype == 0) Jsq%ind1=Jn
+                    If (mype == 0) Then
+                        Jsq%ind1=Jn
+                        Jsq%ind2=Jk
+                        Jsq%val=Jt
+                    End If
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Call startTimer(s1)
