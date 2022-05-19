@@ -139,9 +139,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v4.4 with single precision")'
+            strfmt = '(4X,"Program conf v4.5 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v4.4")'
+            strfmt = '(4X,"Program conf v4.5")'
         End Select
         
         Write( 6,strfmt)
@@ -1462,7 +1462,8 @@ Contains
 
         Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
         Real(kind=type_real), Dimension(4) :: realtmp
-        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jn ! work array
+        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jt ! work array
+        Integer, Allocatable, Dimension(:) :: Jn, Jk
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
@@ -1509,8 +1510,10 @@ Contains
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
             js = size(Jsq%ind1)
-            Allocate(Jn(js))
+            Allocate(Jn(js),Jk(js),Jt(js))
             Jn=Jsq%ind1
+            Jk=Jsq%ind2
+            Jt=Jsq%val
         End If
 
         ! Davidson loop:
@@ -1650,6 +1653,8 @@ Contains
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                                 If (mype == 0) Then
                                     Jsq%ind1=Jn
+                                    Jsq%ind2=Jk
+                                    Jsq%val=Jt
                                 End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
@@ -1678,10 +1683,12 @@ Contains
             End If
         End Do
 
-        ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
+        ! temporary solution for value of Jsq changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
             Jsq%ind1=Jn
-            Deallocate(Jn)
+            Jsq%ind2=Jk
+            Jsq%val=Jt
+            Deallocate(Jn,Jk,Jt)
         End If
         
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ

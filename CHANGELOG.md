@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2022-05-19
+- conf v4.5 - bug fix for seg faults when writing intermediate CONF.XIJ caused by deallocation of Jsq after LAPACK subroutines
+
 ## [0.8.5] - 2022-04-04
 - added serial modernized add program
 
