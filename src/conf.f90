@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.1 with single precision")'
+            strfmt = '(4X,"Program conf v5.2 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.1")'
+            strfmt = '(4X,"Program conf v5.2")'
         End Select
         
         Write( 6,strfmt)
@@ -1480,7 +1480,8 @@ Contains
 
         Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
         Real(kind=type_real), Dimension(4) :: realtmp
-        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jn ! work array
+        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jt ! work array
+        Integer, Allocatable, Dimension(:) :: Jn, Jk
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
@@ -1520,15 +1521,17 @@ Contains
             Case(dp)
                 Call DSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
             End Select
-            lwork = Int(realtmp(1))
+            lwork = Nint(realtmp(1))
             Allocate(W(lwork))
         End If
 
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
             js = size(Jsq%ind1)
-            Allocate(Jn(js))
+            Allocate(Jn(js),Jk(js),Jt(js))
             Jn=Jsq%ind1
+            Jk=Jsq%ind2
+            Jt=Jsq%val
         End If
 
         ! Davidson loop:
@@ -1590,7 +1593,11 @@ Contains
                     Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
                 If (K_prj == 1) Then
-                    If (mype == 0) Jsq%ind1=Jn
+                    If (mype == 0) Then
+                        Jsq%ind1=Jn
+                        Jsq%ind2=Jk
+                        Jsq%val=Jt
+                    End If
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Call startTimer(s1)
@@ -1668,6 +1675,8 @@ Contains
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                                 If (mype == 0) Then
                                     Jsq%ind1=Jn
+                                    Jsq%ind2=Jk
+                                    Jsq%val=Jt
                                 End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
@@ -1702,9 +1711,12 @@ Contains
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
             Jsq%ind1=Jn
-            Deallocate(Jn)
+            Jsq%ind2=Jk
+            Jsq%val=Jt
+            If (allocated(Jn)) Deallocate(Jn)
+            If (allocated(Jk)) Deallocate(Jk)
+            If (allocated(Jt)) Deallocate(Jt)
         End If
-        
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
 
@@ -2492,15 +2504,15 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nconfs, q0
+        Integer :: j, k, j1, j2, j3, ic, i, i1, is, il, ij, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nspacesg, nconfs, q0
         Real(dp) :: wsum, gfactor
-        Integer, Allocatable, Dimension(:) :: Wpsave
-        Real(dp), Allocatable, Dimension(:)  :: C, Wsave
-        Real(dp), Allocatable, Dimension(:,:)  :: W, W2
+        Integer, Allocatable, Dimension(:,:) :: Wpsave
+        Real(dp), Allocatable, Dimension(:)  :: C
+        Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
         Character(Len=1), Dimension(11) :: st1, st2, l0
         Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
-        Character(Len=512), Allocatable, Dimension(:) :: strcsave
-        Character(Len=3) :: strc, strq
+        Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
+        Character(Len=3) :: strc, strq, strterm
         Integer, Dimension(33)  ::  nnn, jjj, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
@@ -2508,7 +2520,7 @@ Contains
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
         nconfs = 20
-        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs), Wpsave(nconfs), strcsave(nconfs))
+        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
         strsp = ''
 
         If (kWeights == 1) Then
@@ -2517,9 +2529,12 @@ Contains
         End If
         ! Form matrix of weights of each configuration for each energy level
         W2=0_dp
+        nspacesg = 0
         Open(99,file='CONFFINAL.RES',status='UNKNOWN')
         Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
+        Open(97,file='CONFSTR.RES',status='UNKNOWN')
         
+        Wsave = 0_dp
         Do j=1,Nlv
             If (kWeights == 1) Then
                 Write(88,'(A,I3)') 'Level #',j
@@ -2548,15 +2563,14 @@ Contains
                 End Do
             End Do
 
-            Wsave = 0_dp
             Do i=1,nconfs
-                Wsave(i) = maxval(W2(1:Nnr,j),1)
-                Wpsave(i) = maxloc(W2(1:Nnr,j),1)
+                Wsave(i,j) = maxval(W2(1:Nnr,j),1)
+                Wpsave(i,j) = maxloc(W2(1:Nnr,j),1)
                 W2(maxloc(W2(1:Nnr,j)),j) = 0
             End Do
             Do k=1,nconfs
                 strconfig = ''
-                m1=sum(Nrnrc(1:Wpsave(k)))
+                m1=sum(Nrnrc(1:Wpsave(k,j)))
                 n1=Nc0(m1)+1
                 n2=Nc0(m1)+Nvc(m1)
                 Do i=n1,n2
@@ -2585,67 +2599,83 @@ Contains
                     End If
                     strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
                 End Do
-                strcsave(k) = strconfig
+                strcsave(k,j) = strconfig
             End Do
-            nspaces = 0
-            do k=2,1,-1
-                W2(Wpsave(k),j) = Wsave(k)
-                If (nspaces < (len(Trim(AdjustL(strcsave(k)))) - 4)) nspaces = len(Trim(AdjustL(strcsave(k)))) - 4
-            end do
-            
+        End Do
+
+        ! Set weights back after assigning top values to Wsave and set maximum length of configuration string to nspacesg
+        nspaces = 0
+        Do j=1,Nlv
+            Do k=nconfs,1,-1
+                W2(Wpsave(k,j),j) = Wsave(k,j)
+                If (nspacesg < (len(Trim(AdjustL(strcsave(k,j)))))) nspacesg = len(Trim(AdjustL(strcsave(k,j))))
+            End Do
+        End Do
+
+        Do j=1,Nlv
             ! Calculate g-factors if including L, S, J
             If (kLSJ == 1) gfactor = g_factor(Xl(j),Xs(j),Tj(j))
 
+            ! Writes main configurations to CONFSTR.RES
+            Write(97,'(A)') Trim(AdjustL(strcsave(1,j)))
+
+            ! If LSJ is calculated, also include terms in CONFSTR.RES
+            If (kLSJ == 1) Then
+                strterm = term(Xl(j), Xs(j), Tj(j))
+                Write(97,'(A)') strterm
+            End If
+
+            nspaces = nspacesg
             ! If L, S, J is needed
             If (kLSJ == 1) Then
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  #   ' // strsp(1:nspaces-1) // 'conf     S     L     J    gf                 EV      Δ(cm^-1)   conf%    '// strsp(1:nspaces-1) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf term     S     L     J    gf                 EV      Δ(cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
-                If (Wsave(1) < 0.7) Then
-                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
-                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1))))
-                        strfmt = '(I3,2X,A,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                If (Wsave(1,j) < 0.7) Then
+                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
+                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
+                        strfmt = '(I3,2X,A,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     Else
-                        strfmt = '(I3,2X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                        strfmt = '(I3,2X,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     End If
                 ! Else we include only the main configuration
                 Else
-                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
-                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1)))) 
-                        strfmt = '(I3,2X,A,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
+                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
+                        strfmt = '(I3,2X,A,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                     Else
-                        strfmt = '(I3,2X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                        strfmt = '(I3,2X,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                     End If
                 End If
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  #   ' // strsp(1:nspaces-1) // 'conf     J                 EV      Δ(cm^-1)   conf%    '// strsp(1:nspaces-1) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf      J                 EV      Δ(cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
-                If (Wsave(1) < 0.7) Then
-                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
-                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1))))
+                If (Wsave(1,j) < 0.7) Then
+                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
+                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
                         strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     Else
                         strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1)*100, Trim(AdjustL(strcsave(2))), Wsave(2)*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     End If
                 ! Else we include only the main configuration
                 Else
-                    If (len(Trim(AdjustL(strcsave(1)))) <= nspaces) Then
-                        nspaces = nspaces + 4 - len(Trim(AdjustL(strcsave(1)))) 
+                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
+                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
                         strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                     Else
                         strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                     End If
                 End If
             End If
@@ -2663,14 +2693,15 @@ Contains
             i=0
             Do While (wsum < 0.99 .and. i < nconfs)
                 i=i+1
-                Write(98, strfmt) Wsave(i), strcsave(i)
-                wsum = wsum + Wsave(i)
+                Write(98, strfmt) Wsave(i,j), strcsave(i,j)
+                wsum = wsum + Wsave(i,j)
             End Do
             Write(98,'(A)') '_______'
             Write(98,'(F9.6)') wsum
             Write(98,'(A)') ''
             
         End Do
+        Close(97)
         Close(98)
         Close(99)
         If (kWeights == 1) Close(88)
@@ -2703,10 +2734,40 @@ Contains
         
     End Subroutine PrintWeights
 
+    Character(Len=3) Function term(L, S, J)
+        ! This function returns the term, given L, S and J
+        Implicit None
+        Real(dp), Intent(In) :: L, S, J
+        Integer :: is, il, ij
+        Character(Len=1) :: strl
+
+        is = 2*Nint(S)+1
+        il = Nint(L)
+        ij = Nint(J)
+
+        Select Case (il)
+        Case(0)
+            strl = 'S' 
+        Case(1)
+            strl = 'P' 
+        Case(2)
+            strl = 'D' 
+        Case(3)
+            strl = 'F' 
+        Case(4)
+            strl = 'G' 
+        Case(5)
+            strl = 'H' 
+        End Select
+
+        Write(term, '(I1,A,I1)') is, strl, ij
+
+    End Function term
+
     Real(dp) Function g_factor(L, S, J)
         ! This function returns the g-factor, given L, S and J
         Implicit None
-        Real(dp) :: L, S, J
+        Real(dp), Intent(In) :: L, S, J
 
         g_factor = 1 + (J*(J+1)-L*(L+1)+S*(S+1))/(2*J*(J+1))
 

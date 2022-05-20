@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2022-05-19
+- conf v5.2 - implemented writing of terms if LSJ is used
+- conf.f90: separated writing of files from calculation of weights
+- conf.f90: changed Wsave, Wpsave, strcsave to dimension(nconfs,Nlv)
+- conf.f90: new function term to write term based on LSJ values
+- conf.f90: changed formatting of CONFFINAL.RES table to include term for LSJ
+- conf.f90: fixed formatting for different size configuration strings in CONFFINAL.RES table
+
 ## [0.9.1] - 2022-05-14
 - conf v5.1 - implemented writing of energies every N davidson iteration
 - conf_init.f90: fixed out-of-bound error for array Nrnrc in subroutine ReadConfigurations
@@ -34,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - conf.f90: new code written to write a table of main configuration, S, L, J, gfactor, energy in eV, energy from ground state in cm-1, weight% for main configuration, secondary configuration and secondary weight if the weight for main configuration is < 70%, for each energy level
 - conf.f90: new code written to write list of top weights and configurations for each energy level
 - conf.f90: new function g_factor to calculate g-factors given L, S, J
+
+## [0.8.6] - 2022-05-19
+- conf v4.5 - bug fix for seg faults when writing intermediate CONF.XIJ caused by deallocation of Jsq after LAPACK subroutines
 
 ## [0.8.5] - 2022-04-04
 - added serial modernized add program
