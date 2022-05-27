@@ -329,7 +329,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.13",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.14",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -879,7 +879,6 @@ Contains
         Do i8=1,NumH
             Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
         End Do
-        print*,'NumH=',NumH
         Return
     End Subroutine
 
@@ -902,6 +901,11 @@ Contains
         If (.not. Allocated(scales)) Allocate(scales(IP1))
         If (.not. Allocated(Mps)) Allocate(Mps(IP1))
         If (.not. Allocated(ipiv)) Allocate(ipiv(IP1))
+        If (kl > 0) Then
+            If (.not. Allocated(X1)) Allocate(X1(Nd))
+            If (.not. Allocated(YY1)) Allocate(YY1(Nd))
+            If (.not. Allocated(YY2)) Allocate(YY2(Nd))
+        End If
         
         elft= E0+W0                          !### equation has the form:
         If (Kli.EQ.2.AND.Klf.NE.2) elft=E2   !### (elft-H)X1=Y1
@@ -1073,6 +1077,8 @@ Contains
         If (.not. Allocated(XX3)) Allocate(XX3(Nd))
         If (.not. Allocated(X12)) Allocate(X12(Nd))
         If (.not. Allocated(X13)) Allocate(X13(Nd))
+        If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
+        If (.not. Allocated(Vr)) Allocate(Vr(IPad))
 
         num=4
         call FormV(num)
@@ -1198,7 +1204,7 @@ Contains
             End If
         End Do
         strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I5," are saved",/3X,63("="))'
+             I7," are saved",/3X,63("="))'
  200    write( 6,strfmt) str,Nd
         write(11,strfmt) str,Nd
         Return

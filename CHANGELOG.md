@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2022-05-27
+- ine v1.14 - bug fix for kl>0 where required arrays were not allocated
+
 ## [0.9.3] - 2022-05-26
 - conf v5.3 - implemented writing of top weights of configurations to end of CONFLEVELS.RES
 - conf.f90: wrote code to count the top configurations in CONFLEVELS.RES and list them in weighted order
