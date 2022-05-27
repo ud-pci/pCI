@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2022-05-26
+- conf v5.3 - implemented writing of top weights of configurations to end of CONFLEVELS.RES
+- conf.f90: wrote code to count the top configurations in CONFLEVELS.RES and list them in weighted order
+- conf.f90: new Type(WeightTable) stores data for top weights
+- conf.f90: moved energies in EV and Delta(cm^-1) to after term if LSJ is used in CONFFINAL.RES
+- conf.f90: added a significant figure to gfactors
+- conf.f90: gfactors are no longer written if J=0
+
 ## [0.9.2] - 2022-05-19
 - conf v5.2 - implemented writing of terms if LSJ is used
 - conf.f90: separated writing of files from calculation of weights

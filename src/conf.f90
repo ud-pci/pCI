@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.2 with single precision")'
+            strfmt = '(4X,"Program conf v5.3 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.2")'
+            strfmt = '(4X,"Program conf v5.3")'
         End Select
         
         Write( 6,strfmt)
@@ -2516,28 +2516,36 @@ Contains
         Integer, Dimension(33)  ::  nnn, jjj, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
+        Character(Len=5) :: strgf
+        Type WeightTable
+            Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
+            Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
+            Real(dp), Allocatable, Dimension(:) :: wgt, wgtsave
+        End Type WeightTable
+        Type(WeightTable) :: wgtconfs
         data st1/11*'='/, st2/11*'-'/
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
         nconfs = 20
-        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
         strsp = ''
+        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
 
         If (kWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
             strfmt = '(I8,I6,F11.7)'
         End If
-        ! Form matrix of weights of each configuration for each energy level
-        W2=0_dp
-        nspacesg = 0
+
         Open(99,file='CONFFINAL.RES',status='UNKNOWN')
         Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
         Open(97,file='CONFSTR.RES',status='UNKNOWN')
-        
+
+        ! Form matrix of weights of each configuration for each energy level
+        W2=0_dp
+        nspacesg = 0
         Wsave = 0_dp
         Do j=1,Nlv
             If (kWeights == 1) Then
-                Write(88,'(A,I3)') 'Level #',j
+                Write(88,'(A,I3)') 'Level #', j
                 Write(88,'(A25)') '========================='
                 Write(88,'(A25)') '      ID    IC     W     '
             End If
@@ -2563,11 +2571,14 @@ Contains
                 End Do
             End Do
 
+            ! Save top nconfs weights and respective indices to Wsave and Wpsave
             Do i=1,nconfs
                 Wsave(i,j) = maxval(W2(1:Nnr,j),1)
                 Wpsave(i,j) = maxloc(W2(1:Nnr,j),1)
                 W2(maxloc(W2(1:Nnr,j)),j) = 0
             End Do
+
+            ! Save the configuration string to strcsave(k,j)
             Do k=1,nconfs
                 strconfig = ''
                 m1=sum(Nrnrc(1:Wpsave(k,j)))
@@ -2612,9 +2623,17 @@ Contains
             End Do
         End Do
 
+        ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to CONFFINAL.RES
         Do j=1,Nlv
             ! Calculate g-factors if including L, S, J
-            If (kLSJ == 1) gfactor = g_factor(Xl(j),Xs(j),Tj(j))
+            If (kLSJ == 1) Then
+                If (Nint(Tj(j)) == 0) Then
+                    Write(strgf,'(A)') '-----'
+                Else
+                    gfactor = g_factor(Xl(j),Xs(j),Tj(j))
+                    Write(strgf,'(F5.3)') gfactor
+                End If
+            End If
 
             ! Writes main configurations to CONFSTR.RES
             Write(97,'(A)') Trim(AdjustL(strcsave(1,j)))
@@ -2629,27 +2648,27 @@ Contains
             ! If L, S, J is needed
             If (kLSJ == 1) Then
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf term     S     L     J    gf                 EV      Δ(cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf term            EV      Δ(cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
                     If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
                         nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
-                        strfmt = '(I3,2X,A,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                        strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     Else
-                        strfmt = '(I3,2X,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                        strfmt = '(I3,2X,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     End If
                 ! Else we include only the main configuration
                 Else
                     If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
                         nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
-                        strfmt = '(I3,2X,A,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                        strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
                     Else
-                        strfmt = '(I3,2X,A,1X,A,2X,f4.2,2x,f4.2,2x,f4.2,2x,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Xs(j), Xl(j), Tj(j), gfactor, Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                        strfmt = '(I3,2X,A,1X,A,2X,f14.8,f14.1,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
                     End If
                 End If
             ! If L, S, J is not needed
@@ -2678,9 +2697,17 @@ Contains
                         Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                     End If
                 End If
-            End If
+            End If 
+        End Do
 
-            ! Write LEVELS.RES
+        ! Write LEVELS.RES
+        Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
+        Allocate(wgtconfs%strconfsave(nconfs), wgtconfs%nconfsave(nconfs), wgtconfs%wgt(nconfs), wgtconfs%wgtsave(nconfs))
+        wgtconfs%strconfs = ''
+        wgtconfs%nconfs = 0
+        wgtconfs%wgt = 0_dp
+        k=1
+        Do j=1,Nlv
             Write(98,'(A)') '****************************************************'
             write(98,'(A)') ''
             strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f14.8)'
@@ -2694,13 +2721,49 @@ Contains
             Do While (wsum < 0.99 .and. i < nconfs)
                 i=i+1
                 Write(98, strfmt) Wsave(i,j), strcsave(i,j)
+                If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
+                    Continue
+                Else
+                    wgtconfs%strconfs(k) = strcsave(i,j)
+                    k = k + 1
+                End If
+                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
+                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
                 wsum = wsum + Wsave(i,j)
             End Do
             Write(98,'(A)') '_______'
             Write(98,'(F9.6)') wsum
             Write(98,'(A)') ''
-            
         End Do
+
+        k=k-1
+        wgtconfs%wgt(1:k) = wgtconfs%wgt(1:k)/Nlv
+        Do j=1,k
+            i = maxloc(wgtconfs%wgt(1:k),1)
+            wgtconfs%strconfsave(j) = wgtconfs%strconfs(i)
+            wgtconfs%nconfsave(j) = wgtconfs%nconfs(i)
+            wgtconfs%wgtsave(j) = maxval(wgtconfs%wgt(1:k),1)
+            wgtconfs%nconfs(i) = 0
+            wgtconfs%wgt(i) = 0
+        End Do
+
+        Write(98,'(A)') ''
+        Write(98,'(A)')    ' Full list of configurations that appear in this file'
+        Write(98,'(A)')    ' ===================================================='
+        Write(98,'(A,I3)') ' Number of levels =  ', Nlv
+        Write(98,'(A,I3)') ' Total number of configurations that appear in this file = ', k
+        Write(98,'(A)')    ' The list is in ADD.INP format'
+        Write(98,'(A)')    ' N is how many times this configuration appeared in this file'
+        Write(98,'(A)')    ' W is its average (divided by the number of levels) weight'
+        Write(98,'(A)') ''
+        Write(98,'(A)') '     N       W         Configuration'
+        
+        Do j=1,k
+            If (wgtconfs%wgtsave(j) > 0) Then
+                Write(98,'(I6,1X,F10.5,10X,A)') wgtconfs%nconfsave(j), wgtconfs%wgtsave(j), wgtconfs%strconfsave(j)
+            End If
+        End Do
+
         Close(97)
         Close(98)
         Close(99)
