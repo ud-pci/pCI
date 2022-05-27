@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2022-05-27
+- ine v1.14 - bug fix for kl>0 where required arrays were not allocated
+
 ## [0.8.6] - 2022-05-19
 - conf v4.5 - bug fix for seg faults when writing intermediate CONF.XIJ caused by deallocation of Jsq after LAPACK subroutines
 
