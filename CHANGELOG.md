@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2022-06-16
+- combined dtm_aux.f90 with dtm.f90
+
 ## [0.9.5] - 2022-06-16
 - conf v5.4 - implemented writing of weights of configurations when CONF.XIJ is written
 - conf.f90: new subroutine PrintWeightsDvdsn writes weights of configurations for each energy level to CONF.LVL every kXIJ iterations
