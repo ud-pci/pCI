@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2022-06-16
+- conf v5.4 - implemented writing of weights of configurations when CONF.XIJ is written
+- conf.f90: new subroutine PrintWeightsDvdsn writes weights of configurations for each energy level to CONF.LVL every kXIJ iterations
+
 ## [0.9.4] - 2022-05-27
 - ine v1.14 - bug fix for kl>0 where required arrays were not allocated
 

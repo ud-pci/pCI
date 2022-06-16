@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.3 with single precision")'
+            strfmt = '(4X,"Program conf v5.4 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.3")'
+            strfmt = '(4X,"Program conf v5.4")'
         End Select
         
         Write( 6,strfmt)
@@ -1683,6 +1683,7 @@ Contains
                             If (mype == 0) Then
                                 Call FormB
                                 Call PrintEnergiesDvdsn(it)
+                                Call PrintWeightsDvdsn(it)
                             End If
                         Else
                             If (mype == 0) Call FormBskip
@@ -1822,6 +1823,198 @@ Contains
         Write(81,strfmt)
         Close(81)
     End Subroutine PrintEnergiesDvdsn
+
+    Subroutine PrintWeightsDvdsn(iter)
+        ! This subroutine prints the weights of configurations
+        Implicit None
+        Integer :: j, k, j1, j2, j3, ic, i, i1, is, il, ij, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nspacesg, nconfs, q0, iter
+        Real(dp) :: wsum, gfactor
+        Integer, Allocatable, Dimension(:,:) :: Wpsave
+        Real(dp), Allocatable, Dimension(:)  :: C
+        Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
+        Character(Len=1), Dimension(11) :: st1, st2, l0
+        Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
+        Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
+        Character(Len=3) :: strc, strq, strterm
+        Integer, Dimension(33)  ::  nnn, jjj, nqq 
+        Character(Len=1), Dimension(9) :: Let 
+        Character(Len=1), Dimension(33):: lll
+        Character(Len=5) :: strgf
+        Type WeightTable
+            Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
+            Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
+            Real(dp), Allocatable, Dimension(:) :: wgt, wgtsave
+        End Type WeightTable
+        Type(WeightTable) :: wgtconfs
+        data st1/11*'='/, st2/11*'-'/
+        Data Let/'s','p','d','f','g','h','i','k','l'/
+        print*,'test0'
+        nconfs = 20
+        strsp = ''
+        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
+
+        If (iter <= kXIJ) Then
+            Open(unit=98,status='UNKNOWN',file='CONF.LVL')
+        Else
+            Open(unit=98,status='UNKNOWN',POSITION='APPEND',file='CONF.LVL')
+            strfmt = '(A)'
+            Write(98,strfmt) ''
+        End If
+
+        ! Print line of "=" for top of table
+        strfmt = '(A,I3)'
+        Write(98,strfmt) 'Davidson Iteration #', iter
+        Write(98,strfmt)
+
+        ! Form matrix of weights of each configuration for each energy level
+        W2=0_dp
+        nspacesg = 0
+        Wsave = 0_dp
+        Do j=1,Nlv
+            C(1:Nd)=ArrB(1:Nd,j)
+            i=0
+            Do ic=1,Nc
+                W(ic,j)=0.d0
+                ndk=Ndc(ic)
+                Do k=1,ndk
+                    i=i+1
+                    W(ic,j)=W(ic,j)+C(i)**2
+                End Do
+            End Do
+            k=0
+
+            ! Calculate weights of non-relativistic configurations and store in array W2
+            Do ic=1,Nnr
+                Do i=1,Nrnrc(ic)
+                    k=k+1
+                    W2(ic,j) = W2(ic,j) + W(k,j)
+                End Do
+            End Do
+
+            ! Save top nconfs weights and respective indices to Wsave and Wpsave
+            Do i=1,nconfs
+                Wsave(i,j) = maxval(W2(1:Nnr,j),1)
+                Wpsave(i,j) = maxloc(W2(1:Nnr,j),1)
+                W2(maxloc(W2(1:Nnr,j)),j) = 0
+            End Do
+
+            ! Save the configuration string to strcsave(k,j)
+            Do k=1,nconfs
+                strconfig = ''
+                m1=sum(Nrnrc(1:Wpsave(k,j)))
+                n1=Nc0(m1)+1
+                n2=Nc0(m1)+Nvc(m1)
+                Do i=n1,n2
+                    i1=i-n1+1
+                    ni=Nip(i)
+                    l=Ll(ni)+1
+                    lll(i1)=let(l)
+                    nnn(i1)=Nn(ni)
+                    nqq(i1)=Nq(i)
+                End Do
+                n=n2-n1+1
+                n0=0
+                Do i=2,n
+                    If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                        nqq(i-1) = nqq(i-1) + nqq(i)
+                        nqq(i) = 0
+                    End If
+                End Do
+                Do i=1,n
+                    If (nqq(i) == 0) Cycle
+                    Write(strc,'(I2)') nnn(i)
+                    If (nqq(i) > 1) Then
+                        Write(strq,'(I2)') nqq(i)
+                    Else
+                        strq = ''
+                    End If
+                    strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                End Do
+                strcsave(k,j) = strconfig
+            End Do
+        End Do
+
+        ! Set weights back after assigning top values to Wsave and set maximum length of configuration string to nspacesg
+        nspaces = 0
+        Do j=1,Nlv
+            Do k=nconfs,1,-1
+                W2(Wpsave(k,j),j) = Wsave(k,j)
+                If (nspacesg < (len(Trim(AdjustL(strcsave(k,j)))))) nspacesg = len(Trim(AdjustL(strcsave(k,j))))
+            End Do
+        End Do
+
+        ! Write LEVELS.RES
+        Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
+        Allocate(wgtconfs%strconfsave(nconfs), wgtconfs%nconfsave(nconfs), wgtconfs%wgt(nconfs), wgtconfs%wgtsave(nconfs))
+        wgtconfs%strconfs = ''
+        wgtconfs%nconfs = 0
+        wgtconfs%wgt = 0_dp
+        k=1
+        Do j=1,Nlv
+            Write(98,'(A)') '****************************************************'
+            write(98,'(A)') ''
+            strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f14.8)'
+            Write(98, strfmt) j, Tj(j), Tk(j)
+            Write(98,'(A)') ''
+            Write(98,'(A)') ' Weight     Configuration'
+            Write(98,'(A)') ''
+            strfmt = '(F9.6,5X,A)'
+            wsum=0_dp
+            i=0
+            Do While (wsum < 0.99 .and. i < nconfs)
+                i=i+1
+                Write(98, strfmt) Wsave(i,j), strcsave(i,j)
+                If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
+                    Continue
+                Else
+                    wgtconfs%strconfs(k) = strcsave(i,j)
+                    k = k + 1
+                End If
+                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
+                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
+                wsum = wsum + Wsave(i,j)
+            End Do
+            Write(98,'(A)') '_______'
+            Write(98,'(F9.6)') wsum
+            Write(98,'(A)') ''
+        End Do
+
+        k=k-1
+        wgtconfs%wgt(1:k) = wgtconfs%wgt(1:k)/Nlv
+        Do j=1,k
+            i = maxloc(wgtconfs%wgt(1:k),1)
+            wgtconfs%strconfsave(j) = wgtconfs%strconfs(i)
+            wgtconfs%nconfsave(j) = wgtconfs%nconfs(i)
+            wgtconfs%wgtsave(j) = maxval(wgtconfs%wgt(1:k),1)
+            wgtconfs%nconfs(i) = 0
+            wgtconfs%wgt(i) = 0
+        End Do
+
+        Write(98,'(A)') ''
+        Write(98,'(A)')    ' Full list of configurations that appear in this file'
+        Write(98,'(A)')    ' ===================================================='
+        Write(98,'(A,I3)') ' Number of levels =  ', Nlv
+        Write(98,'(A,I3)') ' Total number of configurations that appear in this file = ', k
+        Write(98,'(A)')    ' The list is in ADD.INP format'
+        Write(98,'(A)')    ' N is how many times this configuration appeared in this file'
+        Write(98,'(A)')    ' W is its average (divided by the number of levels) weight'
+        Write(98,'(A)') ''
+        Write(98,'(A)') '     N       W         Configuration'
+        
+        Do j=1,k
+            If (wgtconfs%wgtsave(j) > 0) Then
+                Write(98,'(I6,1X,F10.5,10X,A)') wgtconfs%nconfsave(j), wgtconfs%wgtsave(j), wgtconfs%strconfsave(j)
+            End If
+        End Do
+
+        Write(98,'(A)')    ' ===================================================='
+        Close(98)
+
+        Deallocate(C, W, W2, Wsave, Wpsave, strcsave)
+        Deallocate(wgtconfs%strconfs, wgtconfs%nconfs)
+        Deallocate(wgtconfs%strconfsave, wgtconfs%nconfsave, wgtconfs%wgt, wgtconfs%wgtsave)
+        
+    End Subroutine PrintWeightsDvdsn
 
     Subroutine WriteFinalXIJ(mype)
         Use mpi_f08
