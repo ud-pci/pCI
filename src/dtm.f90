@@ -1989,7 +1989,7 @@ Contains
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| MQM |",1X,A,2X,A,">",3X,E12.5,9X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
-            If (QM /= 0.d0 .or. M1 /= 0.d0) Then
+            If (QM /= 0.d0 .or. QM1 /= 0.d0) Then
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(111,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
