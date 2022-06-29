@@ -7,7 +7,7 @@ Module dtm_variables
     Public
     
     ! Global variables for dtm program
-    Integer  :: Kt, Kdm, Ii, Ng, Iprt, K_M1, Kl1, Njf, Nmax, Nd1, Nd2, nterm1, nterm2, nterm2f
+    Integer  :: Kt, Kdm, Ii, Ng, Iprt, K_M1, Kl1, Njf, Nmax, Nd1, Nd2, nterm1, nterm1f, nterm2, nterm2f
     Integer  :: Nint, Npo, nlvs
     Real(dp) :: Cl, Trd, H0, Anuc, Dint, MaxT, all, Tm2, AE1V, tj1
 

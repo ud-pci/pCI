@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2022-06-29
+- tm v3.0 - implemented new tables for improved data analysis
+- dtm.f90: new type Key to encapsulate all keys for matrix elements
+- dtm.f90: new subroutines SetKeys and CloseKeys to open and close files for writing individual matrix element tables
+- dtm.f90: TM part now reads in 2 ranges: nterm1 to nterm1f and nterm2 to nterm2f
+- dtm.f90: added missing Read(Nsu) part for CONF.DET
+- dtm.f90: removed progress report
+- dtm.f90: added broadcast of new global variable nterm1f
+- dtm.f90: added code to read configurations and terms from CONFSTR.RES
+- dtm.f90: added loop over first range of energy levels
+- dtm.f90: moved reading of wavefunctions to inside loop over first range of energy levels
+- dtm.f90: added code to write tables of matrix elements
+
 ## [0.9.6] - 2022-06-16
 - combined dtm_aux.f90 with dtm.f90
 
