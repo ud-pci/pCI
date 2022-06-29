@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - dtm.f90: new type Key to encapsulate all keys for matrix elements
 - dtm.f90: new subroutines SetKeys and CloseKeys to open and close files for writing individual matrix element tables
 - dtm.f90: TM part now reads in 2 ranges: nterm1 to nterm1f and nterm2 to nterm2f
+- dtm.f90: dtm.in reads list of matrix elements starting from 3rd line: 'E1', 'E1_L', 'E1_V', 'E2', 'E3', 'M1', 'M2', 'M3', 'EDM', 'PNC', 'MQM', 'AM'
 - dtm.f90: added missing Read(Nsu) part for CONF.DET
 - dtm.f90: removed progress report
 - dtm.f90: added broadcast of new global variable nterm1f

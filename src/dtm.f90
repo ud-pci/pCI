@@ -1816,7 +1816,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1 /= 0.d0 .and. AE1V /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         ! Print table for E1_L
@@ -1831,7 +1831,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         ! Print table for E1_V
@@ -1846,7 +1846,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1V /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1862,7 +1862,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E2 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE2 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1878,7 +1878,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E3 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE3 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(102,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1894,6 +1894,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M1 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (G /= 0.d0) Then
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), G, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), G, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1909,6 +1910,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M2 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AM2 /= 0.d0) Then
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(104,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1924,7 +1926,7 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M3 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AM3 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1939,7 +1941,8 @@ Contains
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| EDM |",1X,A,2X,A,">",3X,E12.5,3X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
-            If (EDM1 /= 0.d0) Then
+            If (EDM /= 0.d0 .or. EDM1 /= 0.d0) Then
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(108,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1954,7 +1957,8 @@ Contains
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| PNC |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
-            If (PNC1 /= 0.d0) Then
+            If (PNC1 /= 0.d0 .or. PNC1 /= 0.d0) Then
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(109,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1969,8 +1973,8 @@ Contains
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| AM |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
-            If (AM1 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
+            If (AM /= 0.d0 .or. AM1 /= 0.d0) Then
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(110,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
@@ -1985,8 +1989,8 @@ Contains
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| MQM |",1X,A,2X,A,">",3X,E12.5,9X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
-            If (QM1 /= 0.d0) Then
-                Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
+            If (QM /= 0.d0 .or. M1 /= 0.d0) Then
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
                 Write(111,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
