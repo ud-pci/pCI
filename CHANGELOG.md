@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2022-06-30
+- tm v3.1 - bug fixes
+- dtm.f90 - added conditionals to track terms if range does not start from level 1
+- dtm.f90 - removed unused variables and arrays
+- dtm.f90 - increased format digits for NSP to 6
+- dtm.f90 - broadcasting of Iarr now uses mpi_utils subroutine BroadcastI
+
 ## [0.10.0] - 2022-06-29
 - tm v3.0 - implemented new tables for improved data analysis
 - dtm.f90: new type Key to encapsulate all keys for matrix elements

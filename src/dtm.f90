@@ -74,11 +74,11 @@ Contains
         Implicit None
         Integer, Intent(In) :: file_unit
         Integer :: err_stat
-        Character(Len=64) :: str_key, err_msg
+        Character(Len=64) :: str_key
         
         err_stat = 0
         Do While (err_stat == 0)
-            Read(file_unit,*,iostat=err_stat,iomsg=err_msg) str_key
+            Read(file_unit,*,iostat=err_stat) str_key
             Select Case(str_key)
                 Case('E1')
                     Keys%E1_L = 1
@@ -130,8 +130,6 @@ Contains
 
     Subroutine CloseKeys
         Implicit None
-        Integer :: err_stat
-        Character(Len=64) :: str_key, err_msg
         
         If (Keys%E1_L == 1 .or. Keys%E1_V == 1) Then
             Close(100)
@@ -262,7 +260,7 @@ Contains
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
                 Read (99,*) nterm1, nterm1f, nterm2, nterm2f
-                strfmt = '(/4X,"Program DTM v3.0: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program DTM v3.1: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
@@ -346,7 +344,7 @@ Contains
                 /4X,"Z   =",F6.2,4X,"JM  =",F6.2,4X,"II  =",I4, &
                 /4X,"NG  =",I3,7X,"LAG =",I3,7X,"H   =",F7.4, &
                 /4X,"AL  =",F7.4,3X,"BT  =",F6.2, &
-                /4X,"NSP =",I5,5X,"NS  =",I4,6X,"NSO =",I3, &
+                /4X,"NSP =",I6,4X,"NS  =",I4,6X,"NSO =",I3, &
                  7X,"NC =",I6, &
                 /4X,"R2 =",F6.2,2X,"R1 =",E11.4,2X,"RNUC =",E11.4)'
         WRITE( 6,strfmt) KL,KV,KT,Z,JM,II,NG,KLAG,H,AL,BT,NSP,NS,NSO,NC,RMAX,R1,RNUC
@@ -1256,16 +1254,19 @@ Contains
 
     Subroutine BcastTMArrays(mype)
         Use mpi_f08
+        Use mpi_utils
         Implicit None
         Integer :: mype, mpierr, i
+        Integer(Kind=int64) :: count
+
         Call MPI_Bcast(tj1, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         If (mype /= 0) Allocate(Iarr(Ne,Nd1))
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd1), Nd1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Iarr2(i,1:Nd2), Nd2, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        count = Ne*Int(Nd1,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        count = Ne*Int(Nd2,kind=int64) 
+        Call BroadcastI(Iarr2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(B1(1:Nd1), Nd1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,nlvs
             Call MPI_Bcast(ArrB2(1:Nd2,i), Nd2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1280,9 +1281,9 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         ! calculates transition matrix & amplitudes
         Implicit None
-        Integer :: lf, imax, k, i, n2, n21, n22, k1, icomp, ic, &
+        Integer :: lf, imax, k, i, i1, i2, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
-                  imin, i1, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
+                  imin, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
         Integer :: mype, npes, mpierr, size, err_stat, err_stat2
         Integer*8 :: mem, memsum
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
@@ -1291,7 +1292,7 @@ Contains
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
         Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
-        If (mype == 0) Write (*,'(1X," TM from terms",I2," - ",I2," to terms",I2," - ",I2)') nterm1, nterm1f, nterm2, nterm2f
+        If (mype == 0) Write (*,'(1X," TM from terms ",I2," - ",I2," to terms ",I2," - ",I2)') nterm1, nterm1f, nterm2, nterm2f
         n21=nterm2
         n22=nterm2f
         nlvs=n22
@@ -1342,13 +1343,21 @@ Contains
                 strt2 = ''
                 existStr = .false.
             Else
+                i=1
                 Do n=1,nterm1f
-                    Read(97,'(A)') strc1(n)
-                    Read(97,'(A)') strt1(n)
+                    If (n >= nterm1 .and. n <= nterm1f) Then
+                        Read(97,'(A)') strc1(i)
+                        Read(97,'(A)') strt1(i)
+                        i=i+1
+                    End If
                 End Do
+                i=1
                 Do n=1,nterm2f
-                    Read(98,'(A)') strc2(n)
-                    Read(98,'(A)') strt2(n)
+                    If (n >= nterm2 .and. n <= nterm2f) Then
+                        Read(98,'(A)') strc2(i)
+                        Read(98,'(A)') strt2(i)
+                        i=i+1
+                    End If
                 End Do
                 existStr = .true.
             End If 
@@ -1384,7 +1393,9 @@ Contains
         End If
         size=end-start+1
 
+        i1=0
         Do n1=nterm1,nterm1f
+            i1=i1+1
             ! Read in wavefunctions of CONF.XIJ
             Call OpenFS('CONF.XIJ',1,16,0)
             Do n=1,n1
@@ -1396,7 +1407,9 @@ Contains
             tj1=jt/2.d0
             lf=0
             iab2=0
+            i2=0
             Do n2=n21,n22
+                i2=i2+1
                 lf=lf+1
                 iab2=iab2+1
                 B2(1:Nd2)=ArrB2(1:Nd2,iab2)
@@ -1516,7 +1529,7 @@ Contains
                                       F12.8,5X," PARITY = ",I2)') Ne,s,Iprt
                         If (Kl /= 0) Write(11,'(/1X,"Ne = ",I2,"; Trace(Ro) = ", &
                                       F12.8,5X," PARITY = ",I2)') Ne,s,Iprt
-                        Call RdcTM(n1,n2,e1,e2,tj1,tj2,imin,imax,lf)
+                        Call RdcTM(n1,n2,i1,i2,e1,e2,tj1,tj2,imin,imax,lf)
                     End If
                 End If
             End Do
@@ -1561,12 +1574,12 @@ Contains
         Return
     End function Gjj
 
-    Subroutine RdcTM (n1,n2,e1,e2,tj1,tj2,imin,imax,lf)
+    Subroutine RdcTM (n1,n2,k1,k2,e1,e2,tj1,tj2,imin,imax,lf)
         ! This subroutine forms reduced transition matrices from Ro
         Use wigner
         Use amp_ops
         Implicit None
-        Integer :: k, kmax, no, i, imin1, imax1, lf, n1, n2, nspaces, nspaces1, nspaces2, &
+        Integer :: k, kmax, no, i, imin1, imax1, lf, n1, n2, k1, k2, nspaces1, nspaces2, &
                    lk, jk, ik2, ik1, imin, imax, l, ml, il, &
                    mk, ik, mc, lll, l1, icc, nok, il1, il2, nol, jl
         Real(dp) :: ppl, delE, delEcm, q12, tm1, tj2, tj1, e1, e2, &
@@ -1789,24 +1802,24 @@ Contains
         nspaces1 = 0
         nspaces2 = 0
         If (existStr == .false.) Then
-            Write(strc1(n1),'(F3.1)') tj1
-            Write(strt1(n1),'(F3.1)') tm1
-            Write(strc2(n2),'(F3.1)') tj2
-            Write(strt2(n2),'(F3.1)') tm2
+            Write(strc1(k1),'(F3.1)') tj1
+            Write(strt1(k1),'(F3.1)') tm1
+            Write(strc2(k2),'(F3.1)') tj2
+            Write(strt2(k2),'(F3.1)') tm2
         End If
-        Do i=1,nterm1f
+        Do i=1,nterm1f-nterm1+1
             If (len(Trim(AdjustL(strc1(i)))) > nspaces1) nspaces1 = len(Trim(AdjustL(strc1(i))))
         End Do
-        Do i=1,nterm2f
+        Do i=1,nterm2f-nterm2+1
             If (len(Trim(AdjustL(strc2(i)))) > nspaces2) nspaces2 = len(Trim(AdjustL(strc2(i))))
         End Do   
 
-        nspaces1 = nspaces1 - len(Trim(AdjustL(strc1(n1))))
-        nspaces2 = nspaces2 - len(Trim(AdjustL(strc2(n2))))
+        nspaces1 = nspaces1 - len(Trim(AdjustL(strc1(k1))))
+        nspaces2 = nspaces2 - len(Trim(AdjustL(strc2(k2))))
 
         ! Print table for E1_L and E1_V
         If (Keys%E1_L == 1 .and. Keys%E1_V == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>  <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1816,12 +1829,12 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1 /= 0.d0 .and. AE1V /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, AE1V, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         ! Print table for E1_L
         Else If (Keys%E1_L == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1831,12 +1844,12 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         ! Print table for E1_V
         Else If (Keys%E1_V == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1846,13 +1859,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE1V /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1V, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for E2
         If (Keys%E2 == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(101,'(A)') 'N1 -> N2:  <conf1 trm1 | E2 | conf2 trm2>    <J1|E2|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1862,13 +1875,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E2 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE2 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE2, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for E3
         If (Keys%E3 == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(102,'(A)') 'N1 -> N2:  <conf1 trm1 | E3 | conf2 trm2>    <J1|E3|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1878,13 +1891,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E3 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AE3 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(102,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(102,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE3, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for M1
         If (Keys%M1 == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(103,'(A)') 'N1 -> N2:  <conf1 trm1 | M1 | conf2 trm2>    <J1|M1|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1894,13 +1907,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M1 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (G /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), G, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), G, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), G, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), G, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for M2
         If (Keys%M2 == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(104,'(A)') 'N1 -> N2:  <conf1 trm1 | M2 | conf2 trm2>    <J1|M2|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1910,13 +1923,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M2 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AM2 /= 0.d0) Then
-                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(104,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(104,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM2, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for M3
         If (Keys%M3 == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(105,'(A)') 'N1 -> N2:  <conf1 trm1 | M3 | conf2 trm2>    <J1|M3|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1926,13 +1939,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M3 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AM3 /= 0.d0) Then
-                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM3, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for EDM
         If (Keys%EDM == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(108,'(A)') 'N1 -> N2:  <conf1 trm1 | EDM | conf2 trm2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1942,13 +1955,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| EDM |",1X,A,2X,A,">",3X,E12.5,3X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (EDM /= 0.d0 .or. EDM1 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(108,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(108,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), EDM, EDM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for PNC
         If (Keys%PNC == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(109,'(A)') 'N1 -> N2:  <conf1 trm1 |  PNC | conf2 trm2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1958,13 +1971,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| PNC |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (PNC1 /= 0.d0 .or. PNC1 /= 0.d0) Then
-                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(109,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write(  6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(109,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), PNC, PNC1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for AM
         If (Keys%AM == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(110,'(A)') 'N1 -> N2:  <conf1 trm1 | AM | conf2 trm2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1974,13 +1987,13 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| AM |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (AM /= 0.d0 .or. AM1 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(110,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(110,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AM, AM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         ! Print table for MQM
         If (Keys%MQM == 1) Then
-            If (n1 == 1 .and. n2 == 1) Then
+            If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
                     Write(111,'(A)') 'N1 -> N2:  <conf1 trm1 |  MQM | conf2 trm2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
                 Else
@@ -1990,8 +2003,8 @@ Contains
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| MQM |",1X,A,2X,A,">",3X,E12.5,9X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
 
             If (QM /= 0.d0 .or. QM1 /= 0.d0) Then
-                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
-                Write(111,strfmt) n1, n2, Trim(AdjustL(strc1(n1))) // strsp(1:nspaces1), strt1(n1), Trim(AdjustL(strc2(n2))) // strsp(1:nspaces2), strt2(n2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
+                !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
+                Write(111,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), QM, QM1, e1, e2, delEcm, abs(1e7/delEcm)
             End If
         End If
         Write(6, '(A)') ' '
