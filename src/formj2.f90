@@ -302,6 +302,15 @@ Module formj2
             Call IVAccumulatorCopy(iva2, Jsq%ind2, counter2)
             Call RVAccumulatorCopy(rva1, Jsq%val, counter3)
             
+            If (counter1 == 0) Then
+                Allocate(Jsq%ind1(1))
+                Allocate(Jsq%ind2(1))
+                Allocate(Jsq%val(1))
+                Jsq%ind1(1) = 1
+                Jsq%ind2(1) = 1
+                Jsq%val(1) = 0
+            End If
+
             Call IVAccumulatorReset(iva1)
             Call IVAccumulatorReset(iva2)
             Call RVAccumulatorReset(rva1)
@@ -317,7 +326,7 @@ Module formj2
         Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
         ! Write J^2 matrix to file CONFp.JJJ
-        If (Kl /= 1) Call WriteMatrix(Jsq%ind1,Jsq%ind2,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
+        If (Kl /= 1) Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
 
         If (mype == 0) Then
             Write(counterStr,fmt='(I16)') NumJ

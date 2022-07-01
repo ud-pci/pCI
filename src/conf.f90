@@ -120,7 +120,7 @@ Program conf
     ! Call LSJ routines if kLSJ=1
     If (kLSJ == 1) Then
         If (mype == 0) Call Rdet('CONF.DET')
-        Call AllocateLSJArrays(mype)
+        Call AllocateLSJArrays
         Call InitLSJ
         Call lsj(ArrB,xj,xl,xs,mype,npes)
     End If
@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.4 with single precision")'
+            strfmt = '(4X,"Program conf v5.5 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.4")'
+            strfmt = '(4X,"Program conf v5.5")'
         End Select
         
         Write( 6,strfmt)
@@ -875,7 +875,7 @@ Contains
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt, memkind
+        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         Call startTimer(stot)
@@ -1001,11 +1001,6 @@ Contains
                 End Do
 
                 Call startTimer(s1)
-
-                If (devmode == 1) Then
-                    !print*, '      #dets', '         #eles', '        pid'
-                    !print*, n, cntarray(1), mype
-                End If
 
                 NumH =  NumH + cntarray(1)
                 num_done = 0
@@ -1161,7 +1156,7 @@ Contains
 
             If (mype /= 0) Then
                 Allocate(Hamil%val(counter1))
-                Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
+                If (Kl==3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
                 Call startTimer(s2)
                 Do n=ih4+1,counter1
                     nn=Hamil%ind1(n)
@@ -1200,7 +1195,7 @@ Contains
         Call MPI_AllReduce(MPI_IN_PLACE, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
         
         ! Write Hamiltonian to file CONFp.HIJ
-        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value
         Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
@@ -1380,7 +1375,7 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
-        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
         Integer :: I, J, lwork, mype, npes, ifail
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
@@ -1478,10 +1473,9 @@ Contains
         Implicit None
         External :: DSYEV, SSYEV
 
-        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork, js
+        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork
         Real(kind=type_real), Dimension(4) :: realtmp
-        Real(kind=type_real), Allocatable, Dimension(:) :: W, Jt ! work array
-        Integer, Allocatable, Dimension(:) :: Jn, Jk
+        Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
@@ -1526,13 +1520,13 @@ Contains
         End If
 
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        If (mype == 0) Then
-            js = size(Jsq%ind1)
-            Allocate(Jn(js),Jk(js),Jt(js))
-            Jn=Jsq%ind1
-            Jk=Jsq%ind2
-            Jt=Jsq%val
-        End If
+        !If (mype == 0) Then
+        !    js = size(Jsq%ind1)
+        !    Allocate(Jn(js),Jk(js),Jt(js))
+        !    Jn=Jsq%ind1
+        !    Jk=Jsq%ind2
+        !    Jt=Jsq%val
+        !End If
 
         ! Davidson loop:
         kdavidson = 0
@@ -1593,11 +1587,11 @@ Contains
                     Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
                 If (K_prj == 1) Then
-                    If (mype == 0) Then
-                        Jsq%ind1=Jn
-                        Jsq%ind2=Jk
-                        Jsq%val=Jt
-                    End If
+                    !If (mype == 0) Then
+                    !    Jsq%ind1=Jn
+                    !    Jsq%ind2=Jk
+                    !    Jsq%val=Jt
+                    !End If
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Call startTimer(s1)
@@ -1673,11 +1667,11 @@ Contains
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                                If (mype == 0) Then
-                                    Jsq%ind1=Jn
-                                    Jsq%ind2=Jk
-                                    Jsq%val=Jt
-                                End If
+                                !If (mype == 0) Then
+                                !    Jsq%ind1=Jn
+                                !    Jsq%ind2=Jk
+                                !    Jsq%val=Jt
+                                !End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
                             If (mype == 0) Then
@@ -1710,14 +1704,14 @@ Contains
         End Do
 
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        If (mype == 0) Then
-            Jsq%ind1=Jn
-            Jsq%ind2=Jk
-            Jsq%val=Jt
-            If (allocated(Jn)) Deallocate(Jn)
-            If (allocated(Jk)) Deallocate(Jk)
-            If (allocated(Jt)) Deallocate(Jt)
-        End If
+        !If (mype == 0) Then
+        !    Jsq%ind1=Jn
+        !    Jsq%ind2=Jk
+        !    Jsq%val=Jt
+        !    If (allocated(Jn)) Deallocate(Jn)
+        !    If (allocated(Jk)) Deallocate(Jk)
+        !    If (allocated(Jt)) Deallocate(Jt)
+        !End If
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
 
@@ -1827,26 +1821,23 @@ Contains
     Subroutine PrintWeightsDvdsn(iter)
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, i1, is, il, ij, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nspacesg, nconfs, q0, iter
-        Real(dp) :: wsum, gfactor
+        Integer :: j, k, ic, i, i1, l, n0, n1, n2, ni, ndk, m1, nspaces, nspacesg, nconfs, iter
+        Real(dp) :: wsum
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
-        Character(Len=1), Dimension(11) :: st1, st2, l0
-        Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
+        Character(Len=512) :: strfmt, strconfig, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
-        Character(Len=3) :: strc, strq, strterm
-        Integer, Dimension(33)  ::  nnn, jjj, nqq 
+        Character(Len=3) :: strc, strq
+        Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
-        Character(Len=5) :: strgf
         Type WeightTable
             Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
             Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
             Real(dp), Allocatable, Dimension(:) :: wgt, wgtsave
         End Type WeightTable
         Type(WeightTable) :: wgtconfs
-        data st1/11*'='/, st2/11*'-'/
         Data Let/'s','p','d','f','g','h','i','k','l'/
         print*,'test0'
         nconfs = 20
@@ -2048,12 +2039,10 @@ Contains
         Return
     End Subroutine WriteFinalXIJ
 
-    Subroutine AllocateLSJArrays(mype)
+    Subroutine AllocateLSJArrays
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
-
-        Integer :: mpierr, mype
 
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
@@ -2697,16 +2686,16 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, i1, is, il, ij, l, n0, n1, n2, ni, nk, ndk, nr_wgt, m1, m2, nspaces, nspacesg, nconfs, q0
+        Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs
         Real(dp) :: wsum, gfactor
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
-        Character(Len=1), Dimension(11) :: st1, st2, l0
+        Character(Len=1), Dimension(11) :: st1, st2
         Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq, strterm
-        Integer, Dimension(33)  ::  nnn, jjj, nqq 
+        Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
         Character(Len=5) :: strgf

@@ -263,10 +263,9 @@ Contains
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
     
-        Integer :: i, err_stat
-        logical :: finished
+        Integer :: i
         character(Len=5), Dimension(5) :: str
-        Character(Len=128) :: strfmt, err_msg
+        Character(Len=128) :: strfmt
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
         Call recunit

@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2022-07-01
+- conf v5.5 - bug fixes
+- conf.f90 - removed unused variables and arrays
+- conf.f90 - changed argument of WriteMatrix to be Type(Matrix) instead of 3 arrays
+- conf.f90 - added EXTERNAL declarations for BLACS_GRIDEXIT, BLACS_EXIT
+- conf.f90 - removed temporary Jsq fixes
+- formj2.f90 - added support for when core 0 obtains no non-zero matrix elements from FormJ
+- formj2.f90 - changed argument of WriteMatrix to be Type(Matrix) instead of 3 arrays
+- matrix_io.f90 - changed argument of WriteMatrix to be Type(Matrix) instead of 3 arrays
+- ine.f90 - removed unused variables
+- add.f90 - removed unused variables
+- mpi_utils.f90 - added EXTERNAL declaration for GetEnv
+
 ## [0.10.1] - 2022-06-30
 - tm v3.1 - bug fixes
 - dtm.f90 - added conditionals to track terms if range does not start from level 1

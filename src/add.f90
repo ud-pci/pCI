@@ -764,8 +764,7 @@ Contains
     Subroutine PrintConfINP(Ncpt, keyPT)
         Implicit None
         Integer :: i, k, Ncpt, keyPT, Ncl, ic, ic1, j, icnr, ne1
-        Character(Len=1), Dimension(5) :: com, com1, com2
-        Character(Len=1), Dimension(4) :: com4
+        Character(Len=1), Dimension(5) :: com
         Character(Len=70) :: string
         Character(Len=128) :: strfmt
 

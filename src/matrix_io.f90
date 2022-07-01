@@ -51,7 +51,7 @@ Module matrix_io
         End Select
     End Subroutine MPIErrHandle
 
-    Subroutine WriteMatrix(indices1,indices2,values,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
+    Subroutine WriteMatrix(mat,num_elements_per_core,num_elements_total,filename,mype,npes,mpierr)
         !
         ! This subroutine writes a parallel file
         ! Matrix 'mat' is written to the file 'filename'
@@ -66,8 +66,7 @@ Module matrix_io
         !
         Use mpi
         Implicit None
-        Integer, Allocatable, Dimension(:)  :: indices1, indices2
-        Real(kind=type_real), Allocatable, Dimension(:) :: values
+        Type(Matrix(type_real)) :: mat
         Integer, Intent(In)             :: num_elements_per_core
         Integer(Kind=int64), Intent(In) :: num_elements_total
 
@@ -110,33 +109,33 @@ Module matrix_io
         Call MPI_FILE_WRITE(fh, num_elements_per_core, 1, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
-        ! Write mat%n
+        ! Write mat%ind1
         disp = (npes + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
-        Call MPI_FILE_WRITE(fh, indices1, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_WRITE(fh, mat%ind1, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
-        ! Write mat%k
+        ! Write mat%ind2
         disp = (npes + num_elements_total + disps(mype+1)) * 4_MPI_OFFSET_KIND
         Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
         Call MPIErrHandle(mpierr)
-        Call MPI_FILE_WRITE(fh, indices2, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
+        Call MPI_FILE_WRITE(fh, mat%ind2, num_elements_per_core, MPI_INTEGER, MPI_STATUS_IGNORE, mpierr) 
         Call MPIErrHandle(mpierr)
 
-        ! Write mat%t
+        ! Write mat%val
         Select Case(type_real)
         Case(sp)
             disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 4_MPI_OFFSET_KIND
             Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
             Call MPIErrHandle(mpierr)
-            Call MPI_FILE_WRITE(fh, values, num_elements_per_core, MPI_REAL, MPI_STATUS_IGNORE, mpierr) 
+            Call MPI_FILE_WRITE(fh, mat%val, num_elements_per_core, MPI_REAL, MPI_STATUS_IGNORE, mpierr) 
             Call MPIErrHandle(mpierr)
         Case(dp)
             disp = (npes + 2 * num_elements_total) * 4_MPI_OFFSET_KIND + disps(mype+1) * 8_MPI_OFFSET_KIND
             Call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, MPI_INTEGER, 'native', MPI_INFO_NULL, mpierr) 
             Call MPIErrHandle(mpierr)
-            Call MPI_FILE_WRITE(fh, values, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
+            Call MPI_FILE_WRITE(fh, mat%val, num_elements_per_core, MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr) 
             Call MPIErrHandle(mpierr)
         Case default 
             print*,'unrecognized real kind'

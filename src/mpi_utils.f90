@@ -29,6 +29,7 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
+        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
@@ -72,6 +73,7 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
+        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
@@ -116,6 +118,7 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
+        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
