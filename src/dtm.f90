@@ -1281,7 +1281,7 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         ! calculates transition matrix & amplitudes
         Implicit None
-        Integer :: lf, imax, k, i, i1, i2, n2, n21, n22, k1, icomp, ic, &
+        Integer :: lf, imax, k, i, l1, l2, i1, i2, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
                   imin, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
         Integer :: mype, npes, mpierr, size, err_stat, err_stat2
@@ -1393,9 +1393,9 @@ Contains
         End If
         size=end-start+1
 
-        i1=0
+        l1=0
         Do n1=nterm1,nterm1f
-            i1=i1+1
+            l1=l1+1
             ! Read in wavefunctions of CONF.XIJ
             Call OpenFS('CONF.XIJ',1,16,0)
             Do n=1,n1
@@ -1407,9 +1407,9 @@ Contains
             tj1=jt/2.d0
             lf=0
             iab2=0
-            i2=0
+            l2=0
             Do n2=n21,n22
-                i2=i2+1
+                l2=l2+1
                 lf=lf+1
                 iab2=iab2+1
                 B2(1:Nd2)=ArrB2(1:Nd2,iab2)
@@ -1529,7 +1529,7 @@ Contains
                                       F12.8,5X," PARITY = ",I2)') Ne,s,Iprt
                         If (Kl /= 0) Write(11,'(/1X,"Ne = ",I2,"; Trace(Ro) = ", &
                                       F12.8,5X," PARITY = ",I2)') Ne,s,Iprt
-                        Call RdcTM(n1,n2,i1,i2,e1,e2,tj1,tj2,imin,imax,lf)
+                        Call RdcTM(n1,n2,l1,l2,e1,e2,tj1,tj2,imin,imax,lf)
                     End If
                 End If
             End Do
