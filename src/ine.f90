@@ -1335,7 +1335,7 @@ Contains
 !     - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
         Allocate(TJ1(Nd),TJ2(Nd),TJ3(Nd),TJ4(Nd),TJ5(Nd))
-
+        If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
         j0= 2*Tj0+0.1d0
 
         TJ1=0.d0
