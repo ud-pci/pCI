@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.5 with single precision")'
+            strfmt = '(4X,"Program conf v5.6 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.5")'
+            strfmt = '(4X,"Program conf v5.6")'
         End Select
         
         Write( 6,strfmt)
@@ -407,6 +407,9 @@ Contains
         Write(11,strfmt) (Nn(i),lll(i),Jj(i),Nq(i),i=1,Nso)
         Write(11,'(1X,71("="))')
 
+        ! Print list of relativistic configurations in format:
+        ! nl(j) q; note that h (11/2) is currently printed as h (*/2) 
+        ! and will result in conversion errors when debugging
         Do ic=1,Nc
             n1=Nc0(ic)+1
             n2=Nc0(ic)+Nvc(ic)
@@ -1754,10 +1757,10 @@ Contains
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
 
-        If (iter == 1) Then
-            Open(unit=81,status='UNKNOWN',file='CONF.ENG')
+        If (iter <= kXIJ) Then
+            Open(unit=81,status='REPLACE',file='CONF.ENG',action='WRITE')
         Else
-            Open(unit=81,status='UNKNOWN',POSITION='APPEND',file='CONF.ENG')
+            Open(unit=81,status='UNKNOWN',POSITION='APPEND',file='CONF.ENG',action='WRITE')
             strfmt = '(A)'
             Write(81,strfmt) ''
         End If
@@ -1839,15 +1842,14 @@ Contains
         End Type WeightTable
         Type(WeightTable) :: wgtconfs
         Data Let/'s','p','d','f','g','h','i','k','l'/
-        print*,'test0'
         nconfs = 20
         strsp = ''
         Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
 
         If (iter <= kXIJ) Then
-            Open(unit=98,status='UNKNOWN',file='CONF.LVL')
+            Open(unit=98,status='REPLACE',file='CONF.LVL',action='WRITE')
         Else
-            Open(unit=98,status='UNKNOWN',POSITION='APPEND',file='CONF.LVL')
+            Open(unit=98,status='UNKNOWN',POSITION='APPEND',file='CONF.LVL',action='WRITE')
             strfmt = '(A)'
             Write(98,strfmt) ''
         End If
@@ -1936,7 +1938,7 @@ Contains
 
         ! Write LEVELS.RES
         Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
-        Allocate(wgtconfs%strconfsave(nconfs), wgtconfs%nconfsave(nconfs), wgtconfs%wgt(nconfs), wgtconfs%wgtsave(nconfs))
+        Allocate(wgtconfs%strconfsave(nconfs*5), wgtconfs%nconfsave(nconfs*5), wgtconfs%wgt(nconfs*5), wgtconfs%wgtsave(nconfs*5))
         wgtconfs%strconfs = ''
         wgtconfs%nconfs = 0
         wgtconfs%wgt = 0_dp
@@ -2830,7 +2832,7 @@ Contains
             ! If L, S, J is needed
             If (kLSJ == 1) Then
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf term            EV      Δ(cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
@@ -2856,7 +2858,7 @@ Contains
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  # ' // strsp(1:nspaces-4) // 'conf      J                 EV      Δ(cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf      J         E_n (a.u.)   DEL (cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
@@ -2884,7 +2886,7 @@ Contains
 
         ! Write LEVELS.RES
         Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
-        Allocate(wgtconfs%strconfsave(nconfs), wgtconfs%nconfsave(nconfs), wgtconfs%wgt(nconfs), wgtconfs%wgtsave(nconfs))
+        Allocate(wgtconfs%strconfsave(nconfs*5), wgtconfs%nconfsave(nconfs*5), wgtconfs%wgt(nconfs*5), wgtconfs%wgtsave(nconfs*5))
         wgtconfs%strconfs = ''
         wgtconfs%nconfs = 0
         wgtconfs%wgt = 0_dp

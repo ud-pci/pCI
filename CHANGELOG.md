@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2022-07-07
+- conf v5.6 - bug fixes and CONFFINAL.RES table changes
+- conf.f90 - CONF.ENG and CONF.LVL are now written correctly from a new file
+- conf.f90 - increased allocation of weight strings by factor of 5
+- conf.f90 - change greek symbol delta in tables to DEL and energies EV to E_n (a.u.) in CONFFINAL.RES
+- conf_init.f90 - bug fix for reading blank lines between configurations from result of merge_ci or con_cut
+
 ## [0.10.2] - 2022-07-01
 - conf v5.5 - bug fixes
 - conf.f90 - removed unused variables and arrays

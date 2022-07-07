@@ -63,7 +63,7 @@ Module conf_init
             Do While (ne0 < Ne)
                 i2=i1+5
                 Read (10,'(I4,F7.4,5(4X,F7.4))') nr, Qnl(i1), (Qnl(i),i=i1+1,i2)
-                If (Qnl(i1) == 0) Then
+                If (nr /= 0 .and. Qnl(i1) == 0) Then
                     Nnr = nr
                     If (Nnr > 1) Nrnrc(Nnr-1) = cnt
                     cnt = 0
