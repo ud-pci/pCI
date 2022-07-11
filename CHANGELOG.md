@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.4] - 2022-07-10
+- dm v3.0 - implemented new tables for g-factors, A_hfs and B_hfs
+- dtm.f90 - rewrote SetKeys subroutine to open files depending on dm/tm and which keys are used
+- dtm.f90 - broadcasting of Iarr now uses mpi_utils subroutine BroadcastI
+- dtm.f90 - added code to get terms from CONFSTR.RES 
+- dtm.f90 - added code to write tables for g-factors, A_hfs and B_hfs in DM regime
+
 ## [0.10.3] - 2022-07-07
 - conf v5.6 - bug fixes and CONFFINAL.RES table changes
 - conf.f90 - CONF.ENG and CONF.LVL are now written correctly from a new file

@@ -26,6 +26,7 @@ Program dtm
         Integer :: PNC = 0
         Integer :: AM = 0
         Integer :: MQM = 0
+        Integer :: GF = 0
     End Type Key
 
     Type(Key) :: Keys
@@ -51,9 +52,9 @@ Program dtm
         Call FormDM(mype,npes)  ! calculates density matrix and expectation values
     Case(2)
         Call FormTM(mype,npes)  ! calculates transition matrix & amplitudes
-        Call CloseKeys
     End Select
 
+    Call CloseKeys
     If (mype==0) Then  
         Write( *,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
         Write(11,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
@@ -64,7 +65,7 @@ Program dtm
         End If
         Close(11)
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of tm was '// trim(timeStr)
+        write(*,'(2X,A)'), 'TIMING >>> Total computation time of dtm was '// trim(timeStr)
     End If
     Call MPI_Finalize(mpierr)
 
@@ -74,58 +75,76 @@ Contains
         Implicit None
         Integer, Intent(In) :: file_unit
         Integer :: err_stat
-        Character(Len=64) :: str_key
+        Character(Len=64) :: str_key, str_key0
         
         err_stat = 0
-        Do While (err_stat == 0)
-            Read(file_unit,*,iostat=err_stat) str_key
-            Select Case(str_key)
-                Case('E1')
-                    Keys%E1_L = 1
-                    Keys%E1_V = 1
-                    Call OpenFS('E1.RES',0,100,1)
-                Case('E1_L')
-                    Keys%E1_L = 1
-                    Call OpenFS('E1_L.RES',0,100,1)
-                Case('E1_V')
-                    Keys%E1_V = 1
-                    Call OpenFS('E1_V.RES',0,100,1)
-                Case('E2')
-                    Keys%E2 = 1
-                    Call OpenFS('E2.RES',0,101,1)
-                Case('E3')
-                    Keys%E3 = 1
-                    Call OpenFS('E3.RES',0,102,1)
-                Case('M1')
-                    Keys%M1 = 1
-                    Call OpenFS('M1.RES',0,103,1)
-                Case('M2')
-                    Keys%M2 = 1
-                    Call OpenFS('M2.RES',0,104,1)
-                Case('M3')
-                    Keys%M3 = 1
-                    Call OpenFS('M3.RES',0,105,1)
-                Case('A_hf')
-                    Keys%A_hf = 1
-                    Call OpenFS('A_hf.RES',0,106,1)
-                Case('B_hf')
-                    Keys%B_hf = 1
-                    Call OpenFS('B_hf.RES',0,107,1)
-                Case('EDM')
-                    Keys%EDM = 1
-                    Call OpenFS('EDM.RES',0,108,1)
-                Case('PNC')
-                    Keys%PNC = 1
-                    Call OpenFS('PNC.RES',0,109,1)
-                Case('AM')
-                    Keys%AM = 1
-                    Call OpenFS('AM.RES',0,110,1)
-                Case('MQM')
-                    Keys%MQM = 1
-                    Call OpenFS('MQM.RES',0,111,1)
-            End Select
-        End Do
-    
+        Select Case(Kl1)
+        Case(1)
+            Do While (err_stat == 0)
+                Read(file_unit,*,iostat=err_stat) str_key
+                Select Case(str_key)
+                    Case('A_hf')
+                        Keys%A_hf = 1
+                        Call OpenFS('A_hf.RES',0,106,1)
+                    Case('B_hf')
+                        Keys%B_hf = 1
+                        Call OpenFS('B_hf.RES',0,107,1)
+                    Case('GF')
+                        Keys%GF = 1
+                        Call OpenFS('GF.RES',0,112,1)
+                    Case Default
+                        If (str_key /= str_key0) print*, Trim(AdjustL(str_key)), ' is not a valid key for DM'
+                End Select
+                str_key0 = str_key
+            End Do
+        Case(2)
+            Do While (err_stat == 0)
+                Read(file_unit,*,iostat=err_stat) str_key
+                Select Case(str_key)
+                    Case('E1')
+                        Keys%E1_L = 1
+                        Keys%E1_V = 1
+                        Call OpenFS('E1.RES',0,100,1)
+                    Case('E1_L')
+                        Keys%E1_L = 1
+                        Call OpenFS('E1_L.RES',0,100,1)
+                    Case('E1_V')
+                        Keys%E1_V = 1
+                        Call OpenFS('E1_V.RES',0,100,1)
+                    Case('E2')
+                        Keys%E2 = 1
+                        Call OpenFS('E2.RES',0,101,1)
+                    Case('E3')
+                        Keys%E3 = 1
+                        Call OpenFS('E3.RES',0,102,1)
+                    Case('M1')
+                        Keys%M1 = 1
+                        Call OpenFS('M1.RES',0,103,1)
+                    Case('M2')
+                        Keys%M2 = 1
+                        Call OpenFS('M2.RES',0,104,1)
+                    Case('M3')
+                        Keys%M3 = 1
+                        Call OpenFS('M3.RES',0,105,1)
+                    Case('EDM')
+                        Keys%EDM = 1
+                        Call OpenFS('EDM.RES',0,108,1)
+                    Case('PNC')
+                        Keys%PNC = 1
+                        Call OpenFS('PNC.RES',0,109,1)
+                    Case('AM')
+                        Keys%AM = 1
+                        Call OpenFS('AM.RES',0,110,1)
+                    Case('MQM')
+                        Keys%MQM = 1
+                        Call OpenFS('MQM.RES',0,111,1)
+                    Case Default
+                        If (str_key /= str_key0) print*, Trim(AdjustL(str_key)), ' is not a valid key for TM'
+                End Select
+                str_key0 = str_key
+            End Do
+        End Select
+            
     End Subroutine SetKeys
 
     Subroutine CloseKeys
@@ -169,6 +188,10 @@ Contains
 
         If (Keys%MQM == 1) Then
             Close(111)
+        End If
+
+        If (Keys%GF == 1) Then
+            Close(112)
         End If
     
     End Subroutine CloseKeys
@@ -253,10 +276,11 @@ Contains
         Select Case(Kl1)
             Case(1) ! regime of Density matrix & expectation values
                 Read (99,*) nterm1, nterm2
-                strfmt = '(/4X,"Program DTM v2.1: Density matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program DTM v3.0: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('DM.RES',0,11,1)
+                Call SetKeys(99)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
                 Read (99,*) nterm1, nterm1f, nterm2, nterm2f
@@ -1012,14 +1036,16 @@ Contains
 
     Subroutine BcastDMArrays(mype)
         Use mpi_f08
+        Use mpi_utils
         Implicit None
         Integer :: mype, mpierr, i
+        Integer(Kind=int64) :: count
+
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        If (mype/=0) Allocate(Iarr(Ne,Nd1))
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        If (mype/=0) Allocate(Iarr(Ne,Nd))
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,nlvs
             Call MPI_Bcast(ArrB2(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
@@ -1034,13 +1060,13 @@ Contains
         Use determinants, Only : Gdet, CompC, Rspq
         Use conf_variables, Only : iconf1, iconf2
         Implicit None
-        Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, &
-                   ic2, kx, n1, ic1, imin, nx, Ndpt, j1, j2, i1, iab2, &
+        Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, err_stat, &
+                   ic2, kx, n1, ic1, imin, nx, Ndpt, j1, j2, i1, iab2, l, &
                    imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, size
         Integer :: npes,mype
         Integer*8 :: mem, memsum
         Real(dp) :: s, bn, bk, Tj, Etrm
-        Character(Len=16)     :: memStr, npesStr
+        Character(Len=16)     :: memStr, npesStr, err_msg
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
@@ -1085,6 +1111,26 @@ Contains
         End If
     
         Call BcastDMArrays(mype)
+
+        Allocate(strc1(nterm2-nterm1+1))
+        Allocate(strt1(nterm2-nterm1+1))
+        Open(97,file='CONFSTR.RES',status='OLD',iostat=err_stat,iomsg=err_msg)
+        If (err_stat /= 0) Then
+            strc1 = ''
+            strt1 = ''
+            existStr = .false.
+        Else
+            i=1
+            Do n=1,nterm2
+                If (n >= ntrm .and. n <= ntrm1) Then
+                    Read(97,'(A)') strc1(i)
+                    Read(97,'(A)') strt1(i)
+                    i=i+1
+                End If
+            End Do
+            i=1
+            existStr = .true.
+        End If 
     
         ! Divide workload into npes
         If (mype==0) Then
@@ -1101,7 +1147,9 @@ Contains
 
         lf=0
         iab2=0
+        l=0
         Do ntr=ntrm,ntrm1
+            l=l+1
             iab2=iab2+1
             lf=lf+1
             Ro(:,:)=0.d0
@@ -1197,7 +1245,7 @@ Contains
                 If (Kl /= 0)             Write(11,35) Ne,s,imin,imax
 35              format(1X,'Ne = ',I2,'; Trace(Ro) = ',F12.8, &
                       5X,'Imin, Imax =',2I4)
-                Call RdcDM(ntr,Etrm,Tj,imin,imax,lf)
+                Call RdcDM(ntr,l,Etrm,Tj,imin,imax,lf)
             End If
         End Do
     
@@ -1281,7 +1329,7 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         ! calculates transition matrix & amplitudes
         Implicit None
-        Integer :: lf, imax, k, i, l1, l2, i1, i2, n2, n21, n22, k1, icomp, ic, &
+        Integer :: lf, imax, k, i, l1, l2, i1, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
                   imin, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
         Integer :: mype, npes, mpierr, size, err_stat, err_stat2
@@ -1534,7 +1582,7 @@ Contains
                 End If
             End Do
         End Do
-
+        Close(100)
         Deallocate(idet1,idet2,iconf1,iconf2)
         Return
     End Subroutine FormTM
@@ -1821,9 +1869,9 @@ Contains
         If (Keys%E1_L == 1 .and. Keys%E1_V == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>  <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>  <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>  <J1|E1_L|J2>  <J1|E1_V|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>  <J1|E1_L|J2>  <J1|E1_V|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1836,9 +1884,9 @@ Contains
         Else If (Keys%E1_L == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_L|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>   <J1|E1_L|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>   <J1|E1_L|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1851,9 +1899,9 @@ Contains
         Else If (Keys%E1_V == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  <conf1 trm1 | E1 | conf2 trm2>   <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>   <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(100,'(A)') 'N1 -> N2:  < J1   M1 | E1 |  J2   M2>   <J1|E1_V|J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E1 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1867,9 +1915,9 @@ Contains
         If (Keys%E2 == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(101,'(A)') 'N1 -> N2:  <conf1 trm1 | E2 | conf2 trm2>    <J1|E2|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(101,'(A)') 'N1 -> N2:  <conf1 trm1 | E2 | conf2 trm2>    <J1|E2|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(101,'(A)') 'N1 -> N2:  < J1   M1 | E2 |  J2   M2>    <J1|E2|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(101,'(A)') 'N1 -> N2:  < J1   M1 | E2 |  J2   M2>    <J1|E2|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E2 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1883,9 +1931,9 @@ Contains
         If (Keys%E3 == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(102,'(A)') 'N1 -> N2:  <conf1 trm1 | E3 | conf2 trm2>    <J1|E3|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(102,'(A)') 'N1 -> N2:  <conf1 trm1 | E3 | conf2 trm2>    <J1|E3|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(102,'(A)') 'N1 -> N2:  < J1   M1 | E3 |  J2   M2>    <J1|E3|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(102,'(A)') 'N1 -> N2:  < J1   M1 | E3 |  J2   M2>    <J1|E3|J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| E3 |",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1899,9 +1947,9 @@ Contains
         If (Keys%M1 == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(103,'(A)') 'N1 -> N2:  <conf1 trm1 | M1 | conf2 trm2>    <J1|M1|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(103,'(A)') 'N1 -> N2:  <conf1 trm1 | M1 | conf2 trm2>    <J1|M1|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(103,'(A)') 'N1 -> N2:  < J1   M1 | M1 |  J2   M2>    <J1|M1|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(103,'(A)') 'N1 -> N2:  < J1   M1 | M1 |  J2   M2>    <J1|M1|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M1 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1915,9 +1963,9 @@ Contains
         If (Keys%M2 == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(104,'(A)') 'N1 -> N2:  <conf1 trm1 | M2 | conf2 trm2>    <J1|M2|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(104,'(A)') 'N1 -> N2:  <conf1 trm1 | M2 | conf2 trm2>    <J1|M2|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(104,'(A)') 'N1 -> N2:  < J1   M1 | M2 |  J2   M2>    <J1|M2|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(104,'(A)') 'N1 -> N2:  < J1   M1 | M2 |  J2   M2>    <J1|M2|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M2 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1931,9 +1979,9 @@ Contains
         If (Keys%M3 == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(105,'(A)') 'N1 -> N2:  <conf1 trm1 | M3 | conf2 trm2>    <J1|M3|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(105,'(A)') 'N1 -> N2:  <conf1 trm1 | M3 | conf2 trm2>    <J1|M3|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(105,'(A)') 'N1 -> N2:  < J1   M1 | M3 |  J2   M2>    <J1|M3|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(105,'(A)') 'N1 -> N2:  < J1   M1 | M3 |  J2   M2>    <J1|M3|J2> (μ_0)      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| M3 |",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1947,9 +1995,9 @@ Contains
         If (Keys%EDM == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(108,'(A)') 'N1 -> N2:  <conf1 trm1 | EDM | conf2 trm2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(108,'(A)') 'N1 -> N2:  <conf1 trm1 | EDM | conf2 trm2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(108,'(A)') 'N1 -> N2:  < J1   M1 | EDM |  J2   M2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(108,'(A)') 'N1 -> N2:  < J1   M1 | EDM |  J2   M2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| EDM |",1X,A,2X,A,">",3X,E12.5,3X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1963,9 +2011,9 @@ Contains
         If (Keys%PNC == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(109,'(A)') 'N1 -> N2:  <conf1 trm1 |  PNC | conf2 trm2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(109,'(A)') 'N1 -> N2:  <conf1 trm1 |  PNC | conf2 trm2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(109,'(A)') 'N1 -> N2:  < J1   M1 | PNC |  J2   M2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(109,'(A)') 'N1 -> N2:  < J1   M1 | PNC |  J2   M2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| PNC |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1979,9 +2027,9 @@ Contains
         If (Keys%AM == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(110,'(A)') 'N1 -> N2:  <conf1 trm1 | AM | conf2 trm2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(110,'(A)') 'N1 -> N2:  <conf1 trm1 | AM | conf2 trm2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(110,'(A)') 'N1 -> N2:  < J1   M1 | AM |  J2   M2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(110,'(A)') 'N1 -> N2:  < J1   M1 | AM |  J2   M2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| AM |",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -1995,9 +2043,9 @@ Contains
         If (Keys%MQM == 1) Then
             If (k1 == 1 .and. k2 == 1) Then
                 If (existStr == .true.) Then
-                    Write(111,'(A)') 'N1 -> N2:  <conf1 trm1 |  MQM | conf2 trm2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(111,'(A)') 'N1 -> N2:  <conf1 trm1 |  MQM | conf2 trm2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 Else
-                    Write(111,'(A)') 'N1 -> N2:  < J1   M1 | MQM |  J2   M2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)          λ (nm)'
+                    Write(111,'(A)') 'N1 -> N2:  < J1   M1 | MQM |  J2   M2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
                 End If
             End If
             strfmt = '(I2," -> ",I2,":",2X,"<",A,2X,A,1X,"| MQM |",1X,A,2X,A,">",3X,E12.5,9X,E12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
@@ -2010,12 +2058,12 @@ Contains
         Write(6, '(A)') ' '
     End Subroutine RdcTM
 
-    Subroutine RdcDM (ntrm,Etrm,Tj1,imin,imax,lf)
+    Subroutine RdcDM (ntrm,k1,Etrm,Tj1,imin,imax,lf)
         ! This subroutine forms reduced density matrices from Ro
         Use wigner
         Use amp_ops
         Implicit None
-        Integer :: kmax, k, no, i, imax1, imin1, lf, imax, imin, mk, ik, &
+        Integer :: kmax, k, k1, no, i, imax1, imin1, lf, imax, imin, mk, ik, nspaces1, &
                    lll, il1, il2, nk, nol, jl, ml, lk, jk, ippx, il, ik1, ik2, l, &
                    nok, l1, ipp, nk0, lk0, jt, mj, ntrm
         Real(dp) :: A, B, G, ppl, tj, tm, tj1, Etrm, s, g1, xjl, xmk, &
@@ -2024,6 +2072,7 @@ Contains
         Integer, Dimension(IPx) :: i1, i2
         Real(dp), Dimension(IPx) :: pp
         Integer, Dimension(IPx) :: npp, lpp
+        Character(Len=256) :: strfmt, strsp
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         imin1=imin+Npo
         imax1=imax+Npo
@@ -2188,6 +2237,56 @@ Contains
                "; A =",E15.8," MHz; B =",E15.8," MHz" &
                /" oc.num.(n,l)",4(i3,i2,F8.4),/5(i3,i2,F8.4))') &
                ppl,G,A,B,(npp(i),lpp(i),pp(i),i=1,ippx)
+
+        strsp = ''
+        nspaces1 = 0
+
+        If (existStr == .false.) Then
+            Write(strc1(k1),'(F3.1)') tj
+            Write(strt1(k1),'(F3.1)') tm
+        End If
+        Do i=1,nterm2-nterm1+1
+            If (len(Trim(AdjustL(strc1(i)))) > nspaces1) nspaces1 = len(Trim(AdjustL(strc1(i))))
+        End Do
+       
+        nspaces1 = nspaces1 - len(Trim(AdjustL(strc1(k1))))
+
+        If (Keys%GF == 1) Then
+            If (ntrm == 1) Then
+                If (existStr == .true.) Then
+                    Write(112,'(A)') ' n   conf  term     gfactor   E_n (a.u.)'
+                Else
+                    Write(112,'(A)') ' n  J1   M1     gfactor       E_n (a.u.)'
+                End If
+            End If
+            strfmt = '(I2,2X,A,3X,A,4X,F8.5,5X,F8.5)'
+            Write(112,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), G, Etrm
+        End If
+
+        If (Keys%A_hf == 1) Then
+            If (ntrm == 1) Then
+                If (existStr == .true.) Then
+                    Write(106,'(A)') ' n   conf  term        A_hfs (MHz)      E_n (a.u.)'
+                Else
+                    Write(106,'(A)') ' n  J1   M1     A_hfs (MHz)       E_n (a.u.)'
+                End If
+            End If
+            strfmt = '(I2,2X,A,3X,A,4X,E15.8,8X,F8.5)'
+            Write(106,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), A, Etrm
+        End If
+
+        If (Keys%B_hf == 1) Then
+            If (ntrm == 1) Then
+                If (existStr == .true.) Then
+                    Write(107,'(A)') ' n   conf  term        B_hfs (MHz)      E_n (a.u.)'
+                Else
+                    Write(107,'(A)') ' n  J1   M1     B_hfs (MHz)       E_n (a.u.)'
+                End If
+            End If
+            strfmt = '(I2,2X,A,3X,A,4X,E15.8,8X,F8.5)'
+            Write(107,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), B, Etrm
+        End If
+
         Return
     End Subroutine RdcDM
 
