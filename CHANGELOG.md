@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.5] - 2022-07-20
+- ine v1.15 - bug fix for E2 polarizabilities
+- ine.f90 - added missing allocation statement in Ort subroutine
+- ine.f90 - removed calculation for negative parity for E2 polarizabilities
+- ine.f90 - remove xlamb_next from last iteration
+
 ## [0.10.4] - 2022-07-10
 - dm v3.0 - implemented new tables for g-factors, A_hfs and B_hfs
 - dtm.f90 - rewrote SetKeys subroutine to open files depending on dm/tm and which keys are used

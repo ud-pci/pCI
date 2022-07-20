@@ -56,6 +56,7 @@ Program ine
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
+    Integer, Parameter :: IP2 = 50000
     Integer :: i, n, k, Nd2, Nddir, nsu2, icyc, nlamb, kIters
     Real(dp) :: dlamb
     Integer(Kind=int64) :: start_time
@@ -75,7 +76,7 @@ Program ine
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
-    If (W0 == 0.d0) Then
+    If (W0 == 0.d0 .or. Kli == 5) Then
         icyc=1
     Else
         icyc=2
@@ -102,7 +103,12 @@ Program ine
             print*, 'xlamb=',xlamb
             Do i=1,icyc
                 Ndir=Nddir
-                If (Kli.EQ.5) Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
+                If (Kli.EQ.5) Then
+                    Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
+                    If (Ndir > IP2) Then
+                        Print*, 'WARNING: Dimensionality of matrix exceeds', IP2
+                    End If
+                End If
                 If (i.EQ.2) W0= -W0
                 If (dabs(xlamb).GT.1.d-8) Then
                     If (i.EQ.2) xlamb= -xlamb
@@ -328,7 +334,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.14",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.15",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -2203,7 +2209,9 @@ Contains
         Character(Len=256) :: strfmt, err_msg
     
         tres= 1.d-11    ! X0*X1 should be < tres
-    
+        
+        If (.not. allocated(XXn)) Allocate(XXn(Nd))
+
         open(unit=16,file='CONF.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.XIJ is absent"/)'
