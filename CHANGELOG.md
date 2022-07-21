@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.6] - 2022-07-21
+- tm v3.2 - addition of transition rates to E1, E2, M1 tables
+- dtm.f90 - removed cases E_i -> E_i from M1, E2 tables
+- dtm.f90 - new variables wl for wavelengths and tr for transition rates
+
 ## [0.10.5] - 2022-07-20
 - ine v1.15 - bug fix for E2 polarizabilities
 - ine.f90 - added missing allocation statement in Ort subroutine
