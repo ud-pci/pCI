@@ -1,0 +1,34 @@
+system:
+  [
+    name: Sr,
+    atomic_number: 38.0,
+    atomic_mass: 87.0, 
+    include_gaunt: True,
+    include_breit: True,
+  ]
+
+configurations:
+  odd: 
+    [
+      5s1 5p1
+    ]
+  even: 
+    [
+      5s2
+    ]
+
+basis: 20spd17f14g
+
+orbitals:
+  core: 1s 2s 2p 3s 3p 3d 4s 4p
+  active:
+    [
+
+    ]
+
+excitations:
+  [
+    single: True,
+    double: True,
+    triple: False,
+  ]

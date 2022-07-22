@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2022-07-22
+- added python scripts to new py-lib folder
+- basis.py - python script that generates input files used to create basis sets
+- create_add_yml.py - python script that creates yaml-formatted input file used to create ADD.INP via create_add_inp.py script
+- create_add_inp.py - python script that creates ADD.INP using yaml-formatted input file
+- orbitals.py - python library of functions related to working with orbitals
+- read_bass.py - python library of functions related to reading BASS.INP
+- get_excitations.py - python library of functions related to generating excited configurations
+- get_atomic_data.py - python library of functions scraping atomic data tables online
+- add.yml - sample yaml input file using Sr
+- basis.yml - sample yaml input file using Ac
+- moved sort.py to new py-lib folder
+
 ## [0.10.6] - 2022-07-21
 - tm v3.2 - addition of transition rates to E1, E2, M1 tables
 - dtm.f90 - removed cases E_i -> E_i from M1, E2 tables
