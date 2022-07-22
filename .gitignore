@@ -25,3 +25,6 @@ test/
 # vscode
 .vscode
 *.code-workspace
+
+# Python cache files
+__pycache__/

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2022-07-23
+- added initial developmental version of create_conf_inp.py to py-lib folder
+
 ## [0.11.0] - 2022-07-22
 - added python scripts to new py-lib folder
 - basis.py - python script that generates input files used to create basis sets
