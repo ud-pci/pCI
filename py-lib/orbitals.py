@@ -275,7 +275,7 @@ def count_excitations(excitations):
             count = count + 1
     return count
 
-def expand_orbitals(basis, orbital_list):
+def expand_orbitals(basis, orbital_list, multiplicity, configurations):
     """Return a table of orbitals and occupation numbers"""
 
     orb_occ = {}
@@ -284,6 +284,9 @@ def expand_orbitals(basis, orbital_list):
 
     core_orbs = 0
     active_orbs = orbital_list['active']
+    conf_list = []
+    for configuration in configurations['even']: conf_list.append(configuration)
+    for configuration in configurations['odd']: conf_list.append(configuration)
 
     # Add orbitals from BASS.INP to table
     try:
@@ -294,7 +297,9 @@ def expand_orbitals(basis, orbital_list):
         nmax = int(re.findall('[0-9]+', next(reversed(orb_occ)))[0])
     # Add orbitals from basis if BASS.INP not found
     except FileNotFoundError as e:
-        orb_occ, nmax = expand_basis(basis)
+        orb_occ, nmax = expand_basis(basis, multiplicity, conf_list)
+
+        print(orb_occ, nmax)
 
     # Remove orbitals not in basis set
     nlmax = expand_nl(basis)
@@ -348,19 +353,42 @@ def expand_orbitals(basis, orbital_list):
 
     return orb_occ
 
-def expand_basis(basis):
+def expand_basis(basis, multiplicity, conf_list):
     orb_occ = {}
+
+    # Default min and max occupation numbers
     min_occ = 0
     max_occ = 2
 
     nmin_dict = {'s': 1, 'p': 2, 'd': 3, 'f': 4, 'g': 5, 'h': 6}
-    n_array = re.findall('[0-9]+', basis)
-    l_array = re.findall('[spdfghii]+', basis)
+    nmin_array = [1, 2, 3, 4, 5, 6]
+    n_array2 = re.findall('[0-9]+', basis)
+    l_array2 = re.findall('[spdfghi]+', basis)
+    n_array = []
+    l_array = []
+
+    for configuration in conf_list:
+        num_orb = len(configuration.split())
+        n_config = re.findall('[0-9]+', configuration)
+        l_config = re.findall('[spdfghi]+', configuration)
+        print(n_config)
+        print(l_config)
+        for i in range(num_orb):
+            maxq = int(n_config[2*i+1])+multiplicity
+            if maxq <= maxq_dict[l_config[i]]:
+                orb_occ[str(n_config[2*i])+l_config[i]] = str(min_occ), str(int(n_config[2*i+1])+multiplicity)
+            else: 
+                orb_occ[str(n_config[2*i])+l_config[i]] = str(min_occ), str(maxq_dict[l_config[i]])
+
+    for i in range(len(l_array2)):
+        for l in l_array2[i]:
+            n_array.append(n_array2[i])
+            l_array.append(l)
 
     for i in range(len(n_array)):
-        for l in l_array[i]:
-            if l in nmin_dict:
-                for n in range(nmin_dict[l], int(n_array[i]) + 1):
+        for n in range(nmin_array[i], int(n_array[i]) + 1):
+            for l in l_array:
+                if n >= nmin_dict[l]:
                     orb_occ[str(n) + l] = str(min_occ), str(max_occ)
 
     return orb_occ, int(max(n_array))

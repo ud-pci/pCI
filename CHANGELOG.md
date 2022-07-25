@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2022-07-25
+- create_add_inp.py - if no BASS.INP is present, the list of subshells and occupation numbers will now be ordered starting from basic configurations, then ascending by principal quantum number 
+
 ## [0.11.1] - 2022-07-23
 - added initial developmental version of create_conf_inp.py to py-lib folder
 
