@@ -92,6 +92,8 @@ Module davidson
             Call startTimer(s1)
         End If
 
+        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
         B1=0_type_real
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
@@ -332,7 +334,7 @@ Module davidson
             B1(i)=0_type_real
             Cycle
         End Do
-        cnorm=sqrt(abs(cnorm))
+        cnorm=dsqrt(dabs(cnorm))
         Iconverge(j)=0
         char='         '
         If (cnorm < Crt4) Then
@@ -361,7 +363,7 @@ Module davidson
                     s=s+Z1(k,i)*C(k)
                 End Do
                 t=val-E1(i)
-                If (abs(t) < 1.d-6) Cycle
+                If (dabs(t) < 1.d-6) Cycle
                 B1(1:Nd0)=B1(1:Nd0)+(s/t)*Z1(1:Nd0,i)
             End Do
         End If
@@ -370,7 +372,7 @@ Module davidson
         Do i=1,Nd
             s=s+B1(i)**2
         End Do
-        s=1.d0/sqrt(s)
+        s=1.d0/dsqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
         Return
     End Subroutine Dvdsn
@@ -477,7 +479,7 @@ Module davidson
                 Do i=1,Nd
                     s=s+ArrB(i,j)*ArrB(i,l)
                 End Do
-                If (abs(s) > smax1) smax1=abs(s)
+                If (dabs(s) > smax1) smax1=dabs(s)
                 ArrB(1:Nd,j)=ArrB(1:Nd,j)-s*ArrB(1:Nd,l)
             End Do
             If (smax1 < ortho) Exit
@@ -498,7 +500,7 @@ Module davidson
             Write (6,'(4X,"Fail of normalization of vector ",I2)') j
             ifail=j
         End If
-        s=1.d0/sqrt(s)
+        s=1.d0/dsqrt(s)
         ArrB(1:Nd,j)=ArrB(1:Nd,j)*s
         Return
     End Subroutine Ortn
@@ -584,9 +586,9 @@ Module davidson
                         Do n=1,Nd                       
                             sj=sj+ArrB(n,i1)*ArrB(n,i2) 
                         End Do
-                        aj=sqrt(1+sj) - 1               !# eigenvalue for 2*J
-                        err=abs(aj-jav)                 !# difference from target
-                        err1=max1(err1,err)
+                        aj=dsqrt(1+sj) - 1               !# eigenvalue for 2*J
+                        err=dabs(aj-jav)                 !# difference from target
+                        err1=dmax1(err1,err)
                     End If
                 End Do
                 If (err1 < trsd) Then             !# convergency check
@@ -605,7 +607,7 @@ Module davidson
                                 s=s+a*a
                                 ArrB(n,i1)=a
                             End Do
-                            s1=1.d0/sqrt(s)
+                            s1=1.d0/dsqrt(s)
                             ArrB(1:Nd,i1)=ArrB(1:Nd,i1)*s1  !# normalization of X1
                         End If
                     End Do

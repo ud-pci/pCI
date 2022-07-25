@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3]- 2022-07-25
+- conf v5.7 - bug fix for Kv = 3
+- davidson.f90 - re-added broadcast of Z1 in initial stage of FormB0
+- conf.f90, davidson.f90, formj2.f90 - reverted generic intrisic functions (abs, sqrt) back to double-type intrinsic functions (dabs, dsqrt)
+- formj2.f90 - counter for J is now set by counter1 variable instead of size(Jsq%val)
+
 ## [0.11.2] - 2022-07-25
 - create_add_inp.py - if no BASS.INP is present, the list of subshells and occupation numbers will now be ordered starting from basic configurations, then ascending by principal quantum number 
 

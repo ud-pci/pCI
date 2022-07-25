@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.6 with single precision")'
+            strfmt = '(4X,"Program conf v5.7 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.6")'
+            strfmt = '(4X,"Program conf v5.7")'
         End Select
         
         Write( 6,strfmt)
@@ -264,7 +264,7 @@ Contains
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
         c1 = 0.01d0
-        mj = 2*abs(Jm)+0.01d0
+        mj = 2*dabs(Jm)+0.01d0
 
         Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
@@ -280,7 +280,7 @@ Contains
         Read(12,rec=6) q1
 
         z1 = pq(1)
-        If (abs(Z-z1) > 1.d-6) Then
+        If (dabs(Z-z1) > 1.d-6) Then
             strfmt = '("nuc. charge is changed: Z =",F12.6," ><",F12.6)'
             Write( 6,strfmt) Z,z1
             Write(11,strfmt) Z,z1
@@ -298,7 +298,7 @@ Contains
         Write( 6,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
         Write(11,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
 
-        longbasis=abs(PQ(20)-0.98765d0) < 1.d-6
+        longbasis=dabs(PQ(20)-0.98765d0) < 1.d-6
         If (longbasis) Then
             Write( *,*) ' Using variant for long basis '
             Write(11,*) ' Using variant for long basis '
@@ -327,7 +327,7 @@ Contains
         Nsu=0
         Do nj=1,Nsp
             i=sign(1.d0,Qnl(nj))
-            d=abs(Qnl(nj))+1.d-14
+            d=dabs(Qnl(nj))+1.d-14
             d=10.0*d
             nnj=d
             d=10.0d0*(d-nnj)
@@ -1647,7 +1647,7 @@ Contains
                             xx=0.d0
                             Do k=1,Nlv
                                 k1=k+Nlv
-                                x=abs(P(k1,i))
+                                x=dabs(P(k1,i))
                                 If (xx <= x) Then
                                     xx=x
                                     kx=k

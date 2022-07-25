@@ -320,7 +320,7 @@ Module formj2
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End If
 
-        ij8=size(Jsq%val)
+        ij8 = counter1
         ij4 = ij8
 
         Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -367,7 +367,7 @@ Module formj2
         xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then
-            If (abs(xj-XJ_av) > 1.d-1) ierr=1
+            If (dabs(xj-XJ_av) > 1.d-1) ierr=1
         End If
         Return
     End Subroutine J_av
