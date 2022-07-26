@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.7 with single precision")'
+            strfmt = '(4X,"Program conf v6.0 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.7")'
+            strfmt = '(4X,"Program conf v6.0")'
         End Select
         
         Write( 6,strfmt)
@@ -170,7 +170,8 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
+        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ, ksym
+        Close(99)
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
@@ -182,13 +183,11 @@ Contains
         ! Kw=0 - CONF.HIJ will not be written
         ! Kw=1 - CONF.HIJ will be written
         Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
-        Close(99)
 
         ! kLSJ determines whether CONF.HIJ will be written or not
         ! kLSJ=0 - LSJ will not be written in CONFFINAL.RES
         ! kLSJ=1 - LSJ will be written CONFFINAL.RES
         Write( 6,'(/4X,"kLSJ = (0-do not calculate LSJ, 1-calculate LSJ) ",I1)') kLSJ
-        Close(99)
 
         ! If starting new computation with MBPT
         ! Ksig = 0 - no MBPT included (same as Kl = 0)
@@ -214,6 +213,11 @@ Contains
         Else
             Ksig=0
         End If
+
+        ! ksym determines whether CSFs are used in the CI calculation
+        ! ksym=0 - CSFs will not be used
+        ! ksym=1 - CSFs will be used
+        Write( 6,'(/4X,"ksym = (0-do not use CSFs, 1-use CSFs) ",I1)') ksym
 
         ! Read configurations from file CONF.INP
         Call ReadConfigurations

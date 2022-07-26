@@ -6,7 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.3]- 2022-07-25
+## [0.12.0] - 2022-07-26
+- conf v6.0 - initial import of conf_csf functions
+- conf_variables.f90 - new key ksym to turn on/off usage of CSFs
+- conf.f90 - input file c.in now reads new ksym variable
+- davidson.f90 - re-imported previously removed Hould subroutine
+- csf.f90 - new module containing functions used for new CSF functionalities
+
+## [0.11.3] - 2022-07-25
 - conf v5.7 - bug fix for Kv = 3
 - davidson.f90 - re-added broadcast of Z1 in initial stage of FormB0
 - conf.f90, davidson.f90, formj2.f90 - reverted generic intrisic functions (abs, sqrt) back to double-type intrinsic functions (dabs, dsqrt)
