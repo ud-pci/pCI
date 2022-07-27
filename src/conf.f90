@@ -44,7 +44,7 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    Use csf, Only : nonequiv_conf
+    Use csf, Only : jbasis, nonequiv_conf
     use determinants, only : Wdet, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
@@ -53,6 +53,7 @@ Program conf
     Implicit None
     External :: BLACS_PINFO
     Integer   :: n, i, ierr, mype, npes, mpierr
+    Integer :: ncsf, nccj, max_ndcs
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
@@ -96,7 +97,7 @@ Program conf
         Call Det_Number
         Call Det_List
         Call Jterm                  ! prints table with numbers of levels with given J
-        !if (kCSF > 0) call jbasis(idt,Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
+        If (kCSF > 0) call jbasis(Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
         Call FormD
     End If
@@ -155,9 +156,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v6.1 with single precision")'
+            strfmt = '(4X,"Program conf v6.2 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v6.1")'
+            strfmt = '(4X,"Program conf v6.2")'
         End Select
         
         Write( 6,strfmt)

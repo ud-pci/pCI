@@ -9,7 +9,7 @@ Module csf
 
     Private
 
-    Public :: nonequiv_conf, Init_ND0_sym, unsym, reorder_det, read_ccj, idif
+    Public :: jbasis, nonequiv_conf, Init_ND0_sym, unsym, reorder_det, read_ccj, idif
 
 
 Contains
@@ -17,14 +17,22 @@ Contains
     Subroutine jbasis(nconf,ncsf,nccj,max_ndcs)
         Implicit None
         Integer :: nconf, ncsf, nccj, max_ndcs
-        Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail
-        Real(dp) :: t, jtt, tj
+        Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
+        Real(dp) :: t, tj
 
         Integer, Allocatable, Dimension(:) ::  ind_conf, idet1, idet2
         real(dp), dimension(:,:), allocatable :: zz
         real(dp), dimension(:), allocatable :: de
         real(dp), dimension(:), allocatable :: dd
         Character(Len=256) :: strfmt
+
+        If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
+        If (.not. allocated(ind_conf)) Allocate(ind_conf(Nc))
+        If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
+        If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
+        If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
+        If (.not. allocated(idet1)) Allocate(idet1(Ne))
+        If (.not. allocated(idet2)) Allocate(idet2(Ne))
 
         ncsf=0
         nccj=0
@@ -122,9 +130,9 @@ Contains
                 tj=0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
                 jtt=2*tj+0.0001
                 if (dabs(2*tj-jtt).gt.1.d-7) then
-                write( *,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
-                write(11,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
-                stop
+                    write( *,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
+                    write(11,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
+                    stop
                 end if
                 if (jtt.eq.mj) then
                     ncsf=ncsf+1
@@ -135,12 +143,12 @@ Contains
                 end if
             end do
             if (iconf_neq.gt.1) then
-              ic1=iconf_neq-1
-              iplace_cj(iconf_neq)=iplace_cj(ic1)+ndcs(ic1)*ndc_neq(ic1)
+                ic1=iconf_neq-1
+                iplace_cj(iconf_neq)=iplace_cj(ic1)+ndcs(ic1)*ndc_neq(ic1)
             end if
             if (iconf.gt.1) then
-              ic1=nc_neq(iconf-1)
-              mdcs(iconf)=mdcs(iconf-1)+ndcs(ic1)
+                ic1=nc_neq(iconf-1)
+                mdcs(iconf)=mdcs(iconf-1)+ndcs(ic1)
             end if
             if (ndcs(iconf_neq).gt.max_ndcs) max_ndcs=ndcs(iconf_neq)
             ind_conf(iconf_neq)=1

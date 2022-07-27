@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2022-07-27
+- conf v6.2 - implementation of jbasis subroutine
+- csf.f90 - bug fixes completed by allocating several arrays used for jbasis subroutine
+- csf.f90 - change type of variable jtt from dp to integer
+
 ## [0.12.1] - 2022-07-27
 - conf v6.1 - revamp of Dinit -> Jterm subroutines
 - params.f90 - new global variable idt to replace Iarr
