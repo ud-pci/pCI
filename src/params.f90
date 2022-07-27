@@ -54,7 +54,7 @@ Module params
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
     Real(dp), Allocatable, Dimension(:)   :: D1, Qnl
-    Integer, Allocatable, Dimension(:,:)  :: Iarr
+    Integer, Allocatable, Dimension(:,:)  :: Iarr, idt
 
     Real(type_real), Allocatable, Dimension(:) :: B1, B2
 

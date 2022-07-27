@@ -44,7 +44,8 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    use determinants, only : Wdet, Dinit, Jterm, Rdet
+    Use csf, Only : nonequiv_conf
+    use determinants, only : Wdet, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -90,8 +91,12 @@ Program conf
         Call Init                   ! reads basis set information from CONF.DAT
         Call Rint                   ! reads radial integrals from CONF.INT
         Call RintS                  ! reads in radial integrals from SGC.CON and SCRC.CON
+        If (kCSF > 0) call nonequiv_conf(Nc) ! List of non-equivalent configurations
         Call Dinit                  ! forms list of determinants
+        Call Det_Number
+        Call Det_List
         Call Jterm                  ! prints table with numbers of levels with given J
+        !if (kCSF > 0) call jbasis(idt,Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
         Call FormD
     End If
@@ -150,9 +155,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v6.0 with single precision")'
+            strfmt = '(4X,"Program conf v6.1 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v6.0")'
+            strfmt = '(4X,"Program conf v6.1")'
         End Select
         
         Write( 6,strfmt)
@@ -170,7 +175,7 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ, ksym
+        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ, kCSF
         Close(99)
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
@@ -217,7 +222,7 @@ Contains
         ! ksym determines whether CSFs are used in the CI calculation
         ! ksym=0 - CSFs will not be used
         ! ksym=1 - CSFs will be used
-        Write( 6,'(/4X,"ksym = (0-do not use CSFs, 1-use CSFs) ",I1)') ksym
+        Write( 6,'(/4X,"kCSF = (0-do not use CSFs, 1-use CSFs) ",I1)') kCSF
 
         ! Read configurations from file CONF.INP
         Call ReadConfigurations
@@ -645,7 +650,7 @@ Contains
         Do n=1,Nd
             x=0.d0
             Do i=1,Ne
-                ie=Iarr(i,n)
+                ie=idt(n,i)
                 ke=Nh(ie)
                 x=x+Eps(ke)
             End Do
@@ -696,7 +701,7 @@ Contains
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
 
         If (Ksig /= 0) Then
             If (.not. Allocated(Scr)) Allocate(Scr(10))
@@ -717,7 +722,7 @@ Contains
         If (mype==0) Then
             memFormH = 0_int64
             memFormH = sizeof(Nvc)+sizeof(Nc0) &
-                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
+                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(idt) &
                 + sizeof(IntOrd)
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
@@ -841,7 +846,7 @@ Contains
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
-        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Rsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
@@ -1327,7 +1332,7 @@ Contains
         If (Allocated(I_is)) Deallocate(I_is)
         If (Allocated(IntOrd)) Deallocate(IntOrd)
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
-        If (Allocated(Iarr)) Deallocate(Iarr)
+        If (Allocated(idt)) Deallocate(idt)
         If (Allocated(Scr)) Deallocate(Scr)
 
     End Subroutine DeAllocateFormHArrays
@@ -2065,7 +2070,7 @@ Contains
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(Xj)) Allocate(Xj(Nlv))
@@ -2136,7 +2141,7 @@ Contains
         Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
-        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tk, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 

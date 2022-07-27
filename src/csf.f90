@@ -9,9 +9,7 @@ Module csf
 
     Private
 
-    Integer :: nconf, nconf_neq
-    Integer, Allocatable, Dimension(:), Public :: Ndc, Ndcs, Mdc, Mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
-    Integer, Allocatable, Dimension(:,:), Public :: idt
+    Public :: nonequiv_conf, Init_ND0_sym, unsym, reorder_det, read_ccj, idif
 
 
 Contains
@@ -171,12 +169,12 @@ Contains
         Integer :: nconf
 
         Integer :: iconf, iconf_neq, jconf, njj, nj, nii, ni, nsj, nj0, nsi, ni0, nii1, ni1, i
-
-        Integer, Allocatable, Dimension(:) :: ni_conf, nf_conf, ind_nj, nc_neq
-
+        Integer, Allocatable, Dimension(:) :: ind_nj
         Character(Len=256) :: strfmt
 
         write( *,'(/4x,a)') 'Creating list of nonequivalent  configurations...'
+
+        Allocate(ni_conf(nconf), nf_conf(nconf), nc_neq(Nc), ind_nj(Ns))
 
         do iconf=1,nconf
           ni_conf(iconf)=nc0(iconf)+1
@@ -185,43 +183,42 @@ Contains
 
         iconf_neq=0
 
-        do iconf=1,nconf
-            do jconf=1,iconf-1
+        conf1: do iconf=1,nconf
+            conf2: do jconf=1,iconf-1
                 do njj=ni_conf(jconf),nf_conf(jconf)
-                  nj=nip(njj)
-                  ind_nj(nj)=0
-                end do
-                outer: do nii=ni_conf(iconf),nf_conf(iconf)
+                    nj=nip(njj)
+                    ind_nj(nj)=0
+                enddo
+                inner: do nii=ni_conf(iconf),nf_conf(iconf)
                     ni=nip(nii)
-                    inner: do njj=ni_conf(jconf),nf_conf(jconf)
+                    Do njj=ni_conf(jconf),nf_conf(jconf)
                         nj=nip(njj)
-                        if (ind_nj(nj).eq.1) cycle
-                        if (ll(ni).ne.ll(nj)) cycle
-                        if (jj(ni).ne.jj(nj)) cycle
-                        if (nq(nii).ne.nq(njj)) cycle
+                        if (ind_nj(nj).eq.1) Cycle
+                        if (ll(ni).ne.ll(nj)) Cycle
+                        if (jj(ni).ne.jj(nj)) Cycle
+                        if (nq(nii).ne.nq(njj)) Cycle
                         ind_nj(nj)=1
-                        cycle outer
-                    end do inner
-                    cycle
-                end do outer
-                ! Equivalent configurations must to be in the same order.
+                        Cycle inner
+                    End Do
+                    Cycle conf2
+                End Do inner
                 do nii=ni_conf(iconf),nf_conf(iconf)
                     ni=nip(nii)
                     ind_nj(ni)=0
-                enddo
+                end do
                 nsj=nf_conf(jconf)-ni_conf(jconf)+1
                 do nj0=1,nsj
                     njj=nj0+ni_conf(jconf)-1
                     nj=nip(njj)
                     nsi=nf_conf(iconf)-ni_conf(iconf)+1
-                    do ni0=1,nsi
+                    Do ni0=1,nsi
                         nii=ni0+ni_conf(iconf)-1
                         ni=nip(nii)
-                        if (ind_nj(ni).eq.1) cycle
-                        if (ll(ni).ne.ll(nj)) cycle
-                        if (jj(ni).ne.jj(nj)) cycle
-                        if (nq(nii).ne.nq(njj)) cycle
-                        if (nj0.ne.ni0) then
+                        If (ind_nj(ni).eq.1) Cycle
+                        If (ll(ni).ne.ll(nj)) Cycle
+                        If (jj(ni).ne.jj(nj)) Cycle
+                        If (nq(nii).ne.nq(njj)) Cycle
+                        If (nj0.ne.ni0) Then
                             nii1=nj0+ni_conf(iconf)-1
                             ni1=nip(nii1)
                             i=nip(nii1)
@@ -233,15 +230,15 @@ Contains
                             i=ind_nj(ni1)
                             ind_nj(ni1)=ind_nj(ni)
                             ind_nj(ni)=i
-                        end if
-                    end do
-                end do
+                        End If
+                    End Do
+                End Do
                 nc_neq(iconf)=nc_neq(jconf)
-                cycle
-            end do
+                Cycle conf1
+            end do conf2
             iconf_neq=iconf_neq+1
             nc_neq(iconf)=iconf_neq
-        end do
+        end do conf1
 
         nconf_neq=iconf_neq
         strfmt = '(4x,"Number of nonequivalent configurations:",i7)'

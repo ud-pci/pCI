@@ -9,7 +9,7 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC
+    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC, sort_det, Det_Number, Det_List
 
   Contains
 
@@ -92,65 +92,103 @@ Module determinants
         Return
     End Subroutine Dinit
 
+    Subroutine Det_Number
+        Implicit None
+
+        Integer :: iconf, ndi
+        Character(Len=256) :: strfmt
+        Integer, Allocatable, Dimension(:) :: idet
+        Logical :: fin
+
+        If (.not. allocated(idet)) allocate(idet(Ne))
+        if (.not. allocated(Mdc)) allocate(Mdc(Nc))
+        If (.not. allocated(Ndc)) Allocate(Ndc(Nc))
+        
+        Nd=0
+        ! list of determinants
+        do iconf=1,Nc
+            Mdc(iconf)=Nd
+            ndi=0
+            fin=.TRUE.
+            call Ndet(iconf,fin,idet)
+            Do While (.not. fin)
+                if (M == Mj) ndi=ndi+1
+                call Ndet(iconf,fin,idet)
+            End Do
+            Nd=Nd+Ndi
+            Ndc(iconf)=Ndi
+        end do
+        if (Nd == 0) then
+            strfmt = '(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)'
+            write( 6,strfmt) Mj/2.d0
+            write(11,strfmt) Mj/2.d0
+           Stop
+        end if
+
+        strfmt = '(4X,"Nd   =",I8)'
+        write( 6,strfmt) Nd
+        write(11,strfmt) Nd
+        Deallocate(idet)
+
+    End Subroutine Det_Number
+
+    Subroutine Det_List
+        Implicit None
+
+        Integer :: Nd0, ic1, ndi, iconf, imax, nd1, im, i
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Logical :: fin
+
+        If (.not. allocated(idet1)) allocate(idet1(Ne))
+        If (.not. allocated(idet2)) allocate(idet2(Ne))
+        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Jtc)) Allocate(Jtc(Nc))
+
+        Nd0=0
+        ! list of determinants
+        Do ic1=1,Nc
+            ndi=0
+            imax=1
+            fin=.TRUE.
+            call Ndet(ic1,fin,idet1)
+            Do While (.not. fin)
+                if (M.GE.Mj) then
+                    if (M.EQ.Mj) ndi=ndi+1
+                    nd1=nd0+ndi
+                    if (M.EQ.Mj) then
+                        call sort_det(idet1,idet2)
+                        do i=1,ne
+                            idt(nd1,i)=idet2(i)
+                        enddo
+                    end if
+                    im=(M-Mj)/2+1
+                    if (im.GT.imax) imax=im
+                end if
+                call Ndet(ic1,fin,idet1)
+            End Do
+            Ndc(ic1)=ndi
+            Jtc(ic1)=imax
+            Nd0=Nd0+Ndi
+        End Do
+    End Subroutine Det_List
+
     Subroutine Jterm
         Implicit None
 
-        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1
+        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1
         Real(dp)        :: d
-        Integer, allocatable, dimension(:) :: idet
-        Integer, dimension(60) :: nmj
+        Integer, allocatable, dimension(:) :: idet, nmj
         logical :: fin
 
-        allocate(idet(Ne),Ndc(Nc),Jtc(Nc))
-        Njd=0
-        Nd=0
-        ! Calculate Nd
-        Do iconf1=1,Nc
-            ndi=0
-            iconf=iconf1
-            fin=.true.
-            Call Ndet(iconf,fin,idet)
-            Do While (.not. fin)
-                If (M == Mj) ndi = ndi + 1
-                Call Ndet(iconf,fin,idet)
-            End Do
-            Nd=Nd+Ndi
-        End Do
-
-        if (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
+        If (.not. allocated(idet)) allocate(idet(Ne))
+        if (.not. allocated(idt)) allocate(idt(Nd,Ne))
 
         Njd=0
-        Nd=0
-        Do iconf1=1,Nc
-            ndi=0
-            ndi1=0
-            iconf=iconf1
-            imax=1
-            fin=.true.
-            Call Ndet(iconf,fin,idet)
-            Do While (.not. fin)
-                If (M >= Mj) Then
-                    If (M == Mj) ndi=ndi+1
-                    If (M == Mj+2) ndi1=ndi1+1
-                    nd1=nd+ndi
-                    If (M == Mj) Then
-                      Call Pdet (nd1,idet)
-                    End If
-                    im=(M-Mj)/2+1
-                    If (im > imax) imax=im
-                End If
-                Call Ndet(iconf,fin,idet)
-            End Do
-            Ndc(iconf)=ndi
-            Jtc(iconf)=ndi
-            If (kv == 1) Jtc(iconf)=ndi-ndi1
-            Nd=Nd+Ndi
+        Do iconf=1,Nc
+            ndi=Ndc(iconf)
+            imax=Jtc(iconf)
             If (ndi /= 0) Then
-                If (imax > 60) Then
-                    write(*,*) ' Jterm: array nmj is too small'
-                    write(*,*) ' Dimension is 60, required:',imax
-                    Read(*,*)
-                End If
+                allocate(nmj(imax))
                 Do im=1,imax
                     nmj(im)=0
                 End Do
@@ -192,18 +230,13 @@ Module determinants
                     End If
                     goto 230
                 End If
+                Deallocate(nmj)
             End If
         End Do
 
-        If (Nd == 0) Then
-            write( 6,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
-            write(11,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
-            stop
-        End If
-
         ! Writing table of J
-        write( 6,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
-        write(11,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
+        write( 6,'(3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))')
+        write(11,'(3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))')
         i = 1
         Do While (i == 1)
             i=0
@@ -334,7 +367,7 @@ Module determinants
         Integer  ::  n
         Integer, allocatable, dimension(:) :: idet
         !  - - - - - - - - - - - - - - - - - - - - - - - - -
-        Iarr(1:Ne,n)=idet(1:Ne) 
+        idt(n,1:Ne)=idet(1:Ne) 
         Return
     End Subroutine Pdet
 
@@ -348,7 +381,7 @@ Module determinants
         Open (16,file=str,status='UNKNOWN',form='UNFORMATTED')
         Write(16) Nd,Nsu
         Do i=1,Nd
-           write(16) Iarr(1:Ne,i)
+           write(16) idt(i,1:Ne)
         End Do
         close(16)
         Return
@@ -358,19 +391,16 @@ Module determinants
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
         !
         Implicit None
-        Integer :: i
+        Integer :: i, n
         Character(Len=*) :: str
 
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
         Open (16,file=str,status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
         Do i=1,Nd
-           Read(16,end=710) Iarr(1:Ne,i)
+           Read(16) idt(i,1:Ne)
         End Do
-        close(16)
-        Return
-710     write(*,*)' Rdet: end of CONF.DET for idet=',i
-        stop
+        Close(16)
     End Subroutine Rdet
 
     Subroutine Rspq(id1,id2,is,nf,i1,j1,i2,j2)
@@ -611,7 +641,7 @@ Module determinants
         Integer :: n
         Integer, allocatable, dimension(:)  :: idet
 
-        idet(1:Ne)=Iarr(1:Ne,n)
+        idet(1:Ne)=idt(n,1:Ne)
         Return
     End Subroutine Gdet
 
@@ -716,5 +746,32 @@ Module determinants
         Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompNRC
+
+    Subroutine sort_det(idet1, idet2)
+        ! sorts the integer array idet1(i)
+        Implicit None
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+
+        Integer :: is, i, k, j, k1, j1, iswap
+
+        is=1
+        idet2=idet1
+
+        do i=1,ne-1
+          k=i
+          do j=i+1,ne
+            k1=idet2(k)
+            j1=idet2(j)
+            if (j1.lt.k1) k=j
+          end do
+          if (k.ne.i) then
+            iswap   = idet2(k)
+            idet2(k) = idet2(i)
+            idet2(i) = iswap
+            is=-1
+          end if
+        end do
+
+    End Subroutine sort_det
 
 end module determinants

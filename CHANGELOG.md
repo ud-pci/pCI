@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2022-07-27
+- conf v6.1 - revamp of Dinit -> Jterm subroutines
+- params.f90 - new global variable idt to replace Iarr
+- conf_variables.f90 - replaced key ksym with kCSF
+- conf_variables.f90 - moved global variables from csf.f90 here since they are used globally in conf
+- determinants.f90 - previous Jterm subroutine is now broken into 3 parts: Det_Number, Det_List, and Jterm
+- determinants.f90 - replaced Iarr with idt and swapped dimensions to (Nd,Ne) in subroutines Wdet, Pdet, Rdet, and Gdet
+- determinants.f90 - new subroutine sort_det sorts an integer array idet1 and returns sorted array idet2
+- conf.f90 - replaced Iarr with idt and swapped dimensions to (Nd,Ne) in subbroutines FormD, AllocateFormHArrays, InitFormH, DeAllocateFormHArrays, and AllocateLSJArrays
+- conf.f90 - implemented nonequiv_conf subroutine to count number of nonequivalent configurations
+- csf.f90 - bug fixes and refactoring in nonequiv_conf subroutine
+
 ## [0.12.0] - 2022-07-26
 - conf v6.0 - initial import of conf_csf functions
 - conf_variables.f90 - new key ksym to turn on/off usage of CSFs
