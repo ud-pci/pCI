@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.3] - 2022-07-29
+## [0.12.3] - 2022-08-02
 - conf v6.3 - implementation of formh_sym subroutine
 - conf.f90 - implemented serial version of DiagInitApprox
 - csf.f90 - implemented subroutines formh_sym, hmatrix, and F_J2
