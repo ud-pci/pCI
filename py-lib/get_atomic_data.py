@@ -10,8 +10,20 @@ def get_radii():
 
     radii_df.columns = [ "Z", "Elem.", "Mass", "n", "R_av(fm)", "ΔR_av(fm)", "R_av,p(fm)", "ΔR_av,p(fm)"]
     radii_df.reset_index(drop=True, inplace=True)
+    radii_df['Z'].fillna(method='ffill',inplace=True)
+    radii_df['Elem.'].fillna(method='ffill',inplace=True)
 
     return radii_df
+
+def get_extra_radii():
+    rnuc_data = [
+        [89,'Ac',227,5.7350],
+        [91,'Pa',231,5.8000],
+        [93,'Np',237,5.8500]
+    ]
+    rnuc_df = pd.DataFrame(rnuc_data, columns = ['Z','Elem.','Mass','R_av(fm)'])
+
+    return rnuc_df
 
 def get_periodic_table():
     url = "https://www.webelements.com/compounds.html"
