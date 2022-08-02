@@ -52,12 +52,12 @@ Program ine
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
     Use ine_variables
-    Use determinants, Only : Dinit, Jterm
+    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
     Integer, Parameter :: IP2 = 50000
-    Integer :: i, n, k, Nd2, Nddir, nsu2, icyc, nlamb, kIters
+    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
     Real(dp) :: dlamb
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
@@ -69,7 +69,9 @@ Program ine
     Call Input                        ! Read list of configurations from CONF.INP
     Call Init                         ! Read basis set information from CONF.DAT
     Call Rint                         ! Read radial integrals from CONF.INT
-    Call Dinit                        ! Form list of determinants
+    Call Dinit                        ! 
+    Call Det_Number                   ! counts number of determinants
+    Call Det_List                     ! generates list of determinants
     Call Jterm                        ! Print table with numbers of levels with given J
     Call ReadHIJ                      ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
     Call ReadJJJ                      ! Read J^2 matrix in X1 space from file CONF.JJJ
@@ -134,6 +136,15 @@ Program ine
                         Ndir=Nd
                         IP1=Nd
                         Call SolEq1(kl) ! Direct solution
+                    Case(2)
+                        N_it = 2
+                        Do l=1,N_it4
+                            print*, '   2-step ITERATION #', l
+                            If (l > 1) kl = 2
+                            Call SolEq1(kl) ! Direct solution
+                            Call SolEq4(ok) ! Iterative solution
+                            If (ok) Exit
+                        End Do
                 End Select
                 If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
                 If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
@@ -176,19 +187,19 @@ Contains
         ! Khe=1 - new solution of homogeneous eq-n
         Khe= 1   
 
-        ! Specify kIters - (0-iterate and invert if diverged, 1-invert only)
-        kIters=0
+        ! Specify kIters - (0-iterate and invert if diverged, 1-invert only, 2-2-step iteration)
+        kIters=2
 
         ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
         ! To solve homogeneous equation for the whole matrix, Nddir=IP1
-        Nddir= 1000  
+        Nddir = IP1  
 
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
         IP1=15000
 
-        ! Specify N_it - number of iterations in SolEq4
-        N_it = 20
+        ! Specify N_it4 - number of iterations in SolEq4
+        N_it4 = 100
         
         Gj = 0.d0
 
@@ -334,7 +345,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.15",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.18",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -2172,7 +2183,8 @@ Contains
 
     Subroutine Mxmpy(num,j,x,y)     !# Y2J(j)  = (Elft-H)*x
         Implicit None               !# Y2J(j+1)= (Elft-H)*y (only for num=2)
-        Integer :: j, j1, i8, num, n, k
+        Integer :: j, j1, num, n, k
+        Integer(kind=int64) :: i8
         Real(dp) :: t
         Real(dp), Allocatable, Dimension(:) :: x, y
         j1=j+1

@@ -9,7 +9,7 @@ Program conf_pt
     Use mpi
     Use conf_pt_variables
     Use integrals, Only : Rint
-    Use determinants, Only : Dinit, Jterm, Wdet
+    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm, Wdet
     Implicit None
     Integer  :: Nc_0, mpierr, mype, npes
     Real :: start_time, stop_time
@@ -43,7 +43,9 @@ Program conf_pt
         Call Input
         Call Init
         Call Rint
-        Call Dinit
+        Call Dinit                        ! 
+        Call Det_Number                   ! counts number of determinants
+        Call Det_List                     ! generates list of determinants
         Call Jterm
         Call Wdet('CONF_PT.DET')
         Call NR_Init
@@ -402,7 +404,7 @@ Contains
         If (.not. allocated(Iint3)) allocate(Iint3(Ngint))
         If (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
         If (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
-        If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
+        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
         If (.not. allocated(DVnr)) allocate(DVnr(Nc))
 
         If (Ksig /= 0) Then
@@ -434,7 +436,7 @@ Contains
         Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(idt(1:Nd,i), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End Do
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)

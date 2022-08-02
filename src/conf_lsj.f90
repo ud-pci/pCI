@@ -2,7 +2,7 @@ Program conf_lsj
     use mpi
     Use conf_variables
     use davidson, Only : Prj_J
-    use determinants, Only : Dinit, Jterm
+    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm
     use integrals, Only : Rint
     use formj2, Only : FormJ, J_av
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -33,7 +33,9 @@ Program conf_lsj
         Call Input          ! reads list of configurations from CONF.INP
         Call Init           ! reads basis set information from CONF.DAT
         Call Rint           ! reads radial integrals from CONF.INT
-        Call Dinit          ! forms list of determinants
+        Call Dinit          ! 
+        Call Det_Number     ! counts number of determinants
+        Call Det_List       ! generates list of determinants
         Call Jterm          ! prints table with numbers of levels with given J
         Call ReadXIJ(B1h)   ! reads relevant wavefunctions from CONF.XIJ
     End If
@@ -364,7 +366,7 @@ Contains
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
         If (.not. Allocated(D1)) Allocate(D1(nlvs))
         If (.not. Allocated(Tj)) Allocate(Tj(nlvs))
         If (.not. Allocated(Xj)) Allocate(Xj(nlvs))
@@ -375,7 +377,7 @@ Contains
         If (mype==0) Then
             memFormH = 0_int64
             memFormH = sizeof(Nvc)+sizeof(Nc0) &
-                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr)&
+                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(idt)&
                 + sizeof(IntOrd)
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
@@ -446,7 +448,7 @@ Contains
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(idt(1:Nd,i), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End do  
         Call MPI_Bcast(nnd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)

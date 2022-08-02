@@ -44,7 +44,7 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    Use csf, Only : jbasis, nonequiv_conf
+    Use csf, Only : jbasis, nonequiv_conf, formh_sym
     use determinants, only : Wdet, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
@@ -93,9 +93,9 @@ Program conf
         Call Rint                   ! reads radial integrals from CONF.INT
         Call RintS                  ! reads in radial integrals from SGC.CON and SCRC.CON
         If (kCSF > 0) call nonequiv_conf(Nc) ! List of non-equivalent configurations
-        Call Dinit                  ! forms list of determinants
-        Call Det_Number
-        Call Det_List
+        Call Dinit                  ! 
+        Call Det_Number             ! counts number of determinants
+        Call Det_List               ! generates list of determinants
         Call Jterm                  ! prints table with numbers of levels with given J
         If (kCSF > 0) call jbasis(Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
@@ -104,16 +104,24 @@ Program conf
 
     ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype)
-    
-    ! Formation of Hamiltonian matrix
-    Call FormH(npes,mype)
 
-    ! Formation of J^2 matrix
-    Call FormJ(mype, npes)   
-    
-    ! Deallocate arrays that are no longer used in FormH
-    Call DeAllocateFormHArrays(mype)
+    If (kCSF > 0) Then
+        ! Formation of symmetrized Hamiltonian matrix
+        If (mype == 0) Then
+            Call formh_sym(Nc,ncsf,nccj,max_ndcs)
+        End If
+    Else
+        ! Formation of Hamiltonian matrix
+        Call FormH(npes,mype)
 
+        ! Formation of J^2 matrix
+        Call FormJ(mype, npes)   
+
+        ! Deallocate arrays that are no longer used in FormH
+        Call DeAllocateFormHArrays(mype)
+
+    End If
+    
     ! Allocate arrays that are used in Davidson procedure
     Call AllocateDvdsnArrays(mype)
     
@@ -156,9 +164,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v6.2 with single precision")'
+            strfmt = '(4X,"Program conf v6.3 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v6.2")'
+            strfmt = '(4X,"Program conf v6.3")'
         End Select
         
         Write( 6,strfmt)
@@ -1388,7 +1396,7 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
-        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+        External :: SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
         Integer :: I, J, lwork, mype, npes, ifail
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
@@ -1402,6 +1410,26 @@ Contains
 
         ! Start timer for initial diagonalization
         Call startTimer(s1)
+
+        ! If running in serial
+        If (npes == 1) Then
+            Select Case(type_real)
+            Case(sp)
+                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+            Case(dp)
+                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+            End Select
+            lwork = Nint(realtmp(1))
+            Allocate(W(lwork))
+            Select Case(type_real)
+            Case(sp)
+                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+            Case(dp)
+                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+            End Select
+            Deallocate(W)
+            Return
+        End If
 
         ! Set the number of rows, NPROW, and columns, NPCOL, of the processor grid
         NPROW = 1

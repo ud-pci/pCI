@@ -1,7 +1,7 @@
 Program dtm 
     Use dtm_variables
     Use mpi_f08
-    Use determinants, Only : Dinit, Jterm
+    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
     Implicit None
     
@@ -38,11 +38,13 @@ Program dtm
     Call startTimer(start_time)
 
     If (mype==0) Then
-        Call Input   ! reads file CONF.INP
-        Call Init    ! reads file CONF.DAT
-        Call RintA   ! either reads or calculates radial integrals
-        Call Dinit   ! forms list of determinants (CONF.DET)
-        Call Jterm   ! produces table of levels and generates basis set of determinants from CONF.INP
+        Call Input          ! reads file CONF.INP
+        Call Init           ! reads file CONF.DAT
+        Call RintA          ! either reads or calculates radial integrals
+        Call Dinit          ! 
+        Call Det_Number     ! counts number of determinants
+        Call Det_List       ! generates list of determinants
+        Call Jterm          ! produces table of levels and generates basis set of determinants from CONF.INP
     End If
 
     Call InitTDM
@@ -491,7 +493,7 @@ Contains
         Open(17,file='CONF.DET',status='OLD',form='UNFORMATTED')
         Read(17) Nd1, Nsu
         Close(17)      
-        Allocate(Iarr(Ne,Nd1))
+        Allocate(idt(Nd1,Ne))
         If (Kl1 == 2) Then   ! TM regime requires files CONF1.DET & CONF1.XIJ
                              ! in addition to CONF.DET & CONF.XIJ for DM regime
             Open(17,file='CONF1.DET',status='OLD',form='UNFORMATTED')
@@ -1043,9 +1045,9 @@ Contains
 
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        If (mype/=0) Allocate(Iarr(Ne,Nd))
+        If (mype/=0) Allocate(idt(Nd,Ne))
         count = Ne*Int(Nd,kind=int64)
-        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,nlvs
             Call MPI_Bcast(ArrB2(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
@@ -1077,7 +1079,7 @@ Contains
         ntrm1=nterm2
         nlvs=ntrm1-ntrm+1
         Allocate(B1(Nd),ArrB2(Nd,nlvs),e2s(nlvs),tj2s(nlvs))
-        mem = sizeof(Iarr)+sizeof(B1)+sizeof(ArrB2)
+        mem = sizeof(idt)+sizeof(B1)+sizeof(ArrB2)
         ! Sum all the mem sizes to get a total...
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         ! ...before overwriting mem with the maximum value across all workers:
@@ -1310,11 +1312,11 @@ Contains
         Call MPI_Bcast(tj1, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(tj2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        If (mype /= 0) Allocate(Iarr(Ne,Nd1))
+        If (mype /= 0) Allocate(idt(Nd1,Ne))
         count = Ne*Int(Nd1,kind=int64)
-        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd2,kind=int64) 
-        Call BroadcastI(Iarr2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(idt2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(B1(1:Nd1), Nd1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Do i=1,nlvs
             Call MPI_Bcast(ArrB2(1:Nd2,i), Nd2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1347,7 +1349,7 @@ Contains
         Allocate(e2s(nlvs),tj2s(nlvs))
         Allocate(ArrB2(Nd2,nlvs))
         Allocate(B1(Nd1),B2(Nd2))
-        Allocate(Iarr2(Ne,Nd2))
+        Allocate(idt2(Nd2,Ne))
 
         If (mype==0) Then
             ! Read in determinants of CONF1.DET
@@ -1356,7 +1358,7 @@ Contains
             Write (*,*) 'Ne, Nd1, Nd2',Ne,Nd1,Nd2
             Do n=1,Nd2
                 Read(17) (idet2(i),i=1,Ne)
-                Iarr2(1:Ne,n) = idet2(1:Ne)
+                idt2(n,1:Ne) = idet2(1:Ne)
             End Do
             Close(17)
         
@@ -1411,7 +1413,7 @@ Contains
             End If 
         End If
 
-        mem = sizeof(Iarr)+sizeof(Iarr2)+sizeof(B1)+sizeof(B2)+sizeof(ArrB2)
+        mem = sizeof(idt)+sizeof(idt2)+sizeof(B1)+sizeof(B2)+sizeof(ArrB2)
         ! Sum all the mem sizes to get a total...
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         ! ...before overwriting mem with the maximum value across all workers:
@@ -1473,7 +1475,7 @@ Contains
                     Do n=start,end   !### - final state
                         Ndr=n
                         bn=B2(n)
-                        idet2(1:Ne)=Iarr2(1:Ne,n)
+                        idet2(1:Ne)=idt2(n,1:Ne)
                         If (n == 1) Then
                             ms=0     !### - Jz for the final state
                             Do i=1,Ne

@@ -12,7 +12,7 @@ Module dtm_variables
     Real(dp) :: Cl, Trd, H0, Anuc, Dint, MaxT, all, Tm2, AE1V, tj1
 
     Integer, Allocatable, Dimension(:)      :: Intg, iconf1, iconf2
-    Integer, Allocatable, Dimension(:,:)    :: Iarr2
+    Integer, Allocatable, Dimension(:,:)    :: idt2
     Real(dp), Allocatable, Dimension(:)     :: Rnt, e2s, tj2s
     Real(dp), Allocatable, Dimension(:,:)   :: ArrB2
     Real(dp), Dimension(IP1,IP1)            :: Ro

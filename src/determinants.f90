@@ -16,19 +16,24 @@ Module determinants
     Subroutine calcNd0(ic1, n2)
         Implicit None
         Integer, Intent(out) :: ic1, n2
-        Integer :: ic, n1, n0
+        Integer :: ic, n1, n0, iconf_neq
 
         ic1=0
         n0=IP1+1
         n1=0
 
         Do ic=1,Nc4
-            n1=n1+Ndc(ic)
-            If (n1 < n0) Then
-                n2=n1
-                ic1=ic
+            If (kCSF > 0) Then
+                iconf_neq=nc_neq(ic)
+                n1=n1+ndcs(iconf_neq)
+            Else
+                n1=n1+Ndc(ic)
             End If
-        End Do    
+            If (n1 < n0) Then
+                 n2=n1
+                 ic1=ic
+            End If
+        End Do
         
     End Subroutine calcNd0
     

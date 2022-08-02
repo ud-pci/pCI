@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3] - 2022-07-29
+- conf v6.3 - implementation of formh_sym subroutine
+- conf.f90 - implemented serial version of DiagInitApprox
+- csf.f90 - implemented subroutines formh_sym, hmatrix, and F_J2
+- csf.f90 - added allocation statements in idif function
+- csf.f90 - changed Iarr to idt in subroutine reorder_det
+- determinants.f90 - added conditional for CSF case in calcNd0
+- miscellaneous global changes
+- ine.f90, conf.f90, dtm.f90, conf_pt.f90, conf_lsj.f90 - replaced Iarr with idt and swapped array dimension to (Nd,Ne)
+- dtm_variables.f90 - changed Iarr2 to idt2
+
 ## [0.12.2] - 2022-07-27
 - conf v6.2 - implementation of jbasis subroutine
 - csf.f90 - bug fixes completed by allocating several arrays used for jbasis subroutine
@@ -29,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - conf.f90 - input file c.in now reads new ksym variable
 - davidson.f90 - re-imported previously removed Hould subroutine
 - csf.f90 - new module containing functions used for new CSF functionalities
+
+## [0.11.5] - 2022-07-29
+- ine v1.18 - bug fix for integer overflow in Mxmpy
+- ine.f90 - changed type for variable i8 to kind int64
+
+## [0.11.4] - 2022-07-28
+- ine v1.17 - implemented 2-step iteration method
+- ine.f90 - new key value for kIters = 2 allows for 2-step iteration method
+- ine.f90 - new key N_it4 defines number of 2-step iterations
 
 ## [0.11.3] - 2022-07-25
 - conf v5.7 - bug fix for Kv = 3

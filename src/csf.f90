@@ -9,7 +9,7 @@ Module csf
 
     Private
 
-    Public :: jbasis, nonequiv_conf, Init_ND0_sym, unsym, reorder_det, read_ccj, idif
+    Public :: jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, read_ccj, idif
 
 
 Contains
@@ -253,167 +253,213 @@ Contains
         write( *,strfmt) nconf_neq
         write(11,strfmt) nconf_neq
     End Subroutine nonequiv_conf
-!
-!    Subroutine formh_sym
-!        Implicit None
-!
-!        Character(Len=256) :: strfmt
-!
-!        allocate(ccj(nccj))
-!        allocate(zzc(max_ndcs,max_ndcs))
-!        allocate(buf(max_ndcs))
-!
-!        call read_ccj(nccj,ccj)
-!
-!        i8=0  ! integer*8
-!        if (Kout.EQ.0) Idel=5000
-!        if (Kout.EQ.1) Idel=500
-!        if (Kout.GE.2) Idel=1
-!        open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-!        read(16) (In(i),i=1,IPgnt)
-!        read(16) (Gnt(i),i=1,IPgnt)
-!        close(unit=16)
-!        NumH=0
-!        Kherr=0
-!        Kgerr=0
-!        numzero=0
-!        n0=1
-!        Hmin=0.d0
-!        if (Ksig.EQ.2) then
-!           iscr=0
-!           xscr=0
-!           write(*,*) 'Screening is included'
-!        end if
-!
-!        ! reading/forming of the file CONF.HIJ
-!
-!        if (Kl.EQ.1) then
-!           call Hread(i8,n,k,hij,ierr)
-!           if (ierr.LE.1) then
-!                strfmt = '(4X,"NumH =",I9," Hmin =",F12.6/)'
-!                write( *,strfmt) NumH,Hmin
-!                write(11,strfmt) NumH,Hmin
-!                if (ierr.EQ.1) then
-!                    deallocate(buf)
-!                    deallocate(zzc)
-!                    deallocate(ccj)
-!                    return
-!                end if
-!           else
-!              call Hwrite(i8,0,0,hij)
-!              write (*,*) 'Hread: error',ierr,' in CONF.HIJ'
-!           end if
-!           n0=n+1
-!        else
-!           call Hwrite(i8,0,0,hij)
-!        end if
-!        strfmt = '(7X,"energy matrix"/8X,"N",7X,"I",5X,"J",9X,"H"/)'
-!        write( *,strfmt)
-!
-!        ! calculation of the matrix elements
-!
-!        ih8=NumH
-!        do iconf=1,nconf
-!            iconf_neq=nc_neq(iconf)
-!            nci=ndcs(iconf_neq)
-!            if (nci.eq.0) cycle
-!            ndi=ndc(iconf)
-!            do jconf=1,iconf
-!                jconf_neq=nc_neq(jconf)
-!                ncj=ndcs(jconf_neq)
-!                if (ncj.eq.0) cycle
-!                ndj=ndc(jconf)
-!                idf=idif(iconf,jconf,nsp,nq,nip)
-!                if (idf.gt.2) cycle
-!                zzc(1:nci,1:ncj)=0.d0
-!                n1=mdc(iconf)+1
-!                n2=n1+ndc(iconf)-1
-!                do n=n1,n2
-!                    id=n-n1+1
-!                    idet1(1:Ne)=idt(n,1:Ne)
-!                    k1=mdc(jconf)+1
-!                    k2=k1+ndc(jconf)-1
-!                    buf(1:ncj)=0.d0
-!                    do k=k1,k2
-!                        idet2(1:Ne)=idt(k,1:Ne)
-!                        if (Kdsig.NE.0) E_k=Diag(k)
-!                        call Hmatrix(Ne,idf,idet1,idet2,hij)
-!                        if (dabs(hij).lt.1.d-20) cycle
-!                        jd=k-k1+1
-!                        do jc=1,ncj
-!                          jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-!                          buf(jc)=buf(jc)+hij*ccj(jccj)
-!                        end do
-!                    end do
-!                    do ic=1,nci
-!                        iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-!                        do jc=1,ncj
-!                          zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
-!                        end do
-!                    end do
-!                end do
-!                do ic=1,nci
-!                    jc2=ncj
-!                    if (iconf.eq.jconf) jc2=ic
-!                    do jc=1,jc2
-!                        hij=zzc(ic,jc)
-!                        n=ic+mdcs(iconf)
-!                        k=jc+mdcs(jconf)
-!                        if (hij.NE.0.d0) then
-!                           ih8=ih8+1
-!                           call Hwrite(ih8,n,k,hij)
-!                           if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-!                           if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
-!                        else
-!                           numzero=numzero+1
-!                        end if
-!                        strfmt = '("+",1X,I8,I8,I8,F16.9,4X,A1)'
-!                        if (Idel.EQ.1) write(11,25) ih8,n,k,hij
-!                        if (k.EQ.n) then
-!                           if (Idel.GT.1) then
-!                              if(n.EQ.Idel*(n/Idel)) then
-!                                 write( *,25) ih8,n,n,hij,st
-!                              end if
-!                           end if
-!                        end if
-!                    end do
-!                end do
-!            end do
-!        end do
-!
-!        NumH=ih8
-!        call Hwrite(ih8,n,k,hij)
-!        write(*,*) 'NumH=',NumH
-!        write(*,*) 'numzer=',numzero
-!
-!        deallocate(buf)
-!        deallocate(zzc)
-!        deallocate(ccj)
-!    End Subroutine formh_sym
-!
-    Subroutine Init_ND0_sym
+
+    Subroutine formh_sym(nconf,ncsf,nccj,max_ndcs)
+        Use vaccumulator
+        Use determinants, Only : calcNd0
         Implicit None
 
-        Integer :: n1, ic1, n2, iconf, iconf_neq
+        Integer :: nconf, ncsf, nccj, max_ndcs
+        Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
+        Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Type(IVAccumulator)   :: iva1, iva2
+        Type(RVAccumulator)   :: rva1
+        Integer               :: vaGrowBy
+        Real(dp) :: Hmin, hij
+        Real(dp), Allocatable, Dimension(:) :: ccj, buf
+        Real(dp), Allocatable, Dimension(:,:) :: zzc
         Character(Len=256) :: strfmt
 
-        ! Dimension of the approximation to start with
-        n1=0
-        ic1=0
-        n2=Nd0-1
-        do iconf=1,Nc4
-           iconf_neq=nc_neq(iconf)
-           n1=n1+ndcs(iconf_neq)
-           if (n1.LT.Nd0) then
-              n2=n1
-              ic1=iconf
-           end if
+        If (.not. allocated(ccj)) allocate(ccj(nccj))
+        If (.not. allocated(zzc)) allocate(zzc(max_ndcs,max_ndcs))
+        If (.not. allocated(buf)) allocate(buf(max_ndcs))
+        If (.not. allocated(idet1)) allocate(idet1(Ne))
+        If (.not. allocated(idet2)) allocate(idet2(Ne))
+
+        Call calcNd0(Nc1, Nd0)
+
+        vaGrowBy = 10000000
+        Call IVAccumulatorInit(iva1, vaGrowBy)
+        Call IVAccumulatorInit(iva2, vaGrowBy)
+        Call RVAccumulatorInit(rva1, vaGrowBy)
+
+        ! Reading the list of the symmetrized coefficients
+        call read_ccj(ccj)
+
+        close(unit=16)
+        NumH=0
+        Kherr=0
+        Kgerr=0
+        numzero=0
+        n0=1
+        Hmin=0.d0
+        if (Ksig.EQ.2) then
+           iscr=0
+           xscr=0
+           write(*,*) 'Screening is included'
+        end if
+
+        ! calculation of the matrix elements
+        do iconf=1,nconf
+            iconf_neq=nc_neq(iconf)
+            nci=ndcs(iconf_neq)
+            if (nci.eq.0) cycle
+            ndi=ndc(iconf)
+            do jconf=1,iconf
+                jconf_neq=nc_neq(jconf)
+                ncj=ndcs(jconf_neq)
+                if (ncj.eq.0) cycle
+                ndj=ndc(jconf)
+                idf=idif(iconf,jconf)
+                if (idf.gt.2) cycle
+                zzc(1:nci,1:ncj)=0.d0
+                n1=mdc(iconf)+1
+                n2=n1+ndc(iconf)-1
+                do n=n1,n2
+                    id=n-n1+1
+                    idet1(1:Ne)=idt(n,1:Ne)
+                    k1=mdc(jconf)+1
+                    k2=k1+ndc(jconf)-1
+                    buf(1:ncj)=0.d0
+                    do k=k1,k2
+                        idet2(1:Ne)=idt(k,1:Ne)
+                        if (Kdsig.NE.0) E_k=Diag(k)
+                        call Hmatrix(idf,idet1,idet2,hij)
+                        if (dabs(hij).lt.1.d-20) cycle
+                        jd=k-k1+1
+                        do jc=1,ncj
+                          jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
+                          buf(jc)=buf(jc)+hij*ccj(jccj)
+                        end do
+                    end do
+                    do ic=1,nci
+                        iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
+                        do jc=1,ncj
+                          zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                        end do
+                    end do
+                end do
+                do ic=1,nci
+                    jc2=ncj
+                    if (iconf.eq.jconf) jc2=ic
+                    do jc=1,jc2
+                        hij=zzc(ic,jc)
+                        n=ic+mdcs(iconf)
+                        k=jc+mdcs(jconf)
+                        if (hij.NE.0.d0) then
+                            ih8=ih8+1
+                            if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                            if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                            Call IVAccumulatorAdd(iva1, n)
+                            Call IVAccumulatorAdd(iva2, k)
+                            Call RVAccumulatorAdd(rva1, hij)
+                            Hamil%minval = Hmin
+                        else
+                            numzero=numzero+1
+                        end if
+                    end do
+                end do
+            end do
         end do
-        Nd0=n2
-        strfmt = '(3X,"Starting approx. includes ",I3," conf.,",I4," det.")'
-        write( *,strfmt) ic1,Nd0
-        write(11,strfmt) ic1,Nd0
-    End Subroutine Init_ND0_sym
+
+        NumH=ih8
+        Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
+        Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
+        Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
+
+        Call IVAccumulatorReset(iva1)
+        Call IVAccumulatorReset(iva2)
+        Call RVAccumulatorReset(rva1)
+
+        write(*,*) 'NumH=',NumH
+        write(*,*) 'numzer=',numzero
+        write(*,*) 'Hmin=',Hamil%minval
+
+        deallocate(buf)
+        deallocate(zzc)
+        deallocate(ccj)
+    End Subroutine formh_sym
+
+    Subroutine Hmatrix(icomp,idet1,idet2,t)
+        Use integrals, Only : Hint, Gint
+        Implicit None
+
+        Integer :: icomp, is, nf, i1, i2, j1, j2, iq, jq, jq0
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+
+        Real(dp) :: t
+
+        call Rspq(idet1,idet2,is,nf,i1,i2,j1,j2)
+        t=0.d0
+        if (nf.LE.2) then
+            if (nf.EQ.2) then
+                !    determinants differ by two functions
+                t=t+Gint(i2,j2,i1,j1)*is !### det_k goes first!
+                if (kCSF.eq.0.and.icomp.EQ.0) t=t+Gj*F_J2(idet1,idet2)
+            else
+                if (nf.EQ.1) then
+                !     determinants differ by one function
+                 do iq=1,Ne
+                    i1=idet1(iq)
+                    if (i1.NE.j1) then
+                       t=t+Gint(j2,i1,j1,i1)*is
+                    end if
+                 end do
+                 t=t+Hint(j2,j1)*is
+                else
+                    !     determinants are equal
+                    do iq=1,Ne
+                        i1=idet1(iq)
+                        jq0=iq+1
+                        if (jq0.LE.Ne) then
+                           do jq=jq0,Ne
+                              j1=idet1(jq)
+                              t=t+Gint(i1,j1,i1,j1)*is
+                           end do
+                        end if
+                        t=t+Hint(i1,i1)*is
+                    end do
+                    if (kCSF.eq.0) t=t+Gj*F_J2(idet1,idet2)
+                end if
+           end if
+        end if
+    End Subroutine hmatrix
+
+    Real(type_real) Function F_J2(idet1, idet2) 
+        Implicit None
+
+        Integer, allocatable, dimension(:), intent(InOut) :: idet1, idet2
+        Integer :: na, ja, ma, jq0, iq, jq, is, nf, ia, ib, ic, id
+        Real(type_real)  :: t
+
+        t=0_type_real
+        call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
+        Select Case(nf)
+            Case(0) 
+                t=mj*mj
+                Do iq=1,Ne
+                    ia=idet1(iq)
+                    na=Nh(ia)
+                    ja=Jj(na)
+                    ma=Jz(ia)
+                    t=t+ja*(ja+2)-ma**2
+                    jq0=iq+1
+                    If (jq0 <= Ne) Then
+                        Do jq=jq0,Ne
+                            ib=idet1(jq)
+                            t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
+                        End Do
+                    End If
+                End Do
+            Case(2)
+                t=is*(Plj(ia,ic)*Plj(id,ib)+Plj(ic,ia)*Plj(ib,id)- &
+                    Plj(ia,id)*Plj(ic,ib)-Plj(id,ia)*Plj(ib,ic))
+        End Select
+
+        F_J2=t
+        Return
+    End Function F_J2
 
     Subroutine unsym(ncsf,nconf,nccj)
         Implicit None
@@ -484,7 +530,7 @@ Contains
                 k2=k1+ndc(iconf)-1
                 Inner: Do k=k1,k2
                     Do i=1,ne
-                        idet2(i)=Iarr(k,i)
+                        idet2(i)=idt(k,i)
                     End Do
                     Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
                     If (nf.ne.0) Cycle
@@ -495,9 +541,9 @@ Contains
                     End If
                     If (k.eq.n) Cycle
                     Do i=1,ne
-                        id=Iarr(n,i)
-                        Iarr(n,i)=Iarr(k,i)
-                        Iarr(k,i)=id
+                        id=idt(n,i)
+                        idt(n,i)=idt(k,i)
+                        idt(k,i)=id
                     End Do
                     Do ilev=1,Nlv
                         t=ArrB(n,ilev)
@@ -545,6 +591,9 @@ Contains
         
         id=3
         idif=id
+
+        If (.not. allocated(iocc)) Allocate(iocc(Ns))
+        If (.not. allocated(jocc)) Allocate(jocc(Ns))
         iocc(1:Ns)=0
         jocc(1:Ns)=0
         do nii=ni_conf(iconf),nf_conf(iconf)
