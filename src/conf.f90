@@ -150,9 +150,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.7 with single precision")'
+            strfmt = '(4X,"Program conf v5.8 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.7")'
+            strfmt = '(4X,"Program conf v5.8")'
         End Select
         
         Write( 6,strfmt)
@@ -246,14 +246,14 @@ Contains
 
     Subroutine Init
         Implicit None
-        Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, if, &
+        Integer  :: ic, n, j, imax, ni, ni2, kkj, llj, nnj, i, nj, nr, if, &
                     ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
-        Integer, Dimension(33)  ::  nnn ,jjj ,nqq 
+        Integer, Dimension(33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
         Character(Len=1), Dimension(9) :: Let 
-        Character(Len=1), Dimension(33):: lll
+        Character(Len=1), Dimension(33):: lll, lll1, lll2
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
@@ -288,6 +288,7 @@ Contains
         End If
 
         Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
+        Allocate(Nrnrc(Nc))
         Ns = pq(2)+c1
         ii = pq(3)+c1
         Rnuc=pq(13)
@@ -410,9 +411,12 @@ Contains
         ! Print list of relativistic configurations in format:
         ! nl(j) q; note that h (11/2) is currently printed as h (*/2) 
         ! and will result in conversion errors when debugging
+        Nnr=1
+        nr=0
         Do ic=1,Nc
             n1=Nc0(ic)+1
             n2=Nc0(ic)+Nvc(ic)
+            nr=nr+1
             Do i=n1,n2
                 i1=i-n1+1
                 ni=Nip(i)
@@ -429,11 +433,48 @@ Contains
                 End If
             End Do
             n=n2-n1+1
+
+            ! Convert relativistic configuration into non-relativistic configuration
+            ni=1
+            Do i=1,n
+                If (i > 1 .and. nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                    qqq1(ni-1) = qqq1(ni-1) + nqq(i)
+                Else
+                    nnn1(ni) = nnn(i)
+                    lll1(ni) = lll(i)
+                    qqq1(ni) = nqq(i)
+                    ni=ni+1
+                End If
+            End Do
+
+            If (ic > 1) Then
+                If (ni2 /= ni) Then
+                    Nnr=Nnr+1
+                Else
+                    Do i=1,ni
+                        If (nnn2(i) == nnn1(i) .and. lll2(i) == lll1(i) .and. qqq2(i) == qqq1(i)) Then
+                            Continue
+                        Else
+                            Nnr=Nnr+1
+                        End If
+                    End Do
+                End If
+            End If
+            Nrnrc(Nnr) = nr
+            ni2=ni
+            nnn2=nnn1
+            lll2=lll1
+            qqq2=qqq1
+            
             strfmt = '(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
                              /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
                              /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
                              /8X,6(I2,A1,"(",I1,"/2)",I2,";"))'
             Write(11,strfmt) ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
+        End Do
+
+        Do i=Nnr,2,-1
+            Nrnrc(i)=Nrnrc(i)-Nrnrc(i-1)
         End Do
 
         Write(11,'(1X,71("="))')

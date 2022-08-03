@@ -47,27 +47,21 @@ Module conf_init
     Subroutine ReadConfigurations
         ! This subroutine Reads configurations from CONF.INP
         Implicit None
-        Integer  :: i, i1, i2, ic, ne0, nx, ny, nz, nr, cnt
+        Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
         ! - - - - - - - - - - - - - - - - - - - - - -
         Allocate(Qnl(100000000)) ! upper bound = 100 million rel. conf-s = 0.8 GB
-        Allocate(Nrnrc(Nc))
+        
         If (Nso /= 0) Then 
             Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
         End If
         ! Reading in configurations - - - - - - 
         i1=Nso+1
-        nr=0
         Do ic=1,Nc
             ne0=0
             Do While (ne0 < Ne)
                 i2=i1+5
-                Read (10,'(I4,F7.4,5(4X,F7.4))') nr, Qnl(i1), (Qnl(i),i=i1+1,i2)
-                If (nr /= 0 .and. Qnl(i1) == 0) Then
-                    Nnr = nr
-                    If (Nnr > 1) Nrnrc(Nnr-1) = cnt
-                    cnt = 0
-                End If
+                Read (10,'(6(4X,F7.4))') (Qnl(i),i=i1,i2)
                 Do i=i1,i2
                    x=abs(Qnl(i))+1.d-9
                    If (x < 1.d-8) Exit
@@ -79,13 +73,11 @@ Module conf_init
                 i2=i-1
                 i1=i2+1
             End Do
-            cnt = cnt + 1
             If (ne0 > Ne) Then
                 Write(6,'(" INPUT: too many electrons for ic =",I6)') ic
                 Stop
             End If
         End Do
-        Nrnrc(Nnr) = cnt
         Nsp=i2
         Close(unit=10)
         Return

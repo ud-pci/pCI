@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.6] - 2022-08-03
+- conf v5.8 - fix for weight subroutines when missing lines and counters for non-rel configs in CONF.INP
+- conf_init.f90 - removed counting of configurations (Nrnrc) and moved to subroutine Init
+- conf.f90 - new code to count number of non-relativistic configurations
+
 ## [0.11.5] - 2022-07-29
 - ine v1.18 - bug fix for integer overflow in Mxmpy
 - ine.f90 - changed type for variable i8 to kind int64
