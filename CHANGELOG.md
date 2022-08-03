@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.4] - 2022-08-03
+- conf v6.4 - implemented allocations and broadcasts for future MPI version of formh_sym
+- conf.f90 - moved InitFormH, calcNd0, and calcMemReqs calls to main conf program
+- csf.f90 - added memory addition for memFormH in formh_sym subroutine
+
 ## [0.12.3] - 2022-08-02
 - conf v6.3 - implementation of formh_sym subroutine
 - conf.f90 - implemented serial version of DiagInitApprox

@@ -45,7 +45,7 @@ Program conf
     Use conf_variables
     Use mpi_f08
     Use csf, Only : jbasis, nonequiv_conf, formh_sym
-    use determinants, only : Wdet, Dinit, Det_Number, Det_List, Jterm, Rdet
+    use determinants, only : Wdet, calcNd0, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -53,7 +53,7 @@ Program conf
     Implicit None
     External :: BLACS_PINFO
     Integer   :: n, i, ierr, mype, npes, mpierr
-    Integer :: ncsf, nccj, max_ndcs
+    Integer :: ncsf, nccj, max_ndcs, nbas
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
@@ -104,6 +104,9 @@ Program conf
 
     ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype)
+    Call InitFormH 
+    Call calcNd0(Nc1, Nd0)
+    If (mype == 0) Call calcMemReqs
 
     If (kCSF > 0) Then
         ! Formation of symmetrized Hamiltonian matrix
@@ -117,10 +120,10 @@ Program conf
         ! Formation of J^2 matrix
         Call FormJ(mype, npes)   
 
-        ! Deallocate arrays that are no longer used in FormH
-        Call DeAllocateFormHArrays(mype)
-
     End If
+
+    ! Deallocate arrays that are no longer used in FormH
+    Call DeAllocateFormHArrays(mype)
     
     ! Allocate arrays that are used in Davidson procedure
     Call AllocateDvdsnArrays(mype)
@@ -164,9 +167,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v6.3 with single precision")'
+            strfmt = '(4X,"Program conf v6.4 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v6.3")'
+            strfmt = '(4X,"Program conf v6.4")'
         End Select
         
         Write( 6,strfmt)
@@ -682,6 +685,8 @@ Contains
         Integer :: mpierr, mype
 
         vaBinSize = 10000000
+        Call MPI_Bcast(kCSF, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(ncsf, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -696,6 +701,30 @@ Contains
         Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        If (kCSF > 0) Then
+            nbas = Nd
+            Nd = ncsf
+
+            Call MPI_Bcast(nconf, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+            If (.not. Allocated(ni_conf)) Allocate(ni_conf(nconf))
+            If (.not. Allocated(nf_conf)) Allocate(nf_conf(nconf))
+            If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
+            If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
+            If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
+            If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
+            If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
+
+            Call MPI_Bcast(ni_conf, nconf, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(nf_conf, nconf, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(iplace_cj, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(mdcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ndcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ndc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End If
+
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -900,12 +929,9 @@ Contains
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         Call startTimer(stot)
-        Call InitFormH 
-        Call calcNd0(Nc1, Nd0)
 
         If (mype == 0) Then
             If (Ksig == 2) Write(*,*) 'Screening is included'
-            Call calcMemReqs
         End If
 
         ! Read number of processors
@@ -1341,7 +1367,7 @@ Contains
         If (Allocated(I_is)) Deallocate(I_is)
         If (Allocated(IntOrd)) Deallocate(IntOrd)
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
-        If (Allocated(idt)) Deallocate(idt)
+        If (kLSJ == 0 .and. Allocated(idt)) Deallocate(idt)
         If (Allocated(Scr)) Deallocate(Scr)
 
     End Subroutine DeAllocateFormHArrays
@@ -1352,7 +1378,7 @@ Contains
         Implicit None
         Integer :: mpierr, mype
         Character(Len=16) :: memStr, memTotStr
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))

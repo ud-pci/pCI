@@ -277,8 +277,6 @@ Contains
         If (.not. allocated(idet1)) allocate(idet1(Ne))
         If (.not. allocated(idet2)) allocate(idet2(Ne))
 
-        Call calcNd0(Nc1, Nd0)
-
         vaGrowBy = 10000000
         Call IVAccumulatorInit(iva1, vaGrowBy)
         Call IVAccumulatorInit(iva2, vaGrowBy)
@@ -371,6 +369,8 @@ Contains
         Call IVAccumulatorReset(iva1)
         Call IVAccumulatorReset(iva2)
         Call RVAccumulatorReset(rva1)
+
+        memEstimate = memEstimate + NumH*16
 
         write(*,*) 'NumH=',NumH
         write(*,*) 'numzer=',numzero
