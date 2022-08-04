@@ -456,6 +456,7 @@ Contains
                             Continue
                         Else
                             Nnr=Nnr+1
+                            Exit
                         End If
                     End Do
                 End If
