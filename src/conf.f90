@@ -171,6 +171,7 @@ Contains
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
         Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
+        Close(99)
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
@@ -182,13 +183,11 @@ Contains
         ! Kw=0 - CONF.HIJ will not be written
         ! Kw=1 - CONF.HIJ will be written
         Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
-        Close(99)
 
         ! kLSJ determines whether CONF.HIJ will be written or not
         ! kLSJ=0 - LSJ will not be written in CONFFINAL.RES
         ! kLSJ=1 - LSJ will be written CONFFINAL.RES
         Write( 6,'(/4X,"kLSJ = (0-do not calculate LSJ, 1-calculate LSJ) ",I1)') kLSJ
-        Close(99)
 
         ! If starting new computation with MBPT
         ! Ksig = 0 - no MBPT included (same as Kl = 0)
@@ -437,8 +436,10 @@ Contains
             ! Convert relativistic configuration into non-relativistic configuration
             ni=1
             Do i=1,n
-                If (i > 1 .and. nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
-                    qqq1(ni-1) = qqq1(ni-1) + nqq(i)
+                If (i > 1) Then
+                    If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                        qqq1(ni-1) = qqq1(ni-1) + nqq(i)
+                    End If
                 Else
                     nnn1(ni) = nnn(i)
                     lll1(ni) = lll(i)
