@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - davidson.f90 - re-imported previously removed Hould subroutine
 - csf.f90 - new module containing functions used for new CSF functionalities
 
+## [0.11.7] - 2022-08-05
+- basc v2.2 - addition of Andrey's code for core Breit contributions
+- basc.f90 - added import of breit_int subroutine in subroutine Core
+- basc.f90 - new variable Ebcore for Breit contribution to core energy and its calculation
+- basc.f90 - core energy output now includes Breit 
+- basc.f90 - changed formatting for Rint2Table
+
 ## [0.11.6] - 2022-08-03
 - conf v5.8 - fix for weight subroutines when missing lines and counters for non-rel configs in CONF.INP
 - conf_init.f90 - removed counting of configurations (Nrnrc) and moved to subroutine Init

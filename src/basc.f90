@@ -94,7 +94,7 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.1")'
+        strfmt = '(4X,"PROGRAM BasC v2.2")'
         Write( *,strfmt)
         Write(11,strfmt)
 
@@ -363,11 +363,14 @@ Contains
         Use readfff
         Use sintg
         Use test_ori
+        Use breit, Only : breit_int
+
         Implicit None
 
         Integer :: ih, i, nigd, irr, ni, na, la, ja, ir, ir1, ir2, ir3, ir4, igm, m, m1, im
         Integer :: ik, nj, k, nb, lb, jb, k1, ip, kmin, kmax
         Real(dp) :: hh, Hcore, err1, err2, qa, t, r1, gm, dgm, cpp, cqq, qb, s, d, xk, xja, xjb, ds, yy
+        Real(dp) :: hgc, dsb, Ebcore 
         Real(dp), Dimension(IP6) :: A, B, CP, CQ, Y
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
@@ -375,6 +378,7 @@ Contains
         Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
         Ecore=0.d0
         Hcore=0.d0
+        Ebcore=0.d0
         ih=2-kt
         hh=h0*ih/3.d0
         C=0.d0
@@ -481,6 +485,20 @@ Contains
                 kmax=(ja+jb)/2+1
                 Do k1=kmin,kmax
                     k=k1-1
+                    ! Breit energy of the core
+                    If (Kbrt > 0) Then
+                        If (nj <= ni .and. ni <= Nso) Then
+                            xja=ja/2.d0
+                            xjb=jb/2.d0
+                            xk=k
+                            hgc=(FJ3(xk,xja,xjb,0.d0,-0.5d0,0.5d0))**2
+                            dsb=breit_int(k,ni,p,q,nj,a,b,nj,a,b,ni,p,q)
+                            
+                            d=-qa*qb*hgc
+                            If (ni == nj) d=-0.5d0*qa*(qa-1.d0)*(ja+1.d0)/ja*hgc 
+                            Ebcore=Ebcore+d*dsb 
+                        End If
+                    End If
                     ip=la+lb+k
                     If (ip == 2*(ip/2)) Then
                         Do i=1,ii,ih
@@ -527,15 +545,18 @@ Contains
             ! test of expansion at the origin
             Call WriteF(12,ni+4+Ns,CP,CQ,2)
         End Do
+        Ecore = Ecore+Ebcore
 
         Call ReadF (12,1,P,Q,2)
         P(18)=Ecore
         P(19)=Hcore
         Call WriteF(12,1,P,Q,2)
 
-        strfmt='(/4X,"one-el. and total core energy:",F17.7,4X,F17.7)'
-        Write( *,strfmt) Hcore,Ecore
-        Write(11,strfmt) Hcore,Ecore
+        strfmt='(/4X,"one-el. and total core energy:",F17.7,4X,F17.7, &
+              /6X "including Breit core energy:",F17.7)'
+        ! strfmt='(/4X,"one-el., Coulomb & Breit core energy:",F17.7,2(4X,F17.7))'
+        Write( *,strfmt) Hcore,Ecore,Ebcore
+        Write(11,strfmt) Hcore,Ecore,Ebcore
 
         If(irr > 0) Then
             strfmt='(4X,"Only",I4," first orbitals are good at the origin", &
@@ -816,6 +837,7 @@ Contains
         kt1=kt
         fis=0.d0                   !## rad. int. for Volume shift (VS)
         num_is=0                   !## number of IS integrals (VS or SMS)
+        tad_br=0.d0
 
         ! parameter for indexation of integrals:
         nx = IPx
@@ -891,7 +913,7 @@ Contains
                         If (Kbrt >= 1) tad_br=Br_core(na,nd)         !### Core Breit
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
-                        Write(11,'(I6,8X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",3F15.8)') &
+                        Write(11,'(I6,8X,I3,A1,I2,"/2",2X,I3,A1,I2,"/2",3F15.8)') &
                             nhint,nna,let(lla),jja,nnd,let(lld),jjd,tad,tad_br,fis
                         Rint1(nhint)=tad+tad_br
                         Iint1(nhint)=nad
@@ -1125,13 +1147,15 @@ Contains
         Integer, Intent(In) :: idel
 
         Integer :: ngint, n1, n2, n3, n4, na, nb, nc, nd, i, iis, la, lb, lc, ld, ja, jb, jc, jd
-        Integer :: l_br, k, k1, kmin, kmax, nna, nnb, nnc, nnd, n0
+        Integer :: k, k1, kmin, kmax, nna, nnb, nnc, nnd, n0
+        Logical*1  ::  l_br
         Character(Len=256) :: strfmt
         Character(Len=1) :: let(9)
         data let/'s','p','d','f','g','h','i','k','l'/
 
         ngint=0
         n0=Nso+1
+        l_br=Kbrt /= 0 .and. IPbr == 2
 
         Do n1=n0,Nsx2
             If (Ll(n1) > lsx) Cycle
@@ -1172,8 +1196,8 @@ Contains
                                     i=k+la+lc
                                     If (i /= 2*(i/2) .and. .not.l_br) Cycle
                                     ngint=ngint+1
-                                    strfmt = '(1X,I8,1X,I2,2X,I3,A1,1X,I1,"/2",1X,I3,A1,1X,I1, &
-                                            "/2",1X,I3,A1,1X,I1,"/2",1X,I3,A1,1X,I1,"/2",2F13.7)'
+                                    strfmt = '(1X,I8,1X,I2,2X,I3,A1,I2,"/2",1X,I3,A1,I2, &
+                                            "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
                                         write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
                                                         nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)

@@ -185,14 +185,15 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ, kCSF
-        Close(99)
+        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
+        
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
             Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
             If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
+        Close(99)
 
         ! Kw determines whether CONF.HIJ will be written or not
         ! Kw=0 - CONF.HIJ will not be written
@@ -456,13 +457,15 @@ Contains
             ! Convert relativistic configuration into non-relativistic configuration
             ni=1
             Do i=1,n
-                If (i > 1 .and. nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
-                    qqq1(ni-1) = qqq1(ni-1) + nqq(i)
-                Else
-                    nnn1(ni) = nnn(i)
-                    lll1(ni) = lll(i)
-                    qqq1(ni) = nqq(i)
-                    ni=ni+1
+                If (i > 1) Then
+                    If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                        qqq1(ni-1) = qqq1(ni-1) + nqq(i)
+                    Else
+                        nnn1(ni) = nnn(i)
+                        lll1(ni) = lll(i)
+                        qqq1(ni) = nqq(i)
+                        ni=ni+1
+                    End If
                 End If
             End Do
 
