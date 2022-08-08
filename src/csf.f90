@@ -254,11 +254,13 @@ Contains
         write(11,strfmt) nconf_neq
     End Subroutine nonequiv_conf
 
-    Subroutine formh_sym(nconf,ncsf,nccj,max_ndcs)
+    Subroutine formh_sym(nconf,ncsf,nccj,max_ndcs,mype,npes)
+        Use mpi_f08
         Use vaccumulator
         Use determinants, Only : calcNd0
         Implicit None
 
+        Integer :: mype, npes, mpierr
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
         Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
@@ -283,9 +285,9 @@ Contains
         Call RVAccumulatorInit(rva1, vaGrowBy)
 
         ! Reading the list of the symmetrized coefficients
-        call read_ccj(ccj)
+        If (mype == 0) call read_ccj(ccj)
+        Call MPI_Bcast(ccj, nccj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        close(unit=16)
         NumH=0
         Kherr=0
         Kgerr=0
@@ -295,7 +297,7 @@ Contains
         if (Ksig.EQ.2) then
            iscr=0
            xscr=0
-           write(*,*) 'Screening is included'
+           If (mype == 0) write(*,*) 'Screening is included'
         end if
 
         ! calculation of the matrix elements
@@ -327,14 +329,14 @@ Contains
                         if (dabs(hij).lt.1.d-20) cycle
                         jd=k-k1+1
                         do jc=1,ncj
-                          jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-                          buf(jc)=buf(jc)+hij*ccj(jccj)
+                            jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
+                            buf(jc)=buf(jc)+hij*ccj(jccj)
                         end do
                     end do
                     do ic=1,nci
                         iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
                         do jc=1,ncj
-                          zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                            zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
                         end do
                     end do
                 end do
@@ -597,18 +599,20 @@ Contains
         iocc(1:Ns)=0
         jocc(1:Ns)=0
         do nii=ni_conf(iconf),nf_conf(iconf)
+            if (nii == 0 .or. nii > Nsp) cycle
             ni=nip(nii)
             nqi=nq(nii)
             iocc(ni)=nqi
         enddo
         do njj=ni_conf(jconf),nf_conf(jconf)
+            if (njj == 0 .or. njj > Nsp) cycle
             nj=nip(njj)
             nqj=nq(njj)
             jocc(nj)=nqj
         end do
         i1=0
         i2=0
-        do ni=1,ns
+        do ni=1,Ns
           i=iocc(ni)-jocc(ni)
           if (i.gt.0) i1=i1+i
           if (i.lt.0) i2=i2-i

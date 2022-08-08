@@ -110,9 +110,7 @@ Program conf
 
     If (kCSF > 0) Then
         ! Formation of symmetrized Hamiltonian matrix
-        If (mype == 0) Then
-            Call formh_sym(Nc,ncsf,nccj,max_ndcs)
-        End If
+        Call formh_sym(Nc,ncsf,nccj,max_ndcs,mype,npes)
     Else
         ! Formation of Hamiltonian matrix
         Call FormH(npes,mype)
@@ -477,6 +475,7 @@ Contains
                             Continue
                         Else
                             Nnr=Nnr+1
+                            Exit
                         End If
                     End Do
                 End If
@@ -733,6 +732,8 @@ Contains
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nsp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IPlv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -743,27 +744,35 @@ Contains
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
+        nbas = Nd
         If (kCSF > 0) Then
-            nbas = Nd
             Nd = ncsf
 
-            Call MPI_Bcast(nconf, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(nccj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(max_ndcs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
-            If (.not. Allocated(ni_conf)) Allocate(ni_conf(nconf))
-            If (.not. Allocated(nf_conf)) Allocate(nf_conf(nconf))
+            If (.not. Allocated(ni_conf)) Allocate(ni_conf(Nc))
+            If (.not. Allocated(nf_conf)) Allocate(nf_conf(Nc))
             If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
             If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
             If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
             If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
             If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
+            If (.not. allocated(Nip)) Allocate(Nip(Nsp))
+            If (.not. allocated(Nq)) Allocate(Nq(Nsp))
+            If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
 
-            Call MPI_Bcast(ni_conf, nconf, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(nf_conf, nconf, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(ni_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(nf_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(iplace_cj, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(mdcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(ndcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(ndc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Nip, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Nq, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
 
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
@@ -771,7 +780,7 @@ Contains
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. Allocated(Jz)) Allocate(Jz(Nst))
         If (.not. Allocated(Nh)) Allocate(Nh(Nst))
-        If (.not. Allocated(Diag)) Allocate(Diag(Nd))
+        If (.not. Allocated(Diag)) Allocate(Diag(nbas))
         If (.not. Allocated(In)) Allocate(In(Ngaunt))
         If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
@@ -780,7 +789,7 @@ Contains
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
-        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
+        If (.not. Allocated(idt)) Allocate(idt(nbas,Ne))
 
         If (Ksig /= 0) Then
             If (.not. Allocated(Scr)) Allocate(Scr(10))
@@ -923,8 +932,8 @@ Contains
         Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-        count = Ne*Int(Nd,kind=int64)
+        Call MPI_Bcast(Diag, nbas, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
+        count = Ne*Int(nbas,kind=int64)
         Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)

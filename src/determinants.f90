@@ -380,15 +380,20 @@ Module determinants
         ! This subroutine writes the basis set of determinants to the file 'str'.
         !
         Implicit None
-        Integer  :: i
+        Integer  :: i, n
+        Integer, Allocatable, Dimension(:) :: idet
         Character(Len=*) :: str
+
+        If (.not. Allocated(idet)) Allocate(idet(Ne))
 
         Open (16,file=str,status='UNKNOWN',form='UNFORMATTED')
         Write(16) Nd,Nsu
-        Do i=1,Nd
-           write(16) idt(i,1:Ne)
+        Do n=1,Nd
+            idet(1:Ne) = idt(n,1:Ne)
+            write(16) (idet(i),i=1,Ne)
         End Do
         close(16)
+        If (Allocated(idet)) Deallocate(idet)
         Return
     End Subroutine Wdet
 
