@@ -446,6 +446,11 @@ Contains
                         qqq1(ni) = nqq(i)
                         ni=ni+1
                     End If
+                Else
+                    nnn1(ni) = nnn(i)
+                    lll1(ni) = lll(i)
+                    qqq1(ni) = nqq(i)
+                    ni=ni+1
                 End If
             End Do
 
