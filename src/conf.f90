@@ -251,9 +251,9 @@ Contains
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
-        Integer, Dimension(33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
+        Integer, Dimension(0:33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
         Character(Len=1), Dimension(9) :: Let 
-        Character(Len=1), Dimension(33):: lll, lll1, lll2
+        Character(Len=1), Dimension(0:33):: lll, lll1, lll2
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
@@ -437,15 +437,8 @@ Contains
             ! Convert relativistic configuration into non-relativistic configuration
             ni=1
             Do i=1,n
-                If (i > 1) Then
-                    If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
-                        qqq1(ni-1) = qqq1(ni-1) + nqq(i)
-                    Else
-                        nnn1(ni) = nnn(i)
-                        lll1(ni) = lll(i)
-                        qqq1(ni) = nqq(i)
-                        ni=ni+1
-                    End If
+                If (nnn(i) == nnn(i-1) .and. lll(i) == lll(i-1)) Then
+                    qqq1(ni-1) = qqq1(ni-1) + nqq(i)
                 Else
                     nnn1(ni) = nnn(i)
                     lll1(ni) = lll(i)
@@ -1730,6 +1723,7 @@ Contains
                                 Call FormB
                                 Call PrintEnergiesDvdsn(it)
                                 Call PrintWeightsDvdsn(it)
+                                print*, 'CONF.LVL updated'
                             End If
                         Else
                             If (mype == 0) Call FormBskip
@@ -1877,13 +1871,13 @@ Contains
         Real(dp) :: wsum
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
-        Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
+        Real(dp), Allocatable, Dimension(:,:)  :: Weights, W2, Wsave
         Character(Len=512) :: strfmt, strconfig, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq
-        Integer, Dimension(33)  ::  nnn, nqq 
+        Integer, Dimension(0:33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
-        Character(Len=1), Dimension(33):: lll
+        Character(Len=1), Dimension(0:33):: lll
         Type WeightTable
             Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
             Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
@@ -1893,7 +1887,12 @@ Contains
         Data Let/'s','p','d','f','g','h','i','k','l'/
         nconfs = 20
         strsp = ''
-        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
+        If (.not. Allocated(C)) Allocate(C(Nd))
+        If (.not. Allocated(Weights)) Allocate(Weights(Nc,Nlv))
+        If (.not. Allocated(W2)) ALlocate(W2(Nnr, Nlv))
+        If (.not. Allocated(Wsave)) Allocate(Wsave(nconfs,Nlv))
+        If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
+        If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
 
         If (iter <= kXIJ) Then
             Open(unit=98,status='REPLACE',file='CONF.LVL',action='WRITE')
@@ -1909,6 +1908,7 @@ Contains
         Write(98,strfmt)
 
         ! Form matrix of weights of each configuration for each energy level
+        Weights=0_dp
         W2=0_dp
         nspacesg = 0
         Wsave = 0_dp
@@ -1916,11 +1916,11 @@ Contains
             C(1:Nd)=ArrB(1:Nd,j)
             i=0
             Do ic=1,Nc
-                W(ic,j)=0.d0
+                Weights(ic,j)=0.d0
                 ndk=Ndc(ic)
                 Do k=1,ndk
                     i=i+1
-                    W(ic,j)=W(ic,j)+C(i)**2
+                    Weights(ic,j)=Weights(ic,j)+C(i)**2
                 End Do
             End Do
             k=0
@@ -1929,7 +1929,7 @@ Contains
             Do ic=1,Nnr
                 Do i=1,Nrnrc(ic)
                     k=k+1
-                    W2(ic,j) = W2(ic,j) + W(k,j)
+                    W2(ic,j) = W2(ic,j) + Weights(k,j)
                 End Do
             End Do
 
@@ -1986,11 +1986,18 @@ Contains
         End Do
 
         ! Write LEVELS.RES
-        Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
-        Allocate(wgtconfs%strconfsave(nconfs*5), wgtconfs%nconfsave(nconfs*5), wgtconfs%wgt(nconfs*5), wgtconfs%wgtsave(nconfs*5))
+        If (.not. Allocated(wgtconfs%strconfs)) Allocate(wgtconfs%strconfs(Nc))
+        If (.not. Allocated(wgtconfs%nconfs)) Allocate(wgtconfs%nconfs(Nc))
+        If (.not. Allocated(wgtconfs%strconfsave)) Allocate(wgtconfs%strconfsave(Nc))
+        If (.not. Allocated(wgtconfs%nconfsave)) Allocate(wgtconfs%nconfsave(Nc))
+        If (.not. Allocated(wgtconfs%wgt)) Allocate(wgtconfs%wgt(Nc))
+        If (.not. Allocated(wgtconfs%wgtsave)) Allocate(wgtconfs%wgtsave(Nc))
         wgtconfs%strconfs = ''
+        wgtconfs%strconfsave = ''
         wgtconfs%nconfs = 0
+        wgtconfs%nconfsave = 0
         wgtconfs%wgt = 0_dp
+        wgtconfs%wgtsave = 0_dp
         k=1
         Do j=1,Nlv
             Write(98,'(A)') '****************************************************'
@@ -2052,10 +2059,19 @@ Contains
         Write(98,'(A)')    ' ===================================================='
         Close(98)
 
-        Deallocate(C, W, W2, Wsave, Wpsave, strcsave)
+        Deallocate(C, Weights, W2, Wsave, Wpsave, strcsave)
+        print*, 'wgtconfs%strconfs, wgtconfs%nconfs', sizeof(wgtconfs%strconfs), sizeof(wgtconfs%nconfs)
         Deallocate(wgtconfs%strconfs, wgtconfs%nconfs)
-        Deallocate(wgtconfs%strconfsave, wgtconfs%nconfsave, wgtconfs%wgt, wgtconfs%wgtsave)
-        
+        print*, 'wgtconfs%strconfsave', sizeof(wgtconfs%strconfsave)
+        Deallocate(wgtconfs%strconfsave)
+        print*, 'wgtconfs%nconfsave', sizeof(wgtconfs%nconfsave)
+        Deallocate(wgtconfs%nconfsave)
+        print*, 'wgtconfs%wgt', sizeof(wgtconfs%wgt)
+        !Deallocate(wgtconfs%wgt)
+        print*, 'wgtconfs%wgtsave', sizeof(wgtconfs%wgtsave)
+        !Deallocate(wgtconfs%wgtsave)
+        print*,'Weights printed to CONF.LVL'
+        Return
     End Subroutine PrintWeightsDvdsn
 
     Subroutine WriteFinalXIJ(mype)
@@ -2761,7 +2777,12 @@ Contains
 
         nconfs = 20
         strsp = ''
-        Allocate(C(Nd), W(Nc,Nlv), W2(Nnr, Nlv), Wsave(nconfs,Nlv), Wpsave(nconfs,Nlv), strcsave(nconfs,Nlv))
+        If (.not. Allocated(C)) Allocate(C(Nd))
+        If (.not. Allocated(W)) Allocate(W(Nc,Nlv))
+        If (.not. Allocated(W2)) ALlocate(W2(Nnr, Nlv))
+        If (.not. Allocated(Wsave)) Allocate(Wsave(nconfs,Nlv))
+        If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
+        If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
 
         If (kWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
@@ -2934,8 +2955,12 @@ Contains
         End Do
 
         ! Write LEVELS.RES
-        Allocate(wgtconfs%strconfs(nconfs*5), wgtconfs%nconfs(nconfs*5))
-        Allocate(wgtconfs%strconfsave(nconfs*5), wgtconfs%nconfsave(nconfs*5), wgtconfs%wgt(nconfs*5), wgtconfs%wgtsave(nconfs*5))
+        If (.not. Allocated(wgtconfs%strconfs)) Allocate(wgtconfs%strconfs(Nc))
+        If (.not. Allocated(wgtconfs%nconfs)) Allocate(wgtconfs%nconfs(Nc))
+        If (.not. Allocated(wgtconfs%strconfsave)) Allocate(wgtconfs%strconfsave(Nc))
+        If (.not. Allocated(wgtconfs%nconfsave)) Allocate(wgtconfs%nconfsave(Nc))
+        If (.not. Allocated(wgtconfs%wgt)) Allocate(wgtconfs%wgt(Nc))
+        If (.not. Allocated(wgtconfs%wgtsave)) Allocate(wgtconfs%wgtsave(Nc))
         wgtconfs%strconfs = ''
         wgtconfs%nconfs = 0
         wgtconfs%wgt = 0_dp
