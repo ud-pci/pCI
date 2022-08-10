@@ -129,7 +129,7 @@ Module davidson
         ! Write eigenvalues and eigenvectors of initial approximation to CONF.XIJ
         If (mype == 0) Then
             Do j=1,Nlv
-                strfmt = '(1X,"E(",I2,") =",F12.6," Jtot =",F10.6)'
+                strfmt = '(1X,"E(",I3,") =",F12.6," Jtot =",F10.6)'
                 Write( 6,strfmt) j,E(j),Tj(j)
                 Write(11,strfmt) j,E(j),Tj(j)
                 If (kXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
@@ -345,8 +345,8 @@ Module davidson
                 char='converged'
             End If
         End If
-        Write ( 6,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
-        Write (11,'(4X,"|| C(",I2,") || = ",F10.7,2X,A9)') j,cnorm,char
+        Write ( 6,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
+        Write (11,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
         If (cnorm > cnx) cnx=Real(cnorm,kind=dp)
         If (Iconverge(j)==1) Then
             B1(1:Nd)=0_type_real
