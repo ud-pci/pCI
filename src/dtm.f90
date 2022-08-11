@@ -1235,6 +1235,7 @@ Contains
               Call MPI_Reduce(Ro(1:IP1,1:IP1), Ro(1:IP1,1:IP1), IP1*IP1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
             End If
+            Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             If (mype==0) Then
                 s=0.d0
