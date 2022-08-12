@@ -1398,6 +1398,9 @@ Contains
                         Read(97,'(A)') strc1(i)
                         Read(97,'(A)') strt1(i)
                         i=i+1
+                    Else
+                        Read(97,'(A)')
+                        Read(97,'(A)')    
                     End If
                 End Do
                 i=1
@@ -1406,6 +1409,9 @@ Contains
                         Read(98,'(A)') strc2(i)
                         Read(98,'(A)') strt2(i)
                         i=i+1
+                    Else
+                        Read(98,'(A)')
+                        Read(98,'(A)')    
                     End If
                 End Do
                 existStr = .true.
