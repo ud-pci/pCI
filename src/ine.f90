@@ -343,7 +343,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.18",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.19",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1800,7 +1800,7 @@ Contains
           is=1-2*mod(is,2)
 !MK          f1=-is*1.5d0*dsqrt(3.d0)*(2*Tj0+1)
           If (W0.NE.0.d0) Then
-            f1=-is*1.5d0*dsqrt(6*Tj0*(2*Tj0+1)/(Tj0+1)) &
+            f1=is*1.5d0*dsqrt(6*Tj0*(2*Tj0+1)/(Tj0+1)) &
                *FJ6(Tj0,1.d0,tj, 1.d0,Tj0,1.d0)
           Else
             f1= 0.d0
@@ -1840,7 +1840,7 @@ Contains
           al  = (s(1)+s(2))/2.d0
           al0 = (s0(1)+s0(2))/2.d0
           al2 = (s2(1)+s2(2))/2.d0
-          al1 = (s1(1)-s1(2))/2.d0
+          al1 = (s1(1)-s1(2))
 
           strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
           write( 6,strfmt2)
