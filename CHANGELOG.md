@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.5] - 2022-08-10
+## [0.12.5] - 2022-08-22
 - conf v6.5 - implemented initial simple parallelized formh_sym subroutine as well code to change wave function from CSF back to set of determinants
 - conf.f90 - added block of code (including unsym, Det_List, reorder_det, Wdet, WriteXIJ) for CSF to change wave function from CSF back to set of determinants in main program
 - conf.f90 - added condition to use serial diagonalization if number of determinants is small to avoid errors with ScaLAPACK routines
