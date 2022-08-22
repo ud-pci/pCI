@@ -508,10 +508,10 @@ Contains
             lll2=lll1
             qqq2=qqq1
             
-            strfmt = '(1X,I6,"#",6(I2,A1,"(",I1,"/2)",I2,";"), &
-                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"), &
-                             /8X,6(I2,A1,"(",I1,"/2)",I2,";"))'
+            strfmt = '(1X,I6,"#",6(I2,A1,"(",I2,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I2,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I2,"/2)",I2,";"), &
+                             /8X,6(I2,A1,"(",I2,"/2)",I2,";"))'
             Write(11,strfmt) ic,(nnn(i),lll(i),jjj(i),nqq(i),i=1,n)
         End Do
 
@@ -1791,7 +1791,7 @@ Contains
                             End Do
                             If (ax < xx) ax=xx
                             If (vmax < E(i)) vmax=E(i)
-                            strfmt = '(1X,"E(",I2,") =",F14.8,"; admixture of vector ",I2,": ",F10.7)'
+                            strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
                             Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                             Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                         End Do
@@ -1948,7 +1948,7 @@ Contains
             Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
             DT=Tk(j)-Ecore
             DEL=(Tk(1)-Tk(j))*2*DPRy
-            Write(81,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+            Write(81,'(3X,I3,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
         End Do
 
         ! Print line of "=" for bottom of table
@@ -2210,6 +2210,7 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -2247,40 +2248,7 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kl4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kherr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kgerr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(K_prj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Mj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(NmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(LmaxS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kmax, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ksym, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nsum, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gj, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(C_is, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(XJ_av, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(K_sms, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kdsig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kexn, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Eps, IPs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh0, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -2288,13 +2256,6 @@ Contains
         Call MPI_Bcast(Kk, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        count = IPbr*Int(Ngint,kind=int64)
-        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3, Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -2817,8 +2778,8 @@ Contains
             Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
             DT=Tk(j)-Ecore
             DEL=(Tk(1)-Tk(j))*2*DPRy
-            Write( 6,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
-            Write(11,'(3X,I2,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+            Write( 6,'(3X,I3,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+            Write(11,'(3X,I3,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
         End Do
 
         ! Print line of "=" for bottom of table

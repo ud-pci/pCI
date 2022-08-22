@@ -1237,6 +1237,7 @@ Contains
               Call MPI_Reduce(Ro(1:IP1,1:IP1), Ro(1:IP1,1:IP1), IP1*IP1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
                                   MPI_COMM_WORLD, mpierr)
             End If
+            Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
             If (mype==0) Then
                 s=0.d0
@@ -1399,6 +1400,9 @@ Contains
                         Read(97,'(A)') strc1(i)
                         Read(97,'(A)') strt1(i)
                         i=i+1
+                    Else
+                        Read(97,'(A)')
+                        Read(97,'(A)')    
                     End If
                 End Do
                 i=1
@@ -1407,6 +1411,9 @@ Contains
                         Read(98,'(A)') strc2(i)
                         Read(98,'(A)') strt2(i)
                         i=i+1
+                    Else
+                        Read(98,'(A)')
+                        Read(98,'(A)')    
                     End If
                 End Do
                 existStr = .true.
@@ -1532,6 +1539,7 @@ Contains
                         ! End If
                     End Do
                     Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+                    Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
                 
                     ! A manual implementation of MPI_Reduce for Ro
@@ -1648,8 +1656,8 @@ Contains
         delEcm=(e2-e1)*219474.63_dp
         Write( 6,5) n1,e1,n2,e2,tj1,tm1,tj2,Tm2
         Write(11,5) n1,e1,n2,e2,tj1,tm1,tj2,Tm2
-5       format('====== E(',I2,') = ',F12.6, &
-               ' ---> E(',I2,') = ',F12.6,'=======', &
+5       format('====== E(',I3,') = ',F12.6, &
+               ' ---> E(',I3,') = ',F12.6,'=======', &
               /'  J1 = ',F6.3,' M1 = ',F6.3,' J2 = ', &
                F6.3,' M2 = ',F6.3)
         ! DIVISION OF THE INTERVAL [imin1,imax1] INTO SHELLS. FOR

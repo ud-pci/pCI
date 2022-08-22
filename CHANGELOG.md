@@ -74,6 +74,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - davidson.f90 - re-imported previously removed Hould subroutine
 - csf.f90 - new module containing functions used for new CSF functionalities
 
+## [0.11.9] - 2022-08-17
+- ine v1.19 - fixed numerical errors in calculating a_1 value
+
+## [0.11.8] - 2022-08-10
+- conf v5.9 - bug fix for error occuring in allocation of arrays for LSJ
+- conf.f90 - removed unnecessary allocations and broadcasts to arrays storing integrals in InitLSJ and AllocateLSJArrays
+- conf.f90 - removed devel comments from previous version of conf
+- conf.f90 - increased integer formatting of j for configurations to 2
+- conf.f90 - increased integer formatting for energy levels to 3
+- davidson.f90 - increased integer formatting for energy levels to 3
+
 ## [0.11.7] - 2022-08-05
 - basc v2.2 - addition of Andrey's code for core Breit contributions
 - basc.f90 - added import of breit_int subroutine in subroutine Core
