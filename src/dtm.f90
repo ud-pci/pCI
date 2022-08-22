@@ -43,7 +43,7 @@ Program dtm
         Call RintA          ! either reads or calculates radial integrals
         Call Dinit          ! 
         Call Det_Number     ! counts number of determinants
-        Call Det_List       ! generates list of determinants
+        Call Det_List(idt)  ! generates list of determinants
         Call Jterm          ! produces table of levels and generates basis set of determinants from CONF.INP
     End If
 

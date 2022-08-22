@@ -264,14 +264,17 @@ Contains
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
         Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
-        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Type(MPI_STATUS) :: status
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: vaGrowBy
+        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
         Character(Len=256) :: strfmt
+        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
+        Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         If (.not. allocated(ccj)) allocate(ccj(nccj))
         If (.not. allocated(zzc)) allocate(zzc(max_ndcs,max_ndcs))
@@ -279,7 +282,18 @@ Contains
         If (.not. allocated(idet1)) allocate(idet1(Ne))
         If (.not. allocated(idet2)) allocate(idet2(Ne))
 
-        vaGrowBy = 10000000
+        vaGrowBy = vaBinSize
+        ndGrowBy = 1
+
+        If (mype==0) Then
+            Write(counterStr,fmt='(I16)') vaGrowBy
+            Write(counterStr2,fmt='(I16)') ndGrowBy
+            Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
+            print*, '========== Starting calculation stage of FormH =========='
+        End If
+
+        cntarray=0
+        
         Call IVAccumulatorInit(iva1, vaGrowBy)
         Call IVAccumulatorInit(iva2, vaGrowBy)
         Call RVAccumulatorInit(rva1, vaGrowBy)
@@ -301,69 +315,135 @@ Contains
         end if
 
         ! calculation of the matrix elements
-        do iconf=1,nconf
-            iconf_neq=nc_neq(iconf)
-            nci=ndcs(iconf_neq)
-            if (nci.eq.0) cycle
-            ndi=ndc(iconf)
-            do jconf=1,iconf
-                jconf_neq=nc_neq(jconf)
-                ncj=ndcs(jconf_neq)
-                if (ncj.eq.0) cycle
-                ndj=ndc(jconf)
-                idf=idif(iconf,jconf)
-                if (idf.gt.2) cycle
-                zzc(1:nci,1:ncj)=0.d0
-                n1=mdc(iconf)+1
-                n2=n1+ndc(iconf)-1
-                do n=n1,n2
-                    id=n-n1+1
-                    idet1(1:Ne)=idt(n,1:Ne)
-                    k1=mdc(jconf)+1
-                    k2=k1+ndc(jconf)-1
-                    buf(1:ncj)=0.d0
-                    do k=k1,k2
-                        idet2(1:Ne)=idt(k,1:Ne)
-                        if (Kdsig.NE.0) E_k=Diag(k)
-                        call Hmatrix(idf,idet1,idet2,hij)
-                        if (dabs(hij).lt.1.d-20) cycle
-                        jd=k-k1+1
-                        do jc=1,ncj
-                            jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-                            buf(jc)=buf(jc)+hij*ccj(jccj)
+        If (npes == 1) Then
+            do iconf=1,nconf
+                iconf_neq=nc_neq(iconf)
+                nci=ndcs(iconf_neq)
+                if (nci.eq.0) cycle
+                ndi=ndc(iconf)
+                do jconf=1,iconf
+                    jconf_neq=nc_neq(jconf)
+                    ncj=ndcs(jconf_neq)
+                    if (ncj.eq.0) cycle
+                    ndj=ndc(jconf)
+                    idf=idif(iconf,jconf)
+                    if (idf.gt.2) cycle
+                    zzc(1:nci,1:ncj)=0.d0
+                    n1=mdc(iconf)+1
+                    n2=n1+ndc(iconf)-1
+                    do n=n1,n2
+                        id=n-n1+1
+                        idet1(1:Ne)=idt(n,1:Ne)
+                        k1=mdc(jconf)+1
+                        k2=k1+ndc(jconf)-1
+                        buf(1:ncj)=0.d0
+                        do k=k1,k2
+                            idet2(1:Ne)=idt(k,1:Ne)
+                            if (Kdsig.NE.0) E_k=Diag(k)
+                            call Hmatrix(idf,idet1,idet2,hij)
+                            if (dabs(hij).lt.1.d-20) cycle
+                            jd=k-k1+1
+                            do jc=1,ncj
+                                jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
+                                buf(jc)=buf(jc)+hij*ccj(jccj)
+                            end do
+                        end do
+                        do ic=1,nci
+                            iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
+                            do jc=1,ncj
+                                zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                            end do
                         end do
                     end do
                     do ic=1,nci
-                        iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-                        do jc=1,ncj
-                            zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                        jc2=ncj
+                        if (iconf.eq.jconf) jc2=ic
+                        do jc=1,jc2
+                            hij=zzc(ic,jc)
+                            n=ic+mdcs(iconf)
+                            k=jc+mdcs(jconf)
+                            if (hij.NE.0.d0) then
+                                ih8=ih8+1
+                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                Call IVAccumulatorAdd(iva1, n)
+                                Call IVAccumulatorAdd(iva2, k)
+                                Call RVAccumulatorAdd(rva1, hij)
+                                Hamil%minval = Hmin
+                            else
+                                numzero=numzero+1
+                            end if
                         end do
                     end do
                 end do
-                do ic=1,nci
-                    jc2=ncj
-                    if (iconf.eq.jconf) jc2=ic
-                    do jc=1,jc2
-                        hij=zzc(ic,jc)
-                        n=ic+mdcs(iconf)
-                        k=jc+mdcs(jconf)
-                        if (hij.NE.0.d0) then
-                            ih8=ih8+1
-                            if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-                            if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
-                            Call IVAccumulatorAdd(iva1, n)
-                            Call IVAccumulatorAdd(iva2, k)
-                            Call RVAccumulatorAdd(rva1, hij)
-                            Hamil%minval = Hmin
-                        else
-                            numzero=numzero+1
-                        end if
+            end do
+            NumH=ih8
+        Else
+            do iconf=mype+1,nconf,npes
+                iconf_neq=nc_neq(iconf)
+                nci=ndcs(iconf_neq)
+                if (nci.eq.0) cycle
+                ndi=ndc(iconf)
+                do jconf=1,iconf
+                    jconf_neq=nc_neq(jconf)
+                    ncj=ndcs(jconf_neq)
+                    if (ncj.eq.0) cycle
+                    ndj=ndc(jconf)
+                    idf=idif(iconf,jconf)
+                    if (idf.gt.2) cycle
+                    zzc(1:nci,1:ncj)=0.d0
+                    n1=mdc(iconf)+1
+                    n2=n1+ndc(iconf)-1
+                    do n=n1,n2
+                        id=n-n1+1
+                        idet1(1:Ne)=idt(n,1:Ne)
+                        k1=mdc(jconf)+1
+                        k2=k1+ndc(jconf)-1
+                        buf(1:ncj)=0.d0
+                        do k=k1,k2
+                            idet2(1:Ne)=idt(k,1:Ne)
+                            if (Kdsig.NE.0) E_k=Diag(k)
+                            call Hmatrix(idf,idet1,idet2,hij)
+                            if (dabs(hij).lt.1.d-20) cycle
+                            jd=k-k1+1
+                            do jc=1,ncj
+                                jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
+                                buf(jc)=buf(jc)+hij*ccj(jccj)
+                            end do
+                        end do
+                        do ic=1,nci
+                            iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
+                            do jc=1,ncj
+                                zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                            end do
+                        end do
+                    end do
+                    do ic=1,nci
+                        jc2=ncj
+                        if (iconf.eq.jconf) jc2=ic
+                        do jc=1,jc2
+                            hij=zzc(ic,jc)
+                            n=ic+mdcs(iconf)
+                            k=jc+mdcs(jconf)
+                            if (hij.NE.0.d0) then
+                                ih8=ih8+1
+                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                Call IVAccumulatorAdd(iva1, n)
+                                Call IVAccumulatorAdd(iva2, k)
+                                Call RVAccumulatorAdd(rva1, hij)
+                                Hamil%minval = Hmin
+                            else
+                                numzero=numzero+1
+                            end if
+                        end do
                     end do
                 end do
             end do
-        end do
+        End If
+        
+        Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
-        NumH=ih8
         Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
         Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
         Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
@@ -374,9 +454,14 @@ Contains
 
         memEstimate = memEstimate + NumH*16
 
-        write(*,*) 'NumH=',NumH
-        write(*,*) 'numzer=',numzero
-        write(*,*) 'Hmin=',Hamil%minval
+        Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
+
+        If (mype == 0) Then
+            write(*,*) 'NumH=',NumH
+            write(*,*) 'numzer=',numzero
+            write(*,*) 'Hmin=',Hamil%minval
+        End If
 
         deallocate(buf)
         deallocate(zzc)
@@ -481,7 +566,7 @@ Contains
         jmax=nlv
         if (jmax.gt.ncsf) jmax=ncsf
         do j=1,jmax
-            read (17) E1(j),Tj(j),idum,(ccs(i),i=1,ncsf)
+            read (17) Tk(j),Tj(j),idum,(ccs(i),i=1,ncsf)
             cc(1:Nd)=0.d0
             do iconf=1,nconf
                 iconf_neq=nc_neq(iconf)
@@ -491,12 +576,12 @@ Contains
                 n1=mdc(iconf)+1
                 n2=n1+ndi-1
                 do n=n1,n2
-                  id=n-n1+1
-                  do ic=1,nci
-                    k=ic+mdcs(iconf)
-                    iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-                    cc(n)=cc(n)+ccs(k)*ccj(iccj)
-                  end do
+                    id=n-n1+1
+                    do ic=1,nci
+                        k=ic+mdcs(iconf)
+                        iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
+                        cc(n)=cc(n)+ccs(k)*ccj(iccj)
+                    end do
                 end do
             end do
             ArrB(1:Nd,j)=cc(1:Nd)
@@ -510,18 +595,21 @@ Contains
 
     End Subroutine unsym
 
-    Subroutine reorder_det(nconf,idt_orig)
+    Subroutine reorder_det(nconf,idt,idt_orig)
         Implicit None
         Integer :: nconf
-        Integer, Allocatable, Dimension(:,:) :: idt_orig
+        Integer, Allocatable, Dimension(:,:) :: idt, idt_orig
         
         Integer :: iconf, ndi, n1, n2, n, i, k1, k2, k, nf, is, ia, ib, ic, id, ilev
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Real(dp) :: t
 
+        If (.not. Allocated(idet1)) Allocate(idet1(Ne))
+        If (.not. Allocated(idet2)) Allocate(idet2(Ne))
+
         Do iconf=1,nconf
             ndi=ndc(iconf)
-            If (ndi.eq.0) Cycle
+            If (ndi == 0) Cycle
             n1=mdc(iconf)+1
             n2=n1+ndc(iconf)-1
             Outer: Do n=n1,n2
@@ -535,13 +623,13 @@ Contains
                         idet2(i)=idt(k,i)
                     End Do
                     Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
-                    If (nf.ne.0) Cycle
-                    If (is.ne.1) Then
+                    If (nf /= 0) Cycle Inner
+                    If (is /= 1) Then
                         Write(*,*) '  Incorrect sign in subroutine reorder'
                         Write(*,*) '  Det number=',n
                         Stop
                     End If
-                    If (k.eq.n) Cycle
+                    If (k == n) Cycle Outer
                     Do i=1,ne
                         id=idt(n,i)
                         idt(n,i)=idt(k,i)
@@ -549,8 +637,8 @@ Contains
                     End Do
                     Do ilev=1,Nlv
                         t=ArrB(n,ilev)
-                        Arrb(n,ilev)=ArrB(k,ilev)
-                        Arrb(k,ilev)=t
+                        ArrB(n,ilev)=ArrB(k,ilev)
+                        ArrB(k,ilev)=t
                     End Do
                     Cycle Outer
                 End Do Inner

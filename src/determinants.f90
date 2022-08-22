@@ -137,11 +137,12 @@ Module determinants
 
     End Subroutine Det_Number
 
-    Subroutine Det_List
+    Subroutine Det_List(idt)
         Implicit None
 
         Integer :: Nd0, ic1, ndi, iconf, imax, nd1, im, i
         Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer, Allocatable, Dimension(:,:), Intent(InOut) :: idt
         Logical :: fin
 
         If (.not. allocated(idet1)) allocate(idet1(Ne))
@@ -273,7 +274,7 @@ Module determinants
             ndj=Njt(n)
         End Do
 
-        Deallocate(idet, Jtc, Nq0)
+        Deallocate(idet)
 
         Return
     End Subroutine Jterm
@@ -376,12 +377,13 @@ Module determinants
         Return
     End Subroutine Pdet
 
-    Subroutine Wdet(str)
+    Subroutine Wdet(Nd, Ne, idt, str)
         ! This subroutine writes the basis set of determinants to the file 'str'.
         !
         Implicit None
-        Integer  :: i, n
+        Integer  :: i, n, Nd, Ne
         Integer, Allocatable, Dimension(:) :: idet
+        Integer, Allocatable, Dimension(:,:) :: idt
         Character(Len=*) :: str
 
         If (.not. Allocated(idet)) Allocate(idet(Ne))
@@ -397,18 +399,23 @@ Module determinants
         Return
     End Subroutine Wdet
 
-    Subroutine Rdet(str)
+    Subroutine Rdet(Nd, Ne, idt, str)
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
         !
         Implicit None
-        Integer :: i, n
+        Integer :: i, n, Nd, Ne
+        Integer, Allocatable, Dimension(:) :: idet
+        Integer, Allocatable, Dimension(:,:) :: idt
         Character(Len=*) :: str
 
         If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
-        Open (16,file=str,status='OLD',form='UNFORMATTED')
+        If (.not. Allocated(idet)) Allocate(idet(Ne))
+
+        Open(16,file=str,status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
-        Do i=1,Nd
-           Read(16) idt(i,1:Ne)
+        Do n=1,Nd
+            Read(16) (idet(i),i=1,Ne)
+            idt(n,1:Ne)=idet(1:Ne)
         End Do
         Close(16)
     End Subroutine Rdet

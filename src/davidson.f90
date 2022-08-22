@@ -7,7 +7,7 @@ Module davidson
 
     Private
 
-    Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J, Hould
+    Public :: Init4, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J, Hould
 
   Contains
     
@@ -88,7 +88,11 @@ Module davidson
         nskip=0
 
         If (mype==0) Then
-            Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            If (kCSF == 0) Then
+                Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Else
+                Open(unit=17,file='CONF.WFS',status='UNKNOWN',form='UNFORMATTED')
+            End If
             Call startTimer(s1)
         End If
 
@@ -98,7 +102,12 @@ Module davidson
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
                 B1(1:Nd0)=Z1(1:Nd0,j)
-                Call J_av(B1,Nd0,xj,ierr)
+                If (kCSF == 0) Then
+                    Call J_av(B1,Nd0,xj,ierr)
+                Else
+                    ierr = 0
+                    xj = Jm
+                End If
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hamil%minval)
@@ -183,7 +192,11 @@ Module davidson
         Real(type_real) :: t
 
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
-        Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+        If (kCSF == 0) Then
+            Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Else
+            Open(unit=17,file='CONF.WFS',status='UNKNOWN',form='UNFORMATTED')
+        End If
         Do k=1,Nlv
             B2=0_type_real
             Do l=1,2*Nlv
@@ -209,7 +222,11 @@ Module davidson
         Implicit None
         Integer :: i, k
         ! Eigenvectors obtained by Davidson procedure are written to CONF.XIJ file
-        Open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+        If (kCSF == 0) Then
+            Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Else
+            Open(unit=17,file='CONF.WFS',status='UNKNOWN',form='UNFORMATTED')
+        End If
         Do k=1,Nlv
             Write(17) Tk(k),Tj(k),Nd,(ArrB(i,k),i=1,Nd)
         End Do

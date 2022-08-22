@@ -71,7 +71,7 @@ Program ine
     Call Rint                         ! Read radial integrals from CONF.INT
     Call Dinit                        ! 
     Call Det_Number                   ! counts number of determinants
-    Call Det_List                     ! generates list of determinants
+    Call Det_List(idt)                ! generates list of determinants
     Call Jterm                        ! Print table with numbers of levels with given J
     Call ReadHIJ                      ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
     Call ReadJJJ                      ! Read J^2 matrix in X1 space from file CONF.JJJ

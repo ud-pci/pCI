@@ -44,7 +44,7 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    Use csf, Only : jbasis, nonequiv_conf, formh_sym
+    Use csf, Only : jbasis, nonequiv_conf, formh_sym, unsym, reorder_det
     use determinants, only : Wdet, calcNd0, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
@@ -52,11 +52,12 @@ Program conf
 
     Implicit None
     External :: BLACS_PINFO
-    Integer   :: n, i, ierr, mype, npes, mpierr
+    Integer   :: n, nnd, i, ierr, mype, npes, mpierr
     Integer :: ncsf, nccj, max_ndcs, nbas
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
+    Integer, Allocatable, Dimension(:,:) :: idt_orig
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
 
     ! Initialize MPI
@@ -95,10 +96,10 @@ Program conf
         If (kCSF > 0) call nonequiv_conf(Nc) ! List of non-equivalent configurations
         Call Dinit                  ! 
         Call Det_Number             ! counts number of determinants
-        Call Det_List               ! generates list of determinants
+        Call Det_List(idt)               ! generates list of determinants
         Call Jterm                  ! prints table with numbers of levels with given J
         If (kCSF > 0) call jbasis(Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
-        Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
+        Call Wdet(Nd, Ne, idt, 'CONF.DET')       ! writes determinants to file CONF.DET
         Call FormD
     End If
 
@@ -130,11 +131,31 @@ Program conf
     Call Diag4(mype,npes) 
     
     ! Print table of final energies
+    If (kCSF > 0) Then
+        Nd = nbas
+        nbas = ncsf
+    End If
     If (mype==0) Call PrintEnergies
+
+    ! Change wave function from CSF back to set of determinants
+    If (kCSF > 0) Then
+        If (allocated(ArrB)) Then
+            Deallocate(ArrB)
+            Allocate(ArrB(Nd, Nlv))
+        End If
+        If (mype == 0) Then
+            Call unsym(ncsf,Nc,nccj)
+            Allocate(idt_orig(Nd,Ne))
+            Call Det_List(idt_orig)
+            Call reorder_det(Nc, idt, idt_orig)
+            Call Wdet(Nd, Ne, idt, 'CONF.DET')
+            Deallocate(idt_orig)
+            Call WriteXIJ
+        End If
+    End If
 
     ! Call LSJ routines if kLSJ=1
     If (kLSJ == 1) Then
-        If (mype == 0) Call Rdet('CONF.DET')
         Call AllocateLSJArrays
         Call InitLSJ
         Call lsj(ArrB,xj,xl,xs,mype,npes)
@@ -165,9 +186,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v6.4 with single precision")'
+            strfmt = '(4X,"Program conf v6.5 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v6.4")'
+            strfmt = '(4X,"Program conf v6.5")'
         End Select
         
         Write( 6,strfmt)
@@ -185,7 +206,7 @@ Contains
         ! Kl = 2 - new computation with MBPT
         ! Kl = 3 - extending computation with new configurations (not implemented yet)
         Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
+        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ, kCSF
         
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
@@ -1392,7 +1413,7 @@ Contains
         Character(Len=16) :: memStr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-    
+        
         If (mype==0) Then
             Call FormattedMemSize(memFormH, memStr)
             Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' of memory per core from arrays for FormH'  
@@ -1418,7 +1439,7 @@ Contains
         If (Allocated(I_is)) Deallocate(I_is)
         If (Allocated(IntOrd)) Deallocate(IntOrd)
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
-        If (kLSJ == 0 .and. Allocated(idt)) Deallocate(idt)
+        If (kLSJ == 0 .and. kCSF == 0 .and. Allocated(idt)) Deallocate(idt)
         If (Allocated(Scr)) Deallocate(Scr)
 
     End Subroutine DeAllocateFormHArrays
@@ -1488,8 +1509,8 @@ Contains
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
-        ! If running in serial
-        If (npes == 1) Then
+        ! If running in serial or size of initial approximation is very small
+        If (npes == 1 .or. Nd0 <= 1500) Then
             Select Case(type_real)
             Case(sp)
                 Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
@@ -1795,8 +1816,7 @@ Contains
                             If (mype == 0) Then
                                 Call FormB
                                 Call PrintEnergiesDvdsn(it)
-                                Call PrintWeightsDvdsn(it)
-                                print*, 'CONF.LVL updated'
+                                If (kCSF == 0) Call PrintWeightsDvdsn(it)
                             End If
                         Else
                             If (mype == 0) Call FormBskip
@@ -1895,13 +1915,13 @@ Contains
         If (Ksig*Kdsig == 0) Then
             strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
                         /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write(81,strfmt) stecp(ist),Nc,Nd,Gj
+            Write(81,strfmt) stecp(ist),nbas,Nd,Gj
         ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
         Else
             strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
                     I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
                     "EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write(81,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
+            Write(81,strfmt) stecp(ist),E_0,Kexn,Nc,nbas,Gj
         End If
 
         If (C_is /= 0.d0) Then
@@ -2133,19 +2153,25 @@ Contains
         Close(98)
 
         Deallocate(C, Weights, W2, Wsave, Wpsave, strcsave)
-        print*, 'wgtconfs%strconfs, wgtconfs%nconfs', sizeof(wgtconfs%strconfs), sizeof(wgtconfs%nconfs)
         Deallocate(wgtconfs%strconfs, wgtconfs%nconfs)
-        print*, 'wgtconfs%strconfsave', sizeof(wgtconfs%strconfsave)
         Deallocate(wgtconfs%strconfsave)
-        print*, 'wgtconfs%nconfsave', sizeof(wgtconfs%nconfsave)
         Deallocate(wgtconfs%nconfsave)
-        print*, 'wgtconfs%wgt', sizeof(wgtconfs%wgt)
-        !Deallocate(wgtconfs%wgt)
-        print*, 'wgtconfs%wgtsave', sizeof(wgtconfs%wgtsave)
-        !Deallocate(wgtconfs%wgtsave)
-        print*,'Weights printed to CONF.LVL'
+        Deallocate(wgtconfs%wgt)
+        Deallocate(wgtconfs%wgtsave)
         Return
     End Subroutine PrintWeightsDvdsn
+
+    Subroutine WriteXIJ
+        Implicit None
+        Integer :: n, i
+
+        Open(unit=16,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Do n=1,Nlv
+            write (16) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
+        End Do
+        Close(unit=16)
+
+    End Subroutine WriteXIJ
 
     Subroutine WriteFinalXIJ(mype)
         Use mpi_f08
@@ -2169,7 +2195,7 @@ Contains
             End If
         End Do
 
-        Deallocate(Iconverge)
+        If (allocated(Iconverge)) Deallocate(Iconverge)
 
         If (mype==0) Then
             Print*, 'Final CONF.XIJ has been written'
@@ -2217,7 +2243,7 @@ Contains
         Use mpi_utils
         Implicit None
 
-        Integer :: mpierr
+        Integer :: n, mpierr
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -2273,7 +2299,9 @@ Contains
         Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tk, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-
+        Do n=1,Nlv
+            Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
+        End Do
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
     End subroutine InitLSJ
@@ -2749,56 +2777,33 @@ Contains
         ! This subroutine prints eigenvalues in increasing order
         Implicit None
 
-        Integer :: j, ist
+        Integer :: j, k, ist
         Real(kind=type_real) :: dt, del
-        Character(Len=1), Dimension(10) :: stecp*7
-        Character(Len=1), Dimension(4)  :: strsms*6
-        Character(Len=1), Dimension(3)  :: strms*3
+        Character(Len=1), Dimension(3)  :: strms*3, stpt*3, stint*7
+        Character(Len=1), Dimension(4)  :: stsym*3
         Character(Len=512) :: strfmt
-        data stecp/'COULOMB','C+MBPT1','C+MBPT2', &
-                   'GAUNT  ','G+MBPT1','G+MBPT2', &
-                   'BREIT  ','B+MBPT1','B+MBPT2','ECP    '/
-        data strsms/'(1-e) ','(2-e) ','(full)','      '/
-        data strms/'SMS','NMS',' MS'/
+        data stint/'COULOMB','GAUNT  ','BREIT  '/
+        data stpt/' NO',' 1e','YES'/
+        data stsym/' NO',' Gj','Prj','CSF'/
 
-        ist=(Ksig+1)+3*Kbrt          !### stecp(ist) is used for output
-        If (K_is == 3) K_sms=4       !### Used for output
-        If (Kecp == 1) ist=7
 
         ! Print line of "=" for top of table
-        strfmt = '(4X,63("="))'
+        strfmt = '(1X,80("="))'
         Write( 6,strfmt)
         Write(11,strfmt)
+        k=1
+        If (Gj /= 0.d0) k=2
+        If (K_prj /= 0) k=3
+        If (kCSF /= 0)  k=4
 
-        ! If pure CI, print Nc, Nd, Gj
-        If (Ksig*Kdsig == 0) Then
-            strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
-                        /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),Nc,Nd,Gj
-        ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
-        Else
-            strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
-                    I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
-                    "EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-        End If
-
-        If (C_is /= 0.d0) Then
-            If (K_is == 1) Then
-                strfmt = 'format(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
-                Write( *,strfmt) C_is,Rnuc
-                Write(11,strfmt) C_is,Rnuc
-            Else
-                strfmt = '(4X,A3,":",E9.2,"*(P_i Dot P_k) ",A6," Lower component key =",I2)'
-                Write( *,strfmt) strms(K_is-1),C_is,strsms(K_sms),Klow
-                Write(11,strfmt) strms(K_is-1),C_is,strsms(K_sms),Klow
-            End If
-        End If
+        strfmt = '(" Energy levels for ",16A1," (Nc=",I7," Nd=",I9," nbas=", &
+                    I9,")",/" Interaction: ",A7,"; Effective integrals: ",A3, &
+                    "; Symmetry: ",A3,/"  N",9X,"JTOT",12X,"EV",15X,"ET",8X,"DEL(CM**-1)")'
+        Write( 6,strfmt) atom,Nc,Nd,nbas,stint(kbrt+1),stpt(ksig+1),stsym(k)
+        Write(11,strfmt) atom,Nc,Nd,nbas,stint(kbrt+1),stpt(ksig+1),stsym(k)
 
         ! Print line of "-" to close header
-        strfmt = '(4X,63("-"))'
+        strfmt = '(1X,80("-"))'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -2817,7 +2822,7 @@ Contains
         End Do
 
         ! Print line of "=" for bottom of table
-        strfmt = '(4X,63("="))'
+        strfmt = '(1X,80("="))'
         Write( 6,strfmt)
         Write(11,strfmt)
 

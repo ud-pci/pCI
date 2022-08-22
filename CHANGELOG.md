@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.5] - 2022-08-10
+- conf v6.5 - implemented initial simple parallelized formh_sym subroutine as well code to change wave function from CSF back to set of determinants
+- conf.f90 - added block of code (including unsym, Det_List, reorder_det, Wdet, WriteXIJ) for CSF to change wave function from CSF back to set of determinants in main program
+- conf.f90 - added condition to use serial diagonalization if number of determinants is small to avoid errors with ScaLAPACK routines
+- conf.f90 - added condition to not run PrintWeightsDvdsn if using CSF since basis would have to be changed to determinants first
+- conf.f90 - changed Nd -> nbas when printing energy table in PrintEnergiesDvdsn
+- conf.f90 - reorganized deallocations in PrintWeightsDvdsn
+- conf.f90 - new subroutine WriteXIJ simply writes CONF.XIJ
+- conf.f90 - added broadcast of ArrB in InitLSJ
+- conf.f90 - updated final energy table
+- csf.f90 - added header to start calculation of FormH
+- csf.f90 - added condition to run formh_sym in parallel if more than 1 processor is available
+- csf.f90 - implementation of simple round-robin static parallelization scheme for formh_sym
+- csf.f90 - added allocation statements for idet1, idet2 in reorder_det
+- csf.f90 - buf fixes in reorder_det subroutine
+- determinants.f90 - Det_List subroutine now requires a 2d-integer array argument
+- determinants.f90 - refactored Wdet and Rdet subroutines to fix compile warnings
+- determinants.f90 - Wdet and Rdet subroutines now require extra arguments Nd, Ne, idt
+- davidson.f90 - CONF.WFS is now written during Davidson procedure if CSF version is used
+- davidson.f90 - Added condition to not average over J for initial eigenvectors if using CSF
+- davidson.f90 - made WriteXIJ subroutine private since it is not used
+- conf_variables.f90 - new variable atom to store name of system
+- conf_init.f90 - ReadConfInp saves name of atom
+- conf_pt.f90 - updated arguments in Det_List and Wdet
+- conf_lsj.f90 - updated arguments in Det_List and Wdet
+- ine.f90 - updated arguments in Det_List and Wdet
+- dtm.f90 - updated arguments in Det_List and Wdet
+
 ## [0.12.4] - 2022-08-03
 - conf v6.4 - implemented allocations and broadcasts for future MPI version of formh_sym
 - conf.f90 - moved InitFormH, calcNd0, and calcMemReqs calls to main conf program

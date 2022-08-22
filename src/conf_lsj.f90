@@ -35,7 +35,7 @@ Program conf_lsj
         Call Rint           ! reads radial integrals from CONF.INT
         Call Dinit          ! 
         Call Det_Number     ! counts number of determinants
-        Call Det_List       ! generates list of determinants
+        Call Det_List(idt)  ! generates list of determinants
         Call Jterm          ! prints table with numbers of levels with given J
         Call ReadXIJ(B1h)   ! reads relevant wavefunctions from CONF.XIJ
     End If

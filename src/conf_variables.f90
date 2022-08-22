@@ -48,6 +48,8 @@ Module conf_variables
 
     Type(Matrix(type_real)) :: Hamil, Jsq
 
+    Character(Len=1), Dimension(16) :: atom
+
     Save
     
 End Module

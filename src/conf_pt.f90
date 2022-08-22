@@ -45,9 +45,9 @@ Program conf_pt
         Call Rint
         Call Dinit                        ! 
         Call Det_Number                   ! counts number of determinants
-        Call Det_List                     ! generates list of determinants
+        Call Det_List(idt)                ! generates list of determinants
         Call Jterm
-        Call Wdet('CONF_PT.DET')
+        Call Wdet(Nd, Ne, idt, 'CONF_PT.DET')
         Call NR_Init
         Call Weight_CI
     End If

@@ -14,12 +14,11 @@ Module conf_init
         ! This subroutine Reads input parameters from CONF.INP
         Implicit None
         Integer :: istr
-        Character(Len=1) :: name(16)
-        ! - - - - - - - - - - - - - - - - - - - - - -
+
         Open(unit=10,file='CONF.INP',status='OLD')
-        Read(10,'(1X,16A1)') name
-        Write(*,'(4X,16A1)') name
-        Write(11,'(4X,16A1)') name
+        Read(10,'(1X,16A1)') atom
+        Write(*,'(4X,16A1)') atom
+        Write(11,'(4X,16A1)') atom
         Read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
         Read(10,'(5X,I6)') Nso, Nc, Kv, Nlv, Ne
 
