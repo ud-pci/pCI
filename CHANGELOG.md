@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.6] - 2022-10-04
+- basis.py - added automation capabilities
+- basis.py - added additional keys to kvw
+- basis.py - new function construct_vvorbs constructs valence and virtual orbitals for construction of BASS.INP file
+- basis.py - new function write_bass_inp writes file BASS.INP
+- basis.py - added missing file close() statements
+- basis.py - added code to construct basis set by running a sequence of programs depending on key given in input file
+- orbitals.py - added digital format of i subshell
+
+
 ## [0.12.5] - 2022-08-22
 - conf v6.5 - implemented initial simple parallelized formh_sym subroutine as well code to change wave function from CSF back to set of determinants
 - conf.f90 - added block of code (including unsym, Det_List, reorder_det, Wdet, WriteXIJ) for CSF to change wave function from CSF back to set of determinants in main program

@@ -98,7 +98,7 @@ def get_q2(l):
 
 def convert_char_to_digital(orbitals):
     """ Converts a list of non-relativistic subshells to digital format """
-    occ_dict = {'s': 2, 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12)}
+    occ_dict = {'s': 2, 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12), 'i': (12,14)}
     digital_orbitals = []
 
     if type(orbitals) == str:
