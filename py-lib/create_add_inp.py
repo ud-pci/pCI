@@ -12,7 +12,9 @@ def read_config_yaml(filename):
     # set default parameters
     num_dvdsn_iterations = 50
     num_energy_levels = 12
-    system = system + [{'num_dvdsn_iterations' : num_dvdsn_iterations}, {'num_energy_levels' : num_energy_levels}]
+    J = 0.0
+    JM = 0.0
+    system = system + [{'num_dvdsn_iterations' : num_dvdsn_iterations}, {'num_energy_levels' : num_energy_levels}, {'J': J}, {'JM': JM}]
     
     # read yaml file with inputs
     with open(filename,'r') as f:
@@ -26,6 +28,23 @@ def read_config_yaml(filename):
         except KeyError as e:
             print('ERROR: ' + str(e) + ' is missing')
             sys.exit()
+        for item in system:
+            try:
+                system['num_energy_levels'] = item['num_energy_levels']
+            except Exception as e:
+                pass
+            try:
+                system['num_dvdsn_iterations'] = item['num_dvdsn_iterations']
+            except Exception as e:
+                pass
+            try:
+                system['J'] = item['J']
+            except Exception as e:
+                pass
+            try:
+                system['JM'] = item['JM']
+            except Exception as e:
+                pass
         
     return system, configurations, basis, orbitals, excitations
     
@@ -57,7 +76,7 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
         for line in range(num_lines):
             f.write('L:  ' + ' '.join(configuration[line*max_orb_per_line:(line+1)*max_orb_per_line]) + '\n')
     f.write('\n')
-    
+
     # Write list of orbitals and occupation numbers
     nmin = orb_occ['nmin']
     nmax = orb_occ['nmax']
@@ -74,23 +93,20 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
     f.write('\n')
 
     num_core_orb = 0
-    if orb_occ['core'] != 0:
-        try:
-            core_formatted = orb_lib.convert_char_to_digital(orb_occ['core'])
-            num_core_orb = len(core_formatted)
-        except Exception as e:
-            print(e)
-            pass
-    else:
-        core_formatted = []
+    try:
+        core_formatted = orb_lib.convert_char_to_digital(orb_occ['core'])
+        num_core_orb = len(core_formatted)
+    except Exception as e:
+        print(e)
+        pass
         
     # Write head of CONF.INP
     f.write('>>>>>>>>>>>>> Head of the file CONF.INP >>>>>>>>>>>>>>>>>>>>>>>>\n')
     f.write('  ' + system['name'] + ' ' + parity + '\n')
     f.write('  Z = ' + str(system['atomic_number']) + '\n')
     f.write(' Am = ' + str(system['atomic_mass']) + '\n')
-    f.write('  J =  0.0 \n')
-    f.write(' Jm =  0.0 \n')
+    f.write('  J = ' + str(system['J']) + '\n')
+    f.write(' Jm = ' + str(system['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
     f.write(' Kv =  4 \n')
@@ -167,21 +183,12 @@ def parse_system(system):
     return params
 
 if __name__ == "__main__":
-    filename = input('Enter input file: ')
-    try:
-        system, configurations, basis, orbitals, excitations = read_config_yaml(filename)
-    except FileNotFoundError:
-        print('ERROR: The file', filename, 'was not found')
-        sys.exit()
-    except yaml.scanner.ScannerError:
-        print('ERROR: The file', filename, 'was not in YAML format')
-        sys.exit()
+    system, configurations, basis, orbitals, excitations = read_config_yaml('add.yml')
 
     params = parse_system(system)
     num_val = orb_lib.count_valence(configurations)
+    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
     multiplicity = orb_lib.count_excitations(excitations)
 
-    orb_occ = orb_lib.expand_orbitals(basis, orbitals, multiplicity, configurations)
-    
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'even')
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'odd')

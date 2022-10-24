@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.7] - 2022-10-24
+- basis.py - fix for val_aov orbitals
+- basis.py - now asks user for input file name
+- create_add_inp.py - added additional keys under system for J, JM
+- orbitals.py - simplified expand_basis function
+
 ## [0.12.6] - 2022-10-04
 - basis.py - added automation capabilities
 - basis.py - added additional keys to kvw

@@ -63,6 +63,10 @@ def get_atomic_data(name, isotope):
     ptable = libatomic.get_periodic_table()
     rtable = libatomic.get_radii()
     symbol = re.findall('[a-zA-Z]+', name)[0]
+    try:
+        num_rem_ele = re.findall('[0-9]+', name)[0]
+    except:
+        num_rem_ele = 0
     rnuc = 0
     cfermi = 0
 
@@ -105,7 +109,7 @@ def get_atomic_data(name, isotope):
             print('ERROR: Nuclear charge radius could not be found for', name)
             sys.exit()
 
-    return Z, AM, symbol, cfermi, rnuc
+    return Z, AM, symbol, cfermi, rnuc, num_rem_ele
 
 def calc_c_fermi(rnuc):
     """ Calculates c fermi from rms radius """
@@ -127,7 +131,7 @@ def get_key_vw(kvw_str):
 
     if kvw_str == 'ci+all-order' or kvw_str == 'all-order' or kvw_str == 'all':
         kvw = 1
-    elif kvw_str == 'ci+second-order' or kvw_str == 'second-order' or kvw_str == 'second':
+    elif kvw_str == 'ci+all-order' or kvw_str == 'second-order' or kvw_str == 'second':
         kvw = 0
 
     return kvw
@@ -290,26 +294,21 @@ def get_energy_guess(deg_ion, n, n0, l):
 def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
     """ Returns the lowest spdf orbitals in kappa designation """
     N, kappa = [], []
-    nmin = [0, 0, 0, 0]
+    nmin = [1, 2, 3, 4]
     nmax = [0, 0, 0, 0]
     for orbital in core_orbitals.split():
         n = int(re.findall('[0-9]+', orbital)[0])
-        if orbital[-1] == 's' and n > nmin[0]:
-            nmin[0] = n
-        elif orbital[-1] == 'p' and n > nmin[1]:
-            nmin[1] = n
-        elif orbital[-1] == 'd' and n > nmin[2]:
-            nmin[2] = n
-        elif orbital[-1] == 'f' and n > nmin[3]:
-            nmin[3] = n
+        if orbital[-1] == 's':
+            nmin[0] = n + 1
+        elif orbital[-1] == 'p':
+            nmin[1] = n + 1
+        elif orbital[-1] == 'd':
+            nmin[2] = n + 1
+        elif orbital[-1] == 'f':
+            nmin[3] = n + 1
         else:
             pass
 
-    # Set minimum n for each l
-    for n in range(len(nmin)):
-        if nmin[n] < n:
-            nmin[n] = n + 1
-        
     # Set maximum n for each l (4 lowest s, p, d; 3 lowest f) by default
     if val_aov == []:
         nmax = [n + 4 for n in nmin]
@@ -322,28 +321,28 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
     for n in range(len(nmax)):
         if n == 0:
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append('-1')
         elif n == 1:
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append(' 1')
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append('-2')
         elif n == 2:
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append(' 2')
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append('-3')
         elif n == 3:
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append(' 3')
             for i in range(nmin[n],nmax[n]):
-                N.append(i+1)
+                N.append(i)
                 kappa.append('-4')
 
     """
@@ -375,7 +374,7 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
         f.write(' NS =  ' + str(NS) + '\n')
         f.write(' NSO=  ' + str(NSO) + '\n')
         f.write(' Z  =  ' + str(Z) + '\n')
-        f.write(' AM =  ' + '{:.2f}'.format(AM) + '\n')
+        f.write(' AM =  ' + '{:.2f}'.format(round(AM)) + '\n')
         f.write(' JM =  ' + str(JM) + '\n')
         f.write(' R2 =  ' + str(float(system['radius'])) + '\n')
         f.write(' kbr= ' + str(kbr) + '\n')
@@ -619,10 +618,11 @@ def write_spl_in(filename, radius):
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
-    system = read_yaml('basis_Sr.yml')
+    yml_file = input("Input yml-file: ")
+    system = read_yaml(yml_file)
 
     # Get atomic data
-    Z, AM, symbol, cfermi, rnuc = get_atomic_data(system['name'], system['isotope'])
+    Z, AM, symbol, cfermi, rnuc, num_rem_ele = get_atomic_data(system['name'], system['isotope'])
 
     # Get orbital information
     NS, NSO, num_val_orbitals = count_total_orbitals(system['core'], system['valence'])
@@ -668,9 +668,9 @@ if __name__ == "__main__":
     ## Pure CI
     if system['codes'] == 'ci':
         # Run hfd
-        run(["./hfd", ">", "hfd.out"])
+        run(["./hfd", ">", "hfd.out"], shell=True)
         # Run bass
-        run(["./bass", ">", "bass.out"])
+        run(["./bass", ">", "bass.out"], shell=True)
     elif system['codes'] == 'ci+all-order':
         # Run hfd
         run('./hfd > hfd.out', shell=True)
