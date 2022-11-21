@@ -8,8 +8,8 @@ PROJECT(conf_new LANGUAGES Fortran)
 
 INCLUDE(GNUInstallDirs)
 
-SET(CMAKE_Fortran_FLAGS "-g -check all -warn all -traceback -mkl -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
-#SET(CMAKE_Fortran_FLAGS "-mkl -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
+#SET(CMAKE_Fortran_FLAGS "-g -check all -warn all -traceback -lmkl_core -mkl -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
+SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
 
 ADD_LIBRARY(basc_common params.f90 str_fmt.f90 conf_variables.f90 basc_variables.f90 conf_init.f90 readfff.f90 wigner.f90 sintg.f90 test_ori.f90 diff.f90 pi_pk.f90 breit.f90)
 

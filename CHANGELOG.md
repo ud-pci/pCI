@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.8] - 2022-11-21
+
 ## [0.12.7] - 2022-10-24
 - basis.py - fix for val_aov orbitals
 - basis.py - now asks user for input file name
@@ -89,6 +91,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - conf.f90 - input file c.in now reads new ksym variable
 - davidson.f90 - re-imported previously removed Hould subroutine
 - csf.f90 - new module containing functions used for new CSF functionalities
+
+## [0.11.10] - 2022-11-21
+- conf v5.10 - bug fix for ScaLAPACK routines causing openmp-related issues
 
 ## [0.11.9] - 2022-08-17
 - ine v1.19 - fixed numerical errors in calculating a_1 value

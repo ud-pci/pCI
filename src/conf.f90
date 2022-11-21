@@ -51,8 +51,8 @@ Program conf
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
     Implicit None
-    External :: BLACS_PINFO
-    Integer   :: n, nnd, i, ierr, mype, npes, mpierr
+    External :: BLACS_PINFO, BLACS_EXIT
+    Integer   :: n, nnd, i, ierr, mype, npes, mpierr, threadLevel
     Integer :: ncsf, nccj, max_ndcs, nbas
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
@@ -61,11 +61,11 @@ Program conf
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
 
     ! Initialize MPI
-    !Call MPI_Init(mpierr)
+    Call MPI_Init_thread(MPI_THREAD_SINGLE, threadLevel, mpierr)
     ! Get process id
-    !Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
+    Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
-    !Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+    Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
     Call BLACS_PINFO(mype,npes)
     
     Call startTimer(start_time)
@@ -89,6 +89,9 @@ Program conf
     ! Initialization subroutines
     ! master processor will read input files and broadcast parameters and arrays to all processors
     If (mype == 0) Then
+        ! Open the generic logging file:
+        open(unit=11,status='UNKNOWN',file='CONF.RES')
+
         Call Input                  ! reads list of configurations from CONF.INP
         Call Init                   ! reads basis set information from CONF.DAT
         Call Rint                   ! reads radial integrals from CONF.INT
@@ -169,8 +172,13 @@ Program conf
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
 
-    ! Finalize MPI 
-    Call MPI_Finalize(mpierr)
+    ! In rank 0, close-out unit 11
+    If (mype == 0) Then
+        Close(11)
+    End If
+
+    ! All done: 
+    Call BLACS_EXIT(0)
 
 Contains
 
@@ -182,7 +190,7 @@ Contains
         Character(Len=64) :: strfmt
 
         ! Write name of program
-        open(unit=11,status='UNKNOWN',file='CONF.RES')
+        !open(unit=11,status='UNKNOWN',file='CONF.RES')
 
         Select Case(type_real)
         Case(sp)
@@ -881,6 +889,7 @@ Contains
             + type_real * Nd0 ** 2_dp   & ! Z1
             + type_real * Nd0 * 1_dp      ! E1
     
+        if (mype == 0) print*, type_real, Nd, Nd0, IPlv, Nlv, IPlv
         memDvdsn = mem
         Call FormattedMemSize(mem, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
@@ -1494,9 +1503,9 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
-        External :: SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+        External :: INFOG2L, PDELGET, SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
-        Integer :: I, J, lwork, mype, npes, ifail
+        Integer :: I, J, lwork, mype, npes, ifail, ii, jj, srcRow, srcCol
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
         Integer(Kind=int64) :: s1
         Real(type_real), Dimension(4) :: realtmp
@@ -1540,12 +1549,15 @@ Contains
 
         ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
         NROWSA = NUMROC(Nd0,Nd0,MYROW,0,NPROW)
-        NCOLSA = NUMROC(Nd0,Nd0,MYCOL,0,NPCOL)
+        NCOLSA = NUMROC(Nd0,1,MYCOL,0,NPCOL)
         ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
 
         ! Initialize array descriptors DESCA and DESCZ
-        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
-        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
+        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
+        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
+
+        if (mype==0) write(*,*) 'BLACS initialization completed'
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
         ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
         A=0.0d0
@@ -1574,6 +1586,7 @@ Contains
         LWORK = realtmp(1)
         LIWORK = itmp(1)
         ALLOCATE(IWORK(LIWORK), W(LWORK))
+        if (mype==0) write(*,*) 'Work arrays allocated: real=',LWORK,',integer=',LIWORK
 
         ! Compute the eigenvalues E1 and eigenvectors Z
         Select Case(type_real)
@@ -1583,21 +1596,27 @@ Contains
             CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
         End Select
 
+        ! Un-distribute the eigenvector matrix back to Z1 in each worker:
+        Do I=1,Nd0
+            Do J=1,Nd0
+                CALL PDELGET('A', ' ', Z1(I,J), Z, I, J, DESCZ)
+            End Do
+        End Do
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        
         ! Exit BLACS context
         CALL BLACS_GRIDEXIT(CONTEXT)
-        CALL BLACS_EXIT(1)
 
+        ! Stop timer and print time for initial diagonalization
         If (mype == 0) Then
-            ! Set eigenvectors in matrix Z back to matrix Z1
-            Z1(1:NROWSA,1:NCOLSA) = Z(1:NROWSA,1:NCOLSA)
-
-            ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If
 
         ! Clean up
         Deallocate(IWORK, W, Z, A)
+
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
     End Subroutine DiagInitApprox
 
@@ -1618,7 +1637,7 @@ Contains
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
-        Character(Len=16) :: timeStr, iStr
+        Character(Len=16) :: timeStr
 
         ! Initialize parameters and arrays
         Iconverge = 0
@@ -1672,7 +1691,6 @@ Contains
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
 
         Do it=1,N_it
-            Write(iStr,'(A)') it
             If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' ==========' 
             ! Compare lowest admixture of an unconverged vector to convergence criteria
             If (ax > crit) Then
@@ -2194,8 +2212,6 @@ Contains
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
         End Do
-
-        If (allocated(Iconverge)) Deallocate(Iconverge)
 
         If (mype==0) Then
             Print*, 'Final CONF.XIJ has been written'
@@ -2818,7 +2834,7 @@ Contains
         strsp = ''
         If (.not. Allocated(C)) Allocate(C(Nd))
         If (.not. Allocated(W)) Allocate(W(Nc,Nlv))
-        If (.not. Allocated(W2)) ALlocate(W2(Nnr, Nlv))
+        If (.not. Allocated(W2)) Allocate(W2(Nnr, Nlv))
         If (.not. Allocated(Wsave)) Allocate(Wsave(nconfs,Nlv))
         If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
@@ -3089,8 +3105,11 @@ Contains
             End Do
             Write(11,strfmt) (st1,i=j1,j3)
         End Do
-        Deallocate(C, W, W2, Wsave, Wpsave, strcsave, Ndc, Tk, Tj, ArrB)
-        Close(11)
+        Deallocate(C, W, W2, Wsave, Wpsave, strcsave)
+        If (Allocated(Ndc)) Deallocate(Ndc)
+        If (Allocated(Tk)) Deallocate(Tk)
+        If (Allocated(Tj)) Deallocate(Tj)
+        If (Allocated(ArrB)) Deallocate(ArrB)
         
     End Subroutine PrintWeights
 
