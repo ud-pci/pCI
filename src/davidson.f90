@@ -92,7 +92,7 @@ Module davidson
             Call startTimer(s1)
         End If
 
-        Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        !Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         B1=0_type_real
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ

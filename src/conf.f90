@@ -50,19 +50,21 @@ Program conf
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
 
     Implicit None
-    External :: BLACS_PINFO
-    Integer   :: n, i, ierr, mype, npes, mpierr
+    External :: BLACS_PINFO, BLACS_EXIT
+    Integer   :: n, nnd, i, ierr, mype, npes, mpierr, threadLevel
+    Integer :: ncsf, nccj, max_ndcs, nbas
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
+    Integer, Allocatable, Dimension(:,:) :: idt_orig
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
 
     ! Initialize MPI
-    !Call MPI_Init(mpierr)
+    Call MPI_Init_thread(MPI_THREAD_SINGLE, threadLevel, mpierr)
     ! Get process id
-    !Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
+    Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
-    !Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+    Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
     Call BLACS_PINFO(mype,npes)
     
     Call startTimer(start_time)
@@ -86,6 +88,9 @@ Program conf
     ! Initialization subroutines
     ! master processor will read input files and broadcast parameters and arrays to all processors
     If (mype == 0) Then
+        ! Open the generic logging file:
+        open(unit=11,status='UNKNOWN',file='CONF.RES')
+
         Call Input                  ! reads list of configurations from CONF.INP
         Call Init                   ! reads basis set information from CONF.DAT
         Call Rint                   ! reads radial integrals from CONF.INT
@@ -133,8 +138,13 @@ Program conf
         write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
 
-    ! Finalize MPI 
-    Call MPI_Finalize(mpierr)
+    ! In rank 0, close-out unit 11
+    If (mype == 0) Then
+        Close(11)
+    End If
+
+    ! All done: 
+    Call BLACS_EXIT(0)
 
 Contains
 
@@ -146,13 +156,13 @@ Contains
         Character(Len=64) :: strfmt
 
         ! Write name of program
-        open(unit=11,status='UNKNOWN',file='CONF.RES')
+        !open(unit=11,status='UNKNOWN',file='CONF.RES')
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.9 with single precision")'
+            strfmt = '(4X,"Program conf v5.10 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.9")'
+            strfmt = '(4X,"Program conf v5.10")'
         End Select
         
         Write( 6,strfmt)
@@ -1420,9 +1430,9 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Implicit None
-        External :: BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+        External :: INFOG2L, PDELGET, SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
-        Integer :: I, J, lwork, mype, npes, ifail
+        Integer :: I, J, lwork, mype, npes, ifail, ii, jj, srcRow, srcCol
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
         Integer(Kind=int64) :: s1
         Real(type_real), Dimension(4) :: realtmp
@@ -1435,6 +1445,26 @@ Contains
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
+        ! If running in serial or size of initial approximation is very small
+        If (npes == 1 .or. Nd0 <= 1500) Then
+            Select Case(type_real)
+            Case(sp)
+                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+            Case(dp)
+                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+            End Select
+            lwork = Nint(realtmp(1))
+            Allocate(W(lwork))
+            Select Case(type_real)
+            Case(sp)
+                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+            Case(dp)
+                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+            End Select
+            Deallocate(W)
+            Return
+        End If
+
         ! Set the number of rows, NPROW, and columns, NPCOL, of the processor grid
         NPROW = 1
         NPCOL = npes
@@ -1446,12 +1476,15 @@ Contains
 
         ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
         NROWSA = NUMROC(Nd0,Nd0,MYROW,0,NPROW)
-        NCOLSA = NUMROC(Nd0,Nd0,MYCOL,0,NPCOL)
+        NCOLSA = NUMROC(Nd0,1,MYCOL,0,NPCOL)
         ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
 
         ! Initialize array descriptors DESCA and DESCZ
-        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
-        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, Nd0, 0, 0, CONTEXT, NROWSA, ifail)
+        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
+        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
+
+        if (mype==0) write(*,*) 'BLACS initialization completed'
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
         ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
         A=0.0d0
@@ -1480,6 +1513,7 @@ Contains
         LWORK = realtmp(1)
         LIWORK = itmp(1)
         ALLOCATE(IWORK(LIWORK), W(LWORK))
+        if (mype==0) write(*,*) 'Work arrays allocated: real=',LWORK,',integer=',LIWORK
 
         ! Compute the eigenvalues E1 and eigenvectors Z
         Select Case(type_real)
@@ -1489,21 +1523,27 @@ Contains
             CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
         End Select
 
+        ! Un-distribute the eigenvector matrix back to Z1 in each worker:
+        Do I=1,Nd0
+            Do J=1,Nd0
+                CALL PDELGET('A', ' ', Z1(I,J), Z, I, J, DESCZ)
+            End Do
+        End Do
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        
         ! Exit BLACS context
         CALL BLACS_GRIDEXIT(CONTEXT)
-        CALL BLACS_EXIT(1)
 
+        ! Stop timer and print time for initial diagonalization
         If (mype == 0) Then
-            ! Set eigenvectors in matrix Z back to matrix Z1
-            Z1(1:NROWSA,1:NCOLSA) = Z(1:NROWSA,1:NCOLSA)
-
-            ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
         End If
 
         ! Clean up
         Deallocate(IWORK, W, Z, A)
+
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
     End Subroutine DiagInitApprox
 
