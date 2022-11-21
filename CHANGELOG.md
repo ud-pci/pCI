@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [0.11.10] - 2022-11-21
-- conf v5.10
+- conf v5.10 - bug fix for ScaLAPACK routines causing openmp-related issues
 
 ## [0.11.9] - 2022-08-17
 - ine v1.19 - fixed numerical errors in calculating a_1 value
