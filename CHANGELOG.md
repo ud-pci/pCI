@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [0.11.10] - 2022-11-21
-- conf v5.10 - bug fix for ScaLAPACK routines causing openmp-related issues
+- conf v5.10 - bug fixes for ScaLAPACK routines causing openmp-related issues done by Dr. Jeffrey Frey of UD IT-RCI
+- conf.f90 - reimplemented DiagInitApprox subroutine with parallel blocking method
+- conf.f90 - bug fix for memory estimation of Davidson producing negative values
+- conf.f90 - threshold for Nd0 for use of S/DSYEV over ScaLAPACK can now be set from environment (defaulted to 800MiB matrix)
+- str_fmt.f90 - error catching for negative value of memory
+- env_var.f90 - new subroutine GetEnvInteger64 gets an environment variable as an int64 integer
 
 ## [0.11.9] - 2022-08-17
 - ine v1.19 - fixed numerical errors in calculating a_1 value

@@ -4,6 +4,10 @@ Module formj2
 
     Implicit None
 
+    Private
+
+    Public :: F_J0, F_J2, Plj, J_av, Formj
+
   Contains
 
     Real(type_real) Function F_J0(idet)
@@ -92,7 +96,7 @@ Module formj2
     End Function Plj
 
     Subroutine FormJ(mype, npes)
-        Use mpi
+        Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize, FormattedTime
         Use vaccumulator
         Use determinants, Only : Gdet, Gdet, Rspq, Rspq_phase1, Rspq_phase2
@@ -108,8 +112,9 @@ Module formj2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ncGrowBy, nccnt, ncsplit
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
-        Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done, status(MPI_STATUS_SIZE)
+        Integer :: iSign, iIndexes(3), jIndexes(3), an_id, nnc, num_done
         Integer :: sender
+        Type(MPI_Status) :: status
         Character(Len=16) :: timeStr, memStr, memStr2, memTotStr, memTotStr2, counterStr, counterStr2, strfmt
 
         Call startTimer(stot)
@@ -164,7 +169,7 @@ Module formj2
                 ! Distribute a portion of the workload of size ncGrowBy to each worker process
                 Do an_id = 1, npes - 1
                    nnc = ncGrowBy*an_id + 1
-                   Call MPI_SEND( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                   Call MPI_Send( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
                 End Do
 
                 Do ic1=1, ncGrowBy
@@ -203,15 +208,15 @@ Module formj2
                 j=9
 
                 Do 
-                    Call MPI_RECV(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    Call MPI_Recv(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    sender = status.MPI_SOURCE
              
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy
-                        Call MPI_SEND( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_Send( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                     Else
                         msg = -1
-                        Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_Send( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
                         num_done = num_done + 1
                     End If
                     
@@ -253,7 +258,7 @@ Module formj2
                 End Do
             Else
                 Do 
-                    Call MPI_RECV ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_Recv ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpierr)
 
                     If (nnc == -1) Then
                         Exit
@@ -293,7 +298,7 @@ Module formj2
                             End Do
                         End Do
                     
-                        Call MPI_SEND( cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_Send( cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End If
                 End Do
             End If
@@ -345,7 +350,7 @@ Module formj2
         Implicit None
 
         Integer :: ierr, i, k, n, nx, mpierr
-        Real(type_real) :: r, t, xj
+        Real(type_real) :: r, t, xj, xj2
         Real(type_real), dimension(nx) :: X1
 
         ierr=0
@@ -363,8 +368,8 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
+        Call MPI_AllReduce(xj, xj2, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        xj=0.5d0*(sqrt(1.d0+xj2)-1.d0)
 
         If (K_prj == 1) Then
             If (dabs(xj-XJ_av) > 1.d-1) ierr=1
