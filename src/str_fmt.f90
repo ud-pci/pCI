@@ -44,6 +44,12 @@ Module str_fmt
         Integer                         :: unitIdx
         Real(Kind=8)                    :: calcBytes
 
+        If (bytes < 0) Then
+            Write(strBuffer,'(I24)') bytes
+            Write(0, '(A,A)') 'FormattedMemSize: negative byte size encountered: ', AdjustL(Trim(strBuffer))
+            Error Stop
+        End If
+
         unitIdx = 1
         calcBytes = Real(bytes,8)
         Do While ( unitIdx < 6 .and. calcBytes >= 1024.0 )

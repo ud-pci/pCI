@@ -49,6 +49,7 @@ Program conf
     Use integrals, only : Rint
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
+    Use env_var
 
     Implicit None
     External :: BLACS_PINFO, BLACS_EXIT
@@ -83,8 +84,10 @@ Program conf
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
-    Call Get_Environment_Variable("CONF_MAX_BYTES_PER_CPU", eValue)
-    read(eValue,'(I12)') memTotalPerCPU  
+    If (.not. GetEnvIsPresent("CONF_MAX_BYTES_PER_CPU")) Then
+        Error Stop "ERROR:  CONF_MAX_BYTES_PER_CPU not set in environment"
+    End If
+    memTotalPerCPU = GetEnvInteger64("CONF_MAX_BYTES_PER_CPU", 0_int64)
     
     ! Initialization subroutines
     ! master processor will read input files and broadcast parameters and arrays to all processors
@@ -865,12 +868,12 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Implicit None
         Integer(Kind=int64) :: mem
-        Integer :: bytesInteger, bytesDP, bytesReal
+        Integer(Kind=int64) :: bytesInteger, bytesDP, bytesReal
         Character(Len=16) :: memStr
     
-        bytesInteger = 4
-        bytesReal = 4
-        bytesDP = 8
+        bytesInteger = 4_int64
+        bytesReal = type_real
+        bytesDP = 8_int64
     
         Call calcMemStaticArrays
         Call FormattedMemSize(memStaticArrays, memStr)
@@ -881,15 +884,14 @@ Contains
         
         memEstimate = memFormH + memStaticArrays
     
-        mem = type_real * Nd * IPlv     & ! ArrB
-            + type_real * Nlv * 2_dp    & ! Tk,Tj
-            + type_real * IPlv ** 2_dp  & ! P
-            + type_real * IPlv * 2_dp   & ! D,E
-            + type_real * Nd * 2_dp     & ! B1,B2
-            + type_real * Nd0 ** 2_dp   & ! Z1
-            + type_real * Nd0 * 1_dp      ! E1
+        mem = bytesReal * Nd * IPlv        & ! ArrB
+            + bytesReal * Nlv * 2_int64    & ! Tk,Tj
+            + bytesReal * IPlv * IPlv      & ! P
+            + bytesReal * IPlv * 2_int64   & ! D,E
+            + bytesReal * Nd * 2_int64     & ! B1,B2
+            + bytesReal * Nd0 * Nd0        & ! Z1
+            + bytesReal * Nd0                ! E1
     
-        if (mype == 0) print*, type_real, Nd, Nd0, IPlv, Nlv, IPlv
         memDvdsn = mem
         Call FormattedMemSize(mem, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
@@ -1475,7 +1477,6 @@ Contains
             memDvdsn = 0_int64
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(E1)
-            memDvdsn = memDvdsn
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
             memEstimate = memEstimate - memFormH + memDvdsn
@@ -1502,24 +1503,49 @@ Contains
     Subroutine DiagInitApprox(mype, npes)
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
+        Use env_var
         Implicit None
         External :: INFOG2L, PDELGET, SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
         Integer :: I, J, lwork, mype, npes, ifail, ii, jj, srcRow, srcCol
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
-        Integer(Kind=int64) :: s1
+        Integer(Kind=int64) :: s1, scalapackThreshold
+        Integer(Kind=int64), Dimension(2) :: blacsGrid
+        Logical :: isVerbose, shouldForceSerial, shouldForceScalapack
         Real(type_real), Dimension(4) :: realtmp
         Integer, Dimension(4) :: itmp
         Integer, Dimension(9) :: DESCA, DESCZ
         Integer, Allocatable, Dimension(:)     :: IWORK ! integer work array
         Real(type_real), Allocatable, Dimension(:)    :: W     ! double precision work array
         Real(type_real), Allocatable, Dimension(:,:)  :: A, Z
+        Character(len=48) :: blacsGridSpec
 
+        If (mype == 0) Then
+            ! At what point should we switch to the BLACS/ScaLAPACK algorithm?  The default
+            ! value 10240 is just a guess and equates with an 800 MiB Z1:
+            scalapackThreshold = GetEnvInteger64("CONF_DIAG_INIT_APPROX_THRESHOLD", 10240)
+            isVerbose = GetEnvLogical("CONF_DIAG_INIT_APPROX_VERBOSE", .false.)
+            shouldForceSerial = GetEnvLogical("CONF_DIAG_INIT_APPROX_FORCE_SERIAL", .false.)
+            shouldForceScalapack = GetEnvLogical("CONF_DIAG_INIT_APPROX_FORCE_SCALAPACK", .false.)
+            If (shouldForceSerial .and. shouldForceScalapack) shouldForceScalapack = .false.
+        End If
+        Call MPI_Bcast(scalapackThreshold, 1, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(isVerbose, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(shouldForceSerial, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(shouldForceScalapack, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
+        
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
-        ! If running in serial or size of initial approximation is very small
-        If (npes == 1 .or. Nd0 <= 1500) Then
+        ! If running in serial or size of initial approximation is below threshold, 
+        If (.not. shouldForceScalapack .and. (npes == 1 .or. Nd0 <= scalapackThreshold .or. shouldForceSerial)) Then
+            If (mype==0) Then
+                If (npes==1 .or. shouldForceSerial) Then
+                    Write(*,"(A)") "DiagInitApprox: ScaLAPACK not used, running serially"
+                Else
+                    Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
+                End If
+            End If
             Select Case(type_real)
             Case(sp)
                 Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
@@ -1528,96 +1554,107 @@ Contains
             End Select
             lwork = Nint(realtmp(1))
             Allocate(W(lwork))
+            If (mype==0 .and. isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
             Select Case(type_real)
             Case(sp)
                 Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
             Case(dp)
                 Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
             End Select
+            If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
             Deallocate(W)
-            Return
-        End If
+        Else
+            If (mype==0) Write(*,"(A,I5,A)") "DiagInitApprox: ScaLAPACK used, will distribute across ", npes, " cpus"
+            NPROW=1
+            NPCOL=npes
 
-        ! Set the number of rows, NPROW, and columns, NPCOL, of the processor grid
-        NPROW = 1
-        NPCOL = npes
+            ! Initialize BLACS context
+            CALL BLACS_GET(-1, 0, CONTEXT)
+            CALL BLACS_GRIDINIT(CONTEXT, 'R', NPROW, NPCOL)
+            CALL BLACS_GRIDINFO(CONTEXT, NPROW, NPCOL, MYROW, MYCOL)
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: BLACS grid init, rank ", mype, " -> ", MYROW,  ",", MYCOL
 
-        ! Initialize BLACS context
-        CALL BLACS_GET(-1, 0, CONTEXT)
-        CALL BLACS_GRIDINIT(CONTEXT, 'R', NPROW, NPCOL)
-        CALL BLACS_GRIDINFO(CONTEXT, NPROW, NPCOL, MYROW, MYCOL)
+            ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
+            If (mype==0) Then
+                blacsGrid(1) = GetEnvInteger("CONF_DIAG_INIT_APPROX_BLACS_ROWS", Nd0)
+                blacsGrid(2) = GetEnvInteger("CONF_DIAG_INIT_APPROX_BLACS_COLS", 1)
+                If (isVerbose) Write(*,"(A,I5,A,I5,A)") "DiagInitApprox: BLACS grid will be ", blacsGrid(1), " rows by ", blacsGrid(2), " columns"
+            End If
+            Call MPI_Bcast(blacsGrid, 2, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+            
+            NROWSA = NUMROC(Nd0,blacsGrid(1),MYROW,0,NPROW)
+            NCOLSA = NUMROC(Nd0,blacsGrid(2),MYCOL,0,NPCOL)
+            ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated local storage, rank ", mype, " -> ", NROWSA,  " x ", NCOLSA
 
-        ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
-        NROWSA = NUMROC(Nd0,Nd0,MYROW,0,NPROW)
-        NCOLSA = NUMROC(Nd0,1,MYCOL,0,NPCOL)
-        ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
+            ! Initialize array descriptors DESCA and DESCZ
+            CALL DESCINIT(DESCA, Nd0, Nd0, blacsGrid(1), blacsGrid(2), 0, 0, CONTEXT, NROWSA, ifail)
+            CALL DESCINIT(DESCZ, Nd0, Nd0, blacsGrid(1), blacsGrid(2), 0, 0, CONTEXT, NROWSA, ifail)
 
-        ! Initialize array descriptors DESCA and DESCZ
-        CALL DESCINIT(DESCA, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
-        CALL DESCINIT(DESCZ, Nd0, Nd0, Nd0, 1, 0, 0, CONTEXT, NROWSA, ifail)
+            If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: BLACS initialization completed"
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
-        if (mype==0) write(*,*) 'BLACS initialization completed'
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
+            A=0.0d0
+            Select Case(type_real)
+            Case(sp)
+                Do I=1,Nd0
+                    Do J=1,I
+                        CALL PSELSET(A, J, I, DESCA, Z1(I,J))
+                    End Do
+                End Do
+            Case(dp)
+                Do I=1,Nd0
+                    Do J=1,I
+                        CALL PDELSET(A, J, I, DESCA, Z1(I,J))
+                    End Do
+                End Do
+            End Select
+            If (mype==0 .and. isVerbose) Write(*,"(A)") 'DiagInitApprox: Matrix Z1 distributed'
 
-        ! Distribute the upper triangular part of the global matrix Z1 onto the local matrices A
-        A=0.0d0
-        Select Case(type_real)
-        Case(sp)
+            ! Query for the optimal work array sizes
+            Select Case(type_real)
+            Case(sp)
+                CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
+            Case(dp)
+                CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
+            End Select
+            LWORK = realtmp(1)
+            LIWORK = itmp(1)
+            ALLOCATE(IWORK(LIWORK), W(LWORK))
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated work arrays, rank ", mype, " -> real=", LWORK,  ", integer=", LIWORK
+
+            ! Compute the eigenvalues E1 and eigenvectors Z
+            Select Case(type_real)
+            Case(sp)
+                CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
+            Case(dp)
+                CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
+            End Select
+            If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
+
+            ! Un-distribute the eigenvector matrix back to Z1 in each worker:
             Do I=1,Nd0
-                Do J=1,I
-                    CALL PSELSET(A, J, I, DESCA, Z1(I,J))
+                Do J=1,Nd0
+                    CALL PDELGET('A', ' ', Z1(I,J), Z, I, J, DESCZ)
                 End Do
             End Do
-        Case(dp)
-            Do I=1,Nd0
-                Do J=1,I
-                    CALL PDELSET(A, J, I, DESCA, Z1(I,J))
-                End Do
-            End Do
-        End Select
-
-        ! Query for the optimal work array sizes
-        Select Case(type_real)
-        Case(sp)
-            CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
-        Case(dp)
-            CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, realtmp, -1, itmp, 1, ifail)
-        End Select
-        LWORK = realtmp(1)
-        LIWORK = itmp(1)
-        ALLOCATE(IWORK(LIWORK), W(LWORK))
-        if (mype==0) write(*,*) 'Work arrays allocated: real=',LWORK,',integer=',LIWORK
-
-        ! Compute the eigenvalues E1 and eigenvectors Z
-        Select Case(type_real)
-        Case(sp)
-            CALL PSSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
-        Case(dp)
-            CALL PDSYEVD('V', 'U', Nd0, A, 1, 1, DESCA, E1, Z, 1, 1, DESCZ, W, LWORK, IWORK, LIWORK, ifail)
-        End Select
-
-        ! Un-distribute the eigenvector matrix back to Z1 in each worker:
-        Do I=1,Nd0
-            Do J=1,Nd0
-                CALL PDELGET('A', ' ', Z1(I,J), Z, I, J, DESCZ)
-            End Do
-        End Do
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            If (mype==0 .and. isVerbose) Write(*,"(A)") 'DiagInitApprox: Matrix Z1 undistributed'
+            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         
-        ! Exit BLACS context
-        CALL BLACS_GRIDEXIT(CONTEXT)
+            ! Exit BLACS context
+            CALL BLACS_GRIDEXIT(CONTEXT)
+            If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: BLACS grid destroyed"
 
-        ! Stop timer and print time for initial diagonalization
-        If (mype == 0) Then
-            Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Initial diagonalization took '// trim(timeStr) // ' to complete'
+            ! Clean up
+            Deallocate(IWORK, W, Z, A)
         End If
-
-        ! Clean up
-        Deallocate(IWORK, W, Z, A)
-
+        If (mype==0) Then
+            ! Stop timer and print time for initial diagonalization
+            Call stopTimer(s1, timeStr)
+            Write(*,"(2X,A,A,A)"), "TIMING >>> Initial diagonalization took ", trim(timeStr), " to complete"
+        End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-
     End Subroutine DiagInitApprox
 
     Subroutine Diag4(mype, npes)

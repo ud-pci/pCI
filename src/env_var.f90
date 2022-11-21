@@ -1,10 +1,12 @@
 Module env_var
 
+    Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, Int64
+
     Implicit None
     
     Private
 
-    Public :: GetEnvIsPresent, GetEnvLogical, GetEnvInteger
+    Public :: GetEnvIsPresent, GetEnvLogical, GetEnvInteger, GetEnvInteger64
 
   Contains
 
@@ -64,6 +66,25 @@ Module env_var
         If (Len_Trim(varValue) > 0) then
             Read(varValue,*,iostat=convStat) iValue
             If (convStat == 0) GetEnvInteger = iValue
+        End If
+        Return
+    End Function
+
+    Integer(Kind=Int64) Function GetEnvInteger64(varName, defaultValue)
+        Implicit none
+
+        Character(Len=*), Intent(In)    :: varName
+        Integer(Kind=Int64), Intent(In), Optional   :: defaultValue
+
+        Character(Len=48)               :: varValue
+        Integer                         :: convStat
+        Integer(Kind=Int64)             :: iValue
+
+        GetEnvInteger64 = defaultValue
+        Call GetEnv(varName, varValue)
+        If (Len_Trim(varValue) > 0) then
+            Read(varValue,*,iostat=convStat) iValue
+            If (convStat == 0) GetEnvInteger64 = iValue
         End If
         Return
     End Function
