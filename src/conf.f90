@@ -3001,7 +3001,7 @@ Contains
             strfmt = '(F9.6,5X,A)'
             wsum=0_dp
             i=0
-            Do While (wsum < 0.99 .and. i < nconfs)
+            Do While (wsum < 0.95 .and. i < nconfs)
                 i=i+1
                 Write(98, strfmt) Wsave(i,j), strcsave(i,j)
                 If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
