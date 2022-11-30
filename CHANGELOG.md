@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.11] - 2022-11-30
+- conf v5.11 - writing of configurations in ADD.INP format
+- conf.f90 - increased weight threshold to 0.9999
+- conf.f90 - new code to write top weighted configurations in the format of ADD.INP basic configurations
+
 ## [0.11.10] - 2022-11-21
 - conf v5.10 - bug fixes for ScaLAPACK routines causing openmp-related issues done by Dr. Jeffrey Frey of UD IT-RCI
 - conf.f90 - reimplemented DiagInitApprox subroutine with parallel blocking method

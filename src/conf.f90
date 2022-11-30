@@ -163,9 +163,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.10 with single precision")'
+            strfmt = '(4X,"Program conf v5.11 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.10")'
+            strfmt = '(4X,"Program conf v5.11")'
         End Select
         
         Write( 6,strfmt)
@@ -2088,7 +2088,7 @@ Contains
             strfmt = '(F9.6,5X,A)'
             wsum=0_dp
             i=0
-            Do While (wsum < 0.99 .and. i < nconfs)
+            Do While (wsum < 0.995 .and. i < nconfs)
                 i=i+1
                 Write(98, strfmt) Wsave(i,j), strcsave(i,j)
                 If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
@@ -2778,19 +2778,20 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs
+        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt
         Real(dp) :: wsum, gfactor
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
         Character(Len=1), Dimension(11) :: st1, st2
-        Character(Len=512) :: strfmt, strfmt2, strconfig, strsp
+        Character(Len=512) :: strfmt, strfmt2, strconfig, strconfig2, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq, strterm
         Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
-        Character(Len=5) :: strgf
+        Character(Len=5) :: strgf, strconfadd2
+        Character(Len=5), Allocatable, Dimension(:) :: strconfadd
         Type WeightTable
             Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
             Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
@@ -2980,6 +2981,7 @@ Contains
         End Do
 
         ! Write LEVELS.RES
+        If (.not. Allocated(strconfadd)) Allocate(strconfadd(nconfs))
         If (.not. Allocated(wgtconfs%strconfs)) Allocate(wgtconfs%strconfs(Nc))
         If (.not. Allocated(wgtconfs%nconfs)) Allocate(wgtconfs%nconfs(Nc))
         If (.not. Allocated(wgtconfs%strconfsave)) Allocate(wgtconfs%strconfsave(Nc))
@@ -3001,7 +3003,7 @@ Contains
             strfmt = '(F9.6,5X,A)'
             wsum=0_dp
             i=0
-            Do While (wsum < 0.995 .and. i < nconfs)
+            Do While (wsum < 0.9999 .and. i < nconfs)
                 i=i+1
                 Write(98, strfmt) Wsave(i,j), strcsave(i,j)
                 If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
@@ -3043,7 +3045,40 @@ Contains
         
         Do j=1,k
             If (wgtconfs%wgtsave(j) > 0) Then
-                Write(98,'(I6,1X,F10.5,10X,A)') wgtconfs%nconfsave(j), wgtconfs%wgtsave(j), wgtconfs%strconfsave(j)
+                Write(98,'(I6,1X,F11.6,5X,A)') wgtconfs%nconfsave(j), wgtconfs%wgtsave(j), wgtconfs%strconfsave(j)
+            End If
+        End Do
+        
+        Write(98,'(A)')    ' ===================================================='
+        Write(98,'(A)') ''
+        Write(98,'(A)')    ' Full list of configurations in ADD.INP format'
+        Write(98,'(A)') ''
+
+        Do j=1,k
+            cnt = 1
+            strconfadd2 = ''
+            If (wgtconfs%wgtsave(j) > 0) Then
+                Do i=1,Len(Trim(AdjustL(wgtconfs%strconfsave(j))))+1
+                    strconfig2 = Trim(AdjustL(wgtconfs%strconfsave(j)))
+                    strconfadd2 = Trim(strconfadd2) // strconfig2(i:i)
+                    If (strconfig2(i:i) == '') Then
+                        If (any(strconfig2(i-1:i-1) == ["s","p","d","f","g","h","i"])) Then
+                            strconfadd2 = Trim(strconfadd2) // "1"
+                        End If
+                        If (any(strconfadd2(2:2) == ["s","p","d","f","g","h","i"])) Then
+                            strconfadd2 = " " // Trim(strconfadd2)
+                        End If
+                        strconfadd(cnt) = strconfadd2
+                        strconfadd2 = ''
+                        cnt = cnt + 1
+                    End If
+                End Do
+                strconfadd(cnt) = strconfadd2
+                If (cnt > 7) Then
+                    Write(98,'("L:  ",6(A,1X), /"L:  ",6(A,1X))') strconfadd(1:cnt-1)
+                Else
+                    Write(98,'("L:  ",6(A,1X))') strconfadd(1:cnt-1)
+                End If
             End If
         End Do
 
