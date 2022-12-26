@@ -81,7 +81,7 @@ Module vaccumulator
         
         Type(IVAccumulator), Intent(InOut)              :: this
         Integer, Dimension(:), Allocatable, Intent(Out) :: outV
-        Integer, Intent(Out)                            :: outVLen
+        Integer(kind=int64), Intent(Out)                :: outVLen
         
         outVLen = this%vLen
         If (this%vLen > 0) then
@@ -158,7 +158,7 @@ Module vaccumulator
         
         Type(RVAccumulator), Intent(InOut)                  :: this
         Real(kind=type_real), Dimension(:), Allocatable, Intent(Out)    :: outV
-        Integer, Intent(Out)                                :: outVLen
+        Integer(kind=int64), Intent(Out)                                :: outVLen
         
         outVLen = this%vLen
         If (this%vLen > 0) then

@@ -103,11 +103,12 @@ Module formj2
         Use matrix_io
         Implicit None
 
-        Integer :: k1, n1, ic1, ndn, j, ij4, ijmax, n, k, nn, kk, counter1, counter2, counter3, diff
+        Integer :: k1, n1, ic1, ndn, j, ij4, ijmax, n, k, nn, kk, diff
         Real(kind=type_real) :: tt
-        Integer(kind=int64) :: stot, s1, mem, maxmem, statmem
-        Integer, allocatable, dimension(:) :: idet1, idet2, cntarray
-        Integer :: npes, mype, mpierr, msg, maxme, endNc
+        Integer(kind=int64) :: stot, s1, mem, maxmem, statmem, counter1, counter2, counter3, maxme
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer, Allocatable, Dimension(:) :: cntarray
+        Integer :: npes, mype, mpierr, msg,  endNc
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ncGrowBy, nccnt, ncsplit
@@ -349,8 +350,9 @@ Module formj2
         Use mpi_f08
         Implicit None
 
-        Integer :: ierr, i, k, n, nx, mpierr
-        Real(type_real) :: r, t, xj, xj2
+        Integer :: ierr, k, n, nx, mpierr
+        Integer(Kind=int64) :: i
+        Real(type_real) :: r, t, xj
         Real(type_real), dimension(nx) :: X1
 
         ierr=0
@@ -368,8 +370,8 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        Call MPI_AllReduce(xj, xj2, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        xj=0.5d0*(sqrt(1.d0+xj2)-1.d0)
+        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then
             If (dabs(xj-XJ_av) > 1.d-1) ierr=1

@@ -163,9 +163,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.11 with single precision")'
+            strfmt = '(4X,"Program conf v5.12 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.11")'
+            strfmt = '(4X,"Program conf v5.12")'
         End Select
         
         Write( 6,strfmt)
@@ -921,14 +921,15 @@ Contains
 
         Implicit None
 
-        Integer :: npes, mype, mpierr, maxNumElementsPerCore, mesplit
-        Integer :: k1, kx, n, ic, ihmax, j, k, ih4, counter1, counter2, counter3, diff, icomp
-        Integer :: nn, kk, msg, sender, num_done, an_id, endnd, maxme
+        Integer :: npes, mype, mpierr
+        Integer :: k1, kx, n, ic, j, k, diff, icomp, ih4
+        Integer :: nn, kk, msg, sender, num_done, an_id, endnd
         Type(MPI_STATUS) :: status
-        Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
-        Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
+        Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
-        Integer(Kind=int64) :: statmem, mem, maxmem
+        Integer(Kind=int64) :: statmem, mem, maxmem, ihmax, counter1, counter2, counter3
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
@@ -1009,10 +1010,10 @@ Contains
                 If (mype==0) Call RVAccumulatorInit(rva1, vaGrowBy)
                 Nd_prev = 0
                 ih4=0
-                NumH=0
-                counter1=1
-                counter2=1
-                counter3=1
+                NumH=0_int64
+                counter1=1_int64
+                counter2=1_int64
+                counter3=1_int64
             End If
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -1145,7 +1146,7 @@ Contains
                     End If
                 End Do
             Else
-                cntarray=ih4
+                cntarray=Int(ih4, kind=int64)
                 Do 
                     Call MPI_RECV ( nnd, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     If (nnd == -1) Then
@@ -1203,38 +1204,37 @@ Contains
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call startTimer(s1)
 
-            Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+            Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
             If (Kl == 3) Then
                 mesplit = (maxNumElementsPerCore-ih4+1)/10
             Else
                 mesplit = maxNumElementsPerCore/10
             End If
-            numzero=0
+            numzero=0_int64
             j=1
 
             If (mype /= 0) Then
                 Allocate(Hamil%val(counter1))
-                If (Kl==3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
                 Call startTimer(s2)
-                Do n=ih4+1,counter1
-                    nn=Hamil%ind1(n)
-                    kk=Hamil%ind2(n)
+                If (Kl==3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
+                Do n8=ih4+1,counter1
+                    nn=Hamil%ind1(n8)
+                    kk=Hamil%ind2(n8)
                     Call Gdet(nn,idet1)
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                     t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                    Hamil%val(n)=t
+                    Hamil%val(n8)=t
                     If (Kl /=3 .and. t == 0) numzero=numzero+1
-                    If (counter1 == maxNumElementsPerCore .and. mod(n,mesplit)==0) Then
+                    If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(*,'(2X,A,1X,I3,A)'), 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
                         j=j+1
                     End If
                 End Do
                 Call stopTimer(s2, timeStr)
-                !print*,mype,timeStr
             Else
                 print*, '========== Starting calculation stage of FormH =========='
             End If
@@ -1244,7 +1244,7 @@ Contains
             If (mype==0) print*, '========== Formation of Hamiltonian matrix completed =========='
         End If
 
-        ih8=size(Hamil%val)
+        ih8=size(Hamil%val, kind=int64)
         ih4=ih8
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1596,13 +1596,15 @@ Contains
         Implicit None
         External :: DSYEV, SSYEV
 
-        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail=0, lwork
+        Integer  :: k1, k, i, n1, kx, i1, it, js, mype, npes, mpierr, ifail=0, lwork
         Real(kind=type_real), Dimension(4) :: realtmp
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
         Character(Len=16) :: timeStr, iStr
+        Integer,  Allocatable, Dimension(:) :: Jn, Jk
+        Real(kind=type_real), Allocatable, Dimension(:) :: Jt
 
         ! Initialize parameters and arrays
         Iconverge = 0
@@ -1643,13 +1645,13 @@ Contains
         End If
 
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        !If (mype == 0) Then
-        !    js = size(Jsq%ind1)
-        !    Allocate(Jn(js),Jk(js),Jt(js))
-        !    Jn=Jsq%ind1
-        !    Jk=Jsq%ind2
-        !    Jt=Jsq%val
-        !End If
+        If (mype == 0) Then
+            js = size(Jsq%ind1)
+            Allocate(Jn(js),Jk(js),Jt(js))
+            Jn=Jsq%ind1
+            Jk=Jsq%ind2
+            Jt=Jsq%val
+        End If
 
         ! Davidson loop:
         kdavidson = 0
@@ -1710,11 +1712,11 @@ Contains
                     Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
                 If (K_prj == 1) Then
-                    !If (mype == 0) Then
-                    !    Jsq%ind1=Jn
-                    !    Jsq%ind2=Jk
-                    !    Jsq%val=Jt
-                    !End If
+                    If (mype == 0) Then
+                        Jsq%ind1=Jn
+                        Jsq%ind2=Jk
+                        Jsq%val=Jt
+                    End If
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
                         Call startTimer(s1)
@@ -1790,11 +1792,11 @@ Contains
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                                !If (mype == 0) Then
-                                !    Jsq%ind1=Jn
-                                !    Jsq%ind2=Jk
-                                !    Jsq%val=Jt
-                                !End If
+                                If (mype == 0) Then
+                                    Jsq%ind1=Jn
+                                    Jsq%ind2=Jk
+                                    Jsq%val=Jt
+                                End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
                             If (mype == 0) Then
@@ -1828,14 +1830,14 @@ Contains
         End Do
 
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        !If (mype == 0) Then
-        !    Jsq%ind1=Jn
-        !    Jsq%ind2=Jk
-        !    Jsq%val=Jt
-        !    If (allocated(Jn)) Deallocate(Jn)
-        !    If (allocated(Jk)) Deallocate(Jk)
-        !    If (allocated(Jt)) Deallocate(Jt)
-        !End If
+        If (mype == 0) Then
+            Jsq%ind1=Jn
+            Jsq%ind2=Jk
+            Jsq%val=Jt
+            If (allocated(Jn)) Deallocate(Jn)
+            If (allocated(Jk)) Deallocate(Jk)
+            If (allocated(Jt)) Deallocate(Jt)
+        End If
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
 
@@ -2168,7 +2170,7 @@ Contains
             End If
         End Do
 
-        Deallocate(Iconverge)
+        If (allocated(Iconverge)) Deallocate(Iconverge)
 
         If (mype==0) Then
             Print*, 'Final CONF.XIJ has been written'

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.12] - 2022-12-26
+- conf v5.12 - bug fix for integer overflow for very large CI calculations
+
 ## [0.11.11] - 2022-11-30
 - conf v5.11 - writing of configurations in ADD.INP format
 - conf.f90 - increased weight threshold to 0.9999
