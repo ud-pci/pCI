@@ -145,6 +145,7 @@ Contains
         ! speed of light is taken from "phys.par":
         Cl=DPcl
         Mj=2*dabs(Jm)+0.01d0
+        Qw=0_dp
 
         Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
@@ -551,7 +552,6 @@ Contains
         P(18)=Ecore
         P(19)=Hcore
         Call WriteF(12,1,P,Q,2)
-
         strfmt='(/4X,"one-el. and total core energy:",F17.7,4X,F17.7, &
               /6X "including Breit core energy:",F17.7)'
         ! strfmt='(/4X,"one-el., Coulomb & Breit core energy:",F17.7,2(4X,F17.7))'
