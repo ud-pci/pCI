@@ -1126,6 +1126,9 @@ Contains
                     Read(97,'(A)') strc1(i)
                     Read(97,'(A)') strt1(i)
                     i=i+1
+                Else
+                    Read(97,'(A)')
+                    Read(97,'(A)') 
                 End If
             End Do
             i=1
