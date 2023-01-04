@@ -2780,7 +2780,7 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt
+        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt, nspacesterm
         Real(dp) :: wsum, gfactor
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
@@ -2788,7 +2788,8 @@ Contains
         Character(Len=1), Dimension(11) :: st1, st2
         Character(Len=512) :: strfmt, strfmt2, strconfig, strconfig2, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
-        Character(Len=3) :: strc, strq, strterm
+        Character(Len=3) :: strc, strq
+        Character(Len=6) :: strterm
         Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
@@ -2824,6 +2825,8 @@ Contains
         ! Form matrix of weights of each configuration for each energy level
         W2=0_dp
         nspacesg = 0
+        nspacesterm = 0
+        If (mod(Ne,2) == 1) nspacesterm = 3
         Wsave = 0_dp
         Do j=1,Nlv
             If (kWeights == 1) Then
@@ -2923,34 +2926,34 @@ Contains
             ! If LSJ is calculated, also include terms in CONFSTR.RES
             If (kLSJ == 1) Then
                 strterm = term(Xl(j), Xs(j), Tj(j))
-                Write(97,'(A)') strterm
+                Write(97,'(A)') Trim(AdjustL(strterm))
             End If
 
             nspaces = nspacesg
             ! If L, S, J is needed
             If (kLSJ == 1) Then
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf '// strsp(1:nspacesterm) // 'term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
                     If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
                         nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
                         strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     Else
                         strfmt = '(I3,2X,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                     End If
                 ! Else we include only the main configuration
                 Else
                     If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
                         nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
                         strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
                     Else
                         strfmt = '(I3,2X,A,1X,A,2X,f14.8,f14.1,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strterm, Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
+                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
                     End If
                 End If
             ! If L, S, J is not needed
@@ -3117,16 +3120,15 @@ Contains
         
     End Subroutine PrintWeights
 
-    Character(Len=3) Function term(L, S, J)
+    Character(Len=6) Function term(L, S, J)
         ! This function returns the term, given L, S and J
         Implicit None
         Real(dp), Intent(In) :: L, S, J
         Integer :: is, il, ij
         Character(Len=1) :: strl
 
-        is = 2*Nint(S)+1
+        is = Nint(2*S+1)
         il = Nint(L)
-        ij = Nint(J)
 
         Select Case (il)
         Case(0)
@@ -3140,10 +3142,30 @@ Contains
         Case(4)
             strl = 'G' 
         Case(5)
-            strl = 'H' 
+            strl = 'H'
+        Case(6)
+            strl = 'I'
+        Case(7)
+            strl = 'K'  
+        Case(8)
+            strl = 'L'
+        Case(9)
+            strl = 'M'     
+        Case Default
+            strl = '>'    
         End Select
 
-        Write(term, '(I1,A,I1)') is, strl, ij
+        If (mod(Ne,2) == 0) Then
+          ij = Nint(J)
+          Write(term, '(I1,A,I1)') is, strl, ij
+        Else
+          ij = Nint(2*J)  
+          If (ij < 10) Then
+             Write(term, '(I1,A,I1,A2)') is, strl, ij,'/2'
+          Else
+             Write(term, '(I1,A,I2,A2)') is, strl, ij,'/2'
+          EndIf 
+        End If  
 
     End Function term
 
