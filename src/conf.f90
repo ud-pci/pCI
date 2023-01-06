@@ -1870,6 +1870,7 @@ Contains
 
         Integer :: j, ist, iter
         Real(kind=type_real) :: dt, del
+        Real(kind=type_real), Dimension(Nlv) :: Tk0
         Character(Len=1), Dimension(10) :: stecp*7
         Character(Len=1), Dimension(4)  :: strsms*6
         Character(Len=1), Dimension(3)  :: strms*3
@@ -1932,10 +1933,10 @@ Contains
         ! DT = Tk(j)-Ecore = total energy
         ! DEL = Tk(1)-Tk(j) = energy difference between jth level and 1st level in cm**-1
         Do j=1,Nlv
-            Tk(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
-            DT=Tk(j)-Ecore
-            DEL=(Tk(1)-Tk(j))*2*DPRy
-            Write(81,'(3X,I3,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk(j),DT,DEL
+            Tk0(j)=Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
+            DT=Tk0(j)-Ecore
+            DEL=(Tk0(1)-Tk0(j))*2*DPRy
+            Write(81,'(3X,I3,F14.9,F14.8,F18.6,F15.2)') j,Tj(j),Tk0(j),DT,DEL
         End Do
 
         ! Print line of "=" for bottom of table
@@ -2083,7 +2084,7 @@ Contains
             Write(98,'(A)') '****************************************************'
             write(98,'(A)') ''
             strfmt = '("Level #",i3,2x,"J =",f6.3,5x," E =",f14.8)'
-            Write(98, strfmt) j, Tj(j), Tk(j)
+            Write(98, strfmt) j, Tj(j), Tk(j)+4.d0*Gj*Tj(j)*(Tj(j)+1.d0)
             Write(98,'(A)') ''
             Write(98,'(A)') ' Weight     Configuration'
             Write(98,'(A)') ''
