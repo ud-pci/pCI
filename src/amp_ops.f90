@@ -132,7 +132,7 @@ Module amp_ops
         AE=Ro*Fint(11,nk,nl,+1)
         If (AE /= 0.d0) Then
             is = 1
-            k=xjl-0.51d0
+            k=xjl+0.51d0
             If (k /= 2*(k/2)) is=-is
             xlk=lk
             xll=ll
