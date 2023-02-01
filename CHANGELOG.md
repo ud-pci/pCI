@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.13] - 2023-01-31
+- conf v5.13 - bug fix for lost allocation of lsj arrays xj, xl, xs
+
 ## [0.11.12] - 2022-12-26
 - conf v5.12 - bug fix for integer overflow for very large CI calculations
 

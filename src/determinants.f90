@@ -23,6 +23,7 @@ Module determinants
         n1=0
 
         Do ic=1,Nc4
+            if (ic > Nc) Exit
             n1=n1+Ndc(ic)
             If (n1 < n0) Then
                 n2=n1

@@ -128,8 +128,9 @@ Program conf
     ! Call LSJ routines if kLSJ=1
     If (kLSJ == 1) Then
         If (mype == 0) Call Rdet('CONF.DET')
-        Call AllocateLSJArrays
-        Call InitLSJ
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call AllocateLSJArrays(mype)
+        Call InitLSJ(mype)
         Call lsj(ArrB,xj,xl,xs,mype,npes)
     End If
     
@@ -163,9 +164,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.12 with single precision")'
+            strfmt = '(4X,"Program conf v5.13 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.12")'
+            strfmt = '(4X,"Program conf v5.13")'
         End Select
         
         Write( 6,strfmt)
@@ -1401,6 +1402,13 @@ Contains
         If (.not. Allocated(B2)) Allocate(B2(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
+
+        If (kLSJ == 1) Then
+            If (.not. Allocated(xj)) Allocate(xj(Nlv))
+            If (.not. Allocated(xl)) Allocate(xl(Nlv))
+            If (.not. Allocated(xs)) Allocate(xs(Nlv))
+        End If
+
         If (mype==0) Then
             memDvdsn = 0_int64
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
@@ -1630,7 +1638,7 @@ Contains
 
         ! Write initial approximation to file CONF.XIJ
         Call FormB0(mype)
-
+        
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
         If (mype == 0) Then
             n1 = 2*Nlv
@@ -1752,6 +1760,8 @@ Contains
                         Call FormP(2, vmax)
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'FormP2 took ' // timeStr
+                        ! >>>>> this block of code causes problem allocating xj, xl, xs arrays >>>>>
+                        ! >>>>>>>>>>>>>>>> if allocation occurs after this block >>>>>>>>>>>>>>>>>>>
                         ! Evaluation of Nlv eigenvectors:
                         Call startTimer(s1)
                         Select Case(type_real)
@@ -1760,6 +1770,7 @@ Contains
                         Case(dp)
                             Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         End Select
+                        ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
                         
@@ -2181,10 +2192,12 @@ Contains
         Return
     End Subroutine WriteFinalXIJ
 
-    Subroutine AllocateLSJArrays
+    Subroutine AllocateLSJArrays(mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
+        Integer, Intent(In) :: mype
+        Integer :: mpierr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
@@ -2197,22 +2210,23 @@ Contains
         If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
-        If (.not. Allocated(Xj)) Allocate(Xj(Nlv))
-        If (.not. Allocated(Xl)) Allocate(Xl(Nlv))
-        If (.not. Allocated(Xs)) Allocate(Xs(Nlv))
+        If (.not. Allocated(xj)) Allocate(xj(Nlv))
+        If (.not. Allocated(xl)) Allocate(xl(Nlv))
+        If (.not. Allocated(xs)) Allocate(xs(Nlv))
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,Nlv))
 
-        Return
+        If (mype == 0) print*, 'LSJ arrays allocated'
+
     End Subroutine AllocateLSJArrays
 
-    Subroutine InitLSJ
+    Subroutine InitLSJ(mype)
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
         Use mpi_f08
         Use mpi_utils
         Implicit None
 
-        Integer :: mpierr
+        Integer :: mype, mpierr
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -2230,6 +2244,8 @@ Contains
         Call MPI_Bcast(Tk, Nlv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        If (mype == 0) print*, 'LSJ arrays initialized'
+
         Return
     End subroutine InitLSJ
 
