@@ -48,7 +48,7 @@ def count_orbitals(orbitals):
     num_orbitals = 0
     for orbital in orbitals:
         try:
-            l = re.findall('[spdfgh]+', orbital)[0]
+            l = re.findall('[spdfghikl]+', orbital)[0]
         except IndexError:
             print(orbital + ' is not a valid orbital')
         if l == 's':
@@ -392,9 +392,9 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
     norbs = []
 
     ## First we need to construct list of orbitals from nmax + lmax
-    nmin = [0, 0, 0, 0, 0, 0, 0]
+    nmin = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     core_val = core + ' ' + valence
-    l = ['s','p','d','f','g','h','i']
+    l = ['s','p','d','f','g','h','i','k','l']
     for orbital in core_val.split():
         n = int(re.findall('[0-9]+', orbital)[0])
         if orbital[-1] == 's' and n > nmin[0]:
@@ -411,6 +411,10 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
             nmin[5] = n
         elif orbital[-1] == 'i' and n > nmin[6]:
             nmin[6] = n
+        elif orbital[-1] == 'k' and n > nmin[7]:
+            nmin[7] = n
+        elif orbital[-1] == 'l' and n > nmin[8]:
+            nmin[8] = n
         else:
             pass
 
@@ -607,10 +611,10 @@ def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energie
     f.close()
     print('inf.vw has been written')
 
-def write_spl_in(filename, radius):
+def write_spl_in(filename, radius, lmax):
     """ Writes spl.in """
     with open(filename,'w') as f: 
-        f.write('6\n')
+        f.write(str(lmax) + '\n')
         f.write(str(radius) + '\n')
         f.write('40 7\n')
         f.write('0.0 0.00 500')
@@ -650,7 +654,7 @@ if __name__ == "__main__":
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
 
     # Write spl.in
-    write_spl_in('spl.in', system['radius'])
+    write_spl_in('spl.in', system['radius'], system['lmax'])
 
     # Get valence orbitals for all-order calculations
     val_N, val_kappa = get_ao_valence(system['core'], system['valence'], system['val_aov'])
