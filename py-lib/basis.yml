@@ -1,8 +1,8 @@
-name: Ac
-isotope: 227
+name: Th III
+isotope: 232
 include_breit: True
 core: 1s 2s 2p 3s 3p 3d 4s 4p 4d 4f 5s 5p 5d 6s 6p
-valence: 7s 6d 7p 5f 8s 7d 8p
+valence: 6d 5f 7s 7p 8s
 radius: 60
 
 # Enter the number of valence subshells to include in inf.aov
@@ -16,7 +16,7 @@ val_aov:
 
 # Enter nmax and lmax in correlation diagram summations
 nmax: 35
-lmax: 5
+lmax: 6
 
 # Enter version of codes to run: 'ci+all-order' or 'ci+second-order'
 codes: ci+all-order
@@ -31,3 +31,11 @@ energies:
     d: [-0.31000, -0.31000],
     f: [-0.13000, -0.13000]
   ]
+
+# Enter key for isotope shifts
+# 0 for no IS, 1 for IS
+K_is: 1
+C_is: 0.01
+
+# Enter whether or not to run set of all-order codes after basis set construction
+run_ao_codes: false

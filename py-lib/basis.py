@@ -4,6 +4,8 @@ import math
 import sys
 import get_atomic_data as libatomic
 import orbitals as liborb
+import os
+from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, run
 
 def read_yaml(filename):
@@ -32,6 +34,22 @@ def read_yaml(filename):
             energies = config['energies']
         except KeyError as e:
             config[e.args[0]] = []
+
+        # Check to see if isotope shift key is specified. If not, set to 0
+        try:
+            isotope = config['K_is']
+        except KeyError as e:
+            config[e.args[0]] = 0
+        try:
+            C_is = config['C_is']
+        except KeyError as e:
+            config[e.args[0]] = 0 
+
+        # Check whether or not to run all-order codes after basis set construction
+        try:
+            run_ao_codes = config['run_ao_codes']
+        except KeyError as e:
+            config[e.args[0]] = 0 
 
     return config
 
@@ -362,7 +380,7 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
 
     return N, kappa
 
-def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc):
+def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc, K_is, C_is):
     """ Writes HFD.INP """
     # Define default values
     KL = 0
@@ -378,13 +396,16 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
         f.write(' JM =  ' + str(JM) + '\n')
         f.write(' R2 =  ' + str(float(system['radius'])) + '\n')
         f.write(' kbr= ' + str(kbr) + '\n')
+        if C_is != 0:
+            f.write('K_is= ' + str(K_is) + '\n')
+            f.write('C_is= ' + str(C_is) + '\n')
         f.write('rnuc= ' + '{:.4f}'.format(rnuc) + '\n\n')
         f.write('        NL   J       QQ     KP   NC\n\n')
         for i in range(len(NL)):
             f.write(str(i+1).rjust(3," ") + '     ' + NL[i] + ' (' + J[i] + ')' + '   ' 
                         + QQ[i] + '    ' + KP[i] + '   ' + NC[i].rjust(2,' ') + '\n')
     f.close()
-    print('HFD.INP has been written')
+    print(filename + ' has been written')
 
 def construct_vvorbs(core, valence, codename, nmax, lmax):
 # Construct list of valence and virtual orbitals
@@ -461,7 +482,7 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
     return vorbs, norbs, nval, nvvorbs
 
 
-def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, codename, core, valence):
+def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, codename, core, valence, K_is, C_is):
     """ Writes BASS.INP """
     # Define default values
     Nv = len(valence.split())
@@ -500,6 +521,9 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
         f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
         f.write('kout=' + str(0).rjust(5," ") + '# detail rate in the output\n')
         f.write('kbrt=' + str(kbr).rjust(5," ") + '# 0,1,2 - Coulomb, Gaunt, Breit\n')
+        if C_is != 0:
+            f.write('K_is= ' + str(K_is) + '\n')
+            f.write('C_is= ' + str(C_is) + '\n')
         f.write('----------------------------------------------------------\n')
         # Write core orbitals
         if len(core.split()) != 0:
@@ -534,6 +558,7 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
             except IndexError:
                 f.write('>>>>>>>>>> END <<<<<<<<<<')
     f.close()
+    print(filename + ' has been written')
 
 def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi):
     """ Writes bas_wj.in """
@@ -618,7 +643,126 @@ def write_spl_in(filename, radius, lmax):
         f.write(str(radius) + '\n')
         f.write('40 7\n')
         f.write('0.0 0.00 500')
+    f.close()
     print('spl.in has been written')
+
+def write_inputs(system, C_is):
+    # Write HFD.INP
+    write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['K_is'], C_is)
+    
+    # Write BASS.INP
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['nmax'], system['lmax'], system['codes'], system['core'], system['valence'], system['K_is'], C_is)
+
+    # Write bas_wj.in
+    write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
+
+    # Write spl.in
+    write_spl_in('spl.in', system['radius'], system['lmax'])
+    
+    # Write inf.aov
+    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kval, system['energies'])
+
+    # Write inf.vw
+    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kvw, kval, system['energies'])
+
+def write_ao_job_script(filename, nprocs, mem, job_name, partition):
+    with open(filename,'w') as f:
+        f.write('#!/bin/bash -l \n')
+        f.write('#SBATCH --ntasks=' + str(nprocs) + ' \n')
+        f.write('#SBATCH --mem=' + str(mem) + ' \n')
+        f.write('#SBATCH --job-name=' + job_name + ' \n')
+        f.write('#SBATCH --partition=' + partition + ' \n')
+        f.write('#SBATCH --time=1-00:00:00 \n')
+        f.write('#SBATCH --export=NONE \n')
+        f.write('. /opt/shared/slurm/templates/libexec/common.sh \n')
+        f.write('vpkg_require pci \n\n')
+        f.write('time allcore-rle-ci <inf.aov >out.core \n')
+        f.write('time valsd-rle-cis <inf.aov >out.val \n')
+        f.write('time sdvw-rle-cis <inf.aov >out.vw \n')
+        f.write('time second-cis <inf.vw >out.second.vw \n')
+    f.close()
+
+def run_executables():
+    # Run hfd
+    run('hfd > hfd.out', shell=True)
+    print("hfd complete")
+
+    # Produce B-splines
+    if kbrt == 0:
+        run('tdhf < bas_wj.in > tdhf.out', shell=True)
+        print("tdhf complete")
+        run('nspl40 < spl.in > nspl40.out', shell=True)
+        print("nspl40 complete")
+    else:
+        run('bdhf < bas_wj.in > bdhf.out', shell=True)
+        print("bdhf complete")
+        run('bspl40 < spl.in > bspl40.out', shell=True)
+        print("bspl40 complete")
+
+    with open('bwj.in','w') as f: 
+        f.write(str(system['lmax']) + '\n')
+        for i in range(system['lmax']+1):
+            f.write(str(system['nmax']) + '\n')
+        f.write('\n')
+        f.write('\n')
+        f.write('1')
+    f.close()
+
+    run('bas_wj < bwj.in > bas_wj.out', shell=True)
+    run(['rm','bwj.in'])
+    print("bas_wj complete")
+
+    # Edit BASS.INP
+    f = open('BASS.INP', 'r')
+    lines = f.readlines()
+    f.close()
+
+    # Set first orbital for diagonalization to be first valence orbital
+    fvalorb = vorbs[0]
+    fvalorb_str = liborb.convert_digital_to_char(fvalorb)
+    fvalorb = fvalorb_str[0] + " " + fvalorb_str[1][0]
+
+    # Set first orbital to apply kinetic balance to be first virtual orbital
+    fvirorb = vorbs[nvalb]
+    fvirorb_str = liborb.convert_digital_to_char(fvirorb)
+    fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
+
+    # Set last frozen orbital to be last orbital in core
+    frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(system['core'].split()[-1])[-1])
+    frorb = frorb_str[0] + " " + frorb_str[1][0]   
+    
+    f = open('BASS.INP','w')
+    for line in lines:
+        if line[:4] == ' lst':
+            continue
+        elif 'first' in line.split() and 'diagonalization' in line.split():
+            f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
+        elif 'kin.bal.' in line.split():
+            f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
+        elif 'frozen' in line.split():
+            f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
+        elif line[:4] == 'kbrt':
+            f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
+        elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
+            f.write(line[:12] + "\n")
+        else:
+            f.write(line)
+    f.close()
+
+    # run bass
+    with open('bass.in','w') as f: 
+        f.write('WJ.DAT')
+    f.close()
+    run('bass < bass.in > bass.out', shell=True)
+    run(['rm', 'bass.in'])
+    run(['rm','hfspl.1','hfspl.2'])
+    print("bass complete")
+
+    # Run bas_x
+    run('bas_x > bas_x.out', shell=True)
+    print("bas_x complete")
+
+    print("CI+all-order basis set construction complete")
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
@@ -640,21 +784,10 @@ if __name__ == "__main__":
     # Assign keys for which inputs to generate
     kvw = get_key_vw(system['codes'])
 
-    # Write HFD.INP
-    write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc)
-    
-    # Write BASS.INP
     vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(system['core'], system['valence'], system['codes'], system['nmax'], system['lmax'])
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['nmax'], system['lmax'], system['codes'], system['core'], system['valence'])
 
     # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
     N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, system['core'], system['valence'])
-
-    # Write bas_wj.in
-    write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
-
-    # Write spl.in
-    write_spl_in('spl.in', system['radius'], system['lmax'])
 
     # Get valence orbitals for all-order calculations
     val_N, val_kappa = get_ao_valence(system['core'], system['valence'], system['val_aov'])
@@ -662,11 +795,26 @@ if __name__ == "__main__":
     # Set key for energies
     kval = system['kval']
 
-    # Write inf.aov
-    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kval, system['energies'])
+    run_ao_codes = system['run_ao_codes']
 
-    # Write inf.vw
-    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kvw, kval, system['energies'])
+    # Write input files for subsequent executables
+    if system['K_is'] == 0:
+        write_inputs(0, 0)
+    else:
+        C_is = system['C_is']
+        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+        for c in c_list:
+            dir_path = os.getcwd()
+            dir_prefix = ''
+            if c < 0:
+                dir_prefix = 'minus'
+            elif c > 0:
+                dir_prefix = 'plus'
+            dir_name = dir_prefix+str(abs(c))
+            Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
+            os.chdir(dir_name)
+            write_inputs(system,c)
+            os.chdir('../')
 
     # Construct basis set by running sequence of programs
     ## Pure CI
@@ -677,84 +825,33 @@ if __name__ == "__main__":
         # Run bass
         #run(["./bass", ">", "bass.out"], shell=True)
     elif system['codes'] == 'ci+all-order':
-        # Run hfd
-        run('./hfd > hfd.out', shell=True)
-        print("hfd complete")
-
-        # Produce B-splines
-        if kbrt == 0:
-            run('./tdhf < bas_wj.in > tdhf.out', shell=True)
-            print("tdhf complete")
-            run('./nspl40 < spl.in > nspl40.out', shell=True)
-            print("nspl40 complete")
+        # Run executables
+        if system['K_is'] == 0:
+            run_executables(0, 0)
+            # TODO: implement error checking
+            if run_ao_codes: 
+                write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
+                run('sbatch ao.qs', shell=True)
         else:
-            run('./bdhf < bas_wj.in > bdhf.out', shell=True)
-            print("bdhf complete")
-            run('./bspl40 < spl.in > bspl40.out', shell=True)
-            print("bspl40 complete")
-
-        with open('bwj.in','w') as f: 
-            f.write(str(system['lmax']) + '\n')
-            for i in range(system['lmax']+1):
-                f.write(str(system['nmax']) + '\n')
-            f.write('\n')
-            f.write('\n')
-            f.write('1')
-        f.close()
-
-        run('./bas_wj < bwj.in > bas_wj.out', shell=True)
-        run(['rm','bwj.in'])
-        print("bas_wj complete")
-
-        # Edit BASS.INP
-        f = open('BASS.INP', 'r')
-        lines = f.readlines()
-        f.close()
-
-        # Set first orbital for diagonalization to be first valence orbital
-        fvalorb = vorbs[0]
-        fvalorb_str = liborb.convert_digital_to_char(fvalorb)
-        fvalorb = fvalorb_str[0] + " " + fvalorb_str[1][0]
-
-        # Set first orbital to apply kinetic balance to be first virtual orbital
-        fvirorb = vorbs[nvalb]
-        fvirorb_str = liborb.convert_digital_to_char(fvirorb)
-        fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
-
-        # Set last frozen orbital to be last orbital in core
-        frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(system['core'].split()[-1])[-1])
-        frorb = frorb_str[0] + " " + frorb_str[1][0]   
-        
-        f = open('BASS.INP','w')
-        for line in lines:
-            if line[:4] == ' lst':
-                continue
-            elif 'first' in line.split() and 'diagonalization' in line.split():
-                f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
-            elif 'kin.bal.' in line.split():
-                f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
-            elif 'frozen' in line.split():
-                f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
-            elif line[:4] == 'kbrt':
-                f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
-            elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
-                f.write(line[:12] + "\n")
-            else:
-                f.write(line)
-        f.close()
-
-        # run bass
-        with open('bass.in','w') as f: 
-            f.write('WJ.DAT')
-        f.close()
-        run('./bass < bass.in > bass.out', shell=True)
-        run(['rm', 'bass.in'])
-        run(['rm','hfspl.1','hfspl.2'])
-        print("bass complete")
-
-        # Run bas_x
-        run('./bas_x > bas_x.out', shell=True)
-        print("bas_x complete")
-
-        print("CI+all-order basis set construction complete")
+            C_is = system['C_is']
+            c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+            for c in c_list:
+                dir_path = os.getcwd()
+                dir_prefix = ''
+                if c < 0:
+                    dir_prefix = 'minus'
+                elif c > 0:
+                    dir_prefix = 'plus'
+                dir_name = dir_prefix+str(abs(c))
+                print(dir_name + ' calculations starting')
+                os.chdir(dir_name)
+                run_executables()
+                # TODO: implement error checking
+                if run_ao_codes: 
+                    write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
+                    run('sbatch ao.qs', shell=True)
+                os.chdir('../')
+    else:
+        print(system['codes'] + 'not supported')
+        sys.exit()
     
