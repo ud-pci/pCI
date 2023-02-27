@@ -181,7 +181,7 @@ if __name__ == "__main__":
     num_val = orb_lib.count_valence(configurations)
     multiplicity = orb_lib.count_excitations(excitations)
 
-    orb_occ = orb_lib.expand_orbitals(basis, orbitals, multiplicity, configurations)
+    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
     
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'even')
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'odd')
