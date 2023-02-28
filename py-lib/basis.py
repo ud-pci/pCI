@@ -682,7 +682,7 @@ def write_ao_job_script(filename, nprocs, mem, job_name, partition):
         f.write('time second-cis <inf.vw >out.second.vw \n')
     f.close()
 
-def run_executables():
+def run_executables(K_is, C_is):
     # Run hfd
     run('hfd > hfd.out', shell=True)
     print("hfd complete")
@@ -743,6 +743,9 @@ def run_executables():
             f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
         elif line[:4] == 'kbrt':
             f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
+            if K_is != 0:
+                f.write('K_is=' + str(K_is).rjust(2," ") + '\n')
+                f.write('C_is=' + str(C_is) + '\n')
         elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
             f.write(line[:12] + "\n")
         else:
@@ -833,6 +836,7 @@ if __name__ == "__main__":
                 write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
                 run('sbatch ao.qs', shell=True)
         else:
+            K_is = system['K_is']
             C_is = system['C_is']
             c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
             for c in c_list:
@@ -845,7 +849,7 @@ if __name__ == "__main__":
                 dir_name = dir_prefix+str(abs(c))
                 print(dir_name + ' calculations starting')
                 os.chdir(dir_name)
-                run_executables()
+                run_executables(K_is, c)
                 # TODO: implement error checking
                 if run_ao_codes: 
                     write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
