@@ -1832,7 +1832,7 @@ Contains
                         Write( 6,strfmt)
                         Write(11,strfmt)
                         ! Assign energies to array Tk for case when Davidson procedure is already converged 
-                        If (Kl4 == 2 .and. it == 1) Tk=E(1:Nlv) 
+                        If (it == 1) Tk=E(1:Nlv) 
                     End If
                     
                     Exit
