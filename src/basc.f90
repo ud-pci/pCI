@@ -94,7 +94,7 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.2")'
+        strfmt = '(4X,"PROGRAM BasC v2.3")'
         Write( *,strfmt)
         Write(11,strfmt)
 
@@ -933,6 +933,8 @@ Contains
             ! Evaluation of two-electron integrals R(K;NA,NB,NC,ND)
             Call startTimer(start_time)
             
+            l_br=Kbrt /= 0 .and. IPbr == 2
+            nm_br=0
             If (Ne /= 1) Then
                 kt1=Kt
                 ih=2-Kt
@@ -946,8 +948,6 @@ Contains
                     
                 n0=Nso+1
                 r_br=0.d0
-                l_br=Kbrt /= 0 .and. IPbr == 2
-                nm_br=0
                 rint2=0_dp
                 iint2=0
                 iint3=0
@@ -1088,7 +1088,7 @@ Contains
         End If
 
         If (mype == 0) Then
-            Call PrintRint2Table(idel1)
+            If (Ne /= 1) Call PrintRint2Table(idel1)
 
             Call stopTimer(start_time, timeStr)
             Write(*,'(2X,A)'), 'TIMING >>> Evaluation of two-electron integrals took '// trim(timeStr)
