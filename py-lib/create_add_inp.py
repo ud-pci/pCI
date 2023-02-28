@@ -43,7 +43,7 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
 
     # Write header
     f.write('Ncor= {:d}\n'.format(len(configurations[parity])))
-    f.write('NsvNR {:d}\n'.format(orb_occ['num_orb']))
+    f.write('NsvNR{:d}\n'.format(orb_occ['num_orb']))
     f.write('mult= {:d}\n'.format(multiplicity))
     f.write(' NE = {:d}\n\n'.format(num_val))
 
