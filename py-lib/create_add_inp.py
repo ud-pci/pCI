@@ -12,7 +12,11 @@ def read_config_yaml(filename):
     # set default parameters
     num_dvdsn_iterations = 50
     num_energy_levels = 12
-    system = system + [{'num_dvdsn_iterations' : num_dvdsn_iterations}, {'num_energy_levels' : num_energy_levels}]
+    include_gaunt = True
+    include_breit = True
+    J = 0.0
+    JM = 0.0
+    system = system + [{'include_gaunt' : True}, {'include_breit' : True}, {'num_dvdsn_iterations' : num_dvdsn_iterations}, {'num_energy_levels' : num_energy_levels}, {'J': J}, {'JM': JM}]
     
     # read yaml file with inputs
     with open(filename,'r') as f:
@@ -57,7 +61,7 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
         for line in range(num_lines):
             f.write('L:  ' + ' '.join(configuration[line*max_orb_per_line:(line+1)*max_orb_per_line]) + '\n')
     f.write('\n')
-    
+
     # Write list of orbitals and occupation numbers
     nmin = orb_occ['nmin']
     nmax = orb_occ['nmax']
@@ -89,8 +93,8 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
     f.write('  ' + system['name'] + ' ' + parity + '\n')
     f.write('  Z = ' + str(system['atomic_number']) + '\n')
     f.write(' Am = ' + str(system['atomic_mass']) + '\n')
-    f.write('  J =  0.0 \n')
-    f.write(' Jm =  0.0 \n')
+    f.write('  J = ' + str(system['J']) + '\n')
+    f.write(' Jm = ' + str(system['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
     f.write(' Kv =  4 \n')
@@ -179,9 +183,8 @@ if __name__ == "__main__":
 
     params = parse_system(system)
     num_val = orb_lib.count_valence(configurations)
+    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
     multiplicity = orb_lib.count_excitations(excitations)
 
-    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
-    
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'even')
     write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'odd')

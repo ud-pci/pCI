@@ -3,8 +3,11 @@ system:
     name: Sr,
     atomic_number: 38.0,
     atomic_mass: 87.0, 
-    include_gaunt: True,
     include_breit: True,
+    num_energy_levels: 5,
+    num_dvdsn_iterations: 50,
+    J: 1.0,
+    JM: 1.0
   ]
 
 configurations:
