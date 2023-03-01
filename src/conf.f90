@@ -1925,7 +1925,7 @@ Contains
 
         If (C_is /= 0.d0) Then
             If (K_is == 1) Then
-                strfmt = 'format(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
+                strfmt = '(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
                 Write(81,strfmt) C_is,Rnuc
             Else
                 strfmt = '(4X,A3,":",E9.2,"*(P_i Dot P_k) ",A6," Lower component key =",I2)'
@@ -2758,7 +2758,7 @@ Contains
 
         If (C_is /= 0.d0) Then
             If (K_is == 1) Then
-                strfmt = 'format(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
+                strfmt = '(4X,"Volume shift: dR_N/R_N=",F9.5," Rnuc=",F10.7)'
                 Write( *,strfmt) C_is,Rnuc
                 Write(11,strfmt) C_is,Rnuc
             Else
