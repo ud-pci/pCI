@@ -19,14 +19,14 @@ run("python3 create_add_inp.py", shell=True)
 even_exist = os.path.isfile('ADDeven.INP')
 odd_exist = os.path.isfile('ADDodd.INP')
 
-if even_exist:
+if even_exist == True:
     # Generate CONFeven.INP from ADDeven.INP
     run("cp ADDeven.INP ADD.INP", shell=True)
     run("add_nr < add.in", shell=True)
     run("cp CONF.INP CONFeven.INP", shell=True)
     print("CONFeven.INP created")
 
-if odd_exist:
+if odd_exist == True:
     # Generate CONFodd.INP from ADDodd.INP
     run("cp ADDodd.INP ADD.INP", shell=True)
     run("add_nr < add.in", shell=True)
@@ -39,7 +39,8 @@ run("rm add.in", shell=True)
 # Create even and odd directories
 gen_dir = re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input("Generate directories? "))))
 
-if gen_dir:
+if gen_dir == True:
+    print('here')
     dir_path = os.getcwd()
     for dirs in ['EVEN','ODD']:
         Path(dir_path+'/'+dirs).mkdir(parents=True, exist_ok=True)
@@ -51,5 +52,6 @@ if gen_dir:
         if os.path.isfile('../SCRC.CON'):
             run("cp ../SCRC.CON .", shell=True)
         os.chdir('../')
-    print('add script completed')
+
+print('add script completed')
 
