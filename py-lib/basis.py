@@ -216,6 +216,9 @@ def gen_lists_orbitals(core_orbitals, valence_orbitals):
             if orbital[1] == 'f':
                 J.append('5/2')
                 J.append('7/2')
+            if orbital[1] == 'g':
+                J.append('7/2')
+                J.append('9/2')
 
     return NL, J, QQ, KP, NC, num_core_electrons, nval
 
@@ -243,6 +246,9 @@ def gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals):
             if orbital[1] == 'f':
                 kappa.append(' 3')
                 kappa.append('-4')
+            if orbital[1] == 'g':
+                kappa.append(' 4')
+                kappa.append('-5')
     
     # Retrieve lowest n for each l for valence orbitals
     for orbital in valence_orbitals.split():
@@ -268,6 +274,9 @@ def gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals):
             if orbital[1] == 'f':
                 kappa.append(' 3')
                 kappa.append('-4')
+            if orbital[1] == 'g':
+                kappa.append(' 4')
+                kappa.append('-5')    
 
     return N, kappa, iters, energies
 
@@ -312,8 +321,8 @@ def get_energy_guess(deg_ion, n, n0, l):
 def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
     """ Returns the lowest spdf orbitals in kappa designation """
     N, kappa = [], []
-    nmin = [1, 2, 3, 4]
-    nmax = [0, 0, 0, 0]
+    nmin = [1, 2, 3, 4, 5]
+    nmax = [0, 0, 0, 0, 0]
     for orbital in core_orbitals.split():
         n = int(re.findall('[0-9]+', orbital)[0])
         if orbital[-1] == 's':
@@ -324,6 +333,8 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
             nmin[2] = n + 1
         elif orbital[-1] == 'f':
             nmin[3] = n + 1
+        elif orbital[-1] == 'g':
+            nmin[4] = n + 1
         else:
             pass
 
@@ -331,6 +342,7 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
     if val_aov == []:
         nmax = [n + 4 for n in nmin]
         nmax[3] -= 1
+        nmax[4] -= 4
     else:
         for n in range(len(val_aov)):
             nmax[n] = nmin[n] + int(list(val_aov[n].values())[0])
@@ -362,6 +374,13 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
             for i in range(nmin[n],nmax[n]):
                 N.append(i)
                 kappa.append('-4')
+        elif n == 4:
+            for i in range(nmin[n],nmax[n]):
+                N.append(i)
+                kappa.append(' 4')
+            for i in range(nmin[n],nmax[n]):
+                N.append(i)
+                kappa.append('-5')        
 
     """
     # Find orbital # for 23f7/2 
@@ -802,7 +821,7 @@ if __name__ == "__main__":
 
     # Write input files for subsequent executables
     if system['K_is'] == 0:
-        write_inputs(0, 0)
+        write_inputs(system, 0)
     else:
         C_is = system['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
@@ -856,6 +875,6 @@ if __name__ == "__main__":
                     run('sbatch ao.qs', shell=True)
                 os.chdir('../')
     else:
-        print(system['codes'] + 'not supported')
+        print(system['codes'] + ' not supported')
         sys.exit()
     
