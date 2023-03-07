@@ -3,6 +3,7 @@ import re
 import sys
 import orbitals as orb_lib
 import get_excitations
+import math
 
 def read_config_yaml(filename):
     """
@@ -57,7 +58,7 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
 
     # Write list of basic configurations
     for configuration in configurations_formatted:
-        num_lines = len(configuration)//max_orb_per_line + 1
+        num_lines = math.ceil(len(configuration)/max_orb_per_line)
         for line in range(num_lines):
             f.write('L:  ' + ' '.join(configuration[line*max_orb_per_line:(line+1)*max_orb_per_line]) + '\n')
     f.write('\n')
