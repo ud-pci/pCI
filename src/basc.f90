@@ -183,7 +183,7 @@ Contains
         strfmt = '(/4X,"Z   = ",F6.2,5X,"Kt  =",I3,  7X,"II =",I4,    &
                 /4X,"H   =",F7.4, 5X,"R2  =",F6.2,4X,"R1 =",E11.4, &
                 /4X,"Rnuc=",E11.4,1X,"Al  =",F7.4,3X,"Bt =",F5.2,  &
-                /4X,"Nsp =",I5,   7X,"Ns  =",I3,  7X,"Nso=",I3,4X,"Nc =",I4)'
+                /4X,"Nsp =",I7,   7X,"Ns  =",I3,  7X,"Nso=",I3,4X,"Nc =",I7)'
         Write( *,strfmt) Z,Kt,II,H,R2,R1,Rnuc,Al,Bt,Nsp,Ns,Nso,Nc
         Write(11,strfmt) Z,Kt,II,H,R2,R1,Rnuc,Al,Bt,Nsp,Ns,Nso,Nc
 
@@ -621,7 +621,7 @@ Contains
         nsx2=nsx
         ngint=ngint+ngint2
 
-        strfmt='(4X,"NGINT=",I9," including",I9," unused")'
+        strfmt='(4X,"NGINT=",I10," including",I9," unused")'
         Write( *,strfmt) ngint,ngint2
         Write(11,strfmt) ngint,ngint2
         
