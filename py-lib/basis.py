@@ -701,6 +701,56 @@ def write_ao_job_script(filename, nprocs, mem, job_name, partition):
         f.write('time second-cis <inf.vw >out.second.vw \n')
     f.close()
 
+def generate_batch_qed(kqed, krot, kbrt):
+    """ Writes batch.qed """
+    with open('q.in','w') as f:
+        f.write("1 \n")
+        if kqed == True:
+            f.write('2 \n')
+        else:
+            f.write('1 \n')
+        f.write(str(kbrt) + '\n')
+    f.close()
+
+    with open('batch.qed','w') as f: 
+        f.write("#! /bin/bash -fe \n")
+        f.write("vpkg_require pci \n")
+        f.write("kvar=1  # variant of QED potential \n")
+        f.write("iter=25 # max number of iterations \n")
+        f.write("##################################### \n")
+        f.write("cat >qedpot.inp <<EndofFile\n")
+        f.write(" $kvar \n")
+        f.write(" HFD.DAT \n")
+        f.write("EndofFile \n")
+        f.write("##################################### \n")
+        f.write("cat >q.in <<EndofFile\n")
+        f.write("1 \n")
+        if kqed == True:
+            f.write('2 \n')
+        else:
+            f.write('1 \n')
+        f.write(str(kbrt) + '\n')
+        f.write(". \n")
+        f.write(". \n")
+        f.write("  \n")
+        f.write("EndofFile\n")
+        f.write("##################################### \n")
+        f.write("n=1 \n")
+        f.write("while [ $n -lt $iter ]; do \n")
+        f.write("echo 'Iteration '$n \n")
+        f.write("qedpot_conf <q.in >qp.res \n")
+        if krot == True:
+            f.write("qed_rot <q.in >qr.res \n")
+        f.write("grep 'changed' \"QED_ROT.RES\" \n")
+        f.write("  if grep -q reached \"QED_ROT.RES\"; then \n")
+        f.write("  echo 'Converged in '$n' iterations' \n")
+        f.write("  break \n")
+        f.write("  fi \n")
+        f.write("  let n=n+1 \n")
+        f.write("done \n")
+        f.write("##################################### \n")
+    print('batch.qed has been written')
+    
 def run_executables(K_is, C_is):
     # Run hfd
     run('hfd > hfd.out', shell=True)
@@ -779,6 +829,14 @@ def run_executables(K_is, C_is):
     run(['rm', 'bass.in'])
     run(['rm','hfspl.1','hfspl.2'])
     print("bass complete")
+
+    # Run qed
+    if system['rotate_basis'] == True or system['include_qed'] == True:
+        run('cp HFD.DAT HFD-noQED.DAT', shell=True)
+        generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
+        run('chmod +x batch.qed', shell=True)
+        run('./batch.qed > qed.out', shell=True)
+        print("qed complete")
 
     # Run bas_x
     run('bas_x > bas_x.out', shell=True)

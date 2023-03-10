@@ -32,6 +32,11 @@ energies:
     f: [-0.13000, -0.13000]
   ]
 
+# Include QED?
+include_qed: yes
+# If not including QED, rotate basis?
+rotate_basis: yes
+
 # Enter key for isotope shifts
 # 0 for no IS, 1 for IS
 K_is: 1
