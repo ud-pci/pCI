@@ -35,6 +35,18 @@ def read_yaml(filename):
         except KeyError as e:
             config[e.args[0]] = []
 
+        # Check to see if inclusion of QED is specified. If not, set to 0
+        try:
+            qed = config['include_qed']
+        except KeyError as e:
+            config[e.args[0]] = 0
+        
+        # Check to see if rotation of basis is specified. If not, set to 0
+        try:
+            rot_basis = config['rotate_basis']
+        except KeyError as e:
+            config[e.args[0]] = 0
+            
         # Check to see if isotope shift key is specified. If not, set to 0
         try:
             isotope = config['K_is']
@@ -831,12 +843,12 @@ def run_executables(K_is, C_is):
     print("bass complete")
 
     # Run qed
-    if system['rotate_basis'] == True or system['include_qed'] == True:
-        run('cp HFD.DAT HFD-noQED.DAT', shell=True)
-        generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
-        run('chmod +x batch.qed', shell=True)
-        run('./batch.qed > qed.out', shell=True)
-        print("qed complete")
+    #if system['rotate_basis'] == True or system['include_qed'] == True:
+    #    run('cp HFD.DAT HFD-noQED.DAT', shell=True)
+    #    generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
+    #    run('chmod +x batch.qed', shell=True)
+    #    run('./batch.qed > qed.out', shell=True)
+    #    print("qed complete")
 
     # Run bas_x
     run('bas_x > bas_x.out', shell=True)
