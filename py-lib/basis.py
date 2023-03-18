@@ -35,6 +35,12 @@ def read_yaml(filename):
         except KeyError as e:
             config[e.args[0]] = []
 
+        # Check to see if spl.in parameters are specified. If not, set to False
+        try:
+            spl_params = config['spl']
+        except KeyError as e:
+            config[e.args[0]] = 0
+
         # Check to see if inclusion of QED is specified. If not, set to 0
         try:
             qed = config['include_qed']
@@ -667,13 +673,25 @@ def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energie
     f.close()
     print('inf.vw has been written')
 
-def write_spl_in(filename, radius, lmax):
+def write_spl_in(filename, radius, lmax, spl_params):
     """ Writes spl.in """
-    with open(filename,'w') as f: 
-        f.write(str(lmax) + '\n')
-        f.write(str(radius) + '\n')
-        f.write('40 7\n')
-        f.write('0.0 0.00 500')
+    
+    if spl_params == 0:
+        with open(filename,'w') as f: 
+            f.write(str(lmax) + '\n')
+            f.write(str(radius) + '\n')
+            f.write('40 7\n')
+            f.write('0.0 0.00 500')
+    else:
+        spl_dict = {}
+        for param in spl_params:
+            for key in param:
+               spl_dict[key] = param[key]
+        with open(filename,'w') as f: 
+            f.write(str(spl_dict['lmax']) + '\n')
+            f.write(str(radius) + '\n')
+            f.write(str(spl_dict['nmax']) + ' ' + str(spl_dict['k']) + '\n')
+            f.write('0.0 0.00 500')
     f.close()
     print('spl.in has been written')
 
@@ -688,7 +706,7 @@ def write_inputs(system, C_is):
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
 
     # Write spl.in
-    write_spl_in('spl.in', system['radius'], system['lmax'])
+    write_spl_in('spl.in', system['radius'], system['lmax'], system['spl'])
     
     # Write inf.aov
     write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kval, system['energies'])

@@ -18,6 +18,13 @@ val_aov:
 nmax: 35
 lmax: 6
 
+# Explicitly set spl.in parameters
+spl: [
+  lmax: 7,
+  nmax: 30,
+  k: 7
+]
+
 # Enter version of codes to run: 'ci+all-order' or 'ci+second-order'
 codes: ci+all-order
 
