@@ -309,7 +309,7 @@ Contains
         dR_N=pq(16)
         
         strfmt = '(4X,"Kl  =",I3,7X,"Z   =",F6.2,4X,"Jm  =",F6.2,/4X, &
-                    "Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3,5X,"Nc =",I6)'
+                    "Nsp =",I7,5X,"Ns  =",I3,7X,"Nso =",I3,5X,"Nc =",I7)'
         Write( 6,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
         Write(11,strfmt) Kl,Z,Jm,Nsp,Ns,Nso,Nc
 
@@ -1912,13 +1912,13 @@ Contains
 
         ! If pure CI, print Nc, Nd, Gj
         If (Ksig*Kdsig == 0) Then
-            strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
+            strfmt = '(4X,"Energy levels (",A7," Nc=",I7," Nd=",I9,"); Gj =",F7.4, &
                         /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
             Write(81,strfmt) stecp(ist),Nc,Nd,Gj
         ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
         Else
             strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
-                    I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
+                    I2,/4X,"(Nc=",I7," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
                     "EV",16X,"ET",9X,"DEL(CM**-1)")'
             Write(81,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
         End If
@@ -2743,14 +2743,14 @@ Contains
 
         ! If pure CI, print Nc, Nd, Gj
         If (Ksig*Kdsig == 0) Then
-            strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
+            strfmt = '(4X,"Energy levels (",A7," Nc=",I7," Nd=",I9,"); Gj =",F7.4, &
                         /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
             Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
             Write(11,strfmt) stecp(ist),Nc,Nd,Gj
         ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
         Else
             strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
-                    I2,/4X,"(Nc=",I6," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
+                    I2,/4X,"(Nc=",I7," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
                     "EV",16X,"ET",9X,"DEL(CM**-1)")'
             Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
             Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
@@ -3126,7 +3126,7 @@ Contains
             strfmt2 = '(4X,"ICONF",4X,5F11.5)'
             Write(11,strfmt2) (Tk(i),i=j1,j2)
             Write(11,strfmt) (st2,i=j1,j3)
-            strfmt2 = '(2X,I6,"      ",5F11.6)'
+            strfmt2 = '(2X,I7,"      ",5F11.6)'
             Do ic=1,Nc
                 Write(11,strfmt2) ic,(W(ic,j),j=j1,j2)
             End Do

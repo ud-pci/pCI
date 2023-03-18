@@ -21,7 +21,7 @@ Module conf_init
         Write(*,'(4X,16A1)') name
         Write(11,'(4X,16A1)') name
         Read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
-        Read(10,'(5X,I6)') Nso, Nc, Kv, Nlv, Ne
+        Read(10,'(5X,I7)') Nso, Nc, Kv, Nlv, Ne
 
         IPlv = 3*Nlv
         K_is = 0                ! 
