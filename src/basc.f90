@@ -178,7 +178,7 @@ Contains
         Ng  =PQ(10)+C1
         Rnuc=PQ(13)
 
-        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
+        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp),Kbas(Nso))
 
         strfmt = '(/4X,"Z   = ",F6.2,5X,"Kt  =",I3,  7X,"II =",I4,    &
                 /4X,"H   =",F7.4, 5X,"R2  =",F6.2,4X,"R1 =",E11.4, &
