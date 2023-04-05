@@ -734,6 +734,7 @@ Contains
         Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -750,13 +751,16 @@ Contains
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
         If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
 
+        If (K_is /= 0) Then
+            If (.not. Allocated(R_is)) Allocate(R_is(num_is))
+            If (.not. Allocated(I_is)) Allocate(I_is(num_is))
+        End If 
+
         If (Ksig /= 0) Then
             If (.not. Allocated(Scr)) Allocate(Scr(10))
             If (.not. Allocated(Rsig)) Allocate(Rsig(NhintS))
             If (.not. Allocated(Dsig)) Allocate(Dsig(NhintS))
             If (.not. Allocated(Esig)) Allocate(Esig(NhintS)) 
-            If (.not. Allocated(R_is)) Allocate(R_is(num_is))
-            If (.not. Allocated(I_is)) Allocate(I_is(num_is))
             If (.not. Allocated(Rint2S)) Allocate(Rint2S(NgintS))
             If (.not. Allocated(Dint2S)) Allocate(Dint2S(NgintS))
             If (.not. Allocated(Eint2S)) Allocate(Eint2S(NgintS))
@@ -771,9 +775,10 @@ Contains
             memFormH = sizeof(Nvc)+sizeof(Nc0) &
                 + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
                 + sizeof(IntOrd)
+            If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
-                + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(R_is)+sizeof(I_is)+sizeof(IntOrdS)
+                + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
         End If   
 
         Return
@@ -894,6 +899,10 @@ Contains
         Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        If (K_is /= 0) Then
+            Call MPI_Bcast(R_is, num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        End If
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Rsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
@@ -906,8 +915,6 @@ Contains
             Call MPI_Bcast(Dint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Eint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(IntOrdS, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(R_is, num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
