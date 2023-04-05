@@ -199,7 +199,7 @@ def expand_occupancies(nr_config):
 
 def expand_nl(basis):
     """ Expands a basis of type string and returns a dictionary of maximum principle quantum number value for each partial wave key"""
-    nlmax = {'s': 0, 'p': 0, 'd': 0, 'f': 0, 'g': 0, 'h': 0, 'i': 0}
+    nlmax = {'s': 0, 'p': 0, 'd': 0, 'f': 0, 'g': 0, 'h': 0, 'i': 0, 'k': 0, 'l': 0}
     n_array = re.findall('[0-9]+', basis)
     l_array = re.findall('[spdfghikl]+', basis)
 
