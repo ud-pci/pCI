@@ -29,8 +29,7 @@ This is done in 3 main parts:
 '''
 
 def run_executable(code, nl):
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
+    current_time = datetime.now.strftime("%H:%M:%S")
 
     # This function 
     if code == 'add_nr':
@@ -321,6 +320,7 @@ if __name__ == "__main__":
     con_cut
     '''
 
+    current_time = datetime.now.strftime("%H:%M:%S")
     print('upscaling procedure starting at ' + current_time)
 
     # Read slurm environment variables to generate a job script for CI with identical parameters
