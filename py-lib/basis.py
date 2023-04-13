@@ -1,4 +1,4 @@
-import yaml
+import yaml 
 import re
 import math
 import sys
@@ -781,6 +781,25 @@ def generate_batch_qed(kqed, krot, kbrt):
         f.write("##################################### \n")
     print('batch.qed has been written')
     
+def check_errors(filename):
+    # This function checks output files for errors and returns the number of errors
+    # Currently only supports output of program bass
+    num_errors = 0
+    warning_msgs = ['failed', 'error', 'warning']
+    if filename == 'bass.out':
+        try:
+            f = open(filename, 'r')
+            lines = f.readlines()
+            f.close()
+        except FileNotFoundError:
+            num_errors = 1   
+
+        for line in lines:
+            if any(msg in line for msg in warning_msgs):
+                num_errors += 1
+        
+        return num_errors
+
 def run_executables(K_is, C_is):
     # Run hfd
     run('hfd > hfd.out', shell=True)
@@ -851,14 +870,24 @@ def run_executables(K_is, C_is):
             f.write(line)
     f.close()
 
-    # run bass
+    # run bass until there are no errors in output
     with open('bass.in','w') as f: 
         f.write('WJ.DAT')
     f.close()
-    run('bass < bass.in > bass.out', shell=True)
+
+    maxNumTries = 5
+    nTry = 1
+    while check_errors('bass.out') > 0:
+        run('bass < bass.in > bass.out', shell=True)
+        if (nTry >= maxNumTries):
+            print("bass did not converge after", nTry, "attempts")
+            break
+        nTry += 1
+    else:
+        print("bass completed with no errors after", nTry, "attempts")
+
     run(['rm', 'bass.in'])
     run(['rm','hfspl.1','hfspl.2'])
-    print("bass complete")
 
     # Run qed
     #if system['rotate_basis'] == True or system['include_qed'] == True:
