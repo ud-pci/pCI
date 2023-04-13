@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, run
 
@@ -27,6 +28,8 @@ if __name__ == "__main__":
         if line.split()[0].replace('*','') in partition and line.split()[4] == 'idle':
             num_free_nodes[line.split()[0].replace('*','')] = line.split()[3]
     
+    current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    print('TIME: ' + current_time)
     print('FREE NODES:')
     for item in num_free_nodes:
         print(item, ':', num_free_nodes[item])
