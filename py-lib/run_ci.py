@@ -3,7 +3,6 @@ import re
 import math
 import sys
 import os
-from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, run
 from functools import reduce
 
