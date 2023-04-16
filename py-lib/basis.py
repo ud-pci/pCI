@@ -791,12 +791,11 @@ def check_errors(filename):
             f = open(filename, 'r')
             lines = f.readlines()
             f.close()
+            for line in lines:
+                if any(msg in line for msg in warning_msgs):
+                    num_errors += 1
         except FileNotFoundError:
             num_errors = 1   
-
-        for line in lines:
-            if any(msg in line for msg in warning_msgs):
-                num_errors += 1
         
         return num_errors
 
