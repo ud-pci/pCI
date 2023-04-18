@@ -164,9 +164,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.13 with single precision")'
+            strfmt = '(4X,"Program conf v5.14 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.13")'
+            strfmt = '(4X,"Program conf v5.14")'
         End Select
         
         Write( 6,strfmt)
@@ -245,13 +245,24 @@ Contains
 
         ! Read angular factors from file CONF.GNT
         Open(unit=16,file='CONF.GNT',status='OLD',form='UNFORMATTED')
-        Read(16,iostat=err_stat) Ngaunt
-        If (err_stat /= 0 .or. Ngaunt /= 2891) Then
+        Read(16,iostat=err_stat) Nlx, Ngaunt
+        If (err_stat /= 0) Then
+            print*, 'Nlx and Ngaunt could not be obtained from CONF.GNT, so defaulted to Nlx=5, Ngnt=2891'
+            print*, 'INFO: Make sure basc and conf were compiled together in latest version!'
+            Nlx = 5
             Ngaunt = 2891
             Rewind(16)
         End If
+        
+        Allocate(num_gaunts_per_partial_wave(Nlx+1))
         Allocate(In(Ngaunt))
         Allocate(Gnt(Ngaunt))
+
+        Read(16, iostat=err_stat) num_gaunts_per_partial_wave
+        If (err_stat /= 0) Then
+            print*, 'num_gaunts_per_partial_wave could not be read and skipped'
+            Rewind(16)
+        End If
         Read(16) (In(i),i=1,Ngaunt)
         Read(16) (Gnt(i),i=1,Ngaunt)
         Close(unit=16)
@@ -733,6 +744,7 @@ Contains
         Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nlx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
@@ -743,6 +755,7 @@ Contains
         If (.not. Allocated(Diag)) Allocate(Diag(Nd))
         If (.not. Allocated(In)) Allocate(In(Ngaunt))
         If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
+        If (.not. Allocated(num_gaunts_per_partial_wave)) Allocate(num_gaunts_per_partial_wave(Nlx+1))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
         If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
         If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
@@ -883,6 +896,7 @@ Contains
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(num_gaunts_per_partial_wave, Nlx+1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nn, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)

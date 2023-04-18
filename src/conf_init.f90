@@ -55,6 +55,7 @@ Module conf_init
         If (Nso /= 0) Then 
             Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
         End If
+        Nlx=0
         ! Reading in configurations - - - - - - 
         i1=Nso+1
         Do ic=1,Nc
@@ -69,6 +70,7 @@ Module conf_init
                    ny=100*x
                    nz=(nx-100*ny)
                    ne0=ne0+nz
+                   If (mod(ny,10) > Nlx) Nlx=mod(ny,10) ! Set Nlx to be max partial wave
                 End Do
                 i2=i-1
                 i1=i2+1

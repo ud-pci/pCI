@@ -94,7 +94,7 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.3")'
+        strfmt = '(4X,"PROGRAM BasC v2.4")'
         Write( *,strfmt)
         Write(11,strfmt)
 

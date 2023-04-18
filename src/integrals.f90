@@ -584,10 +584,9 @@ Module integrals
 
     Real(dp) Function Gaunt(k,xj1,xm1,xj2,xm2)
         Implicit None
-        Integer  :: i, is, ind, ib1, ib2, im, k, ij, IPlx
+        Integer  :: i, is, ind, ib1, ib2, im, k, ij
         Real(dp)   :: g, x, xj1, xj2, xm1, xm2, j1, j2, m1, m2
 
-        IPlx = 5 ! max l
         j1=xj1
         j2=xj2
         m1=xm1
@@ -618,9 +617,10 @@ Module integrals
                    ij = k+j1-j2
                    If(ij /= 2*(ij/2)) is = -is
                 End If
-                ib1=2*IPlx+1
+                ib1=2*Nlx+1
                 ib2=ib1*ib1
                 ind = ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2)
+                ! TODO - use num_gaunts_per_partial_wave to start looking for gaunt factors in their respective blocks of l
                 Do i=1,Ngaunt
                    If(In(i) == ind) Then
                       g = Gnt(i)
