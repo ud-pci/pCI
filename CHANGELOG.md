@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.14] - 2023-04-18
+- basc v2.4 - automated detection of max partial wave from configuration list and calculation of number of gaunt factors
+- conf v5.14 - automated detection of max partial wave from configuration list and number of gaunt factors
+- global change: renamed IPlx to Nlx since it is no longer a parameter
+- conf_variables.f90 - added Nlx as a global variable
+- conf_variables.f90 - added num_gaunts_per_partial_wave as a global array to store number of gaunt factors per partial wave
+- basc_variables.f90 - include num_gaunts_per_partial wave from conf_variables module
+- breit.f90 - save number of gaunt factors per partial wave to new allocatable array num_gaunts_per_partial_wave
+- breit.f90 - CONF.GNT now writes Nlx and num_gaunts_per_partial_wave in addition to Ngaunt and In, Gnt arrays
+- conf.f90 - subroutine Input now reads new version of CONF.GNT with additional Nlx and num_gaunts_per_partial_wave
+- conf.f90 - added exception if Nlx or num_gaunts_per_partial_wave could not be found to set Nlx=5 and Ngaunt=2891 as default
+- conf_init.f90 - added code to set Nlx to be the maximum partial wave read from configuration list from CONF.INP
+- integrals.f90 - removed assignment of IPlx since it is now determined from configuration list
+
 ## [0.11.13] - 2023-01-31
 - conf v5.13 - bug fix for lost allocation of lsj arrays xj, xl, xs
 
