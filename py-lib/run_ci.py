@@ -60,7 +60,7 @@ def read_yaml(filename):
     return config
 
 def write_job_script(filename, code, num_nodes, num_procs_per_node, exclusive, mem, partition):
-    if code == 'conf':
+    if code == 'conf' or code == 'ci':
         with open('c.in', 'w') as f:
             f.write('2, 2, 0, 0, 1')
         f.close()
@@ -330,7 +330,7 @@ if __name__ == "__main__":
             dir_path = os.getcwd()
             for dir_name in ['EVEN','ODD']:
                 os.chdir(dir_name)
-                write_job_script('ci.qs', program, 5, 64, True, 0, 'large-mem')
+                write_job_script('ci.qs', program, 5, 64, True, 0, 'xlarge-mem')
                 run('sbatch ci.qs', shell=True)
                 os.chdir('../')
         else:
@@ -345,7 +345,7 @@ if __name__ == "__main__":
                     dir_prefix = 'plus'
                 dir_name = dir_prefix+str(abs(c))
                 os.chdir(dir_name)
-                write_job_script(program + '.qs', program, 5, 64, True, 0, 'large-mem')
+                write_job_script(program + '.qs', program, 5, 64, True, 0, 'xlarge-mem')
                 run('sbatch ' + program + '.qs', shell=True)
                 os.chdir('../')
     else:
