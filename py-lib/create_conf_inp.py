@@ -1,4 +1,4 @@
-import yaml
+import yaml 
 import re
 import sys
 import read_bass
@@ -139,7 +139,7 @@ def format_configurations(configurations):
     return configurations_formatted
 
 def format_orb_occ(orb, occ):
-    """ Format configurations as 'nnl qq qq',
+    """ Format orbital occupancies as 'nnl qq qq',
         where nn represents principal quantum number
                l represents angular quantum number
               qq represents occupation number """
@@ -172,8 +172,8 @@ if __name__ == "__main__":
 
     params = parse_system(system)
     num_val = orb_lib.count_valence(configurations)
+    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
     multiplicity = orb_lib.count_excitations(excitations)
-    orb_occ = orb_lib.expand_orbitals(basis, orbitals, multiplicity, configurations)
 
     write_conf_inp('CONF.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'even')
     write_conf_inp('CONF.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'odd')
