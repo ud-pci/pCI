@@ -798,6 +798,8 @@ def check_errors(filename):
             num_errors = 1   
         
         return num_errors
+    else:
+        print(filename + "not currently supported")
 
 def run_executables(K_is, C_is):
     # Run hfd
