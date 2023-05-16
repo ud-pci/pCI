@@ -1831,7 +1831,7 @@ Contains
                    ' <b||E2||a> =',E13.5,' a.u.'/,16x, &
                    ' <b||M3||a> =',E13.5,' mu_0')
             If (dabs(tj1-tj2) < 1.d-6) Then
-                xg = dsqrt(tj1*( +1)*(2*tj1+1)+1.d-77)
+                xg = dsqrt(tj1*(tj1+1)*(2*tj1+1)+1.d-77)
                 Write( 6,'(22X,"G_eff =",F10.5,14X,"A_eff =",E11.4," MHz")') G/xg,A/xg
                 Write(11,'(22X,"G_eff =",F10.5,14X,"A_eff =",E11.4," MHz")') G/xg,A/xg
             End If
