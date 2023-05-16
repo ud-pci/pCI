@@ -344,23 +344,28 @@ if __name__ == "__main__":
     # Find current working directory
     dir_path = os.getcwd()
 
-    '''
     # Run initial run with n[0], l[0] - e.g. 17g
-    initial_run(n[0],l[0])
+    #initial_run(n[0],l[0])
+    initial_run(17,'g')
 
     # Upscale n0l0 to nl0, e.g. 17g -> 22g
-    upscale_n_or_l(n[1],n[0],l[0])
+    #upscale_n_or_l(n[1],n[0],l[0])
+    upscale_n_or_l(26,22,'g')
 
     # Upscale n0l0 to n0l, e.g. 17g -> 17h
-    upscale_n_or_l(l[1],n[0],l[0])
-    '''
+    #upscale_n_or_l(l[1],n[0],l[0])
+    upscale_n_or_l('h',17,'g')
+
     # Upscale n0l0 to nl by merging n0l and nl0 runs, e.g. 22g + 17h -> 22h
-    upscale_nl(n[1],l[1],n[0],l[0])
+    #upscale_nl(n[1],l[1],n[0],l[0])
+    upscale_nl(22,'h',17,'g')
 
     # Upscale n1l0 to n2l0, e.g. 22g -> 26g
-    upscale_n_or_l(n[2],n[1],l[0])
+    #upscale_n_or_l(n[2],n[1],l[0])
+    upscale_n_or_l(26,22,'g')
 
     # 26h with 26g + 22h
-    upscale_nl(n[2],l[1],n[1],l[0])
+    #upscale_nl(n[2],l[1],n[1],l[0])
+    upscale_nl(26,'h',22,'g')
      
     print('upscaling')
