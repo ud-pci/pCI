@@ -14,13 +14,14 @@ Module integrals
         Implicit None
         Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
                        k, mlow, m_is
+        Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
         Data str /'Coulomb','Gaunt  ','Breit  '/
         Data str1 /' VS','SMS','NMS',' MS'/
 
         nsh=Nso+1
         Nhint=0
-        Ngint=0
+        Ngint=0_int64
         ! parameter for indexation of integrals:
         If (Nsu > IPx+nsh-2) Then
             Write (*,*) ' Rint: IPx is too small'
@@ -59,9 +60,10 @@ Module integrals
             Write(*,*)' Rint error: IPx was changed from ', 'nrd=', int(sqrt(real(nrd))), 'to IPx=', nx
             Stop
         End If
-        Read (13) ((Rint2(k,i), k=1,IPbr), i=1,Ngint)
-        Read (13) (Iint2(i), i=1,Ngint)
-        Read (13) (Iint3(i), i=1,Ngint)
+        print*, 'Ngint=', Ngint
+        Read (13) ((Rint2(k,i8), k=1,IPbr), i8=1,Ngint)
+        Read (13) (Iint2(i8), i8=1,Ngint)
+        Read (13) (Iint3(i8), i8=1,Ngint)
         Read (13) (IntOrd(i), i=1,nrd)
         If (K_is >= 1) Then
             Read(13,End=800) m_is,mlow,num_is
@@ -71,7 +73,7 @@ Module integrals
                 Read(*,*)
                 Stop
             End If
-            If (K_is >= 2   .and.   mlow /=  Klow) Then
+            If (K_is >= 2 .and. mlow /=  Klow) Then
                 Write(*,*) 'SMS Integrals are for Klow=',mlow
                 Read(*,*)
             End If
@@ -130,8 +132,8 @@ Module integrals
                         Return
                     End If
                 End Do
-                Write( 6,'(/4X,"one electron integral is absent:"/4X,"na=",I2,2X,"nb=",I2/)') na,nb
-                Write(11,'(/4X,"one electron integral is absent:"/4X,"na=",I2,2X,"nb=",I2/)') na,nb
+                Write( 6,'(/4X,"one electron integral is absent:"/4X,"na=",I3,2X,"nb=",I3/)') na,nb
+                Write(11,'(/4X,"one electron integral is absent:"/4X,"na=",I3,2X,"nb=",I3/)') na,nb
                 Stop
             End If
         End If
@@ -145,8 +147,10 @@ Module integrals
                     is_sms, ii, i4, id, i3, ic, iac, k1, is_br, i_br, minint, &
                     iab, kmax, kmin, ibd0, iac0, k, jd, jc, jb, ja, ibr, i, ld, &
                     lc, lb, ibd, kac, kbd, mi
+        Integer(Kind=int64) :: i8, mi8, minint8=0_int64
         Real(dp) :: e, rabcd
         Logical  :: l_is, l_br, l_pr
+        Character(Len=256) :: strfmt
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         l_is= .not. (C_is == 0.d0)                ! False If C_is=0
         l_is=l_is .and. (K_is == 2 .or. K_is == 4)  ! False If K_is /= 2,4
@@ -226,7 +230,9 @@ Module integrals
                 k=(jb+jd)/2+1
                 If (kmax > k) kmax=k
                 iab = nx*(na-Nso-1)+(nb-Nso)
-                minint = IntOrd(iab)
+                minint8 = IntOrd(iab)
+                !if (minint8 <= 0) print*, minint8, IntOrd(iab), iab
+                !if (minint8 <= 0) Cycle
                 i_br=la+lc+kmin-1
                 If (i_br /= 2*(i_br/2)) Then
                     is_br=ibr
@@ -241,28 +247,30 @@ Module integrals
                         is_br=is_br*ibr
                         iac=nx*nx*k+iac0
                         ibd=ibd0
-                        Do i=minint,ngint
-                            mi=i
-                            kac=Iint2(i)
-                            kbd=Iint3(i)
+                        Do i8=minint8,ngint
+                            !if (i8 <= 0) print*, i8, minint8, ngint
+                            mi8=i8
+                            kac=Iint2(i8)
+                            kbd=Iint3(i8)
                             If (kac == iac .and. kbd == ibd) Then
-                              exit
-                            Else If (i==ngint) Then
-                              Write( 6,'(/4X,"integral is absent:"/4X,"K=",I2,2X,"na=",I2,2X,"nb=",I2, &
-                                  2X,"nc=",I2,2X,"nd=",I2)') k,na,nb,nc,nd
-                              Write(11,'(/4X,"integral is absent:"/4X,"K=",I2,2X,"na=",I2,2X,"nb=",I2, &
-                                  2X,"nc=",I2,2X,"nd=",I2)') k,na,nb,nc,nd
-                              Write(*,*) 'iac=',iac,' ibd=',ibd
-                              Stop
+                                exit
+                            Else If (i8==ngint) Then
+                                strfmt = '(/4X,"integral is absent:"/4X,"K=",I2,2X,"na=",I3,2X,"nb=",I3,2X,"nc=",I3,2X,"nd=",I3)'
+                                Write( 6,strfmt) k,na,nb,nc,nd
+                                Write(11,strfmt) k,na,nb,nc,nd
+                                Write(*,*) 'iac=',iac,' ibd=',ibd, 'kac=',kac, 'kbd',kbd
+                                Stop
                             End If
                         End Do
-                        rabcd=Rint2(1,mi)
-                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi) ! changed 13/3/12
+                        rabcd=Rint2(1,mi8)
+                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi8) ! changed 13/3/12
                         If (Ksig >= 2) Then
                             If (max(na,nb,nc,nd) > Nd .or. max(la,lb,lc,ld) > Lmax) Then
-                                rabcd=Scr(k+1)*rabcd
-                                iscr=iscr+1
-                                xscr=xscr+Scr(k+1)
+                                If (k < 10) Then
+                                    rabcd=Scr(k+1)*rabcd
+                                    iscr=iscr+1
+                                    xscr=xscr+Scr(k+1)
+                                End If
                             End If
                         End If
                         If (k == 1 .and. l_is .and. l_pr) Then
@@ -272,7 +280,7 @@ Module integrals
                             *Gaunt(k,ja*0.5d0,ma*0.5d0,jc*0.5d0,mc*0.5d0) &
                             *Gaunt(k,jd*0.5d0,md*0.5d0,jb*0.5d0,mb*0.5d0) &
                             *rabcd
-                        minint = mi + 1
+                        minint8 = mi8 + 1
                     End If
                 End Do
             End If
@@ -584,10 +592,9 @@ Module integrals
 
     Real(dp) Function Gaunt(k,xj1,xm1,xj2,xm2)
         Implicit None
-        Integer  :: i, is, ind, ib1, ib2, im, k, ij, IPlx
+        Integer  :: i, is, ind, ib1, ib2, im, k, ij
         Real(dp)   :: g, x, xj1, xj2, xm1, xm2, j1, j2, m1, m2
 
-        IPlx = 5 ! max l
         j1=xj1
         j2=xj2
         m1=xm1
@@ -618,9 +625,10 @@ Module integrals
                    ij = k+j1-j2
                    If(ij /= 2*(ij/2)) is = -is
                 End If
-                ib1=2*IPlx+1
+                ib1=2*Nlx+1
                 ib2=ib1*ib1
                 ind = ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2)
+                ! TODO - use num_gaunts_per_partial_wave to start looking for gaunt factors in their respective blocks of l
                 Do i=1,Ngaunt
                    If(In(i) == ind) Then
                       g = Gnt(i)

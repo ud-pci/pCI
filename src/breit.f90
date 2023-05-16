@@ -10,14 +10,14 @@ Module breit
 
   Contains
 
-    Integer Function calcNumGaunts(IPlx)
+    Integer Function calcNumGaunts(Nlx)
         Implicit None
-        Integer, Intent(In) :: IPlx ! max(l)
+        Integer, Intent(In) :: Nlx ! max(l)
         Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, im1, im2, mk
         Real(dp) :: J1,M1,J2,M2
 
         l=0
-        lx=IPlx+1            !### = max(l)
+        lx=Nlx+1            !### = max(l)
         jx=2*lx-1            !### = max(2j)
         Do ij1=1,lx
             j1=ij1-0.5
@@ -49,18 +49,20 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, IPlx, Ngaunt
-        Real(dp) :: J1,M1,J2,M2, x
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, Ngaunt
+        Real(dp) :: J1, M1, J2, M2, x
 
-        IPlx = 5                           ! max(l)
-        Ngaunt = calcNumGaunts(IPlx)       ! number of tabulated Gaunts
+        If (Nlx < 5) Nlx=5                ! Set minimum lmax=5
+        Ngaunt = calcNumGaunts(Nlx)       ! number of tabulated Gaunts
 
         Allocate(In(Ngaunt))
         Allocate(Gnt(Ngaunt))
+        Allocate(num_gaunts_per_partial_wave(Nlx+1))
 
         l=0
-        lx=IPlx+1            !### = max(l)
+        lx=Nlx+1            !### = max(l)
         jx=2*lx-1            !### = max(2j)
+        num_gaunts_per_partial_wave = 0 
         Do ij1=1,lx
             j1=ij1-0.5
             Do ij2=ij1,lx
@@ -84,6 +86,7 @@ Module breit
                             in(l)=ind
                             x=Gaun(K,J1,M1,J2,M2)
                             gnt(l)=x
+                            num_gaunts_per_partial_wave(ij1) = num_gaunts_per_partial_wave(ij1) + 1
                         End Do
                     End Do
                 End Do
@@ -91,9 +94,10 @@ Module breit
         End Do
 
         Open (unit=12,file='CONF.GNT',status='UNKNOWN',form='unformatted')
-        Write(12) Ngaunt
-        Write(12) (in(i),i=1,Ngaunt)
-        Write(12) (gnt(i),i=1,Ngaunt)
+        Write(12) Nlx, Ngaunt
+        Write(12) num_gaunts_per_partial_wave
+        Write(12) (In(i),i=1,Ngaunt)  ! In = combination of quantum numbers
+        Write(12) (Gnt(i),i=1,Ngaunt) ! Gnt= value of Gaunt factor
         Close(unit=12)
 
         Deallocate(In, Gnt)

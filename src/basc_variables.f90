@@ -1,11 +1,11 @@
 Module basc_variables
 
     Use params, ipmr1 => IPmr
-    Use conf_variables, Only : Ecore, Rint1, Iint1, IntOrd, Rint2, Iint2, Iint3, R_is, I_is, In, Gnt
+    Use conf_variables, Only : Ecore, Rint1, Iint1, IntOrd, Rint2, Iint2, Iint3, R_is, I_is, In, Gnt, Nlx, num_gaunts_per_partial_wave, Ngint
 
     Implicit None
 
-    Integer :: MaxT, Kfile, kt, kt1, ii, ipmr, nhint, ngint
+    Integer :: MaxT, Kfile, kt, kt1, ii, ipmr, nhint
     Integer, Allocatable, Dimension(:) :: Kbas
     Integer, Dimension(10) :: N_l
     Real(dp), Dimension(10) :: Rcut

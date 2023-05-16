@@ -94,7 +94,7 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.3")'
+        strfmt = '(4X,"PROGRAM BasC v2.5")'
         Write( *,strfmt)
         Write(11,strfmt)
 
@@ -578,8 +578,10 @@ Contains
         ! This subroutine counts the number of radial integrals
         Implicit None
         Integer, Intent(Out) :: nsx, nsx2, lsx ! nsx and lsx are used to eliminate integrals:
-        Integer :: ngint2=0, i, is, nmin
+        Integer(Kind=int64) :: ngint2=0 
+        Integer :: i, is, nmin
         Character(Len=128) :: strfmt
+        Real(Kind=dp) :: mem
 
         nsx=0
         lsx=0
@@ -621,9 +623,12 @@ Contains
         nsx2=nsx
         ngint=ngint+ngint2
 
-        strfmt='(4X,"NGINT=",I10," including",I9," unused")'
+        strfmt='(4X,"NGINT=",I11," including",I9," unused")'
         Write( *,strfmt) ngint,ngint2
         Write(11,strfmt) ngint,ngint2
+
+        mem = Ngint*4*(2 + 1 + 1)*1E-6
+        print*, 'MEMORY: 2-e radial integrals will require ', mem, 'MB' ! 2 for Rint2, 1 for Iint2, 1 for Iint3
         
         Return
     End Subroutine Rint0
@@ -743,18 +748,18 @@ Contains
     
     End Subroutine countNhint
 
-    Subroutine countNgint(End,ngint1,ngint2)
+    Subroutine countNgint(end,ngint1,ngint2)
         Implicit None
-        Integer, Intent(In) :: End
-        Integer, Intent(Out) :: ngint1, ngint2
+        Integer, Intent(In) :: end
+        Integer(Kind=int64), Intent(Out) :: ngint1, ngint2
 
         Integer :: n0, n1, n2, n3, n4, na, nb, nc, nd, la, lb, lc, ld, ja, jb, jc, jd
         Integer :: k1, k, kmin, kmax, i, iis
-
-        ngint1=0
-        ngint2=0
+        
+        ngint1=0_int64
+        ngint2=0_int64
         n0=Nso+1
-        Do n1=n0,End
+        Do n1=n0,end
             If (Ll(n1) > lsx) Cycle
             Do n2=n1,Nsx
                 If (Ll(n2) > lsx) Cycle
@@ -802,7 +807,7 @@ Contains
                     End Do
                 End Do
             End Do
-        End Do
+        End Do  
     End Subroutine countNgint
 
     Subroutine Rint(nsx,nsx2,lsx,mype,npes)
@@ -817,7 +822,8 @@ Contains
         Integer :: lnx, num_is, nx, i, Idel, idel1, nsx, ih, nmin, na, lsx
         Integer :: nna, lla, jjd, lb, la, nnc, nnb, iis, nb, n4, n3, n2, n1
         Integer :: nsx2, kmin, kmax, k, k1, lc, ld, ja, jb, jc, jd, Iab, nm_br
-        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, ngint2
+        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, cut1, rem, ngint4
+        Integer(Kind=int64) :: ngint2, i8
         Real(dp) :: dint1, r_e1, r_e2, fis, tab_br, tad_br, r_br, rabcd, r_c, tad
         Real(dp), Dimension(IP6) :: cp, cq, ca, cb
         Integer, Dimension(11) :: ilogr
@@ -952,15 +958,15 @@ Contains
                 iint2=0
                 iint3=0
                 ilogr=0
-                intord=0
+                Intord=0_int64
                 Do n1=mype+n0,Nsx2,npes
                     Call countNgint(n1-1,ngint,ngint2)
                     ngint=ngint+ngint2
                     If (Ll(n1) > lsx) Cycle
                     Do n2=n1,Nsx
                         If (Ll(n2) > lsx) Cycle
-                        Iab= nx*(n1-Nso-1)+(n2-nso)
-                        IntOrd(Iab)= ngint+1
+                        iab= nx*(n1-Nso-1)+(n2-nso)
+                        IntOrd(iab)= ngint+1
                         Do n3=n1,Nsx
                             If (Ll(n3) > lsx) Cycle
                             Do n4=n3,Nsx
@@ -1071,22 +1077,39 @@ Contains
                     End Do
                 End Do
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(MPI_IN_PLACE, ngint, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-                Do i=1,IPbr
-                    Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:Ngint), Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                End Do
-                Call MPI_AllReduce(nm_br, nm_br, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(MPI_IN_PLACE, Iint2, Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(MPI_IN_PLACE, Iint3, Ngint, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(MPI_IN_PLACE, IntOrd, IPx*IPx, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                Call MPI_AllReduce(MPI_IN_PLACE, ilogr, 11, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, ngint, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+                
+                If (Ngint > 2147483647) Then
+                    cut1 = Ngint/2
+                    rem = Ngint - cut1 + 1
+                    print*, cut1, rem
+                    Do i=1,IPbr
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:cut1), cut1, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,cut1+1:Ngint), rem, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    End Do
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2(1:cut1), cut1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2(cut1+1:Ngint), rem, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3(1:cut1), cut1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3(cut1+1:Ngint), rem, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Else
+                    ngint4 = Ngint
+                    Do i=1,IPbr
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:ngint4), ngint4, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    End Do
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                End If
+                
 
+                Call MPI_AllReduce(nm_br, nm_br, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, IntOrd, IPx*IPx, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call MPI_AllReduce(MPI_IN_PLACE, ilogr, 11, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Kt=kt1
             Else
                 Continue
             End If
         End If
-
+        
         If (mype == 0) Then
             If (Ne /= 1) Call PrintRint2Table(idel1)
 
@@ -1095,11 +1118,11 @@ Contains
 
             Close(unit=12)
 
-            strfmt = '(2X,"NHINT=",I5," NGINT=",I8, &
-                   /(4X,"10**(-",I2,") < |R| < 10**(-",I2,") num =",I8))'
+            strfmt = '(2X,"NHINT=",I5," NGINT=",I11, &
+                   /(4X,"10**(-",I2,") < |R| < 10**(-",I2,") num =",I11))'
             Write( *,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
             Write(11,strfmt) nhint,ngint,(i,i-1,ilogr(i),i=1,lnx)
-
+ 
             ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             If (K_is >= 2) Then
                 Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
@@ -1118,9 +1141,9 @@ Contains
             Write (13) (Rint1(i), i=1,nhint)
             Write (13) (Iint1(i), i=1,nhint)
             Write (13) ngint,0,nx*nx
-            Write (13) ((Rint2(k,i),k=1,IPbr), i=1,ngint)
-            Write (13) (Iint2(i), i=1,ngint)
-            Write (13) (Iint3(i), i=1,ngint)
+            Write (13) ((Rint2(k,i8),k=1,IPbr), i8=1,ngint)
+            Write (13) (Iint2(i8), i8=1,ngint)
+            Write (13) (Iint3(i8), i8=1,ngint)
             Write (13) (IntOrd(i), i=1,nx*nx)
             If (K_is >= 1) Then
                 Write(13) K_is,Klow,num_is
@@ -1146,8 +1169,9 @@ Contains
         Implicit None
         Integer, Intent(In) :: idel
 
-        Integer :: ngint, n1, n2, n3, n4, na, nb, nc, nd, i, iis, la, lb, lc, ld, ja, jb, jc, jd
+        Integer :: n1, n2, n3, n4, na, nb, nc, nd, i, iis, la, lb, lc, ld, ja, jb, jc, jd
         Integer :: k, k1, kmin, kmax, nna, nnb, nnc, nnd, n0
+        Integer(Kind=int64) :: ngint
         Logical*1  ::  l_br
         Character(Len=256) :: strfmt
         Character(Len=1) :: let(9)
@@ -1196,7 +1220,7 @@ Contains
                                     i=k+la+lc
                                     If (i /= 2*(i/2) .and. .not.l_br) Cycle
                                     ngint=ngint+1
-                                    strfmt = '(1X,I8,1X,I2,2X,I3,A1,I2,"/2",1X,I3,A1,I2, &
+                                    strfmt = '(1X,I11,1X,I2,2X,I3,A1,I2,"/2",1X,I3,A1,I2, &
                                             "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
                                         write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
