@@ -88,9 +88,9 @@ Program ine
         xlambstep = xlambsteps(k)
         If (k > 1) Then
             If (xlamb1 == xlamb2s(k-1)) xlamb1 = xlamb1+xlambstep
-            If (xlamb2 - xlamb1 < xlambstep) xlamb1 = xlamb2
+            If (xlamb2 < xlamb1 + xlambstep) xlamb2 = xlamb1
         End If
-        If (xlamb1==xlamb2) xlambstep=1
+        If (xlamb2==xlamb1) xlambstep=1
 
         dlamb = (xlamb2-xlamb1)/xlambstep
         dlamb = Anint(dlamb*100.0)/100.0
