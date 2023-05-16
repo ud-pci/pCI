@@ -60,7 +60,7 @@ def read_yaml(filename):
     return config
 
 def write_job_script(filename, code, num_nodes, num_procs_per_node, exclusive, mem, partition):
-    if code == 'conf':
+    if code == 'conf' or code == 'ci':
         with open('c.in', 'w') as f:
             f.write('2, 2, 0, 0, 1')
         f.close()
@@ -168,7 +168,7 @@ if __name__ == "__main__":
                 derivative = 0
                 for num_energy2 in range(len(energies)): # runs over the 5 c_is values
                     derivative += points[num_energy2] * float(energies[num_energy2][num_energy]) 
-                derivative = derivative / 0.12
+                derivative = derivative / (12*step_size)
                 derivatives.append(derivative)
                 coefficient = (5/6) * au_to_si_conversion_factor_fs * derivative / (radius**2)
                 K_fs.append(coefficient)
@@ -272,7 +272,79 @@ if __name__ == "__main__":
                     f.write(",".join([str(item) for item in sorted_confs_terms_energies[nlevel]]) + '\n')
 
             print('analysis complete')
+
+    elif program == 'add':
+        ## If attempting to generate configuration lists for IS calculations, we will need to start from either
+        ## a pre-existing CONF.INP file or create new lists using the add.py script
+        add_input = input("Create new configuration lists from add.yml or use existing CONF.INP? ")
+        if add_input == 'add.yml':
+            # generate CONF.INP using add.py
+            print('Generating CONF.INP for each C_is using add.yml')
+            with open('add.in', 'w') as f:
+                f.write("0 \n 0")
+            with open('add2.in', 'w') as f:
+                f.write("add.yml")
+
+            # Run script to generate ADD.INP for even and odd configurations
+            run('python3 create_add_inp.py < add2.in', shell=True)
+
+            # Check if ADDeven.INP and ADDodd.INP exist
+            even_exists = os.path.isfile('ADDeven.INP')
+            odd_exists = os.path.isfile('ADDodd.INP')
+
+            if even_exists and odd_exists:
+                parity = input("Choose even or odd parity configurations to create CONF.INP for: ")
+            elif even_exists:
+                parity = 'even'
+            elif odd_exists: 
+                parity = 'odd'
+            else:
+                print("No ADD.INP exists.")
+                sys.exit()
+            
+            if parity:
+                # Generate CONF.INP from ADD.INP
+                run("cp ADD" + parity + ".INP ADD.INP", shell=True)
+                run("add_nr < add.in", shell=True)
+                print("CONF.INP created")
+        elif add_input == 'CONF.INP':
+            print('Using existing CONF.INP')
+        else:
+            print(add_input + " is not compatible")
             sys.exit()
+
+        # Copy CONF.INP to IS directories
+        print('Copying CONF.INP to IS directories with respective IS coefficients')
+        try:
+            f = open('CONF.INP', 'r')
+            lines = f.readlines()
+            f.close()
+        except FileNotFoundError:
+            print("CONF.INP is not in currently directory")
+            sys.exit()
+        C_is = system['C_is']
+        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+        for c in c_list:
+            dir_path = os.getcwd()
+            dir_prefix = ''
+            if c < 0:
+                dir_prefix = 'minus'
+            elif c > 0:
+                dir_prefix = 'plus'
+            dir_name = dir_prefix+str(abs(c))
+            os.chdir(dir_name)
+            # Find line with 'Kbrt' in CONF.INP and write K_is and C_is after it
+            with open('CONF.INP', 'w') as f:
+                for line in lines:
+                    if 'Kbrt' in line:
+                        f.write(line)
+                        f.write('K_is= 1 \n')
+                        f.write('C_is= ' + str(c) + '\n')
+                    else:
+                        f.write(line)
+            os.chdir('../')
+        print("CONF.INP has been copied to IS directories")
+        
     elif program == 'basc':
         ## TODO - check if CONFFINAL.RES exists - then ask user if they REALLY want to restart calculations
         # Run executables
@@ -330,7 +402,7 @@ if __name__ == "__main__":
             dir_path = os.getcwd()
             for dir_name in ['EVEN','ODD']:
                 os.chdir(dir_name)
-                write_job_script('ci.qs', program, 5, 64, True, 0, 'large-mem')
+                write_job_script('ci.qs', program, 5, 64, True, 0, 'xlarge-mem')
                 run('sbatch ci.qs', shell=True)
                 os.chdir('../')
         else:
@@ -345,7 +417,7 @@ if __name__ == "__main__":
                     dir_prefix = 'plus'
                 dir_name = dir_prefix+str(abs(c))
                 os.chdir(dir_name)
-                write_job_script(program + '.qs', program, 5, 64, True, 0, 'large-mem')
+                write_job_script(program + '.qs', program, 5, 64, True, 0, 'xlarge-mem')
                 run('sbatch ' + program + '.qs', shell=True)
                 os.chdir('../')
     else:
