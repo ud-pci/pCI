@@ -93,7 +93,7 @@ Contains
         Character(Len=512) :: strfmt
 
         ! Write name of program
-        strfmt = '(/4X,"Program CONF_PT v2.1", &
+        strfmt = '(/4X,"Program CONF_PT v2.2", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
@@ -371,7 +371,7 @@ Contains
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -415,9 +415,11 @@ Contains
     End Subroutine AllocatePTArrays
 
     Subroutine BcastPTArrays
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
     	Implicit None
         Integer :: i, mpierr
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -429,13 +431,13 @@ Contains
         Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        count = IPbr*Int(Ngint,kind=int64)
+        Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.15] - 2023-05-19
 - basc v2.5 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
 - conf v5.15 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- conf_lsj v2.4 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- conf_pt v2.2 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
 - basc.f90 - changed datatype of Ngint related variables and arrays to integer*8
 - basc.f90 - added code to split arrays in half if array size goes over 2^31 for MPI_AllReduce calls
 - basc.f90 - increased string formatting for Ngint to I11

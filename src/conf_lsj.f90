@@ -70,7 +70,7 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v2.3")'
+        strfmt = '(4X,"Program conf_lsj v2.4")'
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -345,7 +345,7 @@ Contains
         Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -390,9 +390,11 @@ Contains
     Subroutine InitLSJ
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
         Implicit None
         Integer :: mpierr, i
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(rec1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -439,15 +441,15 @@ Contains
         Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+        count = IPbr*Int(Ngint,kind=int64)
+        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(Iarr(i,1:Nd), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End do  
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nnd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(D1(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
