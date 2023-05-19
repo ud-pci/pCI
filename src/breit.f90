@@ -11,15 +11,12 @@ Module breit
   Contains
 
     Integer Function calcNumGaunts(Nlx)
-    Integer Function calcNumGaunts(Nlx)
         Implicit None
-        Integer, Intent(In) :: Nlx ! max(l)
         Integer, Intent(In) :: Nlx ! max(l)
         Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, im1, im2, mk
         Real(dp) :: J1,M1,J2,M2
 
         l=0
-        lx=Nlx+1            !### = max(l)
         lx=Nlx+1            !### = max(l)
         jx=2*lx-1            !### = max(2j)
         Do ij1=1,lx
