@@ -575,13 +575,14 @@ Contains
     End Subroutine Core
 
     Subroutine Rint0(nsx,nsx2,lsx) 
+        Use str_fmt, Only : FormattedMemSize
         ! This subroutine counts the number of radial integrals
         Implicit None
         Integer, Intent(Out) :: nsx, nsx2, lsx ! nsx and lsx are used to eliminate integrals:
-        Integer(Kind=int64) :: ngint2=0 
+        Integer(Kind=int64) :: ngint2=0, mem
         Integer :: i, is, nmin
         Character(Len=128) :: strfmt
-        Real(Kind=dp) :: mem
+        Character(Len=16) :: memStr
 
         nsx=0
         lsx=0
@@ -627,8 +628,9 @@ Contains
         Write( *,strfmt) ngint,ngint2
         Write(11,strfmt) ngint,ngint2
 
-        mem = Ngint*4*(2 + 1 + 1)*1E-6
-        print*, 'MEMORY: 2-e radial integrals will require ', mem, 'MB' ! 2 for Rint2, 1 for Iint2, 1 for Iint3
+        mem = Ngint*4*(2 + 1 + 1) ! 2 for Rint2, 1 for Iint2, 1 for Iint3
+        Call FormattedMemSize(mem, memStr)
+        print*, 'MEMORY: 2-el radial integrals will require ', Trim(memStr), ' of memory per core' 
         
         Return
     End Subroutine Rint0
@@ -1082,7 +1084,6 @@ Contains
                 If (Ngint > 2147483647) Then
                     cut1 = Ngint/2
                     rem = Ngint - cut1 + 1
-                    print*, cut1, rem
                     Do i=1,IPbr
                         Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:cut1), cut1, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
                         Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,cut1+1:Ngint), rem, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
