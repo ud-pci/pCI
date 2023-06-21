@@ -1,0 +1,77 @@
+# General parameters
+system:
+    name: Ni12+
+    isotope: 
+    include_breit: True
+
+# Parameters used by basis programs
+basis:
+    cavity_radius: 60
+    orbitals:
+        core: 1s 2s 2p 3s 3p 3d 4s 4p 4d 4f 5s 5p 5d 6s 6p
+        valence: 6d 5f 7s 7p 8s
+    b_splines:
+        nmax: 30
+        lmax: 7
+        k: 7
+    val_aov:
+        s: 3
+        p: 3
+        d: 3
+        f: 3
+    val_energies:
+        kval: 2
+        energies: 
+            s: -0.28000
+            p: [-0.22000, -0.22000]
+            d: [-0.31000, -0.31000]
+            f: [-0.13000, -0.13000]
+
+# Parameters used by add program
+add:
+    # Set of even and odd parity reference configurations
+    ref_configs:
+        odd: 
+        even: [
+   1s2 2s2 2p6 3s2   3p4, 
+   1s2 2s2 2p6 3s2   3p3   4p1, 
+   1s2 2s2 2p6 3s1   3p4   4s1, 
+   1s2 2s2 2p6 3s1   3p4   3d1, 
+   1s2 2s2 2p6 3s2   3p2   3d2,
+   1s2 2s2 2p6 3p6,            
+        ]
+    basis_set: 17spdfg
+    orbitals:
+        core:
+        active: [
+            1-2s: 2  2,
+            2p: 6  6,
+            3-7p:  0  6,
+            3-7d:  0  6,
+            4-5f:  0  6,
+            ]    
+    excitations:
+        single: True
+        double: True
+        triple: False
+
+# Parameters used by conf program
+conf:
+    J: 0.0
+    JM: 0.0
+    num_energy_levels: 5
+    num_dvdsn_iterations: 50
+    
+# Optional parameters
+optional:
+    qed:
+        include: False
+        rotate_basis: False
+
+    isotope_shifts: 
+        include: False
+        K_is: 1
+        C_is: 0.01
+
+    code_exec: ci+all-order
+    run_ao_codes: False

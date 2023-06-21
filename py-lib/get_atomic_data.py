@@ -1,5 +1,8 @@
 import pandas as pd
 import requests
+import re
+import math
+import sys
 
 def get_radii():
     url = "https://www-nds.iaea.org/radii/"
@@ -1016,6 +1019,68 @@ def get_periodic_table():
 
 def save_to_csv(df, filename):
     df.to_csv(filename)
+
+def get_atomic_data(name, isotope):
+    """ Gets atomic number Z and atomic mass AM from periodic table """
+    ptable = get_periodic_table()
+    rtable = get_radii()
+    symbol = re.findall('[a-zA-Z]+', name)[0]
+    try:
+        num_rem_ele = re.findall('[0-9]+', name)[0]
+    except:
+        num_rem_ele = 0
+    rnuc = 0
+    cfermi = 0
+
+    # Check if atomic symbol in periodic table
+    if ptable['Symbol'].eq(symbol).any():
+        Z = ptable[ptable['Symbol'] == symbol]['Z'].values.astype(float)[0]
+        AM = ptable[ptable['Symbol'] == symbol]['Mass'].values.astype(float)[0]
+
+    # Check if isotope was specified
+    if isotope:
+        AM = isotope
+    else:
+        print('Isotope was not specified, so default mass is used')
+
+    # Check if atomic symbol in radii table
+    if rtable['Elem.'].eq(symbol).any():
+        try: 
+            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == str(round(AM)))]['R_av(fm)'].values.astype(float)[0]
+        except IndexError:
+            pass
+    
+    
+    # If rnuc could not be found, search manual table for rnuc
+    if rnuc == 0:
+        rtable2 = get_extra_radii()
+        if rtable2['Elem.'].eq(symbol).any():
+            rnuc = rtable2[(rtable2['Elem.'] == symbol)]['R_av(fm)'].values.astype(float)[0]
+            print('rnuc was not found in nuclear charge radii table, so a guess is used.')
+        else:
+            print('Could not find rnuc in any tables. Enter parameters in HFD.INP and bas_wj.in manually.')
+            pass
+    else:
+        # Calculate cfermi
+        try:
+            cfermi = calc_c_fermi(rnuc)
+        except UnboundLocalError as e:
+            print('ERROR: Nuclear charge radius could not be found for', name)
+            sys.exit()
+        except ValueError as e:
+            print('ERROR: Nuclear charge radius could not be found for', name)
+            sys.exit()
+
+    return Z, AM, symbol, cfermi, rnuc, num_rem_ele
+
+def calc_c_fermi(rnuc):
+    """ Calculates c fermi from rms radius """
+    at = 2.3/(4*math.log(3.0))
+    a1 = (5/3)*(rnuc**2)
+    a2 = (7/3)*((math.pi*at)**2)
+    cfermi = math.sqrt(a1-a2)
+
+    return cfermi
 
 if __name__ == "__main__":
     radii_df = get_radii()

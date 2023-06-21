@@ -4,39 +4,22 @@ import sys
 import orbitals as orb_lib
 import get_excitations
 import math
+import get_atomic_data as libatomic
 
-def read_config_yaml(filename):
+def read_yaml(filename):
     """
-    Read yaml input file
-    """ 
-    system = []
-    # set default parameters
-    num_dvdsn_iterations = 50
-    num_energy_levels = 12
-    include_gaunt = True
-    include_breit = True
-    J = 0.0
-    JM = 0.0
-    system = system + [{'include_gaunt' : True}, {'include_breit' : True}, {'num_dvdsn_iterations' : num_dvdsn_iterations}, {'num_energy_levels' : num_energy_levels}, {'J': J}, {'JM': JM}]
-    
-    # read yaml file with inputs
+    This function reads a configuration file in YAML format and returns a dictionary of config parameters
+    """
     with open(filename,'r') as f:
         config = yaml.safe_load(f)
-        try:
-            system = system + config['system']
-            configurations = config['configurations']
-            orbitals = config['orbitals']
-            excitations = config['excitations']
-            basis = config['basis']
-        except KeyError as e:
-            print('ERROR: ' + str(e) + ' is missing')
-            sys.exit()
-        
-    return system, configurations, basis, orbitals, excitations
+
+    return {**config['system'], **config['add'], **config['conf']}
     
-def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_val, orb_occ, parity):
+def write_add_inp(filename, Z, AM, system, multiplicity, num_val, orb_occ, parity):
     """Write ADD.INP file for specified parity"""
 
+    configurations = system['ref_configs']
+    orbitals = system['orbitals']
     # Check if there are configurations 
     if configurations[parity] == []:
         print(parity.capitalize(), 'parity configurations were not specified')
@@ -92,8 +75,8 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
     # Write head of CONF.INP
     f.write('>>>>>>>>>>>>> Head of the file CONF.INP >>>>>>>>>>>>>>>>>>>>>>>>\n')
     f.write('  ' + system['name'] + ' ' + parity + '\n')
-    f.write('  Z = ' + str(system['atomic_number']) + '\n')
-    f.write(' Am = ' + str(system['atomic_mass']) + '\n')
+    f.write('  Z = ' + str(Z) + '\n')
+    f.write(' Am = ' + "{:.1f}".format(round(AM)) + '\n')
     f.write('  J = ' + str(system['J']) + '\n')
     f.write(' Jm = ' + str(system['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
@@ -109,7 +92,10 @@ def write_add_inp(filename, system, configurations, orbitals, multiplicity, num_
     f.write('Ncpt= 0 \n')
     f.write('Cut0= 0.0001 \n')
     f.write('N_it= ' + str(system['num_dvdsn_iterations']) + '\n')
-    kbrt = sum((system['include_gaunt'], system['include_breit']))
+    if system['include_breit']:
+        kbrt = 2
+    else:
+        kbrt = 0
     f.write('Kbrt= ' + str(kbrt) + '\n')
     
     # Write core orbitals
@@ -163,18 +149,10 @@ def format_orb_occ(orb, occ):
 
     return orb_occ_formatted
 
-def parse_system(system):
-    """ Create dictionary with system parameters """ 
-    params = {}
-    for param in system:
-        params[list(param.keys())[0]] = param[list(param.keys())[0]]
-
-    return params
-
 if __name__ == "__main__":
     filename = input('Enter input file: ')
     try:
-        system, configurations, basis, orbitals, excitations = read_config_yaml(filename)
+        config = read_yaml(filename)
     except FileNotFoundError:
         print('ERROR: The file', filename, 'was not found')
         sys.exit()
@@ -182,10 +160,18 @@ if __name__ == "__main__":
         print('ERROR: The file', filename, 'was not in YAML format')
         sys.exit()
 
-    params = parse_system(system)
-    num_val = orb_lib.count_valence(configurations)
-    orb_occ = orb_lib.expand_orbitals(basis, orbitals)
-    multiplicity = orb_lib.count_excitations(excitations)
+    # Get atomic data
+    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config['name'], config['isotope'])
 
-    write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'even')
-    write_add_inp('ADD.INP', params, configurations, orbitals, multiplicity, num_val, orb_occ, 'odd')
+    num_val = orb_lib.count_valence(config['ref_configs'])
+    orb_occ = orb_lib.expand_orbitals(config['basis_set'], config['orbitals'])
+    multiplicity = orb_lib.count_excitations(config['excitations'])
+
+    if config['ref_configs']['even']:
+        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'even')
+    else:
+        print('no even reference configurations specified')
+    if config['ref_configs']['odd']:
+        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd')
+    else:
+        print('no odd reference configurations specified')

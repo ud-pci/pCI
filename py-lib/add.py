@@ -1,5 +1,4 @@
 from subprocess import run
-import sys
 import os
 import re
 from pathlib import Path

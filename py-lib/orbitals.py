@@ -241,14 +241,15 @@ def convert_list_nr_to_rel_configs(nr_configs):
 
 def count_valence(configurations):
     """ Count the number of valence electrons in each basic configuration """
-    try:
+    if configurations['even']: 
         configurations_even = configurations['even']
-    except KeyError:
+    else:
         configurations_even = []
-    try:
+    if configurations['odd']:
         configurations_odd = configurations['odd']
-    except KeyError:
+    else:
         configurations_odd = []
+
     configurations = configurations_even + configurations_odd
     if configurations == []:
         print('No configurations were specified')
@@ -271,7 +272,7 @@ def count_excitations(excitations):
     """ Return the multiplicity of excitations given list of excitations"""
     count = 0
     for excitation in excitations:
-        if list(excitation.values()) == [True]:
+        if excitations[excitation] == True:
             count = count + 1
     return count
 
