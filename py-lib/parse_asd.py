@@ -9,7 +9,7 @@ def generate_asd_url(spectrum):
     url = "https://physics.nist.gov/cgi-bin/ASD/energy1.pl?"
 
     spectrum_post = 'spectrum=' + str(spectrum).replace(' ', '+') + '&submit=Retrieve+Data&'
-    post_data = ('units=0' + '&' 
+    post_req = ('units=0' + '&' 
                 + 'format=0' + '&' 
                 + 'output=0' + '&' 
                 + 'page_size=15' + '&' 
@@ -24,7 +24,7 @@ def generate_asd_url(spectrum):
                 + 'biblio=on' + '&' 
                 + 'temp=')
 
-    full_url = url + spectrum_post + post_data
+    full_url = url + spectrum_post + post_req
 
     return full_url 
 
@@ -93,5 +93,5 @@ if __name__ == "__main__":
         sys.exit()
 
     reformat_df_to_atomdb(asd_df)
-    df_to_csv(asd_df, 'asd.csv')
+    df_to_csv(asd_df, str(spectrum).replace(' ', '_'))
     
