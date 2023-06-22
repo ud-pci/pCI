@@ -1,6 +1,7 @@
 import pandas as pd
 import requests
 import sys
+from io import StringIO
 
 def generate_asd_url(spectrum):
     """
@@ -10,7 +11,7 @@ def generate_asd_url(spectrum):
 
     spectrum_post = 'spectrum=' + str(spectrum).replace(' ', '+') + '&submit=Retrieve+Data&'
     post_req = ('units=0' + '&' 
-                + 'format=0' + '&' 
+                + 'format=2' + '&' # read asd in csv text format
                 + 'output=0' + '&' 
                 + 'page_size=15' + '&' 
                 + 'multiplet_ordered=0' + '&' 
@@ -33,11 +34,9 @@ def generate_df_from_asd(url):
     This function returns a dataframe containing the energies from the NIST Atomic Spectra Database
     """
     r = requests.get(url)
-    df_list = pd.read_html(r.text)
-    asd_df = df_list[2].dropna(how='all')
+    asd_df = pd.read_table(StringIO(r.text), delimiter = ',')
+    new_df = asd_df[['Configuration','Term','J','Level (cm-1)', 'Uncertainty (cm-1)', 'Reference']].replace({'=','"'},'', regex=True)
 
-    new_df = asd_df[['Configuration','Term','J','Level (cm-1)', 'Uncertainty (cm-1)', 'Reference']]
-    
     return new_df
 
 def reformat_df_to_atomdb(asd_df):
@@ -57,6 +56,7 @@ def reformat_df_to_atomdb(asd_df):
     # Fill in empty cells 
     asd_df['state_configuration'].fillna(method='ffill', inplace=True)
     asd_df['state_term'].fillna(method='ffill', inplace=True)
+    asd_df['energy'].fillna('N/A', inplace=True)
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
 
     # Remove spaces in energies
