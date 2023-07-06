@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.16] - 2023-07-06
+- add v2.0 - updated to non-relativistic version for significant speedup
+- add.f90 - removed Nonrel subroutine
+- add.f90 - added l=7,8,9 (k,l,m)
+- add.f90 - added code to write a secondary CONF.INP with relativistic configurations in a single line
+
 ## [0.11.15] - 2023-05-19
 - basc v2.5 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
 - conf v5.15 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
