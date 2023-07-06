@@ -15,7 +15,7 @@ Program add
     Real(dp), Dimension(IPs) :: V
     Real(dp), Dimension(1000) :: Nqmin, Nqmax
 
-    strfmt = '(/4X,"Program Add"/)'
+    strfmt = '(/4X,"Program Add (NR) v2.0"/)'
     Write(6, strfmt)
     Open(unit=10, file='ADD.INP')
 
@@ -24,14 +24,12 @@ Program add
 
     ! Form complete list of relativistic configurations
     Nc=Ncor
-    Call Expand
-    Ncor=Nc
 
     ! Construct new configurations from excitations
     Do l=1,Mult
         Write(*,*) ' multiplicity of excitation:    ',l
         Call Constr
-        Write(*,*) ' number of conf-s after Constr: ',Nc
+        Write(*,*) ' number of NR conf-s after Constr: ',Nc
         if (Nc.GT.IPad1) Then
             strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
             Write(*, strfmt) Nc, IPad1
@@ -42,19 +40,21 @@ Program add
     ! Test parity
     Write(*,*) " test of parity..."
     Call Parity
-    Write(*,*) " conf-s of proper parity: ", Nc
-
-    Write(*,*) " call Nonrel..."
-    Call Nonrel
+    Write(*,*) " NR conf-s of proper parity: ", Nc
+    Write(*,*) ' forming relativistic conf-s...'
+    Call Expand
+    Write(*,*) ' relativistic conf-s: ',Nc
     Write(*,*) " forming output..."
 
     Open(unit=11, file="CONF.INP")
+    Open(unit=12, file="CONF_.INP")
     Call CI_or_PT(Ncpt,keyPT) ! Choosing Nc, or Ncpt
     Rewind(10)
 
     Call PrintConfINP(Ncpt,keyPT)     ! Forms CONF.INP
 
     ! Close ADD.INP and CONF.INP
+    Close(12)
     Close(11)
     Close(10)
     Write(*,*) " File CONF.INP is formed"
@@ -63,13 +63,16 @@ Contains
 
     Subroutine Input
         Implicit None
-        Integer :: nsmc, ic, ne0, i, i1, i2, iz, j, nx, ny, nz, ncheck, ndum, nlvi, nl1
+        Integer :: nsmc, ic, ne0, i, i1, i2, iz, j, nx, ny, nz, ncheck, ndum, nlvi, nl1, &
+                    iskip, ics, ji, k, jk, idif
         Real(dp) :: x
         Integer, Dimension(IPs) :: Nq1, Nq2, Nq3
+        Integer, Dimension(20) :: nyi, myi, nyk, myk
         Real(dp), Dimension(40) :: Qnl
         Character(Len=1), Dimension(IPs) :: let, chr
         Character(Len=1), Dimension(4) :: txt
         Character(Len=128) :: string, strfmt
+        Logical :: new
 
         string(1:5) = '     '
         txt(1)=' '
@@ -88,6 +91,9 @@ Contains
         Write(*,*) ' Mult=',Mult,' Ne   =',Ne
 
         nsmc=0
+        iskip=0     ! - skipped rel. configurations
+        ics=0       ! - basic non-rel. configurations 
+
         ! Run through each configuration
         Do ic=1,Ncor
             ne0=0
@@ -136,15 +142,43 @@ Contains
                 Stop
             End If
 
-            Noz(ic)=iz         ! number of shells in config-n
-            nsmc=max(nsmc,iz)  ! max number of shells in config-n
-            Do j=1,iz
-              Ac(ic,j)=Qnl(j)
-            End Do
-
-            strfmt = '(F7.4,5(4X,F7.4))'
-            Write(*,strfmt) (Ac(ic,j),j=1,iz)
+            Noz(ic)=iz          !### number of shells in config-n
+            do j=1,iz
+                Ac(ic,j)=Qnl(j)
+            end do
+        
+            call Squeeze(ic, ji, nyi, myi) 
+            new=.TRUE.
+            outer: do k=1,ics
+                call Squeeze(k,jk,nyk,myk)
+                if (ji.EQ.jk) then   ! compare two non.rel. config-s
+                    inner: do j=1,ji
+                        idif = iabs(nyi(j)-nyk(j)) + iabs(myi(j)-myk(j))
+                        if (idif.GT.0) Cycle outer
+                    end do inner
+                    new=.FALSE.
+                    Exit outer
+                end if
+            end do outer
+        
+            if (new) then
+                ics=ics+1
+                Noz(ics)=ji       
+                nsmc=max(nsmc,ji) !### max number of shells in config-n
+                do j=1,ji
+                    Ac(ics,j)=(100.d0*nyi(j)+myi(j))/10000.d0
+                end do
+                strfmt = '(I3,1X,F7.4,5(4X,F7.4),/6(4X,F7.4))'
+                write(*,strfmt) ics,(Ac(ics,j),j=1,ji)
+            else
+                iskip=iskip+1
+            end if         
         End Do
+
+        If (iskip.GT.0) Then
+            write(*,*) iskip,' config-s skipped from ',Ncor
+            Ncor=Ncor-iskip
+        End If
 
         ! Check that number of shells do not exceed maximum set by IPad2
         ncheck=nsmc+mult
@@ -182,13 +216,7 @@ Contains
             Nqmax(nlvi)=Nq2(i)
 
             Nsv = Nsv + 1
-            If ( Ll(i).EQ.0 ) Then
-                V(Nsv) = (10000*Nn(i) + 1000*Ll(i))/100000. + 5.0E-8
-            Else
-                V(Nsv) =-(10000*Nn(i) + 1000*Ll(i))/100000. - 5.0E-8
-                Nsv = Nsv + 1
-                V(Nsv) = (10000*Nn(i) + 1000*Ll(i))/100000. + 5.0E-8
-            End If
+            V(Nsv) = (10000*Nn(i) + 1000*Ll(i))/100000. + 5.0E-8
         End Do
 
         Do j=1,Nsv
@@ -213,6 +241,9 @@ Contains
         If (char.EQ.'g'.OR.char.EQ.'G') ichar = 4
         If (char.EQ.'h'.OR.char.EQ.'H') ichar = 5
         If (char.EQ.'i'.OR.char.EQ.'I') ichar = 6
+        If (char.EQ.'k'.OR.char.EQ.'K') ichar = 7
+        If (char.EQ.'l'.OR.char.EQ.'L') ichar = 8
+        If (char.EQ.'m'.OR.char.EQ.'M') ichar = 9
         Return
     End Subroutine ConvertChar
 
@@ -220,11 +251,11 @@ Contains
         ! Form complete list of relativistic configurations from initial list
         Implicit None
         Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar
-        Integer :: j, ir, j1, l, iq1, iq2, idif
+        Integer :: j, ir, j1, l, iq1, iq2, idif, ncr
         Real(dp) :: qnl
         Integer, Dimension(20)      :: nyi, myi, nyk, myk, ivc, ni, li, iv
         Integer, Dimension(20, 9)   :: mx1, mx2
-        Integer, Dimension(100, 20) :: ivv
+        Integer, Dimension(500, 20) :: ivv
         Integer, Dimension(IPad1)   :: NozN
         Real(dp), Dimension(IPad1, IPad2) :: AcN
 
@@ -237,9 +268,14 @@ Contains
 
         Do
             ic=ic+1 ! current configuration
+            If (ic.EQ.Ncor+1) then
+                Write (*,*) Ncor,' initial config-s expanded in ',kc,' relat. config-s'
+                ncr=kc
+            End If
             If (ic.GT.Nc) Then
                 Write (*,*) Nc,' config-s expanded in ',kc,' relat. config-s'
                 Nc=kc
+                Ncor=ncr
                 Do k=1,kc
                     Noz(k)=NozN(k)
                     Do n=1,Noz(k)
@@ -267,7 +303,8 @@ Contains
             ! new non-relativistic configuration
 110         icnr=icnr+1
             strfmt = '(I4)'
-            Write(*, strfmt) icnr
+            !Write(*, strfmt) icnr
+            Knr(icnr)=kc+1
 
             ir=1 ! number of relativistic cofiguration in non-relativistic configuration
             Do i=1,jk
@@ -294,6 +331,12 @@ Contains
                 End If
                 ir=ir*iv(i)
             End Do     
+
+            If (ir.GT.500) Then
+                write(*,*) ' number of relativistic configurations ',ir
+                write(*,*) ' in one NR configuration exceed array size 500'
+                stop
+            End If
 
             ivc(jk)=1
             Do i=jk-1,1,-1
@@ -332,7 +375,7 @@ Contains
                     End If
                 End Do
                 NozN(kc)=j1
-                Write(*, strfmt) kc,(AcN(kc,j),j=1,j1)
+                !Write(*, strfmt) kc,(AcN(kc,j),j=1,j1)
             End Do       
         End Do
 
@@ -341,6 +384,10 @@ Contains
 
 
     Subroutine Squeeze(ic, k, nyi, myi)
+        ! ic - current config in Ac
+        ! k - number of non-rel shells in config
+        ! nyi - array of QN n & l
+        ! myi - array of occupation numbers
         Implicit None
         Integer :: k, j, j1, ic
         Integer, Dimension(20) :: nyi, myi, nzi, mzi
@@ -429,14 +476,14 @@ Contains
         Do j=1,nozi-1
             k=j+1
    100      B= Ac1(j) - Ac1(k)
-            If (abs(B).GE.0.001) goto 110
+            If (abs(B).GE.0.005) goto 110     ! shells are different
             nx=10000*abs(Ac1(k)) + 0.1
             ny=100*abs(Ac1(k)) + 0.1
-            Nxy=nx-100*ny
-            Ac1(j)= abs(Ac1(j)) + Nxy*0.0001
-            Ac1(j)= sign(Ac1(j),Ac1(k))
+            Nxy=nx-100*ny                     ! electrons on shell k
+            Ac1(j)= abs(Ac1(j)) + Nxy*0.0001  ! summing electrons
+            Ac1(j)= sign(Ac1(j),Ac1(k))       ! restoring the sign
             R= 0.01*ny
-            Ac1(k)= sign(R,Ac1(k))
+            Ac1(k)= sign(R,Ac1(k))            ! now shell k has 0 electrons
    110      If (k.NE.nozi) Then
                 k=k+1
                 goto 100
@@ -473,7 +520,7 @@ Contains
             k1=0
             Do k=1,n1
                 P1= abs(Ac1(m)-V(k))
-                If (P1.LT.0.001) k1=k
+                If (P1.LT.0.002) k1=k
                 If (k1.NE.0) goto 100
             End Do
             Write(*, strfmt) m,Ac1(j),(V(k),k=1,n1)
@@ -482,7 +529,7 @@ Contains
             k2=0
             Do k=1,n1
                 P2= abs(Ac1(m)-V(k))
-                If (P2.LT.0.001) k2=k
+                If (P2.LT.0.002) k2=k
                 If (k2.NE.0) goto 110
             End Do
             Write(*, strfmt) m,Ac1(m),(V(k),k=1,n1)
@@ -514,7 +561,7 @@ Contains
         End Do                      !#### in this configuration
   
         Do j=1,noz1                  !### check of the Pauli principle:
-            i1=sign(1.01,Ac1(j))     !#### nq.LE.(2*j+1)
+            i1=sign(1.01,Ac1(j))     !#### nq.LE.(4*l+2)
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d
@@ -523,7 +570,7 @@ Contains
             jlj=2*llj+i1
             d=100*(d-llj)
             nq=d
-            If (nq.GT.jlj+1) Return
+            If (nq.GT.4*llj+2) Return
         End Do
 
         Do j=1,noz1                  ! does this config.
@@ -537,51 +584,20 @@ Contains
             d=100*(d-llj)
             nq=d
 
-            if (i1.EQ.-1.AND.j.LT.noz1) then  ! check if next orbit
-                j1=j+1                          ! belongs to same nr shell
-                i2=sign(1.01,Ac1(j1))
-                d2=abs(Ac1(j1))+1.E-6
-                d2=10*d2
-                nnj2=d2
-                d2=10*(d2-nnj2)
-                llj2=d2
-                jlj2=2*llj2+i2
-                d2=100*(d2-llj2)
-                nq2=d2
-                ierr=iabs(nnj2-nnj)+iabs(llj2-llj)
-                If (ierr.EQ.0) Then
-                    nq=nq+nq2                    ! occ. num. for nr shell
-                End If
-            end if
-
-            If (i1.EQ.1.AND.j.GT.1) Then     ! check if previous orbit
-                j1=j-1                         ! belongs to same nr shell
-                i2=sign(1.01,Ac1(j1))
-                d2=abs(Ac1(j1))+1.E-6
-                d2=10*d2
-                nnj2=d2
-                d2=10*(d2-nnj2)
-                llj2=d2
-                jlj2=2*llj2+i2
-                d2=100*(d2-llj2)
-                nq2=d2
-                ierr=iabs(nnj2-nnj)+iabs(llj2-llj)
-                If (ierr.EQ.0) Then
-                    nq=nq+nq2                    ! occ. num. for nr shell
-                End If
-            End If
+            if (i1.LT.0) return
 
             nlj=10*nnj+llj
             NLnew(nlj)=nq
+            If (nq.LT.Nqmin(nlj).OR.nq.GT.Nqmax(nlj)) Return ! check that occ. num. are within allowed limits
+
         End Do
 
         ! Check that occupation numbers are within allowed limits
-        Do j=1,Nsv                   
-            nlj=10*Nn(j)+Ll(j)      
-            nq1=NLnew(nlj)
-
-            If(nq1.LT.Nqmin(nlj).OR.nq1.GT.Nqmax(nlj)) return
-        End Do
+        !Do j=1,Nsv                   
+        !    nlj=10*Nn(j)+Ll(j)      
+        !    nq1=NLnew(nlj)
+        !    If(nq1.LT.Nqmin(nlj).OR.nq1.GT.Nqmax(nlj)) return
+        !End Do
   
         ! Check and see if configurations are new
         Outer: Do i=1,Nc            
@@ -650,64 +666,6 @@ Contains
         Return
     End Subroutine Parity
 
-    Subroutine Nonrel
-        Implicit None
-        Integer :: ic, icnr, ji, jk, idif, is, NO, j, ncnr
-        Real(dp) :: m
-        Integer, Dimension(20) :: nyi, myi, nyk, myk
-
-        ic=0
-        icnr=0
-
-        Do While (ic < Nc)
-            ic=ic+1      ! current configuration
-            icnr=icnr+1  ! current non.rel. configuration
-            Knr(icnr)=ic
-            
-            Call Squeeze(ic,ji,nyi,myi)
-            is = ic
-
-            Outer: Do kc= ic+1,Nc
-                Call Squeeze(kc,jk,nyk,myk)
-                ! Compare two non-relativistic configurations
-                If (ji.EQ.jk) Then  
-                    Do j=1,ji
-                        idif = iabs(nyi(j)-nyk(j)) + iabs(myi(j)-myk(j))
-                        If (idif.GT.0) Cycle Outer
-                    End Do
-                Else
-                    Cycle
-                End If
-
-                is= is+1
-                ! Reorder configurations
-                Do m= 1,NOz(is)                    
-                    V(m)= Ac(is,m)
-                End Do
-                Do m= 1,NOz(kc)
-                    Ac(is,m)= Ac(kc,m)
-                End Do
-                Do m= 1,NOz(is)
-                    Ac(kc,m)= V(m)
-                End Do
-                NO= NOz(is)
-                NOz(is)= NOz(kc)
-                NOz(kc)= NO
-            End Do Outer
-
-            ic = is
-            If (ic.GT.Nc) Then
-                Write(*,*) " NonRel Error: ic > Nc"
-                Read(*,*)
-                Stop
-            End If
-
-        End Do
-        Ncnr=icnr       
-
-        Return
-    End Subroutine Nonrel
-
     Subroutine CI_or_PT(Ncpt, keyPT)
         Implicit None
         Integer :: Ncpt, keyPT, k
@@ -764,6 +722,7 @@ Contains
     Subroutine PrintConfINP(Ncpt, keyPT)
         Implicit None
         Integer :: i, k, Ncpt, keyPT, Ncl, ic, ic1, j, icnr, ne1
+        Real(kind=dp) :: Jm
         Character(Len=1), Dimension(5) :: com
         Character(Len=70) :: string
         Character(Len=128) :: strfmt
@@ -776,12 +735,16 @@ Contains
 
         read (10, strfmt) string
         write(11, strfmt) string
+        write(12, strfmt) string
         
         do i=1,4
           read (10,15) (com(k),k=1,5),string
           read (string,*) z
           write(11,"(5A1,F5.1)") (com(k),k=1,5),z
+          write(12,"(5A1,F5.1)") (com(k),k=1,5),z
+          If (i==4) Jm= z 
         end do
+        Mj=2*dabs(Jm)+0.01d0 
  15     format(5A1,A)
         read (10,15) (com(k),k=1,5),string
         if (com(2).ne."n".and.com(2).ne."N") goto 200
@@ -789,12 +752,14 @@ Contains
         if (com(4).ne."o".and.com(4).ne."O") goto 200
         read (string,*) Nso
         write(11,25) (com(k),k=1,5),Nso
+        write(12,25) (com(k),k=1,5),Nso
  25     format(5A1,I4)
         read (10,15) (com(k),k=1,5)
         if (com(2).ne."n".and.com(2).ne."N") goto 300
         if (com(3).ne."c".and.com(3).ne."C") goto 300
         if (com(4).ne." ") goto 300
         write(11,35) (com(k),k=1,5),Nc
+        write(12,35) (com(k),k=1,5),Nc
  35     format(5A1,I6)
 
  100    read (10,15) (com(k),k=1,5),string
@@ -805,6 +770,7 @@ Contains
           backspace(10)
         else
           write(11,15) (com(k),k=1,5),string
+          write(12,15) (com(k),k=1,5),string
         end if
         goto 140
  110    if (com(2).ne."n".and.com(2).ne."N") goto 120
@@ -823,12 +789,14 @@ Contains
         goto 100
 
  130    write(11,15) (com(k),k=1,5),string
+        write(12,15) (com(k),k=1,5),string
         goto 100
 
  140    if (Nso.NE.0) then
           read (10,55) (Q(i),i=1,Nso)
         end if
-        write(11,55) (Q(i),i=1,Nso) ! for NSo=0 empty line written
+        write(11,55) (Q(i),i=1,Nso) ! for Nso=0 empty line written
+        write(12,55) (Q(i),i=1,Nso)
 
  55     format (6(4X,F7.4))
  65     format (I4,F7.4,5(4X,F7.4))
@@ -846,13 +814,15 @@ Contains
           ic1=ic-(ic/10000)*10000
           if (ic.EQ.kc) then    ! New non.rel. config-n
             write(11,65) icnr
+            write(12,65) icnr
             icnr=icnr+1
             kc=Knr(icnr)
-          end if
+          end if   
+          write (12,'(I4,F7.4,*(4X,F7.4))') ic1,(Ac(ic,j),j=1,NOz(ic))
           if (NOz(ic).LE.6) then
             write (11,65) ic1,(Ac(ic,j),j=1,NOz(ic))
           else
-            if (NOz(ic).GT.6) then
+            if (NOz(ic).GT.6.AND.NOz(ic).LE.12) then
               write (11,65) ic1,(Ac(ic,j),j=1,6)
               write (11,55) (Ac(ic,j),j=7,NOz(ic))
             else
