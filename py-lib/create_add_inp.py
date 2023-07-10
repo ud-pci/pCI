@@ -111,6 +111,8 @@ def write_add_inp(filename, Z, AM, system, multiplicity, num_val, orb_occ, parit
             if count == 6:
                 f.write('\n')
                 count = 0
+    
+    f.write('\n    ')
 
     print(filename + ' has been written')
     f.close()
