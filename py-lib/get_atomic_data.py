@@ -1046,7 +1046,7 @@ def get_atomic_data(name, isotope):
     # Check if atomic symbol in radii table
     if rtable['Elem.'].eq(symbol).any():
         try: 
-            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == str(round(AM)))]['R_av(fm)'].values.astype(float)[0]
+            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == str(int(AM)))]['R_av(fm)'].values.astype(float)[0]
         except IndexError:
             pass
     
