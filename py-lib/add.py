@@ -21,14 +21,14 @@ odd_exists = os.path.isfile('ADDodd.INP')
 if even_exists:
     # Generate CONFeven.INP from ADDeven.INP
     run("cp ADDeven.INP ADD.INP", shell=True)
-    run("add_nr < add.in", shell=True)
+    run("add < add.in", shell=True)
     run("cp CONF.INP CONFeven.INP", shell=True)
     print("CONFeven.INP created")
 
 if odd_exists:
     # Generate CONFodd.INP from ADDodd.INP
     run("cp ADDodd.INP ADD.INP", shell=True)
-    run("add_nr < add.in", shell=True)
+    run("add < add.in", shell=True)
     run("cp CONF.INP CONFodd.INP", shell=True)
     print("CONFodd.INP created")
 

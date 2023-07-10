@@ -31,21 +31,18 @@ basis:
 
 # Parameters used by add program
 add:
-    # Set of even and odd parity reference configurations
+    # Lists of even and odd parity reference configurations
     ref_configs:
-        odd: 
-        even: [
-            
-        ]
-    basis_set: 17spdfg
+        odd: [4s1   4p1]
+        even: [4s2]
+    basis_set: 21spdfgh
     orbitals:
-        core:
+        core: 1s 2s 2p 3s 3p
         active: [
-            1-2s: 2  2,
-            2p: 6  6,
-            3-7p:  0  6,
-            3-7d:  0  6,
-            4-5f:  0  6,
+            4-7p:  0  4,
+            4-7d:  0  4,
+            4-7f:  0  4,
+            5-7g:  0  4,
             ]    
     excitations:
         single: True
