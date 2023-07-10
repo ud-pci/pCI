@@ -544,7 +544,7 @@ def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies,
     """ Writes bas_wj.in """
     with open(filename,'w') as f: 
         f.write(' ' + symbol + ' ' + str(NS).rjust(4, ' ') + str(int(Z)).rjust(4, ' ') 
-                    + str(round(AM)).rjust(4,' ') + '   0   0   9' + str(NSO+1).rjust(4, ' ')
+                    + str(int(AM)).rjust(4,' ') + '   0   0   9' + str(NSO+1).rjust(4, ' ')
                     + '   1\n')
         for i in range(len(N)):
             f.write(N[i].rjust(4, ' ') + kappa[i].rjust(4, ' ') + iters[i].rjust(4, ' ') +
