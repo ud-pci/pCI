@@ -6,20 +6,21 @@ system:
 
 # Parameters used by basis programs
 basis:
-    cavity_radius: 55
+    cavity_radius: 40
     orbitals:
         core: 1s 2s 2p 3s 3p
         valence: 4s 4p 3d 5s 5p 4d 6s 6p 5d 4f
+        nmax: 35
+        lmax: 6
     b_splines:
         nmax: 40
         lmax: 6
         k: 7
     val_aov:
-        s: 6
-        p: 6
-        d: 6
-        f: 4
-        g: 2
+        s: 5
+        p: 5
+        d: 5
+        f: 3
     val_energies:
         kval: 1
         energies: 
@@ -71,4 +72,4 @@ optional:
         C_is: 0.01
 
     code_exec: ci+all-order
-    run_ao_codes: True
+    run_ao_codes: False

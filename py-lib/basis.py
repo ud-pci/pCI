@@ -621,21 +621,14 @@ def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energie
     f.close()
     print('inf.vw has been written')
 
-def write_spl_in(filename, radius, lmax, spl_params):
+def write_spl_in(filename, radius, spl_params):
     """ Writes spl.in """
     
-    if spl_params:
-        with open(filename,'w') as f: 
-            f.write(str(spl_params['lmax']) + '\n')
-            f.write(str(radius) + '\n')
-            f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')
-            f.write('0.0 0.00 500')
-    else:
-        with open(filename,'w') as f: 
-            f.write(str(lmax) + '\n')
-            f.write(str(radius) + '\n')
-            f.write('40 7\n')
-            f.write('0.0 0.00 500')
+    with open(filename,'w') as f: 
+        f.write(str(spl_params['lmax']) + '\n')
+        f.write(str(radius) + '\n')
+        f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')
+        f.write('0.0 0.00 500')
 
     f.close()
     print('spl.in has been written')
@@ -645,19 +638,19 @@ def write_inputs(system, C_is):
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
     # Write BASS.INP
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], system['optional']['code_exec'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], system['optional']['code_exec'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
 
     # Write bas_wj.in
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
 
     # Write spl.in
-    write_spl_in('spl.in', system['basis']['cavity_radius'], system['basis']['b_splines']['lmax'], system['basis']['b_splines'])
+    write_spl_in('spl.in', system['basis']['cavity_radius'], system['basis']['b_splines'])
     
     # Write inf.aov
-    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], kval, system['basis']['val_energies']['energies'])
+    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kval, system['basis']['val_energies']['energies'])
 
     # Write inf.vw
-    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
+    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
 def write_ao_job_script(filename, nprocs, mem, job_name, partition):
     with open(filename,'w') as f:
@@ -764,9 +757,9 @@ def run_executables(K_is, C_is):
         print("bspl40 complete")
 
     with open('bwj.in','w') as f: 
-        f.write(str(config['basis']['b_splines']['lmax']) + '\n')
-        for i in range(config['basis']['b_splines']['lmax']+1):
-            f.write(str(config['basis']['b_splines']['nmax']) + '\n')
+        f.write(str(config['basis']['orbitals']['lmax']) + '\n')
+        for i in range(config['basis']['orbitals']['lmax']+1):
+            f.write(str(config['basis']['orbitals']['nmax']) + '\n')
         f.write('\n')
         f.write('\n')
         f.write('1')
@@ -869,7 +862,7 @@ if __name__ == "__main__":
     # Assign keys for which inputs to generate
     kvw = get_key_vw(config['optional']['code_exec'])
 
-    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['optional']['code_exec'], config['basis']['b_splines']['nmax'], config['basis']['b_splines']['lmax'])
+    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['optional']['code_exec'], config['basis']['orbitals']['nmax'], config['basis']['orbitals']['lmax'])
 
     # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
     N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
