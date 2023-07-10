@@ -49,6 +49,14 @@ if gen_dir:
             run("cp ../SGC.CON .", shell=True)
         if os.path.isfile('../SCRC.CON'):
             run("cp ../SCRC.CON .", shell=True)
+        if os.path.isfile('../SGC.CON') and os.path.isfile('../SCRC.CON'):
+            with open('c.in', 'w') as f:
+                f.write('2, 2, 0, 0, 1')
+                f.close()
+        else:
+            with open('c.in', 'w') as f:
+                f.write('0, 0, 0, 0, 1')
+                f.close()
         os.chdir('../')
 
 print('add script completed')
