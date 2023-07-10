@@ -16,56 +16,55 @@ def read_yaml(filename):
     # read yaml file with inputs
     with open(filename,'r') as f:
         config = yaml.safe_load(f)
-
         # Check to see if isotope is specified. If not, set to 0
         try:
-            isotope = config['isotope']
+            isotope = config['system']['isotope']
         except KeyError as e:
             config[e.args[0]] = 0
         
         # Check to see if val_aov is specified. If not, set to []
         try:
-            val_aov = config['val_aov']
+            val_aov = config['basis']['val_aov']
         except KeyError as e:
             config[e.args[0]] = []
 
         # Check to see if energies are specified. If not, set to []
         try:
-            energies = config['energies']
+            energies = config['basis']['energies']
         except KeyError as e:
             config[e.args[0]] = []
 
         # Check to see if spl.in parameters are specified. If not, set to False
         try:
-            spl_params = config['spl']
+            spl_params = config['basis']['spl']
         except KeyError as e:
             config[e.args[0]] = 0
 
         # Check to see if inclusion of QED is specified. If not, set to 0
         try:
-            qed = config['include_qed']
+            qed = config['optional']['qed']['include_qed']
         except KeyError as e:
             config[e.args[0]] = 0
         
         # Check to see if rotation of basis is specified. If not, set to 0
         try:
-            rot_basis = config['rotate_basis']
+            rot_basis = config['optional']['qed']['rotate_basis']
         except KeyError as e:
             config[e.args[0]] = 0
             
         # Check to see if isotope shift key is specified. If not, set to 0
         try:
-            isotope = config['K_is']
+            isotope = config['optional']['isotope_shifts']['K_is']
         except KeyError as e:
             config[e.args[0]] = 0
         try:
-            C_is = config['C_is']
+            C_is = config['optional']['isotope_shifts']['C_is']
         except KeyError as e:
             config[e.args[0]] = 0 
 
         # Check whether or not to run all-order codes after basis set construction
         try:
-            run_ao_codes = config['run_ao_codes']
+            run_ao_codes = config['optional']['run_ao_codes']
         except KeyError as e:
             config[e.args[0]] = 0 
 
@@ -93,68 +92,6 @@ def count_orbitals(orbitals):
             num_orbitals += 2
 
     return num_orbitals
-
-def get_atomic_data(name, isotope):
-    """ Gets atomic number Z and atomic mass AM from periodic table """
-    ptable = libatomic.get_periodic_table()
-    rtable = libatomic.get_radii()
-    symbol = re.findall('[a-zA-Z]+', name)[0]
-    try:
-        num_rem_ele = re.findall('[0-9]+', name)[0]
-    except:
-        num_rem_ele = 0
-    rnuc = 0
-    cfermi = 0
-
-    # Check if atomic symbol in periodic table
-    if ptable['Symbol'].eq(symbol).any():
-        Z = ptable[ptable['Symbol'] == symbol]['Z'].values.astype(float)[0]
-        AM = ptable[ptable['Symbol'] == symbol]['Mass'].values.astype(float)[0]
-
-    # Check if isotope was specified
-    if isotope != 0:
-        AM = isotope
-    else:
-        print('Isotope was not specified, so default mass is used')
-
-    # Check if atomic symbol in radii table
-    if rtable['Elem.'].eq(symbol).any():
-        try: 
-            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == str(round(AM)))]['R_av(fm)'].values.astype(float)[0]
-        except IndexError:
-            pass
-    
-    
-    # If rnuc could not be found, search manual table for rnuc
-    if rnuc == 0:
-        rtable2 = libatomic.get_extra_radii()
-        if rtable2['Elem.'].eq(symbol).any():
-            rnuc = rtable2[(rtable2['Elem.'] == symbol)]['R_av(fm)'].values.astype(float)[0]
-            print('rnuc was not found in nuclear charge radii table, so a guess is used.')
-        else:
-            print('Could not find rnuc in any tables. Enter parameters in HFD.INP and bas_wj.in manually.')
-            pass
-    else:
-        # Calculate cfermi
-        try:
-            cfermi = calc_c_fermi(rnuc)
-        except UnboundLocalError as e:
-            print('ERROR: Nuclear charge radius could not be found for', name)
-            sys.exit()
-        except ValueError as e:
-            print('ERROR: Nuclear charge radius could not be found for', name)
-            sys.exit()
-
-    return Z, AM, symbol, cfermi, rnuc, num_rem_ele
-
-def calc_c_fermi(rnuc):
-    """ Calculates c fermi from rms radius """
-    at = 2.3/(4*math.log(3.0))
-    a1 = (5/3)*(rnuc**2)
-    a2 = (7/3)*((math.pi*at)**2)
-    cfermi = math.sqrt(a1-a2)
-
-    return cfermi
 
 def get_key_breit(breit_bool):
     """ Returns key for breit from input whether to use breit or not """
@@ -357,13 +294,15 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
             pass
 
     # Set maximum n for each l (4 lowest s, p, d; 3 lowest f) by default
-    if val_aov == []:
+    if val_aov == {}:
         nmax = [n + 4 for n in nmin]
         nmax[3] -= 1
         nmax[4] -= 4
     else:
-        for n in range(len(val_aov)):
-            nmax[n] = nmin[n] + int(list(val_aov[n].values())[0])
+        n=0
+        for l in val_aov:
+            nmax[n] = nmin[n] + int(val_aov[l])
+            n += 1
 
     # Set kappas for valence orbitals
     for n in range(len(nmax)):
@@ -424,14 +363,18 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
     JM = -2.0
 
     with open(filename, 'w') as f:
-        f.write(' ' + system['name'] + '\n')
+        f.write(' ' + system['system']['name'] + '\n')
         f.write(' KL =  ' + str(KL) + '\n')
         f.write(' NS =  ' + str(NS) + '\n')
         f.write(' NSO=  ' + str(NSO) + '\n')
         f.write(' Z  =  ' + str(Z) + '\n')
-        f.write(' AM =  ' + '{:.2f}'.format(round(AM)) + '\n')
+        try:
+            f.write(' AM =  ' + '{:.2f}'.format(round(AM)) + '\n')
+        except:
+            print('AM could not be found')
+            sys.exit()
         f.write(' JM =  ' + str(JM) + '\n')
-        f.write(' R2 =  ' + str(float(system['radius'])) + '\n')
+        f.write(' R2 =  ' + str(float(system['basis']['cavity_radius'])) + '\n')
         f.write(' kbr= ' + str(kbr) + '\n')
         if C_is != 0:
             f.write('K_is= ' + str(K_is) + '\n')
@@ -543,13 +486,13 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
     # Set last frozen orbital to be last orbital in core
     frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core.split()[-1])[-1])
     frorb = frorb_str[0] + " " + frorb_str[1][0]    
-    
+
     with open(filename, 'w') as f:
-        f.write(' ' + system['name'] + '\n')
+        f.write(' ' + system['system']['name'] + '\n')
         f.write(' Z  =  ' + str(Z) + '\n')
         f.write(' Am =  ' + '{:.1f}'.format(round(AM)) + '\n')
         f.write(' Nso=' + str(NSO).rjust(5," ") + '# number of core orbitals (defines DF operator)\n')
-        f.write(' Nv =' + str(Nv).rjust(5," ") + '# number of valence & virtual orbitals\n')
+        f.write(' Nv =' + str(nvvorbs).rjust(5," ") + '# number of valence & virtual orbitals\n')
         f.write(' Ksg=' + str(Ksg).rjust(5," ") + '# defines Hamiltonian: 1-DF, 3-DF+Breit\n')
         f.write(' Kdg=' + str(Kdg).rjust(5," ") + '# diagonalization of Hamiltonian (0=no,1,2=yes)\n')
         f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
@@ -576,7 +519,7 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
                     if count == 6:
                         f.write('\n')
                         count = 0
-            f.write('\n')
+            f.write('\n\n')
 
         # Write valence and virtual orbitals
         for i, orb in enumerate(vorbs):
@@ -635,12 +578,14 @@ def write_inf_aov(filename, val_N, val_kappa, NSO, nmax, lmax, kval, energies):
         # If kval = 2, write energies 
         if kval == 2:
             f.write(str(len(energies)-1) + '\n')
-            for n in range(len(energies)):
-                energy = list(energies[n].values())[0]
+            n = 0
+            for l in energies:
+                energy = energies[l]
                 if isinstance(energy, list):
                     f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy[0]) + '  ' + "{:.5f}".format(energy[1]) + '\n')
                 elif isinstance(energy, float):
                     f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy) + '\n')
+            n += 1
         f.write(str(len(val_kappa)) + '\n')
         for i in range(len(val_kappa)):
             f.write(str(val_N[i]).rjust(2, ' ') + '  ' + val_kappa[i] + ' 30\n' )
@@ -650,6 +595,7 @@ def write_inf_aov(filename, val_N, val_kappa, NSO, nmax, lmax, kval, energies):
 
 def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energies):
     """ Writes inf.vw """
+    l_array = ['s', 'p', 'd', 'f']
     with open(filename,'w') as f: 
         f.write(str(NSO) + '\n')
         for i in range(NSO):
@@ -664,55 +610,54 @@ def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energie
         # If kval = 2, write energies 
         if kval == 2:
             f.write(str(len(energies)-1) + '\n')
-            for n in range(len(energies)):
-                energy = list(energies[n].values())[0]
+            n = 0
+            for l in l_array:
+                energy = energies[l]
                 if isinstance(energy, list):
                     f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy[0]) + '  ' + "{:.5f}".format(energy[1]) + '\n')
                 elif isinstance(energy, float):
                     f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy) + '\n')
+            n += 1
     f.close()
     print('inf.vw has been written')
 
 def write_spl_in(filename, radius, lmax, spl_params):
     """ Writes spl.in """
     
-    if spl_params == 0:
+    if spl_params:
+        with open(filename,'w') as f: 
+            f.write(str(spl_params['lmax']) + '\n')
+            f.write(str(radius) + '\n')
+            f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')
+            f.write('0.0 0.00 500')
+    else:
         with open(filename,'w') as f: 
             f.write(str(lmax) + '\n')
             f.write(str(radius) + '\n')
             f.write('40 7\n')
             f.write('0.0 0.00 500')
-    else:
-        spl_dict = {}
-        for param in spl_params:
-            for key in param:
-               spl_dict[key] = param[key]
-        with open(filename,'w') as f: 
-            f.write(str(spl_dict['lmax']) + '\n')
-            f.write(str(radius) + '\n')
-            f.write(str(spl_dict['nmax']) + ' ' + str(spl_dict['k']) + '\n')
-            f.write('0.0 0.00 500')
+
     f.close()
     print('spl.in has been written')
 
 def write_inputs(system, C_is):
     # Write HFD.INP
-    write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['K_is'], C_is)
+    write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
     # Write BASS.INP
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['nmax'], system['lmax'], system['codes'], system['core'], system['valence'], system['K_is'], C_is)
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], system['optional']['code_exec'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
 
     # Write bas_wj.in
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
 
     # Write spl.in
-    write_spl_in('spl.in', system['radius'], system['lmax'], system['spl'])
+    write_spl_in('spl.in', system['basis']['cavity_radius'], system['basis']['b_splines']['lmax'], system['basis']['b_splines'])
     
     # Write inf.aov
-    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kval, system['energies'])
+    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], kval, system['basis']['val_energies']['energies'])
 
     # Write inf.vw
-    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['nmax'], system['lmax'], kvw, kval, system['energies'])
+    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['b_splines']['nmax'], system['basis']['b_splines']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
 def write_ao_job_script(filename, nprocs, mem, job_name, partition):
     with open(filename,'w') as f:
@@ -819,9 +764,9 @@ def run_executables(K_is, C_is):
         print("bspl40 complete")
 
     with open('bwj.in','w') as f: 
-        f.write(str(system['lmax']) + '\n')
-        for i in range(system['lmax']+1):
-            f.write(str(system['nmax']) + '\n')
+        f.write(str(config['basis']['b_splines']['lmax']) + '\n')
+        for i in range(config['basis']['b_splines']['lmax']+1):
+            f.write(str(config['basis']['b_splines']['nmax']) + '\n')
         f.write('\n')
         f.write('\n')
         f.write('1')
@@ -847,7 +792,7 @@ def run_executables(K_is, C_is):
     fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
 
     # Set last frozen orbital to be last orbital in core
-    frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(system['core'].split()[-1])[-1])
+    frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(config['basis']['orbitals']['core'].split()[-1])[-1])
     frorb = frorb_str[0] + " " + frorb_str[1][0]   
     
     f = open('BASS.INP','w')
@@ -907,41 +852,41 @@ def run_executables(K_is, C_is):
 if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
-    system = read_yaml(yml_file)
+    config = read_yaml(yml_file)
 
     # Get atomic data
-    Z, AM, symbol, cfermi, rnuc, num_rem_ele = get_atomic_data(system['name'], system['isotope'])
+    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config['system']['name'], config['system']['isotope'])
 
     # Get orbital information
-    NS, NSO, num_val_orbitals = count_total_orbitals(system['core'], system['valence'])
+    NS, NSO, num_val_orbitals = count_total_orbitals(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
 
     # Get breit key
-    kbrt = get_key_breit(system['include_breit'])
+    kbrt = get_key_breit(config['system']['include_breit'])
 
     # Generate body of HFD.INP including orbitals, values of J, and occupation numbers
-    NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(system['core'], system['valence'])
+    NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
     
     # Assign keys for which inputs to generate
-    kvw = get_key_vw(system['codes'])
+    kvw = get_key_vw(config['optional']['code_exec'])
 
-    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(system['core'], system['valence'], system['codes'], system['nmax'], system['lmax'])
+    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['optional']['code_exec'], config['basis']['b_splines']['nmax'], config['basis']['b_splines']['lmax'])
 
     # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
-    N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, system['core'], system['valence'])
+    N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
 
     # Get valence orbitals for all-order calculations
-    val_N, val_kappa = get_ao_valence(system['core'], system['valence'], system['val_aov'])
+    val_N, val_kappa = get_ao_valence(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['basis']['val_aov'])
 
     # Set key for energies
-    kval = system['kval']
+    kval = config['basis']['val_energies']['kval']
 
-    run_ao_codes = system['run_ao_codes']
+    run_ao_codes = config['optional']['run_ao_codes']
 
     # Write input files for subsequent executables
-    if system['K_is'] == 0:
-        write_inputs(system, 0)
+    if not config['optional']['isotope_shifts']['include']:
+        write_inputs(config, 0)
     else:
-        C_is = system['C_is']
+        C_is = config['optional']['isotope_shifts']['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         for c in c_list:
             dir_path = os.getcwd()
@@ -953,46 +898,47 @@ if __name__ == "__main__":
             dir_name = dir_prefix+str(abs(c))
             Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
             os.chdir(dir_name)
-            write_inputs(system,c)
+            write_inputs(config,c)
             os.chdir('../')
 
-    # Construct basis set by running sequence of programs
-    ## Pure CI
-    if system['codes'] == 'ci':
-        # Run hfd
-        run('./hfd > hfd.out', shell=True)
-        print("hfd complete")        
-        # Run bass
-        #run(["./bass", ">", "bass.out"], shell=True)
-    elif system['codes'] == 'ci+all-order':
-        # Run executables
-        if system['K_is'] == 0:
-            run_executables(0, 0)
-            # TODO: implement error checking
-            if run_ao_codes: 
-                write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
-                run('sbatch ao.qs', shell=True)
-        else:
-            K_is = system['K_is']
-            C_is = system['C_is']
-            c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
-            for c in c_list:
-                dir_path = os.getcwd()
-                dir_prefix = ''
-                if c < 0:
-                    dir_prefix = 'minus'
-                elif c > 0:
-                    dir_prefix = 'plus'
-                dir_name = dir_prefix+str(abs(c))
-                print(dir_name + ' calculations starting')
-                os.chdir(dir_name)
-                run_executables(K_is, c)
+    # Construct basis set by running sequence of programs if desired
+    if config['optional']['run_ao_codes']:
+        ## Pure CI
+        if config['optional']['code_exec'] == 'ci':
+            # Run hfd
+            run('./hfd > hfd.out', shell=True)
+            print("hfd complete")        
+            # Run bass
+            #run(["./bass", ">", "bass.out"], shell=True)
+        elif config['optional']['code_exec'] == 'ci+all-order':
+            # Run executables
+            if not config['optional']['isotope_shifts']['include']:
+                run_executables(0, 0)
                 # TODO: implement error checking
                 if run_ao_codes: 
                     write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
                     run('sbatch ao.qs', shell=True)
-                os.chdir('../')
-    else:
-        print(system['codes'] + ' not supported')
-        sys.exit()
+            else:
+                K_is = config['optional']['isotope_shifts']['K_is']
+                C_is = config['optional']['isotope_shifts']['C_is']
+                c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+                for c in c_list:
+                    dir_path = os.getcwd()
+                    dir_prefix = ''
+                    if c < 0:
+                        dir_prefix = 'minus'
+                    elif c > 0:
+                        dir_prefix = 'plus'
+                    dir_name = dir_prefix+str(abs(c))
+                    print(dir_name + ' calculations starting')
+                    os.chdir(dir_name)
+                    run_executables(K_is, c)
+                    # TODO: implement error checking
+                    if run_ao_codes: 
+                        write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
+                        run('sbatch ao.qs', shell=True)
+                    os.chdir('../')
+        else:
+            print(config['optional']['code_exec'] + ' not supported')
+            sys.exit()
     
