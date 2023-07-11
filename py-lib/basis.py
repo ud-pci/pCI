@@ -625,9 +625,9 @@ def write_spl_in(filename, radius, spl_params):
     """ Writes spl.in """
     
     with open(filename,'w') as f: 
-        f.write(str(spl_params['lmax']) + '\n')
-        f.write(str(radius) + '\n')
-        f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')
+        f.write(str(spl_params['lmax']) + '\n') 
+        f.write(str(radius) + '\n')  # Cavity radius
+        f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')  # Number of splines and order of splines
         f.write('0.0 0.00 500')
 
     f.close()
@@ -816,7 +816,9 @@ def run_executables(K_is, C_is):
 
     maxNumTries = 5
     nTry = 1
+    run(['rm','bass.out'])
     while check_errors('bass.out') > 0:
+        print('bass try', nTry)
         run('bass < bass.in > bass.out', shell=True)
         if (nTry >= maxNumTries):
             print("bass did not converge after", nTry, "attempts")
