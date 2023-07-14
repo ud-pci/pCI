@@ -1,12 +1,10 @@
-import os
 from datetime import datetime
-from pathlib import Path
-from subprocess import Popen, PIPE, STDOUT, run
+from subprocess import run
 import re
 import sys
 
 '''
-This script reads the output of sinfo and predicts the most efficient distribution of resources for a job
+This script parses the SLURM scheduling queue and prints the number of available nodes for each partition 
 
 '''
 
@@ -19,24 +17,23 @@ def read_file_lines(filename):
     f.close()
     return lines
 
-def count_num_idle_nodes():
+def get_num_available_nodes():
     '''
-    This function takes in a partition name and returns the number of nodes running 'idle'
+    This function takes in a partition id and nodelist obtained from squeue and returns the number of nodes running on the partition
     '''
-    standard = 'r1n'
-    large = 'r2l'
-    xlarge = 'r2x'
+    
+    # Initialize arrays of partition nodes
+    standard, large, xlarge = {}, {}, {}
 
-    num_idle_nodes = 0
-    running_idle_nodes = []
+    [standard.setdefault(str(i).zfill(2), False) for i in range(48)]
+    [large.setdefault(str(i).zfill(2), False) for i in range(32)]
+    [xlarge.setdefault(str(i).zfill(2), False) for i in range(11)]
 
-    run('squeue > s2.out', shell=True)
-    lines = read_file_lines('s2.out')
+    # Get running job information from squeue
+    run('squeue > s.out', shell=True)
+    lines = read_file_lines('s.out')
 
-    num_running_idle_standard, num_running_idle_large, num_running_idle_xlarge = 0, 0, 0
-    running_idle_standard, running_idle_large, running_idle_xlarge = [], [], []
-
-    # Obtain an array of nodelists containing respective partitions
+    # Parse lines from squeue
     for line in lines:
         job_id = line.split()[0]
         partition = line.split()[1]
@@ -46,75 +43,53 @@ def count_num_idle_nodes():
         time = line.split()[5]
         num_nodes = line.split()[6]
         nodelist = line.split()[7]
+        if partition == 'standard':
+            standard = set_true(nodelist, standard)
+        elif partition == 'large-mem':
+            large = set_true(nodelist, large)
+        elif partition == 'xlarge-me':
+            xlarge = set_true(nodelist, xlarge)
+        else:
+            pass
 
-        if partition == 'idle' and state == 'R':
-            if standard in nodelist:
-                running_idle_standard.append(nodelist)
-            if large in nodelist:
-                running_idle_large.append(nodelist)
-            if xlarge in nodelist:
-                running_idle_xlarge.append(nodelist)
-
-    num_running_idle_standard = count_num_running_idle_nodes('r1n', running_idle_standard)
-    num_running_idle_large = count_num_running_idle_nodes('r2l', running_idle_large)
-    num_running_idle_xlarge = count_num_running_idle_nodes('r2x', running_idle_xlarge)
-
-    return num_running_idle_standard, num_running_idle_large, num_running_idle_xlarge
-
-def count_num_running_idle_nodes(partition, running_idle_partition):
-    '''
-    This function takes in a partition id and nodelist obtained from squeue and returns the number of nodes running on the partition in idle
-    '''
-    list_running_idle = []
-    num_running_between = 0
-    num_running_idle = 0
-
-    for nodes in running_idle_partition:
-        # Check two places after "r2l" for either node number or list of nodes in large partition
-        if partition in nodes:
-            # count number of nodes found
-            node_split = re.findall(r'\d+', nodes.split(partition,1)[1])
-            for node in node_split:
-                list_running_idle.append(node)
-            # count number of nodes "between" in nodelist
-            if re.search(r'-', nodes):
-                num_running_between += int(nodes[7:9]) - int(nodes[4:6]) - 1
+    num_standard = sum(1 for v in standard.values() if v == False)
+    num_large = sum(1 for v in large.values() if v == False)
+    num_xlarge = sum(1 for v in xlarge.values() if v == False)
     
-    list_running_idle = [*set(list_running_idle)]
-    num_running_idle = len(list_running_idle) + num_running_between
-    return num_running_idle
+    return num_standard, num_large, num_xlarge
+
+def set_true(nodelist, ptn_dict):
+    '''
+    This function sets values of partition node dictionary to be true if a job is running on it
+    '''
+
+    # if running on idle partition, job could span different partition nodes, e.g. r1n, r1t, r2t etc
+    #n = re.findall(r'' + pid + '(?:\[.*?\]|\d+)', nodelist)[0]
+    nodes = re.findall(r'(?:\d+-\d+|\d+)', nodelist[3:])
+    for node in nodes:
+        if '-' in node:
+            n1 = int(node[0:2])
+            n2 = int(node[3:5])
+            for n in range(n1,n2+1):
+                ptn_dict[str(n).zfill(2)] = True
+        else:
+            ptn_dict[node] = True
+
+    return ptn_dict
 
 if __name__ == "__main__":
-    dir_path = os.getcwd()
-    run('sinfo > s.out', shell=True)
-    lines = read_file_lines('s.out')
-    num_free_nodes = {'standard' : 0, 'large-mem' : 0, 'xlarge-mem' : 0}
-    num_idle_nodes = {'standard' : 0, 'large-mem' : 0, 'xlarge-mem' : 0}
-    partition = ['standard', 'large-mem', 'xlarge-mem']
-    for line in lines:
-        if line.split()[0].replace('*','') in partition and line.split()[4] == 'idle':
-            num_free_nodes[line.split()[0].replace('*','')] = line.split()[3]
-    
+    # Print time
     current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print('TIME: ' + current_time)
-    print('FREE NODES:')
-    for item in num_free_nodes:
-        print(item, ':', num_free_nodes[item])
+    
+    # Get number of available nodes
+    num_standard, num_large, num_xlarge = get_num_available_nodes()
 
-    num_idle_standard, num_idle_large, num_idle_xlarge = count_num_idle_nodes()
+    # Print number of available nodes for each partition
+    print('AVAILABLE NODES:')
+    print('STANDARD:', num_standard)
+    print('LARGE:', num_large)
+    print('XLARGE:', num_xlarge)
 
-    print('==================')
-    print('IDLE NODES:')
-    print('standard:', num_idle_standard)
-    print('large-mem:', num_idle_large)
-    print('xlarge-mem:', num_idle_xlarge)
-
-    print('==================')
-    print('TOTAL FREE NODES:')
-    print('standard:', num_idle_standard + int(num_free_nodes['standard']))
-    print('large-mem:', num_idle_large + int(num_free_nodes['large-mem']))
-    print('xlarge-mem:', num_idle_xlarge + int(num_free_nodes['xlarge-mem']))
-
-    run('rm s.out s2.out', shell=True)
-    #num_req_nodes = input('How many nodes would you like to use? ')
-    #req_mem = input('How much memory is required per core? ')
+    # Clean up
+    run('rm s.out', shell=True)
