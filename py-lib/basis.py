@@ -9,64 +9,12 @@ from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT, run
 
 def read_yaml(filename):
-    """ Reads yaml input file and returns contents """ 
+    """ 
+    This function reads a configuration file in YAML format and returns a dictionary of config parameters
+    """ 
 
-    isotope = 0
-    val_aov = []
-    # read yaml file with inputs
     with open(filename,'r') as f:
         config = yaml.safe_load(f)
-        # Check to see if isotope is specified. If not, set to 0
-        try:
-            isotope = config['system']['isotope']
-        except KeyError as e:
-            config[e.args[0]] = 0
-        
-        # Check to see if val_aov is specified. If not, set to []
-        try:
-            val_aov = config['basis']['val_aov']
-        except KeyError as e:
-            config[e.args[0]] = []
-
-        # Check to see if energies are specified. If not, set to []
-        try:
-            energies = config['basis']['energies']
-        except KeyError as e:
-            config[e.args[0]] = []
-
-        # Check to see if spl.in parameters are specified. If not, set to False
-        try:
-            spl_params = config['basis']['spl']
-        except KeyError as e:
-            config[e.args[0]] = 0
-
-        # Check to see if inclusion of QED is specified. If not, set to 0
-        try:
-            qed = config['optional']['qed']['include_qed']
-        except KeyError as e:
-            config[e.args[0]] = 0
-        
-        # Check to see if rotation of basis is specified. If not, set to 0
-        try:
-            rot_basis = config['optional']['qed']['rotate_basis']
-        except KeyError as e:
-            config[e.args[0]] = 0
-            
-        # Check to see if isotope shift key is specified. If not, set to 0
-        try:
-            isotope = config['optional']['isotope_shifts']['K_is']
-        except KeyError as e:
-            config[e.args[0]] = 0
-        try:
-            C_is = config['optional']['isotope_shifts']['C_is']
-        except KeyError as e:
-            config[e.args[0]] = 0 
-
-        # Check whether or not to run all-order codes after basis set construction
-        try:
-            run_ao_codes = config['optional']['run_ao_codes']
-        except KeyError as e:
-            config[e.args[0]] = 0 
 
     return config
 
@@ -638,7 +586,7 @@ def write_inputs(system, C_is):
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
     # Write BASS.INP
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], system['optional']['code_exec'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], system['optional']['code_method'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
 
     # Write bas_wj.in
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
@@ -757,9 +705,9 @@ def run_executables(K_is, C_is):
         print("bspl40 complete")
 
     with open('bwj.in','w') as f: 
-        f.write(str(config['basis']['orbitals']['lmax']) + '\n')
-        for i in range(config['basis']['orbitals']['lmax']+1):
-            f.write(str(config['basis']['orbitals']['nmax']) + '\n')
+        f.write(str(basis_lmax) + '\n')
+        for i in range(basis_lmax+1):
+            f.write(str(basis_nmax) + '\n')
         f.write('\n')
         f.write('\n')
         f.write('1')
@@ -785,7 +733,7 @@ def run_executables(K_is, C_is):
     fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
 
     # Set last frozen orbital to be last orbital in core
-    frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(config['basis']['orbitals']['core'].split()[-1])[-1])
+    frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core_orbitals.split()[-1])[-1])
     frorb = frorb_str[0] + " " + frorb_str[1][0]   
     
     f = open('BASS.INP','w')
@@ -822,7 +770,7 @@ def run_executables(K_is, C_is):
     nTry = 1
 
     while check_errors('bass.out') > 0:
-        print('bass try', nTry)
+        print('bass attempt', nTry)
         run('bass < bass.in > bass.out', shell=True)
         if (nTry >= maxNumTries):
             print("bass did not converge after", nTry, "attempts")
@@ -853,39 +801,52 @@ if __name__ == "__main__":
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
 
-    # Get atomic data
-    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config['system']['name'], config['system']['isotope'])
-
-    # Get orbital information
-    NS, NSO, num_val_orbitals = count_total_orbitals(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
-
-    # Get breit key
-    kbrt = get_key_breit(config['system']['include_breit'])
-
-    # Generate body of HFD.INP including orbitals, values of J, and occupation numbers
-    NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
-    
-    # Assign keys for which inputs to generate
-    kvw = get_key_vw(config['optional']['code_exec'])
-
-    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['optional']['code_exec'], config['basis']['orbitals']['nmax'], config['basis']['orbitals']['lmax'])
-
-    # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
-    N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'])
-
-    # Get valence orbitals for all-order calculations
-    val_N, val_kappa = get_ao_valence(config['basis']['orbitals']['core'], config['basis']['orbitals']['valence'], config['basis']['val_aov'])
-
-    # Set key for energies
+    # Set parameters from config
+    name = config['system']['name']
+    isotope = config['system']['isotope']
+    core_orbitals = config['basis']['orbitals']['core']
+    valence_orbitals = config['basis']['orbitals']['valence']
+    include_breit = config['system']['include_breit']
+    basis_nmax = config['basis']['orbitals']['nmax']
+    basis_lmax = config['basis']['orbitals']['lmax']
     kval = config['basis']['val_energies']['kval']
+    val_aov = config['basis']['val_aov']
 
+    include_isotope_shifts = config['optional']['isotope_shifts']['include']
+    if include_isotope_shifts:
+        K_is = config['optional']['isotope_shifts']['K_is']
+        C_is = config['optional']['isotope_shifts']['C_is']
+
+    code_method = config['optional']['code_method']
     run_ao_codes = config['optional']['run_ao_codes']
 
+    # Get atomic data
+    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(name, isotope)
+
+    # Get orbital information
+    NS, NSO, num_val_orbitals = count_total_orbitals(core_orbitals, valence_orbitals)
+
+    # Get breit key
+    kbrt = get_key_breit(include_breit)
+
+    # Generate body of HFD.INP including orbitals, values of J, and occupation numbers
+    NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
+    
+    # Assign keys for which inputs to generate
+    kvw = get_key_vw(code_method)
+
+    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+
+    # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
+    N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals)
+
+    # Get valence orbitals for all-order calculations
+    val_N, val_kappa = get_ao_valence(core_orbitals, valence_orbitals, val_aov)
+
     # Write input files for subsequent executables
-    if not config['optional']['isotope_shifts']['include']:
+    if not include_isotope_shifts:
         write_inputs(config, 0)
     else:
-        C_is = config['optional']['isotope_shifts']['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         for c in c_list:
             dir_path = os.getcwd()
@@ -901,25 +862,23 @@ if __name__ == "__main__":
             os.chdir('../')
 
     # Construct basis set by running sequence of programs if desired
-    if config['optional']['run_ao_codes']:
+    if run_ao_codes:
         ## Pure CI
-        if config['optional']['code_exec'] == 'ci':
+        if code_method == 'ci':
             # Run hfd
             run('./hfd > hfd.out', shell=True)
             print("hfd complete")        
             # Run bass
             #run(["./bass", ">", "bass.out"], shell=True)
-        elif config['optional']['code_exec'] == 'ci+all-order':
+        elif code_method == 'ci+all-order':
             # Run executables
-            if not config['optional']['isotope_shifts']['include']:
+            if not include_isotope_shifts:
                 run_executables(0, 0)
                 # TODO: implement error checking
                 if run_ao_codes: 
                     write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
                     run('sbatch ao.qs', shell=True)
             else:
-                K_is = config['optional']['isotope_shifts']['K_is']
-                C_is = config['optional']['isotope_shifts']['C_is']
                 c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
                 for c in c_list:
                     dir_path = os.getcwd()
@@ -938,6 +897,6 @@ if __name__ == "__main__":
                         run('sbatch ao.qs', shell=True)
                     os.chdir('../')
         else:
-            print(config['optional']['code_exec'] + ' not supported')
+            print(code_method + ' not supported')
             sys.exit()
     

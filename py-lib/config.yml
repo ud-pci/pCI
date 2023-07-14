@@ -68,5 +68,5 @@ optional:
         K_is: 1
         C_is: 0.01
 
-    code_exec: ci+all-order
+    code_method: ci+all-order
     run_ao_codes: True
