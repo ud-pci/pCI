@@ -814,9 +814,13 @@ def run_executables(K_is, C_is):
         f.write('WJ.DAT')
     f.close()
 
+    # check if bass.out exists and remove if it does
+    if os.path.isfile('bass.out'):
+        run(['rm','bass.out'])
+
     maxNumTries = 5
     nTry = 1
-    run(['rm','bass.out'])
+
     while check_errors('bass.out') > 0:
         print('bass try', nTry)
         run('bass < bass.in > bass.out', shell=True)
