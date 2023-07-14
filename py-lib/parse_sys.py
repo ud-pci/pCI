@@ -43,14 +43,15 @@ def get_num_available_nodes():
         time = line.split()[5]
         num_nodes = line.split()[6]
         nodelist = line.split()[7]
-        if partition == 'standard':
-            standard = set_true(nodelist, standard)
-        elif partition == 'large-mem':
-            large = set_true(nodelist, large)
-        elif partition == 'xlarge-me':
-            xlarge = set_true(nodelist, xlarge)
-        else:
-            pass
+        if state == 'R':
+            if partition == 'standard':
+                standard = set_true(nodelist, standard)
+            elif partition == 'large-mem':
+                large = set_true(nodelist, large)
+            elif partition == 'xlarge-me':
+                xlarge = set_true(nodelist, xlarge)
+            else:
+                pass
 
     num_standard = sum(1 for v in standard.values() if v == False)
     num_large = sum(1 for v in large.values() if v == False)
