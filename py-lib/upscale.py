@@ -6,6 +6,36 @@ from subprocess import Popen, PIPE, STDOUT, run
 from datetime import datetime
 
 '''
+========================================================================================================================================================
+
+Goal: Obtain E(B-A), where run B has either higher principle quantum number or partial wave than A.
+
+RUN1:
+We start with a base run A from which we run con_cut to create a smaller configuration subspace A_cut with important configurations.
+This subspace should have differences of energies within 5 cm-1 from the full configuration space, such that E(A_cut) - E(A) <= 5 cm-1. 
+Note this 5 cm-1 is an arbitrary value to ensure an optimal configuration space where nearly all important configurations are still included.
+The goal here is to obtain a C(A_cut) where E(A_cut) ~= E(A) after running conf. 
+
+RUN2:
+Next, we will need to generate a configuration subspace C(B-A) corresponding to the difference between the upscaled space B and the base space A. 
+This is done by running concmp, taking in two CONF.INP as inputs: C_A.INP and C_B.INP. 
+If Nc_B > Nc_A, we obtain after inputting (0 0 1), a list of configurations which are only in C_B.INP. 
+Once we have this C(B-A).INP list, we can merge it with the con_cut base run from RUN 1 to obtain the list:
+C(A_cut) + C(B-A), where xx is the log cut corresponding to near-exact energies.
+Running conf provides us with energies E(A_cut) + E(B-A). Subtracting out the energies from RUN 1:
+
+E(A_cut) + E(B-A) - E(A_cut) = E(B-A), we obtain the energy difference obtained from C(B) and C(A).
+
+Full Example:
+18g from 17g
+1. Run conf for full 17g
+2. Run con_cut for 17g and find log_cutoff threshold where conf results in very small energy difference to full 17g run 
+3. Run concmp to obtain configurations only in 18g (17g in C_A.INP, 18g in C_B.INP; run concmp with input 0 0 1) -> C_B_new.INP
+4. Run merge_ci to combine con_cut 17g run with (18g-17g) configurations (C_B_new.INP -> CONF.INP, con_cut 17g run -> C_A.INP)
+5. Run conf to obtain energies for con_cut 17g + (18g - 17g)
+6. Obtain energy difference 18g - 17g by subtracting out con_cut 17g energies
+========================================================================================================================================================
+
 This python script upscales ci calculations in the following way:
 
 Example:
