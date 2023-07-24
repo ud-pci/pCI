@@ -81,7 +81,10 @@ def write_add_inp(filename, Z, AM, system, multiplicity, num_val, orb_occ, parit
     f.write(' Jm = ' + str(system['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
-    f.write(' Kv =  4 \n')
+    if system['J_selection']:
+        f.write(' Kv =  3 \n')
+    else:
+        f.write(' Kv =  4 \n')
     f.write(' Nlv=  ' + str(system['num_energy_levels']) + '\n')
     f.write(' Ne =  ' + str(num_val) + '\n')
     f.write(' Kl4=  1 \n')
