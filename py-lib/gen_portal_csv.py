@@ -163,7 +163,7 @@ def write_matrix_csv(element):
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
 
         row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
-               'state_two_configuration': conf2, 'state_two_term': term1, 'state_two_J': J2,
+               'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
                'matrix_element': matrix_element_value, 'matrix_element_uncertainty': None}
         df.loc[len(df.index)] = row
     
