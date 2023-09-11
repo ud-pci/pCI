@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.17] - 2023-09-11
+- dtm v3.3 - changed labels of matrix elements to reduced matrix elements and bug fix for missing first M1 transition
+
 ## [0.11.16] - 2023-07-06
 - add v2.0 - updated to non-relativistic version for significant speedup
 - add.f90 - removed Nonrel subroutine
