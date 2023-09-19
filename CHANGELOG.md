@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.18] - 2023-09-19
+- dtm.v3.4 - fixed error in transition rate calculations: tj2 -> tj1 in denominator
+
 ## [0.11.17] - 2023-09-11
 - dtm v3.3 - changed labels of matrix elements to reduced matrix elements and bug fix for missing first M1 transition
 
