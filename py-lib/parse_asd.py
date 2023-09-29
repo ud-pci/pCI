@@ -1,9 +1,39 @@
+from UDRead import Convert_Type,LongSubString
+from io import StringIO
 import pandas as pd
 import requests
 import sys
-from io import StringIO
+import re
 
-def generate_asd_url(spectrum):
+pd.options.mode.chained_assignment = None
+
+
+def convert_res_to_csv(filename): # Modified convert .RES to csv
+
+    f = open(filename, 'r')
+    lines = f.readlines()
+    f.close()
+
+    csvfile = "DATA_Filtered/UD/"+filename.split('/')[-1].split('.')[0] + '.csv' # output file path
+
+    f = open(csvfile, 'w')
+    f.write('n, conf, , term, E_n (a.u.), DEL (cm^-1), S, L, , gf, conf%, conf2, , conf2% \n')
+
+    for line in lines[1:]:
+        newline = re.sub('\s{3,}', '  ', line).replace('  ', ',') + '\n'
+        if newline[0] == ',':
+            newline = newline[1:]
+        
+        string_to_list = newline.split(",")
+        modified_list = [str(Convert_Type(i)) for i in string_to_list]
+        newline = ",".join(modified_list)
+        f.write(newline)
+    f.close()
+
+    return
+
+
+def generate_asd_url(spectrum): # ex: spectrum = Sr I
     """
     This function generates the url for NIST Atomic Spectral Database levels data
     """ 
@@ -39,7 +69,7 @@ def generate_df_from_asd(url):
 
     return new_df
 
-def reformat_df_to_atomdb(asd_df):
+def reformat_df_to_atomdb(asd_df): # Modified
     """
     This function reformats the ASD dataframe for use in the UD Atom database
     """
@@ -59,8 +89,13 @@ def reformat_df_to_atomdb(asd_df):
     asd_df['energy'].fillna('N/A', inplace=True)
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
 
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", "") # replace '.' from the configuration
+    lst = LongSubString(asd_df["state_configuration"].values[:100])
+
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(lst,"")  # replace repeating string from the configuration
+    
     # Remove spaces in energies
-    asd_df['energy'] = asd_df['energy'].str.replace(' ', '')
+    # asd_df['energy'] = asd_df['energy'].str.replace(' ', '')
 
     # Add a '.' between orbitals in configurations
     
@@ -70,14 +105,26 @@ def reformat_df_to_atomdb(asd_df):
 
     return asd_df
 
-def df_to_csv(df, filename):
+def df_to_csv(asd_df, filename,parity=None): # Modified
     """
     This function converts a dataframe into a csv file
     """
+    
+    # Filtering Odd and Even data before converting it to csv
+    if parity=="odd":
+        asd_df = asd_df[asd_df['state_term'].str.len()==3]
+        asd_df["state_term"] = asd_df["state_term"].str.replace("*","")
+        filename = filename.replace(" ","_")+"_NIST_Odd"+".csv"
+
+    elif parity=="even":
+        asd_df = asd_df[asd_df['state_term'].str.len()==2]
+        filename = filename.replace(" ","_")+"_NIST_Even"+".csv"
+
+    else:
+        asd_df = asd_df.to_csv(filename, index=False)
+        filename = filename.replace(" ","_")+"_NIST_All"+".csv"
 
     asd_df.to_csv(filename, index=False)
-
-    print("Dataframe converted to csv")
 
 
 if __name__ == "__main__":
@@ -94,4 +141,3 @@ if __name__ == "__main__":
 
     reformat_df_to_atomdb(asd_df)
     df_to_csv(asd_df, str(spectrum).replace(' ', '_'))
-    
