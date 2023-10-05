@@ -156,7 +156,6 @@ def create_mapping():
         theory_energy_au = line.split()[13]
         theory_delta_cm = line.split()[14]
         theory_delta = line.split()[15]
-        
 
         # select relevant data for portal database 
         if NIST_config != 'Config':
@@ -203,7 +202,10 @@ def write_new_conf_res(name, filepath):
     convert_res_to_csv(filepath + 'CONFFINALeven.RES', uncertainties_even, name)
     convert_res_to_csv(filepath + 'CONFFINALodd.RES', uncertainties_odd, name)
 
-    return confs, terms, energies_cm, uncertainties
+    # Determine energy shift between odd and even parity lowest energy levels
+    energy_shift = abs(ht_to_cm * (energies_au_even[0] - energies_au_odd[0]))
+
+    return confs, terms, energies_cm, uncertainties, energy_shift
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -254,7 +256,7 @@ def convert_res_to_csv(filename, uncertainties, name):
 
     return
 
-def write_energy_csv(name, mapping):
+def write_energy_csv(name, mapping, NIST_shift, theory_shift):
     '''
     This function writes the energy csv file
     '''
@@ -263,21 +265,37 @@ def write_energy_csv(name, mapping):
     # select columns for portal dataframe
     portal_df = pd.DataFrame(columns = ['state_configuration', 'state_term', 'state_J', 'energy', 
                                      'energy_uncertainty', 'is_from_theory'])
+    cnt = 0
+    adjust_energy = False
     for level in mapping:
+        # adjust energy if energy in cm-1 reset to 0 for different parity
+        if round(float(level[1][3])) == 0:
+            cnt += 1
+        if cnt == 2:
+            adjust_energy = True
+        elif cnt > 2: 
+            print('too many zeros detected in mapping, please check')
+            sys.exit()
         # if experimental data does not exist, use theory values
         if level[0][0] == '-':
             is_from_theory = True
             state_config = level[1][5]
             state_term = level[1][1]
             state_J = level[1][2]
-            state_energy = level[1][3]
+            if adjust_energy == True:
+                state_energy = "{:.1f}".format(float(level[1][3]) + float(theory_shift))
+            else:
+                state_energy = level[1][3]
             state_uncertainty = level[1][4]
         else:
             is_from_theory = False
             state_config = level[0][0]
             state_term = level[0][1]
             state_J = level[0][2]
-            state_energy = level[0][3]
+            if adjust_energy == True:
+                state_energy = "{:.3f}".format(float(level[0][3]) + float(NIST_shift))
+            else:
+                state_energy = level[0][3]
             state_uncertainty = level[0][4]
         row = {'state_configuration': state_config, 'state_term': state_term, 'state_J': state_J, 
                'energy': state_energy, 'energy_uncertainty': state_uncertainty,'is_from_theory': is_from_theory}
@@ -354,31 +372,58 @@ def write_matrix_csv(element, filepath, mapping):
 
     return
 
+def nist_parity(term):
+    ''' 
+    this function determines parity of energy level based on term from NIST designated with a '*' 
+    '''
+    if '*' in term:
+        parity = 'odd'
+    else:
+        parity = 'even'
+    
+    return parity
+
+def find_energy_shift(df):
+    '''
+    this function finds the energy shift between lowest odd and even parity energy levels
+    '''
+    ground_parity = nist_parity(df['state_term'].values[:1])
+
+    for index, row in df.iterrows():
+        parity = nist_parity(row['state_term'])
+        if parity != ground_parity:
+            energy_shift = row['energy']
+            break
+    
+    return energy_shift
+
 if __name__ == "__main__":
     atom = 'Sr I'
-    fac = 2
+    fac = 2 # maximum energy difference (in percent) for comparison
     name = atom.replace(" ","_")
 
     '''
     Method:
-    1. Read all CONF.RES files and add uncertainties to CONF.RES file
+    1. Read all CONF.RES files and add uncertainties to CONF.RES file in csv format
     2. Use Vipul's code to correct misidentified configurations
-    4. Reformat data for use on Atom portal
+    3. Reformat data for use on Atom portal
     '''
     
-    # Write new CONF.RES (CONFFINAL.csv) with uncertainties
+    # 1. Write new CONF.RES (CONFFINAL.csv) with uncertainties
     raw_path = "DATA_RAW/"
-    
-    confs, terms, energies_cm, uncertainties = write_new_conf_res(name, raw_path)
+    confs, terms, energies_cm, uncertainties, theory_shift = write_new_conf_res(name, raw_path)
 
-    # DATA NIST
+    # 2. Use Vipul's code to correct misidentified configurations
     # Store filtered data of even or odd parity in DATA_Filtered/NIST/ 
     url_nist = generate_asd_url(atom)
     data_nist = generate_df_from_asd(url_nist)
     data_nist = reformat_df_to_atomdb(data_nist)
+    NIST_shift = find_energy_shift(data_nist)
+
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'odd')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'even')
-
+    
+    # Filter NIST and UD data
     path_nist_even = "DATA_Filtered/NIST/"+name+"_NIST_Even.csv"
     path_ud_even = "DATA_Filtered/UD/"+name+"_UD_Even.csv"
 
@@ -389,7 +434,7 @@ if __name__ == "__main__":
     nist_max_odd = 62
     nist_max_even = 50
     
-    # Filter NIST and UD data
+    # Filtering
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, fac, 'even')
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, fac, 'odd')
     
@@ -399,8 +444,8 @@ if __name__ == "__main__":
     path = "DATA_Output/"+name+"_Odd.txt" 
     ConvertToTXT(data_final_odd, path)
     
-    # Create mapping of NIST data to theory data
+    # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
 
-    write_energy_csv(name, mapping)
+    write_energy_csv(name, mapping, NIST_shift, theory_shift)
     write_matrix_csv(name, raw_path, mapping)
