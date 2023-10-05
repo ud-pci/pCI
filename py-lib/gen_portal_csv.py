@@ -161,6 +161,26 @@ def write_new_conf_res(name, filepath):
     This function creates a new CONF.RES file with theory uncertainties
     '''
     
+    # Check if raw files exist
+    if not os.path.exists(filepath + 'CONFFINALeven.RES'):
+        print('CONFFINALeven.RES not found in', filepath)
+        sys.exit()
+    if not os.path.exists(filepath + 'CONFFINALodd.RES'):
+        print('CONFFINALodd.RES not found in', filepath)
+        sys.exit()
+    if not os.path.exists(filepath + 'CONFFINALevenMBPT.RES'):
+        print('CONFFINALevenMBPT.RES not found in', filepath)
+        sys.exit()
+    if not os.path.exists(filepath + 'CONFFINALoddMBPT.RES'):
+        print('CONFFINALoddMBPT.RES not found in', filepath)
+        sys.exit()
+    if not os.path.exists(filepath + 'E1.RES'):
+        print('E1.RES not found in', filepath)
+        matrix_file_exists = False
+    if not os.path.exists(filepath + 'E1MBPT.RES'):
+        print('E1MBPT.RES not found in', filepath)
+        matrix_file_exists = False
+
     # Read CONF.RES files
     _, _, energies_au_even, energies_cm_even = parse_final_res(filepath + 'CONFFINALeven.RES')
     _, _, energies_au_even_MBPT, _ = parse_final_res(filepath + 'CONFFINALevenMBPT.RES')
@@ -197,7 +217,7 @@ def write_new_conf_res(name, filepath):
     # Determine energy shift between odd and even parity lowest energy levels
     energy_shift = abs(ht_to_cm * (energies_au_even[0] - energies_au_odd[0]))
 
-    return confs, terms, energies_cm, uncertainties, energy_shift
+    return confs, terms, energies_cm, uncertainties, energy_shift, matrix_file_exists
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -404,7 +424,13 @@ if __name__ == "__main__":
     
     # 1. Write new CONF.RES (CONFFINAL.csv) with uncertainties
     raw_path = "DATA_RAW/"
-    confs, terms, energies_cm, uncertainties, theory_shift = write_new_conf_res(name, raw_path)
+    if os.path.isdir(raw_path):
+        print('Reading raw files from ' + raw_path)
+    else:
+        os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+        print('Please put raw files in ' + raw_path)
+        sys.exit()
+    confs, terms, energies_cm, uncertainties, theory_shift, matrix_file_exists = write_new_conf_res(name, raw_path)
 
     # 2. Use Vipul's code to correct misidentified configurations
     # Store filtered data of even or odd parity in DATA_Filtered/NIST/ 
@@ -450,4 +476,7 @@ if __name__ == "__main__":
     mapping = create_mapping()
 
     write_energy_csv(name, mapping, NIST_shift, theory_shift)
-    write_matrix_csv(name, raw_path, mapping)
+    if matrix_file_exists: 
+        write_matrix_csv(name, raw_path, mapping)
+    else:
+        print('E1.RES files were not found, so matrix csv file was not generated')
