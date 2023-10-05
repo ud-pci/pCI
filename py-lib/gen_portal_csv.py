@@ -1,14 +1,6 @@
-##
-# 1. create energy csv file (NIST if it exists, our data if NIST does not exist)
-    # - e.g. Sr1_Energies.csv
-# 2. create matrix element file
-    # - read outputs from dtm (all order and MBPT) and produce csv file [Sr1_Matrix_Elements.csv]
-    # - all theory data
-    # - create uncertainty from abs(all-order - MBPT)
-# 3. option to hide for display G levels
-
 import re
 import sys
+import os
 import pandas as pd
 from UDRead import *
 from parse_asd import *
@@ -229,6 +221,7 @@ def convert_res_to_csv(filename, uncertainties, name):
         parity = 'Even'
     csvfile = "DATA_Filtered/UD/"+name+'_UD_' + parity + '.csv'
 
+    os.makedirs(os.path.dirname(csvfile), exist_ok=True)
     f = open(csvfile, 'w')
     f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, conf2, conf2%, uncertainty \n')
 
@@ -420,6 +413,12 @@ if __name__ == "__main__":
     data_nist = reformat_df_to_atomdb(data_nist)
     NIST_shift = find_energy_shift(data_nist)
 
+    # Create directories for filtered data if it doesn't exist
+    path_filtered_nist = "DATA_Filtered/NIST/"
+    path_filtered_theory = "DATA_Filtered/UD/"
+    os.makedirs(os.path.dirname(path_filtered_nist), exist_ok=True)
+    os.makedirs(os.path.dirname(path_filtered_theory), exist_ok=True)
+
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'odd')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'even')
     
@@ -438,7 +437,10 @@ if __name__ == "__main__":
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, fac, 'even')
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, fac, 'odd')
     
-    # Export filtered data
+    # Export filtered data to output directory
+    path_output = "DATA_Output/"
+    os.makedirs(os.path.dirname(path_output), exist_ok=True)
+
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
     path = "DATA_Output/"+name+"_Odd.txt" 
