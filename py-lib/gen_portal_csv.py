@@ -461,7 +461,7 @@ if __name__ == "__main__":
     nist_max_odd = 62
     nist_max_even = 50
     
-    '''# Filtering
+    # Filtering
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, fac, 'even')
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, fac, 'odd')
     
@@ -473,7 +473,7 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_even, path)
     path = "DATA_Output/"+name+"_Odd.txt" 
     ConvertToTXT(data_final_odd, path)
-    '''
+    
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
 
