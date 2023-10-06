@@ -366,6 +366,10 @@ def MainCode(path_nist, path_ud,nist_max,fac,parity):
         if data[i][6]=="-": data[i][11] = "-"
         if data[i][6]=="": data[i][11] = ""
     
+    # Force energies in a.u. to have 8 decimal places
+    for i in range(len(data)):
+        data[i][13] = "{:.8f}".format(float(data[i][13]))
+
     data[data=='nan'] = '-'
 
     print(np.where(np.bincount(ao_used) > 1)[0]) # duplicates
