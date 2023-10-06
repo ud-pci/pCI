@@ -161,6 +161,7 @@ def write_new_conf_res(name, filepath):
     This function creates a new CONF.RES file with theory uncertainties
     '''
     
+    matrix_file_exists = True
     # Check if raw files exist
     if not os.path.exists(filepath + 'CONFFINALeven.RES'):
         print('CONFFINALeven.RES not found in', filepath)
