@@ -368,7 +368,8 @@ def MainCode(path_nist, path_ud,nist_max,fac,parity):
     
     # Force energies in a.u. to have 8 decimal places
     for i in range(len(data)):
-        data[i][13] = "{:.8f}".format(float(data[i][13]))
+        if data[i][13].strip('.').isnumeric():
+            data[i][13] = "{:.8f}".format(float(data[i][13]))
 
     data[data=='nan'] = '-'
 

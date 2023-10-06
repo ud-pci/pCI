@@ -347,6 +347,7 @@ def write_matrix_csv(element, filepath, mapping):
                                'matrix_element', 'matrix_element_uncertainty'])
     i = 0
     for line in lines[1:]:
+        # E1.RES format: < conf2 || E1 || conf1 > E1_L  E1_V  E2  E1  E2-E1  WL  Tr. Rate
         matrix_element = re.findall(r'\<.*?\>', line)[0]
         Tk = re.findall(r'\|\|.*?\|\|', matrix_element)[0].replace('||', '').replace(' ', '')
         state1 = re.findall(r'\|\|.*?\>', matrix_element)[0].replace(Tk, '').replace('||', '').replace('>', '')
@@ -357,8 +358,8 @@ def write_matrix_csv(element, filepath, mapping):
         term2 = state2.split()[-1][0:2]
         J1 = state1.split()[-1][-1]
         J2 = state2.split()[-1][-1]
-        energy1 = re.findall("\d+\.\d+", line)[2:4][0]
-        energy2 = re.findall("\d+\.\d+", line)[2:4][1]
+        energy1 = re.findall("\d+\.\d+", line)[2:4][1]
+        energy2 = re.findall("\d+\.\d+", line)[2:4][0]
 
         matrix_element_value = re.findall("\d+\.\d+", line)[:1]
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
@@ -367,11 +368,11 @@ def write_matrix_csv(element, filepath, mapping):
 
         # Use mapping to correct confs and terms
         for line_theory in mapping:
-            if line_theory[1][6] == energy1:
+            if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 J1 = line_theory[1][2]
-            if line_theory[1][6] == energy2:
+            if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 J2 = line_theory[1][2]
@@ -460,7 +461,7 @@ if __name__ == "__main__":
     nist_max_odd = 62
     nist_max_even = 50
     
-    # Filtering
+    '''# Filtering
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, fac, 'even')
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, fac, 'odd')
     
@@ -472,7 +473,7 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_even, path)
     path = "DATA_Output/"+name+"_Odd.txt" 
     ConvertToTXT(data_final_odd, path)
-    
+    '''
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
 
