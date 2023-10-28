@@ -102,6 +102,7 @@ Program ine
             If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
             print*, 'xlamb=',xlamb
             Do i=1,icyc
+                print*, Ndir
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
@@ -120,6 +121,7 @@ Program ine
                 End If
                 Select Case(kIters)
                     Case(0)
+                        print*, Ndir
                         Call SolEq1(kl) ! Direct solution
                         If (Ndir.LT.Nd) Then
                             Call SolEq4(ok)                 !### Iterative solution
@@ -188,13 +190,13 @@ Contains
         ! Specify kIters - (0-iterate and invert if diverged, 1-invert only, 2-2-step iteration)
         kIters=2
 
-        ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
-        ! To solve homogeneous equation for the whole matrix, Nddir=IP1
-        Nddir = IP1  
-
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
         IP1=15000
+
+        ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
+        ! To solve homogeneous equation for the whole matrix, Nddir=IP1
+        Nddir = IP1  
 
         ! Specify N_it4 - number of iterations in SolEq4
         N_it4 = 100
@@ -970,6 +972,7 @@ Contains
                 End If
             End If
         End If
+        print*, Nd, Ndir
         If (Nd.GT.Ndir) then
             Ntr=0                          !### Ntr = dimension of the
             Do ic=1,Nc                     !### matrix equation to solve here
