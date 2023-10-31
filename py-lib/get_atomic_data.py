@@ -1171,6 +1171,11 @@ def get_atomic_data(name, isotope):
         except ValueError as e:
             print('ERROR: Nuclear charge radius could not be found for', name)
             sys.exit()
+            
+    # Check that an element has been found or throw an error
+    if Z == 0 or AM == 0:
+        print('ERROR: Element could not be found')
+        sys.exit()
 
     return Z, AM, symbol, cfermi, rnuc, num_rem_ele
 
