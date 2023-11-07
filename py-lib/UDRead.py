@@ -136,7 +136,7 @@ def FindJthAll(i,df_nist,df_ud,fac,corr_config=True): # find ao config correspon
         # First Pass : if J_Nist = J_AO and Percentage Difference is less than 2
         # fac = 2
         EpercLim = fac-i*(fac-0.75)/len(df_ud)
-        if j_nist==j_ao and Eperc<EpercLim:
+        if str(j_nist)==j_ao and Eperc<EpercLim:
             inv_config = inverse_config(config_nist)
             
             # Second Pass : if Term_NIST = Term_AO
