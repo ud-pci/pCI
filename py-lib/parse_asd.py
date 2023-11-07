@@ -90,9 +90,10 @@ def reformat_df_to_atomdb(asd_df): # Modified
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
 
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", "") # replace '.' from the configuration
-    lst = LongSubString(asd_df["state_configuration"].values[:100])
 
-    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(lst,"")  # replace repeating string from the configuration
+    #lst = LongSubString(asd_df["state_configuration"].values[:100])
+
+    #asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(lst,"")  # replace repeating string from the configuration
     
     # Remove spaces in energies
     # asd_df['energy'] = asd_df['energy'].str.replace(' ', '')

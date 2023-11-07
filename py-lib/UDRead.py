@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+from fractions import Fraction
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 
@@ -81,7 +82,7 @@ def Data_UD(ith,df_ao,corr_config=True): # reading filtered csv data
     config1 = df_ao[ith][1] if corr_config==False else  df_ao[ith][-1] # corrected configuration
     config2 = df_ao[ith][10] # second possible configuration
     Term = df_ao[ith][2][0:2] # Term
-    J = df_ao[ith][7] # J value
+    J = str(Fraction(df_ao[ith][7])) # J value
     Level = round(df_ao[ith][4],3) # Level
     Levelau = df_ao[ith][3] # Level in atomic units
     Per1 = df_ao[ith][9] # Percentage Contribution of first configuration
@@ -100,7 +101,7 @@ def Data_Nist(ith,df_nist): # Reading filtered csv data
     return config_nist,term_nist,j_nist,level_nist,uncer_nist
 
 
-def Dataframe(path_nist,path_ao,nist_max,parity,fac):
+def Dataframe(path_nist,path_ao,nist_max,parity,fac,gs_parity):
     # read csv
     df_nist = pd.read_csv(path_nist)
     df_ao = pd.read_csv(path_ao).fillna('') # fill blank for nan
@@ -110,8 +111,8 @@ def Dataframe(path_nist,path_ao,nist_max,parity,fac):
     df_nist = df_nist.values
     df_ao = df_ao.values
 
-    ref_E = df_nist[:,3][0] if parity=="odd" else 0
-    if parity=="odd": df_nist[:,3] = df_nist[:,3]- ref_E # making zero reference energy in odd parity states in NIST Data
+    ref_E = df_nist[:,3][0] if parity!=gs_parity else 0
+    if parity!=gs_parity: df_nist[:,3] = df_nist[:,3]- ref_E # making zero reference energy in odd parity states in NIST Data
 
     new_config = Correct_Config(df_ao,df_nist,nist_max,fac)
     df_ao = np.append(df_ao, np.stack([new_config],axis=1), axis=1)
@@ -304,9 +305,9 @@ def Correct_Config(df_ao,df_nist,nist_max,fac):
 
 
 
-def MainCode(path_nist, path_ud,nist_max,fac,parity):
+def MainCode(path_nist, path_ud, nist_max,fac, parity, gs_parity):
     
-    df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,nist_max,parity,fac)
+    df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,nist_max,parity,fac,gs_parity)
     df_nist_org = np.copy(df_nist)
 
     primary_config_ud = np.array([df_ud[i][1] for i in range(len(df_ud))])
