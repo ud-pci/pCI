@@ -106,7 +106,7 @@ def reformat_df_to_atomdb(asd_df): # Modified
 
     return asd_df
 
-def df_to_csv(asd_df, filename,parity=None): # Modified
+def df_to_csv(asd_df, filename, parity=None): 
     """
     This function converts a dataframe into a csv file
     """
@@ -122,7 +122,6 @@ def df_to_csv(asd_df, filename,parity=None): # Modified
         filename = filename.replace(" ","_")+"_NIST_Even"+".csv"
 
     else:
-        asd_df = asd_df.to_csv(filename, index=False)
         filename = filename.replace(" ","_")+"_NIST_All"+".csv"
 
     asd_df.to_csv(filename, index=False)

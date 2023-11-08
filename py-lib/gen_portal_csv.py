@@ -478,6 +478,7 @@ if __name__ == "__main__":
 
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'odd')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'even')
+    df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom)
     
     # Filter NIST and UD data
     path_nist_even = "DATA_Filtered/NIST/"+name+"_NIST_Even.csv"
