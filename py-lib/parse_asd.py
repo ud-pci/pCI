@@ -113,12 +113,12 @@ def df_to_csv(asd_df, filename,parity=None): # Modified
     
     # Filtering Odd and Even data before converting it to csv
     if parity=="odd":
-        asd_df = asd_df[asd_df['state_term'].str.len()==3]
+        asd_df = asd_df[asd_df['state_term'].str[-1] == '*']
         asd_df["state_term"] = asd_df["state_term"].str.replace("*","")
         filename = filename.replace(" ","_")+"_NIST_Odd"+".csv"
 
     elif parity=="even":
-        asd_df = asd_df[asd_df['state_term'].str.len()==2]
+        asd_df = asd_df[asd_df['state_term'].str[-1] != '*']
         filename = filename.replace(" ","_")+"_NIST_Even"+".csv"
 
     else:
