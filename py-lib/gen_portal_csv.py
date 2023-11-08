@@ -298,7 +298,7 @@ def convert_res_to_csv(filename, uncertainties, name):
 
     return
 
-def write_energy_csv(name, mapping, NIST_shift, theory_shift):
+def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
     '''
     This function writes the energy csv file
     '''
@@ -309,18 +309,9 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift):
                                      'energy_uncertainty', 'is_from_theory'])
     cnt = 0
     adjust_energy = False
+
     for level in mapping:
-        # adjust energy if energy in cm-1 reset to 0 for different parity
-        try:
-            if round(float(level[1][3])) == 0:
-                cnt += 1
-            if cnt == 2:
-                adjust_energy = True
-            elif cnt > 2: 
-                print('too many zeros detected in mapping, please check')
-                sys.exit()
-        except:
-            continue
+        # TODO - check parity of configuration and add energy shift if parity /= parity of ground state
         # if experimental data does not exist, use theory values
         if level[0][0] == '-':
             is_from_theory = True
@@ -433,7 +424,7 @@ def find_energy_shift(df):
     '''
     this function finds the energy shift between lowest odd and even parity energy levels
     '''
-    ground_parity = nist_parity(df['state_term'].values[:1])
+    ground_parity = nist_parity(df['state_term'].values[:1][0])
 
     for index, row in df.iterrows():
         parity = nist_parity(row['state_term'])
@@ -450,7 +441,7 @@ if __name__ == "__main__":
 
     '''
     Method:
-    1. Read all CONF.RES files from directory DATA_RAW and add uncertainties to CONF.RES file in csv format
+    1. Read all CONF*.RES files from the /DATA_RAW directory and add uncertainties to CONF.RES file in csv format
         - CONFFINALeven.RES
         - CONFFINALodd.RES
         - CONFFINALevenMBPT.RES
@@ -462,6 +453,7 @@ if __name__ == "__main__":
     '''
     
     # 1. Write new CONF.RES (CONFFINAL.csv) with uncertainties
+    # TODO - modularize this part to export and import output files
     raw_path = "DATA_RAW/"
     if os.path.isdir(raw_path):
         print('Reading raw files from ' + raw_path)
@@ -514,7 +506,7 @@ if __name__ == "__main__":
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
 
-    write_energy_csv(name, mapping, NIST_shift, theory_shift)
+    write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         write_matrix_csv(name, raw_path, mapping)
     else:
