@@ -5,20 +5,6 @@ import math
 import sys
 
 def get_radii():
-    url = "https://www-nds.iaea.org/radii/"
-
-    r = requests.get(url)
-    df_list = pd.read_html(r.text)
-    radii_df = df_list[0].drop([0, 1, 2])
-
-    radii_df.columns = [ "Z", "Elem.", "Mass", "n", "R_av(fm)", "ΔR_av(fm)", "R_av,p(fm)", "ΔR_av,p(fm)"]
-    radii_df.reset_index(drop=True, inplace=True)
-    radii_df['Z'].fillna(method='ffill',inplace=True)
-    radii_df['Elem.'].fillna(method='ffill',inplace=True)
-
-    return radii_df
-
-def get_extra_radii():
     # nuclear radii compiled by Marianna Safronova
     rnuc_data = [
         [1, 'H', 1, 0.8783],
@@ -1147,20 +1133,15 @@ def get_atomic_data(name, isotope):
     # Check if atomic symbol in radii table
     if rtable['Elem.'].eq(symbol).any():
         try: 
-            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == str(int(AM)))]['R_av(fm)'].values.astype(float)[0]
+            rnuc = rtable[(rtable['Elem.'] == symbol) & (rtable['Mass'] == int(AM))]['R_av(fm)'].values.astype(float)[0]
         except IndexError:
             pass
     
     
     # If rnuc could not be found, search manual table for rnuc
     if rnuc == 0:
-        rtable2 = get_extra_radii()
-        if rtable2['Elem.'].eq(symbol).any():
-            rnuc = rtable2[(rtable2['Elem.'] == symbol)]['R_av(fm)'].values.astype(float)[0]
-            print('rnuc was not found in nuclear charge radii table, so a guess is used.')
-        else:
-            print('Could not find rnuc in any tables. Enter parameters in HFD.INP and bas_wj.in manually.')
-            pass
+        print('Could not find rnuc in the internal table. Enter parameters in HFD.INP and bas_wj.in manually.')
+        pass
     else:
         # Calculate cfermi
         try:
