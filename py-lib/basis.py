@@ -600,22 +600,38 @@ def write_inputs(system, C_is):
     # Write inf.vw
     write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
-def write_ao_job_script(filename, nprocs, mem, job_name, partition):
+def write_job_script(nprocs, mem, code_method, partition):
+    if code_method == 'ci':
+        filename = 'ci_qs'
+    elif code_method == 'ci+all-order' or code_method == 'all-order':
+        filename = 'ao.qs'
+    elif code_method == 'ci+second-order' or code_method == 'second-order':
+        filename = 'cis.qs'
+    else:
+        print('error detecting code method ' + code_method)
+                
     with open(filename,'w') as f:
         f.write('#!/bin/bash -l \n')
         f.write('#SBATCH --ntasks=' + str(nprocs) + ' \n')
         f.write('#SBATCH --mem=' + str(mem) + ' \n')
-        f.write('#SBATCH --job-name=' + job_name + ' \n')
+        f.write('#SBATCH --job-name=' + code_method + ' \n')
         f.write('#SBATCH --partition=' + partition + ' \n')
         f.write('#SBATCH --time=1-00:00:00 \n')
         f.write('#SBATCH --export=NONE \n')
         f.write('. /opt/shared/slurm/templates/libexec/common.sh \n')
         f.write('vpkg_require pci \n\n')
-        f.write('time allcore-rle-ci <inf.aov >out.core \n')
-        f.write('time valsd-rle-cis <inf.aov >out.val \n')
-        f.write('time sdvw-rle-cis <inf.aov >out.vw \n')
-        f.write('time second-cis <inf.vw >out.second.vw \n')
+        if code_method == 'all-order' or code_method == 'ci+all-order':
+            f.write('time allcore-rle-ci <inf.aov >out.core \n')
+            f.write('time valsd-rle-cis <inf.aov >out.val \n')
+            f.write('time sdvw-rle-cis <inf.aov >out.vw \n')
+            f.write('time second-cis <inf.vw >out.second.vw \n')
+        elif code_method == 'second-order' or code_method == 'ci+second-order':
+            f.write('time second-cis <inf.vw >out.second.vw \n')
+        else:
+            print(code_method + ' not supported.')
     f.close()
+    
+    return filename
 
 def generate_batch_qed(kqed, krot, kbrt):
     """ Writes batch.qed """
@@ -870,14 +886,14 @@ if __name__ == "__main__":
             print("hfd complete")        
             # Run bass
             #run(["./bass", ">", "bass.out"], shell=True)
-        elif code_method == 'ci+all-order':
+        elif code_method == 'ci+all-order' or code_method == 'ci+second-order':
             # Run executables
             if not include_isotope_shifts:
                 run_executables(0, 0)
                 # TODO: implement error checking
                 if run_ao_codes: 
-                    write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
-                    run('sbatch ao.qs', shell=True)
+                    script_name = write_job_script(1, 0, code_method, 'standard')
+                    run('sbatch ' + script_name, shell=True)
             else:
                 c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
                 for c in c_list:
@@ -893,8 +909,8 @@ if __name__ == "__main__":
                     run_executables(K_is, c)
                     # TODO: implement error checking
                     if run_ao_codes: 
-                        write_ao_job_script('ao.qs', 1, 0, 'all-order', 'standard')
-                        run('sbatch ao.qs', shell=True)
+                        script_name = write_job_script(1, 0, code_method, 'standard')
+                        run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
         else:
             print(code_method + ' not supported')
