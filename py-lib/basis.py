@@ -6,7 +6,7 @@ import get_atomic_data as libatomic
 import orbitals as liborb
 import os
 from pathlib import Path
-from subprocess import Popen, PIPE, STDOUT, run
+from subprocess import run
 
 def read_yaml(filename):
     """ 
