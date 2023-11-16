@@ -38,5 +38,5 @@ def scrape_term(configuration):
 
 if __name__ == '__main__':
     configuration = input('Input configuration: ')
-    terms = scrape_term(configuration)
+    terms = scrape_term(configuration.replace(' ', '.'))
     print(len(terms), 'terms for ' + configuration + ':', terms)
