@@ -15,7 +15,7 @@ def scrape_term(configuration):
     This function scrapes all possible terms for a given electron configuration from online term calculator
     at http://umop.net/spectra/term_calc.php
     '''
-    url = 'http://umop.net/spectra/term_calc.php?config=' + configuration
+    url = 'http://umop.net/spectra/term_calc.php?config=' + configuration.replace(' ', '.')
     r = requests.get(url)
     
     reg_str = "<strong>(.*?)</strong>"
@@ -38,5 +38,5 @@ def scrape_term(configuration):
 
 if __name__ == '__main__':
     configuration = input('Input configuration: ')
-    terms = scrape_term(configuration.replace(' ', '.'))
+    terms = scrape_term(configuration)
     print(len(terms), 'terms for ' + configuration + ':', terms)
