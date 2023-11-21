@@ -75,7 +75,7 @@ def find_missing_terms(filename):
     return missing_terms, extra_terms, duplicate_terms
 
 if __name__ == '__main__':
-    filename = input('Name of portal-csv file: ')
+    filename = input('Name of input file: ')
     
     missing_terms, extra_terms, duplicate_terms = find_missing_terms(filename)
     
