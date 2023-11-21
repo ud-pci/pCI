@@ -1,4 +1,5 @@
 import get_atomic_term
+import sys
 
 '''
 This python script determines missing terms from NIST database/conf calculations/portal database
@@ -7,6 +8,8 @@ This python script determines missing terms from NIST database/conf calculations
 def find_missing_terms(filename):
     '''
     This function finds missing terms from the specified input file
+    NIST database and portal files should be csv-formatted
+    conf calculation file can be csv-formatted or RES-formatted
     '''
     # Import csv data
     f = open(filename, 'r')
@@ -15,12 +18,36 @@ def find_missing_terms(filename):
 
     # Organize existing configurations and terms
     config_terms = {}
-    for line in lines[1:]:
-        config = line.split(',')[0]
-        term = line.split(',')[1] + line.split(',')[2]
-        if config not in config_terms:
-            config_terms[config] = []
-        config_terms[config] += [term]
+    duplicate_terms = {}
+    if filename[-3:] == 'csv':
+        for line in lines[1:]:
+            config = line.split(',')[0]
+            term = line.split(',')[1] + line.split(',')[2]
+            if config not in config_terms:
+                config_terms[config] = []
+            else:
+                if term in config_terms[config]:
+                    if config not in duplicate_terms:
+                        duplicate_terms[config] = []
+                    duplicate_terms[config] += [term]
+            config_terms[config] += [term]
+    elif filename[-3:] == 'RES':
+        ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
+        Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
+        for line in lines[1:]:
+            config = [conf for conf in line.split('  ') if any(l in conf for l in ls)][0].replace(' ', '.')
+            term = [term for term in line.split('  ') if any(L in term for L in Ls)][0].strip()
+            if config not in config_terms:
+                config_terms[config] = []
+            else:
+                if term in config_terms[config]:
+                    if config not in duplicate_terms:
+                        duplicate_terms[config] = []
+                    duplicate_terms[config] += [term]
+            config_terms[config] += [term]
+    else:
+        print(filename + ' is not compatible')
+        sys.exit()
 
     # Obtain all possible terms for each configuration
     possible_config_terms = {}
@@ -45,13 +72,12 @@ def find_missing_terms(filename):
                     extra_terms[config] = []
                 extra_terms[config] += [term]
     
-    return missing_terms, extra_terms
+    return missing_terms, extra_terms, duplicate_terms
 
 if __name__ == '__main__':
-    # TODO - add implementation with NIST/conf/portal
     filename = input('Name of portal-csv file: ')
     
-    missing_terms, extra_terms = find_missing_terms(filename)
+    missing_terms, extra_terms, duplicate_terms = find_missing_terms(filename)
     
     # Print out missing terms
     print('MISSING TERMS:')
@@ -62,3 +88,8 @@ if __name__ == '__main__':
     print('EXTRA TERMS:')
     for config in extra_terms:
         print(config + ':', extra_terms[config])
+        
+    # Print out duplicate terms
+    print('DUPLICATE TERMS:')
+    for config in duplicate_terms:
+        print(config + ':', duplicate_terms[config])   
