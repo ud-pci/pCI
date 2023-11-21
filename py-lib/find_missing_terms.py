@@ -1,10 +1,13 @@
 import get_atomic_term
 
 '''
-This python script determines missing terms from portal csv
+This python script determines missing terms from NIST database/conf calculations/portal database
 '''
 
 def find_missing_terms(filename):
+    '''
+    This function finds missing terms from the specified input file
+    '''
     # Import csv data
     f = open(filename, 'r')
     lines = f.readlines()
@@ -33,17 +36,29 @@ def find_missing_terms(filename):
                     missing_terms[config] = []
                 missing_terms[config] += [term]
     
-    return missing_terms
+    # Find extra terms or terms that can't exist
+    extra_terms = {}
+    for config in config_terms:
+        for term in config_terms[config]:
+            if term not in possible_config_terms[config]:
+                if config not in extra_terms:
+                    extra_terms[config] = []
+                extra_terms[config] += [term]
+    
+    return missing_terms, extra_terms
 
 if __name__ == '__main__':
     # TODO - add implementation with NIST/conf/portal
-    # TODO - flag extra terms/terms that can't exist (from conf code)
     filename = input('Name of portal-csv file: ')
     
-    missing_terms = find_missing_terms(filename)
+    missing_terms, extra_terms = find_missing_terms(filename)
     
     # Print out missing terms
     print('MISSING TERMS:')
     for config in missing_terms:
         print(config + ':', missing_terms[config])
     
+    # Print out extra terms
+    print('EXTRA TERMS:')
+    for config in extra_terms:
+        print(config + ':', extra_terms[config])
