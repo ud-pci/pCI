@@ -71,7 +71,7 @@ ChooseJth # Choose between j1 and j2 to find the best correspondance
 FindJth # Call "FindJthAll" and "ChooseJth" and returns index of final configuration surviving all five passes
 ```
 
-## Combine Evrything
+## Combine Everything
 
 1. Correct Configurations
 2. Setup empty list (let us call it `"data_csv"`), to fill data
