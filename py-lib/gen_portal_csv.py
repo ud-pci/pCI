@@ -299,6 +299,33 @@ def convert_res_to_csv(filename, uncertainties, name):
 
     return
 
+def find_parity(configuration):
+    '''
+    This function finds parity of specified configuration
+    '''
+    p = 0
+    parity = ''
+    ldict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
+    
+    orbitals = configuration.split('.')
+    for orbital in orbitals:
+        nq = re.findall('[0-9]+', orbital)
+        if len(nq) <= 1: 
+            q = 1
+        else:
+            q = int(nq[1])
+        
+        l_str = re.findall('[spdfghi]+', orbital)[0]
+        l = ldict[l_str]
+        p += l*q
+    
+    if p%2 == 0:
+        parity = 'even'
+    else:
+        parity= 'odd'
+        
+    return parity
+
 def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
     '''
     This function writes the energy csv file
@@ -308,8 +335,6 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
     # select columns for portal dataframe
     portal_df = pd.DataFrame(columns = ['state_configuration', 'state_term', 'state_J', 'energy', 
                                      'energy_uncertainty', 'is_from_theory'])
-    cnt = 0
-    adjust_energy = False
 
     for level in mapping:
         # TODO - check parity of configuration and add energy shift if parity /= parity of ground state
@@ -319,7 +344,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
             state_config = level[1][5]
             state_term = level[1][1]
             state_J = level[1][2]
-            if adjust_energy == True:
+            if find_parity(state_config) != gs_parity:
                 state_energy = "{:.1f}".format(float(level[1][3]) + float(theory_shift))
             else:
                 state_energy = level[1][3]
@@ -329,7 +354,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
             state_config = level[0][0]
             state_term = level[0][1]
             state_J = level[0][2]
-            if adjust_energy == True:
+            if find_parity(state_config) != gs_parity:
                 state_energy = "{:.3f}".format(float(level[0][3]) + float(NIST_shift))
             else:
                 state_energy = level[0][3]
