@@ -1,4 +1,3 @@
-from UDRead import Convert_Type,LongSubString
 from io import StringIO
 import pandas as pd
 import requests
@@ -7,6 +6,26 @@ import re
 
 pd.options.mode.chained_assignment = None
 
+def Convert_Type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
+    s = s.replace(" ", ".")
+    try:
+        f = float(s)
+        i = int(f)
+        return i if i == f else f
+    
+    except ValueError:
+        try: return eval(s)
+        except: return s
+    
+
+def RemoveInitial(l): # find core config to remove it for minimal representation
+    s =""
+    n=0
+    for i in l:
+        s+=i
+        if i==".":n+=1
+        if n==1:break  
+    return s
 
 def convert_res_to_csv(filename): # Modified convert .RES to csv
 
@@ -52,12 +71,12 @@ def generate_asd_url(spectrum): # ex: spectrum = Sr I
                 + 'j_out=on' + '&' 
                 + 'lande_out=on' + '&'
                 + 'perc_out=on' + '&' 
-                + 'biblio=on' + '&' 
+                + 'biblio=on' + '&'
                 + 'temp=')
 
     full_url = url + spectrum_post + post_req
 
-    return full_url 
+    return full_url
 
 def generate_df_from_asd(url):
     """
@@ -89,24 +108,37 @@ def reformat_df_to_atomdb(asd_df): # Modified
     asd_df['energy'].fillna('N/A', inplace=True)
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
 
-    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", "") # replace '.' from the configuration
-
-    #lst = LongSubString(asd_df["state_configuration"].values[:100])
-
-    #asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(lst,"")  # replace repeating string from the configuration
-    
-    # Remove spaces in energies
-    # asd_df['energy'] = asd_df['energy'].str.replace(' ', '')
-
-    # Add a '.' between orbitals in configurations
-    
-
     # Replace reference ID column to 'FALSE' as a value of is_from_theory
     asd_df['is_from_theory'] = 'FALSE'
 
     return asd_df
 
-def df_to_csv(asd_df, filename, parity=None): 
+def NIST_Discrepancies(asd_df,ri=False):
+    # ri : replace initials
+    # All Filters and Discrepencies Here
+    if ri==True: 
+        s = RemoveInitial(asd_df["state_configuration"].values[0])
+        asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(s, "") # replace initial from the configuration
+
+    # missing J
+    asd_df = asd_df[asd_df['state_J'] != ""]
+    asd_df["state_J"] = asd_df["state_J"].str.split(',').str[0]
+    asd_df["state_J"] = asd_df["state_J"].apply(lambda x: Convert_Type(x))
+    asd_df["state_term"] = asd_df["state_term"].str.replace('[a-z]', '',regex=True) # replace x,y,z from the terms
+    asd_df["state_term"] = asd_df["state_term"].str.replace(' ', '',regex=True) # replace spaces from the terms
+    # asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", " ") # replace '.' with " " from the configuration
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("n", "0") # replace "4s np" with "4s 0p" from the configuration
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\(.*?\\)","",regex=True) # replace '()' and whats inside it from the configuration
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\<.*?\\>","",regex=True) # replace '<>' and whats inside it from the configuration
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\.\\.",'.') # replace multiple '.' with single '.' from the configuration
+    # asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("  ", " ") # replace '  ' with " " from the configuration
+
+    asd_df["energy"] = asd_df["energy"].replace(r'^s*$', float('NaN'), regex = True) # replace blank energies with nan from the configuration
+    asd_df.dropna(inplace = True) # remove states with abscent energy values
+
+    return asd_df
+
+def df_to_csv(asd_df, filename, parity=None,ri=False):
     """
     This function converts a dataframe into a csv file
     """
@@ -123,6 +155,8 @@ def df_to_csv(asd_df, filename, parity=None):
 
     else:
         filename = filename.replace(" ","_")+"_NIST_All"+".csv"
+
+    asd_df = NIST_Discrepancies(asd_df,ri)
 
     asd_df.to_csv(filename, index=False)
 

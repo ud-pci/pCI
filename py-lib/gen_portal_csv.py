@@ -5,6 +5,7 @@ import pandas as pd
 from fractions import Fraction
 from UDRead import *
 from parse_asd import *
+from get_atomic_term import *
 
 def parse_final_res(filename):
     try:
@@ -152,18 +153,18 @@ def create_mapping():
         NIST_uncertainty = line.split()[4]
         final_config = line.split()[5]
         theory_config = line.split()[6]
-        corrected_config = line.split()[7]
-        theory_config2 = line.split()[8]
-        theory_term = line.split()[9]
+        corrected_config = line.split()[5]
+        theory_config2 = line.split()[7]
+        theory_term = line.split()[8]
         try:
-            theory_J = str(Fraction(line.split()[10]))
+            theory_J = str(Fraction(line.split()[9]))
         except:
-            theory_J = line.split()[10]
-        theory_energy_cm = line.split()[11]
-        theory_uncertainty = line.split()[12]
-        theory_energy_au = line.split()[13]
-        theory_delta_cm = line.split()[14]
-        theory_delta = line.split()[15]
+            theory_J = line.split()[9]
+        theory_energy_cm = line.split()[10]
+        theory_uncertainty = line.split()[11]
+        theory_energy_au = line.split()[12]
+        #theory_delta_cm = line.split()[13]
+        #theory_delta = line.split()[14]
 
         # select relevant data for portal database 
         if NIST_config != 'Config':
@@ -313,7 +314,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
     for level in mapping:
         # TODO - check parity of configuration and add energy shift if parity /= parity of ground state
         # if experimental data does not exist, use theory values
-        if level[0][0] == '-':
+        if level[0][3] == '-':
             is_from_theory = True
             state_config = level[1][5]
             state_term = level[1][1]
@@ -390,6 +391,7 @@ def write_matrix_csv(element, filepath, mapping):
 
         # Use mapping to correct confs and terms
         for line_theory in mapping:
+            if line_theory[1][6] == '-': continue
             if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
@@ -435,7 +437,8 @@ def find_energy_shift(df):
     return energy_shift
 
 if __name__ == "__main__":
-    atom = 'In I'
+    atom = 'Sr I'
+    ri = False
     fac = 2 # maximum energy difference (in percent) for comparison
     name = atom.replace(" ","_")
 
@@ -460,6 +463,7 @@ if __name__ == "__main__":
     else:
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
         print('Please put raw files in ' + raw_path)
+        print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1.RES, E1MBPT.RES')
         sys.exit()
     confs, terms, energies_cm, uncertainties, theory_shift, gs_parity, matrix_file_exists = write_new_conf_res(name, raw_path)
 
@@ -486,14 +490,18 @@ if __name__ == "__main__":
 
     path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
     path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
-
+    
     # Set maximum number of levels to be read from NIST for each parity
     nist_max_odd = 33
     nist_max_even = 33
     
     # Filtering
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, fac, 'even', gs_parity)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, fac, 'odd', gs_parity)
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
+    
+    ## Finding Missing Levels
+    data_final_even_missing = Missing_Levels(data_final_even)
+    data_final_odd_missing = Missing_Levels(data_final_odd)
     
     # Export filtered data to output directory
     path_output = "DATA_Output/"
