@@ -415,21 +415,25 @@ def write_matrix_csv(element, filepath, mapping):
         i += 1
 
         # Use mapping to correct confs and terms
+        c1, c2 = False, False
         for line_theory in mapping:
             if line_theory[1][6] == '-': continue
             if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 J1 = line_theory[1][2]
+                c1 = True
             if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 J2 = line_theory[1][2]
-
-        row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
-               'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
-               'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
-        df.loc[len(df.index)] = row
+                c2 = True
+                
+        if c1 and c2:
+            row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
+                   'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
+                   'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
+            df.loc[len(df.index)] = row
     
     df.to_csv(filename, index=False)
     print(filename + ' has been written')
@@ -516,26 +520,32 @@ if __name__ == "__main__":
     path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
     path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
     
+    # TODO - automatically set the maximum number of levels
     # Set maximum number of levels to be read from NIST for each parity
     nist_max_odd = 33
     nist_max_even = 33
+    
+    # Export filtered data to output directory
+    path_output = "DATA_Output/"
+    os.makedirs(os.path.dirname(path_output), exist_ok=True)
     
     # Filtering
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
     
-    ## Finding Missing Levels
-    data_final_even_missing = Missing_Levels(data_final_even)
-    data_final_odd_missing = Missing_Levels(data_final_odd)
-    
-    # Export filtered data to output directory
-    path_output = "DATA_Output/"
-    os.makedirs(os.path.dirname(path_output), exist_ok=True)
-
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
     path = "DATA_Output/"+name+"_Odd.txt" 
     ConvertToTXT(data_final_odd, path)
+    
+    ## Finding Missing Levels
+    data_final_even_missing = Missing_Levels(data_final_even)
+    data_final_odd_missing = Missing_Levels(data_final_odd)    
+
+    path = "DATA_Output/"+name+"_Even+missing.txt" 
+    ConvertToTXT(data_final_even_missing, path)
+    path = "DATA_Output/"+name+"_Odd+missing.txt" 
+    ConvertToTXT(data_final_odd_missing, path)
     
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
