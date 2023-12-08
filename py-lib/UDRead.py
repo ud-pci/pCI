@@ -70,10 +70,19 @@ def Correct_Config(config,val,pos):
 def Term_Correct(term,corr=1):
     # correction to term symbol by value "corr", ex : 2D --> 3D if corr = 1
     term_symbol = list(term)
-    term_symbol[0]=str(int(term_symbol[0])+corr)
+    for i in range(len(term_symbol)):
+        if term_symbol[i].isdigit()==True: term_symbol[i]=str(int(term_symbol[i])+corr)
     term_symbol="".join(term_symbol)
     
     return term_symbol
+
+
+def Extract_Multiplicity(term): # extract multiplicity from term
+    mul=""
+    for i in term:
+        if i.isdigit():mul+=i
+    return int(mul)
+
 
 def Dummy_Config(config):
     conf=Sep_Config(config)
@@ -83,11 +92,47 @@ def Dummy_Config(config):
     return Combine_Config(conf)
 
 
+def Mark_UD(df_ud):
+    listt = np.array([])
+    mark = list('abcdefghijklmnopqrstuvwxyz')
+    for i in range(len(df_ud)):
+        if (i in listt)==True:continue
+        idx = np.where((df_ud[:,1]==df_ud[i][1]) & (df_ud[:,2]==df_ud[i][2]))[0]
+        for j in range(1,len(idx)):
+            df_ud[idx[j]][2] = mark[j-1]+df_ud[idx[j]][2]
+    
+    listt = np.concatenate([listt,idx])
+    return df_ud
+
+
+
+def Mark_NIST(df_nist):
+    listt = np.array([])
+    mark = list('abcdefghijklmnopqrstuvwxyz')
+    for i in range(len(df_nist)):
+        if (i in listt)==True:continue
+        idx = np.where((df_nist[:,0]==df_nist[i][0]) & (df_nist[:,1]==df_nist[i][1]) & (df_nist[:,2]==df_nist[i][2]))[0]
+        for j in range(1,len(idx)):
+            df_nist[idx[j]][1] = mark[j-1]+df_nist[idx[j]][1]
+
+        listt = np.concatenate([listt,idx])
+    return df_nist
+
+
+def Unmark_Term(Term): # remove marker from terms
+    term,s=[],0
+    for i in Term:
+        if i.isdigit():s=1
+        if s==1:term+=i
+    return "".join(term)
+
+
 def Data_UD(ith,df_ao): # reading filtered csv data
     
     config1 = df_ao[ith][1] # original first possible configuration from data
     config2 = df_ao[ith][10] # second possible configuration
-    Term = df_ao[ith][2][0:2] # Term
+    Term = df_ao[ith][2][:-1] # Term
+    # J = int(round(df_ao[ith][7],0)) # J value
     J = df_ao[ith][7] # J value
     Level = round(df_ao[ith][4],3) # Level
     Levelau = df_ao[ith][3] # Level in atomic units
@@ -125,6 +170,9 @@ def Dataframe(path_nist,path_ud,nist_max=0):
     print("nist_max : ",nist_max)
 
     df_nist = df_nist[:nist_max]
+
+    df_nist=Mark_NIST(df_nist)
+    df_ud=Mark_UD(df_ud)
 
     ref_E = df_nist[:,3][0]
     df_nist[:,3] = df_nist[:,3]- ref_E
@@ -267,7 +315,8 @@ def IsBeingUsed(j,df_nist,df_ud,corr_config=[],OutAll=False): # return the list 
 def StartingConfigs(df_nist):
     list_config,list_term,list_number,count=np.array([]),np.array([]),np.array([]),np.array([])
     for j in range(len(df_nist)): #len(df_ao)-3
-        mul = int(df_nist[j][1][0])
+        # mul = int(df_nist[j][1][0])
+        mul = Extract_Multiplicity(df_nist[j][1])
         config = df_nist[j][0]
         conf=Sep_Config(config)
         dummy_config = Dummy_Config(config)
@@ -329,7 +378,8 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
     for j in range(len(df_ud)):
         nf,jf,de = IsBeingUsed(j,df_nist,df_ud)
         config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
-        mul = int(term_ao[0]) if jf==0 else int(df_nist[nf][1][0])
+        # mul = int(term_ao[0]) if jf==0 else int(df_nist[nf][1][0])
+        mul = Extract_Multiplicity(term_ao) if jf==0 else Extract_Multiplicity(df_nist[nf][1])
 
         if jf==1: config = config1_ao
         if jf==0 or jf==2:
@@ -429,7 +479,7 @@ def ESort(i,data_final):
 
 
 
-
+# j,df_nist,df_ud,corr_config=[],OutAll=False
 def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
 
     df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,nist_max)
@@ -444,12 +494,12 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
     ref_E = 0
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist = Data_Nist(i,df_nist)
+        term_nist=Unmark_Term(term_nist)
         data_nist = [config_nist, term_nist, j_nist, round(level_nist+ref_E,roundd),uncer_nist]
 
         nist_used = 0
-
         jth,jf,de = FindJth(i,df_nist,df_ud,corr_config=new_config,which_j=True)
-    #     if jf==2 and (1 in IsBeingUsed(jth,df_nist,df_ud,corr_config=new_config))==True:jth=-1 # avoiding duplicates
+        if (jth in ao_used)==True:jth=-1 # avoiding duplicates
         if jth!=-1:
             ao_used.append(jth)
             nist_used = 1
@@ -459,6 +509,7 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
             Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
             EpercStr = str(Eperc)+"%"
             if config2_ao=='': config2_ao='-'
+            term_ao=Unmark_Term(term_ao)
             data_csv.append(data_nist+[new_config[jth],config1_ao,config2_ao, term_ao, j_ao, round(level_ao+ref_E,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
 
 
@@ -469,6 +520,7 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
     ## remaining ao states
     for j in range(len(df_ud)):
         config1_ao, config2_ao, term_ao, j_ao, level_ao,level_au, per1,per2,uncer_ud = Data_UD(j,df_ud)
+        term_ao=Unmark_Term(term_ao)
         if config2_ao=='': config2_ao='-'
         if (j in ao_used)==False:
             data_csv.append(["-","-","-",round(level_ao+ref_E,roundd),"-",new_config[j],config1_ao, config2_ao, term_ao, j_ao, round(level_ao+ref_E,roundd),uncer_ud,level_au,"-","-", per1,per2])
@@ -508,7 +560,8 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
 
 def Missing_Levels(data):
     print("Finding missing levels")
-    header,data_final=data
+    header,data_copy=data
+    data_final = np.copy(data_copy)
 
     config_nist,term_nist,J_nist,config_ud,term_ud,J_ud = data_final[:,0],data_final[:,1],data_final[:,2],data_final[:,5],data_final[:,8],data_final[:,9]
 
@@ -537,9 +590,7 @@ def Missing_Levels(data):
         data_csv.append(["~"+config_exp[j],term_exp[j],J_exp[j],"","","","","","","","","","","","","",""])
 
     print("Finding missing levels : complete...!")
-    return [header,np.concatenate([data_final,data_csv])]
-
-
+    return [header,np.concatenate([data_copy,data_csv])]
 
 
 def ConvertToTXT(data_final,path):

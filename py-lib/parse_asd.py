@@ -128,10 +128,10 @@ def NIST_Discrepancies(asd_df,ri=False):
     asd_df["state_term"] = asd_df["state_term"].str.replace(' ', '',regex=True) # replace spaces from the terms
     # asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", " ") # replace '.' with " " from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("n", "0") # replace "4s np" with "4s 0p" from the configuration
+    asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".\\(.*?\\)","",regex=True) # replace '.()' and whats inside it from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\(.*?\\)","",regex=True) # replace '()' and whats inside it from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\<.*?\\>","",regex=True) # replace '<>' and whats inside it from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("\\.\\.",'.') # replace multiple '.' with single '.' from the configuration
-    # asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("  ", " ") # replace '  ' with " " from the configuration
 
     asd_df["energy"] = asd_df["energy"].replace(r'^s*$', float('NaN'), regex = True) # replace blank energies with nan from the configuration
     asd_df.dropna(inplace = True) # remove states with abscent energy values
