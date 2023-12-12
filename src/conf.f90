@@ -2857,7 +2857,7 @@ Contains
         ! This subroutine prints the weights of configurations
         Implicit None
         Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt, nspacesterm, maxlenconfig
-        Real(dp) :: wsum, gfactor, ax_crit
+        Real(dp) :: wsum, gfactor, ax_crit, j_crit
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
@@ -2911,6 +2911,12 @@ Contains
         ax_crit = 1e-4
         Do i=1,Nlv
             If (ax_array(i) <= ax_crit) converged(i) = .True.
+        End Do 
+
+        ! TODO - set levels where J uncertainty is above some threshold to be not converged
+        j_crit = 1e-4
+        Do i=1,Nlv
+            If (Tj(i)-Nint(Tj(i)) > j_crit) converged(i) = .False.
         End Do 
 
         ! Form matrix of weights of each configuration for each energy level
@@ -3046,7 +3052,7 @@ Contains
                 If (j == 1) Write(99, '(A)') '  n' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf  term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%  converged'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
-                    strfmt = '(I3,2X,A,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,1X,A,3X,f4.1,"%")'
+                    strfmt = '(I3,2X,A,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,2X,A,3X,f4.1,"%")'
                     Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, repeat(' ', maxlenconfig-len_trim(strcsave(2,j))+1) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
@@ -3056,16 +3062,16 @@ Contains
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  n ' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf       J         E_n (a.u.)   DEL (cm^-1)   conf%'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  n ' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf       J         E_n (a.u.)   DEL (cm^-1)   conf%  converged'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
-                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",4X,A,3X,f4.1,"%")'
-                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, repeat(' ', maxlenconfig-len_trim(strcsave(2,j))+1) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",,5X,A,2X,A,3X,f4.1,"%")'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, strconverged, repeat(' ', maxlenconfig-len_trim(strcsave(2,j))+1) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
-                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%")'
-                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
+                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",5X,A)'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
             End If 
         End Do
