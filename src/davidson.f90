@@ -340,10 +340,10 @@ Module davidson
         If (cnorm < Crt4) Then
             If (kdavidson == 1) Then
                 char='Stopped  '
-                Iconverge(j)=1
             Else
                 char='converged'
             End If
+            Iconverge(j)=1
         End If
         Write ( 6,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
         Write (11,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char

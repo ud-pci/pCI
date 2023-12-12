@@ -57,7 +57,7 @@ Program conf
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: eValue, strfmt
     Character(Len=16)   :: timeStr
-    Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
+    Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
 
     ! Initialize MPI
     Call MPI_Init_thread(MPI_THREAD_SINGLE, threadLevel, mpierr)
@@ -200,9 +200,9 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.15 with single precision")'
+            strfmt = '(4X,"Program conf v5.16 with single precision")'
         Case(dp)
-            strfmt = '(4X,"Program conf v5.15")'
+            strfmt = '(4X,"Program conf v5.16")'
         End Select
         
         Write( 6,strfmt)
@@ -1678,6 +1678,7 @@ Contains
         crit=1.d-6
         ax=1.d0
         cnx=1.d0
+        If (.not. Allocated(ax_array)) Allocate(ax_array(Nlv))
 
         ! Start timer for Davidson procedure
         Call startTimer(start_time)
@@ -1850,9 +1851,10 @@ Contains
                             strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
                             Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                             Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
+                            ax_array(i) = xx
                         End Do
                     End If
-                 
+                    
                     Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
                     ! Write intermediate CONF.XIJ in frequency of kXIJ
                     Call startTimer(s1)
@@ -2240,8 +2242,6 @@ Contains
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
         End Do
-
-        If (allocated(Iconverge)) Deallocate(Iconverge)
 
         If (mype==0) Then
             Print*, 'Final CONF.XIJ has been written'
@@ -2856,8 +2856,8 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt, nspacesterm
-        Real(dp) :: wsum, gfactor
+        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt, nspacesterm, maxlenconfig
+        Real(dp) :: wsum, gfactor, ax_crit
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
@@ -2865,12 +2865,14 @@ Contains
         Character(Len=512) :: strfmt, strfmt2, strconfig, strconfig2, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq
-        Character(Len=6) :: strterm
+        Character(Len=6) :: strterm, strconverged
         Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
         Character(Len=5) :: strgf, strconfadd2
         Character(Len=5), Allocatable, Dimension(:) :: strconfadd
+        Logical :: has_secondary_config
+        Logical, Allocatable, Dimension(:) :: converged
         Type WeightTable
             Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
             Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
@@ -2888,6 +2890,7 @@ Contains
         If (.not. Allocated(Wsave)) Allocate(Wsave(nconfs,Nlv))
         If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
+        If (.not. Allocated(converged)) Allocate(converged(Nlv))
 
         If (kWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
@@ -2897,6 +2900,18 @@ Contains
         Open(99,file='CONFFINAL.RES',status='UNKNOWN')
         Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
         Open(97,file='CONFSTR.RES',status='UNKNOWN')
+
+        ! Form array of booleans of converged levels
+        converged = .False.
+        Do i=1,Nlv
+            If (Iconverge(i) == 1) converged(i) = .True.
+        End Do
+
+        ! Set levels with small enough admixtures to also be converged
+        ax_crit = 1e-4
+        Do i=1,Nlv
+            If (ax_array(i) <= ax_crit) converged(i) = .True.
+        End Do 
 
         ! Form matrix of weights of each configuration for each energy level
         W2=0_dp
@@ -2969,7 +2984,11 @@ Contains
                     Else
                         strq = ''
                     End If
-                    strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                    If (strconfig == '') Then
+                        strconfig = Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                    Else
+                        strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                    End If
                 End Do
                 strcsave(k,j) = strconfig
             End Do
@@ -2982,6 +3001,15 @@ Contains
                 W2(Wpsave(k,j),j) = Wsave(k,j)
                 If (nspacesg < (len(Trim(AdjustL(strcsave(k,j)))))) nspacesg = len(Trim(AdjustL(strcsave(k,j))))
             End Do
+        End Do
+
+        ! Check if a level has a secondary configuration with a weight over some threshold
+        If (any(Wsave(1,:) < 0.7)) has_secondary_config = .True.
+
+        ! Find longest configuration length
+        maxlenconfig = 0
+        Do i=1,Nlv
+            If (len_trim(strcsave(1,i)) > maxlenconfig) maxlenconfig = len_trim(strcsave(1,i))
         End Do
 
         ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to CONFFINAL.RES
@@ -3005,58 +3033,39 @@ Contains
                 Write(97,'(A)') Trim(AdjustL(strterm))
             End If
 
-            nspaces = nspacesg
+            ! Set string for convergence
+            if (converged(j)) Then
+                strconverged = '  True'
+            Else
+                strconverged = ' False'
+            End If
+
             ! If L, S, J is needed
             If (kLSJ == 1) Then
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf '// strsp(1:nspacesterm) // 'term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
-
+                If (j == 1) Write(99, '(A)') '  n' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf  term    E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%  converged'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
-                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
-                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
-                        strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
-                    Else
-                        strfmt = '(I3,2X,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",4X,A,3X,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
-                    End If
+                    strfmt = '(I3,2X,A,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,1X,A,3X,f4.1,"%")'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, repeat(' ', maxlenconfig-len_trim(strcsave(2,j))+1) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
-                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
-                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
-                        strfmt = '(I3,2X,A,A,1X,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
-                    Else
-                        strfmt = '(I3,2X,A,1X,A,2X,f14.8,f14.1,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100
-                    End If
+                    strfmt = '(I3,2X,A,A,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A)'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
-                If (j == 1) Write(99, '(A)') '  n ' // strsp(1:nspaces-4) // 'conf      J         E_n (a.u.)   DEL (cm^-1)   conf%'// strsp(1:nspaces-4) // 'conf2  conf2%'
+                If (j == 1) Write(99, '(A)') '  n ' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf       J         E_n (a.u.)   DEL (cm^-1)   conf%'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 If (Wsave(1,j) < 0.7) Then
-                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
-                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j))))
-                        strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
-                    Else
-                        strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%",4X,A,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
-                    End If
+                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",4X,A,3X,f4.1,"%")'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, repeat(' ', maxlenconfig-len_trim(strcsave(2,j))+1) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
-                    If (len(Trim(AdjustL(strcsave(1,j)))) <= nspaces) Then
-                        nspaces = nspaces - len(Trim(AdjustL(strcsave(1,j)))) 
-                        strfmt = '(I3,2X,A,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), strsp(1:nspaces), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
-                    Else
-                        strfmt = '(I3,2X,A,2X,f4.2,5x,f14.8,f14.1,f7.1,"%")'
-                        Write(99,strfmt) j, Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
-                    End If
+                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%")'
+                    Write(99,strfmt) j, repeat(' ', maxlenconfig-len_trim(strcsave(1,j))+1) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100
                 End If
             End If 
         End Do
