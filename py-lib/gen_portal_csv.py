@@ -274,7 +274,7 @@ def convert_res_to_csv(filename, uncertainties, name):
 
     os.makedirs(os.path.dirname(csvfile), exist_ok=True)
     f = open(csvfile, 'w')
-    f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, conf2, conf2%, uncertainty \n')
+    f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
 
     num_cols = 13
     i = 0
@@ -378,7 +378,6 @@ def write_matrix_csv(element, filepath, mapping):
     lines = f.readlines()
     f.close()
 
-    filename = element + '_Matrix_Elements_Theory.csv'
     f = open(filepath + 'E1MBPT.RES', 'r') 
     lines_MBPT = f.readlines()
     f.close()
@@ -393,6 +392,11 @@ def write_matrix_csv(element, filepath, mapping):
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
                                'matrix_element', 'matrix_element_uncertainty'])
+    
+    tr_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
+                               'state_two_configuration', 'state_two_term', 'state_two_J',
+                               'matrix_element', 'matrix_element_uncertainty', 'transition_rate(s-1)'])
+    
     i = 0
     for line in lines[1:]:
         # E1.RES format: < conf2 || E1 || conf1 > E1_L  E1_V  E2  E1  E2-E1  WL  Tr. Rate
@@ -408,11 +412,17 @@ def write_matrix_csv(element, filepath, mapping):
         J2 = state2.split()[-1][-1]
         energy1 = re.findall("\d+\.\d+", line)[2:4][1]
         energy2 = re.findall("\d+\.\d+", line)[2:4][0]
+        wavelength = float(re.findall("\d+\.\d+", line)[5])
 
         matrix_element_value = re.findall("\d+\.\d+", line)[:1]
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
         uncertainty = round(abs(float(matrix_element_value) - float(energies_MBPT[i])),5) if matrix_element_value else None
         i += 1
+
+        if energy2 > energy1:
+            trate = (2.02613*10**18)/((2*int(J1)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
+        else:
+            trate = (2.02613*10**18)/((2*int(J2)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
 
         # Use mapping to correct confs and terms
         c1, c2 = False, False
@@ -434,7 +444,14 @@ def write_matrix_csv(element, filepath, mapping):
                    'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
                    'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
             df.loc[len(df.index)] = row
+            
+            trrow = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
+                   'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
+                   'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty,
+                   'transition_rate(s-1)': f"{trate:.4e}"}
+            tr_df.loc[len(df.index)] = trrow
     
+    tr_df.to_csv('tr_test.csv', index=False)
     df.to_csv(filename, index=False)
     print(filename + ' has been written')
 
@@ -466,7 +483,7 @@ def find_energy_shift(df):
     return energy_shift
 
 if __name__ == "__main__":
-    atom = 'Sr I'
+    atom = 'Fe XVII'
     ri = False
     fac = 2 # maximum energy difference (in percent) for comparison
     name = atom.replace(" ","_")
@@ -522,8 +539,8 @@ if __name__ == "__main__":
     
     # TODO - automatically set the maximum number of levels
     # Set maximum number of levels to be read from NIST for each parity
-    nist_max_odd = 33
-    nist_max_even = 33
+    nist_max_odd = 35
+    nist_max_even = 10
     
     # Export filtered data to output directory
     path_output = "DATA_Output/"
