@@ -107,6 +107,7 @@ def reformat_df_to_atomdb(asd_df): # Modified
     asd_df['state_term'].fillna(method='ffill', inplace=True)
     asd_df['energy'].fillna('N/A', inplace=True)
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
+    asd_df['energy_uncertainty'].replace('', 0, inplace=True)
 
     # Replace reference ID column to 'FALSE' as a value of is_from_theory
     asd_df['is_from_theory'] = 'FALSE'
