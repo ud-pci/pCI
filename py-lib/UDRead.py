@@ -87,7 +87,7 @@ def Term_Correct(term,corr=1):
 
 
 def Extract_Multiplicity(term): # extract multiplicity from term
-    print(term)
+    #print(term)
     mul=""
     for i in term:
         if i.isdigit():mul+=i
