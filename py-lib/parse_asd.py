@@ -121,11 +121,15 @@ def NIST_Discrepancies(asd_df,ri=False):
         asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(s, "") # replace initial from the configuration
 
     # missing J
+    asd_df["term_original"] = asd_df["state_term"]
     asd_df = asd_df[asd_df['state_J'] != ""]
     asd_df["state_J"] = asd_df["state_J"].str.split(',').str[0]
     asd_df["state_J"] = asd_df["state_J"].apply(lambda x: Convert_Type(x))
     asd_df["state_term"] = asd_df["state_term"].str.replace('[a-z]', '',regex=True) # replace x,y,z from the terms
     asd_df["state_term"] = asd_df["state_term"].str.replace(' ', '',regex=True) # replace spaces from the terms
+    asd_df["state_term"] = asd_df["state_term"].str.replace("\\(.*?\\)","",regex=True) # replace '()' and whats inside it from the configuration
+    asd_df["state_term"] = asd_df["state_term"].str.replace("\\[.*?\\]","",regex=True) # replace '[]' and whats inside it from the configuration
+
     # asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".", " ") # replace '.' with " " from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace("n", "0") # replace "4s np" with "4s 0p" from the configuration
     asd_df["state_configuration"] = asd_df["state_configuration"].str.replace(".\\(.*?\\)","",regex=True) # replace '.()' and whats inside it from the configuration

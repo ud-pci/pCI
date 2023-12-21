@@ -77,11 +77,21 @@ def Term_Correct(term,corr=1):
     return term_symbol
 
 
+# def Extract_Multiplicity(term): # extract multiplicity from term
+#     print(term)
+#     mul=""
+#     for i in term:
+#         if i.isdigit():mul+=i
+#     mult = "" if term=="" else int(mul)
+#     return mult
+
+
 def Extract_Multiplicity(term): # extract multiplicity from term
+    print(term)
     mul=""
     for i in term:
         if i.isdigit():mul+=i
-    return int(mul)
+    return int(mul) if mul!="" else ""
 
 
 def Dummy_Config(config):
@@ -120,10 +130,12 @@ def Mark_NIST(df_nist):
 
 
 def Unmark_Term(Term): # remove marker from terms
+    mark = list('abcdefghijklmnopqrstuvwxyz')
+    # print(Term)
     term,s=[],0
-    for i in Term:
-        if i.isdigit():s=1
-        if s==1:term+=i
+    for i in str(Term):
+        if (i in mark)==True:continue
+        term+=i
     return "".join(term)
 
 
@@ -146,20 +158,22 @@ def Data_UD(ith,df_ao): # reading filtered csv data
 def Data_Nist(ith,df_nist):
     # Reading filtered csv data
     config_nist = Convert_Type(df_nist[ith][0])
-    term_nist = Convert_Type(df_nist[ith][1])
+    term_nist = str(df_nist[ith][1])
     j_nist = Convert_Type(df_nist[ith][2])
     level_nist = round(Convert_Type(df_nist[ith][3]),3)
     uncer_nist = round(Convert_Type(df_nist[ith][4]),3)
+    term_org = str(df_nist[ith][-1])
     
-    return config_nist,term_nist,j_nist,level_nist,uncer_nist
+    return config_nist,term_nist,j_nist,level_nist,uncer_nist,term_org
 
 
 def Dataframe(path_nist,path_ud,nist_max=0):
     # read csv
-    df_nist = pd.read_csv(path_nist)
+    df_nist = pd.read_csv(path_nist,keep_default_na=False)
     df_ud = pd.read_csv(path_ud).fillna('') # fill blank for nan
     df_ud = df_ud.sort_values(by=df_ud.columns[4], ascending=True)
 
+    # print(df_nist)
     # Storing as numpy arrays
     df_ud = df_ud.values
     df_nist = df_nist.values
@@ -183,7 +197,7 @@ def Dataframe(path_nist,path_ud,nist_max=0):
 
 def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding to ith nist config
     j1,j2,Eperc1,Eperc2=[],[],[],[]
-    config_nist, term_nist, j_nist, level_nist, uncer_nist = Data_Nist(i,df_nist)
+    config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
     corr=1 if len(corr_config)==len(df_ud) else 0 # corr=True --> Corrected Configurations are proveded and to use those
     for j in range(len(df_ud)):
         config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
@@ -228,7 +242,7 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
         if len(J1)>1:
             for i in range(len(J1)):
                 config1,config2,Term,J,Level,Levelau,Per1,Per2,uncer_ud=Data_UD(J1[i],df_ud)
-                config_nist,term_nist,j_nist,level_nist,uncer_nist=Data_Nist(ith,df_nist)
+                config_nist,term_nist,j_nist,level_nist,uncer_nist,term_org=Data_Nist(ith,df_nist)
                 if Term!=term_nist:
                     J1.remove(J1[i])
                     Eperc1.remove(Eperc1[i])
@@ -241,7 +255,7 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
         if len(J2)>1:
             for i in range(len(J2)):
                 config1,config2,Term,J,Level,Levelau,Per1,Per2,uncer_ud=Data_UD(J2[i],df_ud)
-                config_nist,term_nist,j_nist,level_nist,uncer_nist=Data_Nist(ith,df_nist)
+                config_nist,term_nist,j_nist,level_nist,uncer_nist,term_org=Data_Nist(ith,df_nist)
                 if Term!=term_nist:
                     J2.remove(J2[i])
                     Eperc2.remove(Eperc2[i])
@@ -316,7 +330,9 @@ def StartingConfigs(df_nist):
     list_config,list_term,list_number,count=np.array([]),np.array([]),np.array([]),np.array([])
     for j in range(len(df_nist)): #len(df_ao)-3
         # mul = int(df_nist[j][1][0])
+        # print(df_nist[j],j)
         mul = Extract_Multiplicity(df_nist[j][1])
+        if mul=="": continue
         config = df_nist[j][0]
         conf=Sep_Config(config)
         dummy_config = Dummy_Config(config)
@@ -493,9 +509,9 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
     print("Finding Correspondance")
     ref_E = 0
     for i in range(len(df_nist)):
-        config_nist, term_nist, j_nist, level_nist, uncer_nist = Data_Nist(i,df_nist)
+        config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
-        data_nist = [config_nist, term_nist, j_nist, round(level_nist+ref_E,roundd),uncer_nist]
+        data_nist = [config_nist, term_org, j_nist, round(level_nist+ref_E,roundd),uncer_nist]
 
         nist_used = 0
         jth,jf,de = FindJth(i,df_nist,df_ud,corr_config=new_config,which_j=True)
@@ -515,7 +531,7 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
 
         ## remaining nist states
         if nist_used==0:
-            data_csv.append([config_nist, term_nist, j_nist, round(level_nist+ref_E,roundd),uncer_nist,"-","-","-","-","-",round(level_nist+ref_E,roundd),"-","-","-","-","","-"])
+            data_csv.append([config_nist, term_org, j_nist, round(level_nist+ref_E,roundd),uncer_nist,"-","-","-","-","-",round(level_nist+ref_E,roundd),"-","-","-","-","","-"])
 
     ## remaining ao states
     for j in range(len(df_ud)):
