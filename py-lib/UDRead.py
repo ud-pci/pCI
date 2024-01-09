@@ -39,7 +39,6 @@ def Sep_Config(config):
     return [i for i in conf if i!=""]
 
 
-
 def Combine_Config(conf):
     # combine list of seprated configuration
     config=""
@@ -87,7 +86,7 @@ def Term_Correct(term,corr=1):
 
 
 def Extract_Multiplicity(term): # extract multiplicity from term
-    #print(term)
+    # print(term)
     mul=""
     for i in term:
         if i.isdigit():mul+=i
@@ -105,12 +104,13 @@ def Dummy_Config(config):
 def Mark_UD(df_ud):
     listt = np.array([])
     mark = list('abcdefghijklmnopqrstuvwxyz')
+    idx=[]
     for i in range(len(df_ud)):
         if (i in listt)==True:continue
         idx = np.where((df_ud[:,1]==df_ud[i][1]) & (df_ud[:,2]==df_ud[i][2]))[0]
         for j in range(1,len(idx)):
             df_ud[idx[j]][2] = mark[j-1]+df_ud[idx[j]][2]
-    
+    # print(idx)
     listt = np.concatenate([listt,idx])
     return df_ud
 
@@ -119,6 +119,7 @@ def Mark_UD(df_ud):
 def Mark_NIST(df_nist):
     listt = np.array([])
     mark = list('abcdefghijklmnopqrstuvwxyz')
+    idx=[]
     for i in range(len(df_nist)):
         if (i in listt)==True:continue
         idx = np.where((df_nist[:,0]==df_nist[i][0]) & (df_nist[:,1]==df_nist[i][1]) & (df_nist[:,2]==df_nist[i][2]))[0]
@@ -142,15 +143,15 @@ def Unmark_Term(Term): # remove marker from terms
 def Data_UD(ith,df_ao): # reading filtered csv data
     
     config1 = df_ao[ith][1] # original first possible configuration from data
-    config2 = df_ao[ith][10] # second possible configuration
+    config2 = df_ao[ith][11] # second possible configuration
     Term = df_ao[ith][2][:-1] # Term
     # J = int(round(df_ao[ith][7],0)) # J value
     J = df_ao[ith][7] # J value
     Level = round(df_ao[ith][4],3) # Level
     Levelau = df_ao[ith][3] # Level in atomic units
     Per1 = df_ao[ith][9] # Percentage Contribution of first configuration
-    Per2 = df_ao[ith][11] # Percentage Contribution of second configuration
-    uncer_ud = df_ao[ith][12]
+    Per2 = df_ao[ith][12] # Percentage Contribution of second configuration
+    uncer_ud = df_ao[ith][13]
 
     return config1,config2,Term,J,Level,Levelau,Per1,Per2,uncer_ud
 
@@ -161,11 +162,19 @@ def Data_Nist(ith,df_nist):
     term_nist = str(df_nist[ith][1])
     j_nist = Convert_Type(df_nist[ith][2])
     level_nist = round(Convert_Type(df_nist[ith][3]),3)
-    uncer_nist = round(Convert_Type(df_nist[ith][4]),3)
+    uncer_nist = round(Convert_Type(df_nist[ith][4]),3) if type(Convert_Type(df_nist[ith][4]))!= str else 0
     term_org = str(df_nist[ith][-1])
     
     return config_nist,term_nist,j_nist,level_nist,uncer_nist,term_org
 
+
+def SubtractStr(a,b,w=True): # give subtraction between string a and b : "3p6.4s.4p" - "4s.4p" = "3p6."
+    ri,i="",0
+    if ("".join(a.rsplit(b))==a)==False:ri,i = "".join(a.rsplit(b)),1
+    if ("".join(b.rsplit(a))==b)==False:ri,i = "".join(b.rsplit(a)),2
+    print(ri,i,a,b)
+    if w==True: return ri,i
+    if w==False: return ri
 
 def Dataframe(path_nist,path_ud,nist_max=0):
     # read csv
@@ -177,6 +186,15 @@ def Dataframe(path_nist,path_ud,nist_max=0):
     # Storing as numpy arrays
     df_ud = df_ud.values
     df_nist = df_nist.values
+
+    # subtracting ground state configuration
+    ri,i = SubtractStr(df_nist[0][0],df_ud[0][1])
+    if i==1 and ri!="": df_nist[:,0] = np.array([SubtractStr(j,ri,False) for j in df_nist[:,0]])
+    if i==2 and ri!="": df_ud[:,1] = np.array([SubtractStr(j,ri,False) for j in df_ud[:,1]])
+    
+    # selecting only converged values
+    df_ud = df_ud[np.where(df_ud[:,10].astype(str)=="True")[0]]
+
     if nist_max==0:
         maxx = df_ud[:,1][-1]
         nist_max =  max(np.where(df_nist[:,0]==maxx)[0])-8
