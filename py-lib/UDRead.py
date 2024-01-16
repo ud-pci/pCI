@@ -203,13 +203,48 @@ def Dataframe(path_nist,path_ud,nist_max=0):
 
     df_nist = df_nist[:nist_max]
 
+    ref_E = df_nist[:,3][0]
+    df_nist[:,3] = df_nist[:,3]- ref_E
+
+    df_nist = BlankTerms(df_nist,df_ud)
+    print(df_nist[0])
+    print(df_nist[1])
+
     df_nist=Mark_NIST(df_nist)
     df_ud=Mark_UD(df_ud)
 
-    ref_E = df_nist[:,3][0]
-    df_nist[:,3] = df_nist[:,3]- ref_E
+
     print("Generating Dataframes...!")
     return df_nist,df_ud,ref_E
+
+
+def BlankTerms(df_nist,df_ud): # Filling in blank terms (terms for states with terms (1/2,3/2) in Fe16+) in nist data
+    ddf_nist=np.copy(df_nist)
+    for i in range(len(df_nist)):
+        config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
+        if term_nist!="": continue
+
+        Emin=np.inf
+        term=""
+        for j in range(len(df_ud)):
+            config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
+
+            Ediff = round(abs(level_nist-level_ao),1)
+            Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
+                
+            inv_config = Inverse_Config(config_nist)
+
+            if config_nist==config1_ao or inv_config==config1_ao:
+                if j_nist==j_ao:
+                    if Eperc<Emin: Emin,term = Eperc,term_ao
+
+            if config_nist==config2_ao or inv_config==config2_ao:
+                if j_nist==j_ao:
+                    if Eperc<Emin: Emin,term = Eperc,term_ao
+
+        ddf_nist[i][1]=term
+
+    return ddf_nist
 
 
 
