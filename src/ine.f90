@@ -59,6 +59,7 @@ Program ine
     Integer, Parameter :: IP2 = 50000
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
     Real(dp) :: dlamb
+    Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
     logical :: ok
@@ -345,7 +346,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.19",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.20",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1756,7 +1757,6 @@ Contains
         Integer :: n, i, isk, id, k, kmin, kmax, is
         Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
         Real(dp), Dimension(3) :: sk0, sk1, sk2
-        Real(dp), Dimension(2) :: s, s0, s1, s2, ss
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
         If (.not. Allocated(Y2J)) Allocate(Y2J(Nd,5))
