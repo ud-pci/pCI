@@ -103,7 +103,6 @@ Program ine
             If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
             print*, 'xlamb=',xlamb
             Do i=1,icyc
-                print*, Ndir
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
@@ -122,7 +121,7 @@ Program ine
                 End If
                 Select Case(kIters)
                     Case(0)
-                        print*, Ndir
+                        print*, 'Ndir=',Ndir
                         Call SolEq1(kl) ! Direct solution
                         If (Ndir.LT.Nd) Then
                             Call SolEq4(ok)                 !### Iterative solution
@@ -143,7 +142,9 @@ Program ine
                             print*, '   2-step ITERATION #', l
                             If (l > 1) kl = 2
                             Call SolEq1(kl) ! Direct solution
-                            Call SolEq4(ok) ! Iterative solution
+                            If (Ndir.LT.Nd) Then
+                                Call SolEq4(ok) ! Iterative solution
+                            End If
                             If (ok) Exit
                         End Do
                 End Select
@@ -187,9 +188,6 @@ Contains
         ! Khe=0 - old solution of homogeneous eq-n
         ! Khe=1 - new solution of homogeneous eq-n
         Khe= 1   
-
-        ! Specify kIters - (0-iterate and invert if diverged, 1-invert only, 2-2-step iteration)
-        kIters=2
 
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
@@ -292,6 +290,11 @@ Contains
         Open(unit=11,status='UNKNOWN',file='INE.RES')
         Close(unit=11,status='DELETE')
         Open(unit=11,status='NEW',file='INE.RES')
+
+        Write(*,'(A)') ' kIters= (0- invert and iterate if diverged, 1-invert only, 2-2-step iteration)'
+        Read(*,*) kIters
+        Write(*,'(A,I2)') ' kIters=', kIters
+
         Write(*,'(A)')' kl= (0-new, 1-use X1, 2-use X1,Y1,Y2 ):'
         Read (*,*) kl
         Write(*,'(A,I2)')' kl=',kl
@@ -316,6 +319,7 @@ Contains
         Write(*,'(A)')' X2 is in file CONF0.XIJ, record number:'
         Read (*,*) N2
         Write(*,'(A,I2)')' N2=',N2
+
         Read (*,*) nrange
 
         W0= 0.d0
@@ -346,7 +350,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.20",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.21",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -973,7 +977,7 @@ Contains
                 End If
             End If
         End If
-        print*, Nd, Ndir
+        print*, 'Nd=',Nd, 'IP1=',Ndir
         If (Nd.GT.Ndir) then
             Ntr=0                          !### Ntr = dimension of the
             Do ic=1,Nc                     !### matrix equation to solve here
@@ -1860,6 +1864,11 @@ Contains
           strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4)'
           write( 6,strfmt2) abs(xlamb),al0,al2
           write(11,strfmt2) abs(xlamb),al0,al2
+          if (.not. ok) Then
+            print*,'RESULT DIVERGED'
+          else
+            print*,'RESULT CONVERGED'
+          End If
         End If
         Return
     End Subroutine RdcE1
