@@ -1860,15 +1860,14 @@ Contains
 
           write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
           write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
-
-          strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4)'
+          
+          if (ok) Then
+            strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4,"   CONVERGED")'
+          else
+            strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4,"   DIVERGED")'
+          End If
           write( 6,strfmt2) abs(xlamb),al0,al2
           write(11,strfmt2) abs(xlamb),al0,al2
-          if (.not. ok) Then
-            print*,'RESULT DIVERGED'
-          else
-            print*,'RESULT CONVERGED'
-          End If
         End If
         Return
     End Subroutine RdcE1
