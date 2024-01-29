@@ -337,7 +337,6 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
                                      'energy_uncertainty', 'is_from_theory'])
 
     for level in mapping:
-        # TODO - check parity of configuration and add energy shift if parity /= parity of ground state
         # if experimental data does not exist, use theory values
         if level[0][3] == '-':
             is_from_theory = True
@@ -369,7 +368,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift):
     '''
     This function writes the matrix element csv file
     '''
@@ -395,7 +394,9 @@ def write_matrix_csv(element, filepath, mapping):
     
     tr_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
-                               'matrix_element', 'matrix_element_uncertainty', 'transition_rate(s-1)'])
+                               'matrix_element', 'matrix_element_uncertainty', 
+                               'energy1(cm-1)', 'energy2(cm-1)',
+                               'wavelength(nm)','transition_rate(s-1)'])
     
     i = 0
     for line in lines[1:]:
@@ -419,27 +420,48 @@ def write_matrix_csv(element, filepath, mapping):
         uncertainty = round(abs(float(matrix_element_value) - float(energies_MBPT[i])),5) if matrix_element_value else None
         i += 1
 
-        if energy2 > energy1:
-            trate = (2.02613*10**18)/((2*int(J1)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
-        else:
-            trate = (2.02613*10**18)/((2*int(J2)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
-
-        # Use mapping to correct confs and terms
+        # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
+        energy1cm, energy2cm = 0.0, 0.0
         for line_theory in mapping:
-            if line_theory[1][6] == '-': continue
-            if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
+            if line_theory[1][4] == '-': continue
+            if abs(float(line_theory[1][4]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 J1 = line_theory[1][2]
+                # Check if NIST energy exists - if it does, overwrite theory energy
+                if line_theory[0][3] != '-': 
+                    energy1cm = float(line_theory[0][3])
+                    if find_parity(conf1) != gs_parity:
+                        energy1cm = energy1cm + float(expt_shift)
+                else:
+                    energy1cm = float(line_theory[1][3])
+                    if find_parity(conf1) != gs_parity:
+                        energy1cm = energy1cm + float(theory_shift)
+                    
                 c1 = True
-            if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
+            if abs(float(line_theory[1][4]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 J2 = line_theory[1][2]
+                # Check if NIST energy exists - if it does, overwrite theory energy
+                if line_theory[0][3] != '-': 
+                    energy2cm = float(line_theory[0][3])
+                    if find_parity(conf2) != gs_parity:
+                        energy2cm = energy2cm + float(expt_shift)
+                else:
+                    energy2cm = float(line_theory[1][3])
+                    if find_parity(conf2) != gs_parity:
+                        energy2cm = energy2cm + float(theory_shift)
                 c2 = True
-                
+
         if c1 and c2:
+            wavelength = 1e7/abs(energy2cm-energy1cm)
+            if energy2 > energy1:
+                trate = (2.02613*10**18)/((2*int(J1)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
+            else:
+                trate = (2.02613*10**18)/((2*int(J2)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
+                
             row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
                    'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
                    'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
@@ -448,7 +470,8 @@ def write_matrix_csv(element, filepath, mapping):
             trrow = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
                    'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
                    'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty,
-                   'transition_rate(s-1)': f"{trate:.4e}"}
+                   'energy1(cm-1)': f"{energy1cm:.2f}", 'energy2(cm-1)': f"{energy2cm:.2f}",
+                   'wavelength(nm)': f"{wavelength:.2f}", 'transition_rate(s-1)': f"{trate:.4e}"}
             tr_df.loc[len(df.index)] = trrow
     
     tr_df.to_csv('tr_test.csv', index=False)
@@ -483,7 +506,7 @@ def find_energy_shift(df):
     return energy_shift
 
 if __name__ == "__main__":
-    atom = 'Fe XVII'
+    atom = 'Sr I'
     ri = False
     fac = 2 # maximum energy difference (in percent) for comparison
     name = atom.replace(" ","_")
@@ -539,8 +562,8 @@ if __name__ == "__main__":
     
     # TODO - automatically set the maximum number of levels
     # Set maximum number of levels to be read from NIST for each parity
-    nist_max_odd = 35
-    nist_max_even = 10
+    nist_max_odd = 40
+    nist_max_even = 30
     
     # Export filtered data to output directory
     path_output = "DATA_Output/"
@@ -569,6 +592,7 @@ if __name__ == "__main__":
 
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
-        write_matrix_csv(name, raw_path, mapping)
+        print('Writing matrix elements...')
+        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
