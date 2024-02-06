@@ -88,7 +88,7 @@ def generate_df_from_asd(url):
 
     return new_df
 
-def reformat_df_to_atomdb(asd_df): # Modified
+def reformat_df_to_atomdb(asd_df, theory_J): # Modified
     """
     This function reformats the ASD dataframe for use in the UD Atom database
     """
@@ -101,7 +101,11 @@ def reformat_df_to_atomdb(asd_df): # Modified
                             'Uncertainty (cm-1)':'energy_uncertainty',
                             'Reference':'is_from_theory'}, 
                             inplace=True)
-    
+
+    # Only keep configurations where J is in theory results
+    asd_df = asd_df[(((asd_df['state_J'].isin(theory_J['even'])) & (asd_df['state_term'].str[-1] != '*'))) |
+                    (((asd_df['state_J'].isin(theory_J['odd'])) & (asd_df['state_term'].str[-1] == '*')))]
+
     # Fill in empty cells 
     asd_df['state_configuration'].fillna(method='ffill', inplace=True)
     asd_df['state_term'].fillna(method='ffill', inplace=True)

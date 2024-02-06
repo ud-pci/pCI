@@ -172,11 +172,11 @@ def SubtractStr(a,b,w=True): # give subtraction between string a and b : "3p6.4s
     ri,i="",0
     if ("".join(a.rsplit(b))==a)==False:ri,i = "".join(a.rsplit(b)),1
     if ("".join(b.rsplit(a))==b)==False:ri,i = "".join(b.rsplit(a)),2
-    print(ri,i,a,b)
+    #print(ri,i,a,b)
     if w==True: return ri,i
     if w==False: return ri
 
-def Dataframe(path_nist,path_ud,nist_max=0):
+def Dataframe(path_nist,path_ud,gs_exists,nist_max=0):
     # read csv
     df_nist = pd.read_csv(path_nist,keep_default_na=False)
     df_ud = pd.read_csv(path_ud).fillna('') # fill blank for nan
@@ -199,16 +199,19 @@ def Dataframe(path_nist,path_ud,nist_max=0):
         maxx = df_ud[:,1][-1]
         nist_max =  max(np.where(df_nist[:,0]==maxx)[0])-8
     
-    print("nist_max : ",nist_max)
+    #print("nist_max : ",nist_max)
 
     df_nist = df_nist[:nist_max]
 
-    ref_E = df_nist[:,3][0]
+    if gs_exists:
+        ref_E = df_nist[:,3][0]
+    else: 
+        ref_E = 0
     df_nist[:,3] = df_nist[:,3]- ref_E
 
     df_nist = BlankTerms(df_nist,df_ud)
-    print(df_nist[0])
-    print(df_nist[1])
+    #print(df_nist[0])
+    #print(df_nist[1])
 
     df_nist=Mark_NIST(df_nist)
     df_ud=Mark_UD(df_ud)
@@ -440,7 +443,7 @@ def Correct_Config(jth,config,mul,new_config,list_config,list_term,list_number,c
 
 
 def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
-    print("Correcting ud configurations")
+    print("Correcting theory configurations")
     new_config = np.full(len(df_ud),"",dtype=object)
     list_config,list_term,list_number,count = StartingConfigs(df_nist)
 
@@ -469,7 +472,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             if jf==1 and config=="5s.9p" and mul==1:config="4d.5p"
 
         new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
-    print("Correcting ud configurations : Complete..!")
+    print("Correcting theory configurations : Complete..!")
     return new_config
 
 
@@ -549,9 +552,9 @@ def ESort(i,data_final):
 
 
 # j,df_nist,df_ud,corr_config=[],OutAll=False
-def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
+def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E"):
 
-    df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,nist_max)
+    df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,gs_exists,nist_max)
     ManualCorrection=True if ("Sr_I" in path_nist.split("/")[-1])==True else False
     new_config = Corrected_Config(df_ud,df_nist,ManCorr=ManualCorrection)
 
@@ -564,6 +567,7 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
+        term_org=term_org.replace(' ','.')
         data_nist = [config_nist, term_org, j_nist, round(level_nist+ref_E,roundd),uncer_nist]
 
         nist_used = 0

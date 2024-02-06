@@ -173,7 +173,7 @@ def create_mapping():
     
     return mapping
 
-def write_new_conf_res(name, filepath):
+def write_new_conf_res(name, filepath, data_nist):
     '''
     This function creates a new CONF.RES file with theory uncertainties
     '''
@@ -195,21 +195,34 @@ def write_new_conf_res(name, filepath):
         matrix_file_exists = False
     if not os.path.exists(filepath + 'E1MBPT.RES'):
         print('E1MBPT.RES not found in', filepath)
-        matrix_file_exists = False
 
     # Read CONF.RES files
-    _, _, energies_au_even, energies_cm_even = parse_final_res(filepath + 'CONFFINALeven.RES')
+    _, terms_even, energies_au_even, energies_cm_even = parse_final_res(filepath + 'CONFFINALeven.RES')
     _, _, energies_au_even_MBPT, _ = parse_final_res(filepath + 'CONFFINALevenMBPT.RES')
 
-    _, _, energies_au_odd, energies_cm_odd = parse_final_res(filepath + 'CONFFINALodd.RES')
+    _, terms_odd, energies_au_odd, energies_cm_odd = parse_final_res(filepath + 'CONFFINALodd.RES')
     _, _, energies_au_odd_MBPT, _ = parse_final_res(filepath + 'CONFFINALoddMBPT.RES')
 
     # Merge even and odd parity CONF.RES files
     confs, terms, energies_au, energies_cm = merge_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALodd.RES')
     _, _, energies_au_MBPT, energies_cm_MBPT = merge_res(filepath + 'CONFFINALevenMBPT.RES', filepath + 'CONFFINALoddMBPT.RES')
 
+    # Determine if ground state level exists in theory results
+    gs_exists = False
+    if data_nist['Configuration'].iloc[0] in confs:
+        print('ground state found: ', data_nist['Configuration'].iloc[0])
+        gs_exists = True
+    else:
+        th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
+        gs_parity = find_parity(data_nist['Configuration'].iloc[0])
+        
     # Determine minimum energies
-    min_energy = max(energies_au)
+    if gs_exists:
+        min_energy = max(energies_au)
+    else:
+        min_energy = th_gs_au
+    
+    # Determine if MBPT energy exists
     try:
         min_energy_MBPT = max(energies_au_MBPT)
     except:
@@ -235,8 +248,8 @@ def write_new_conf_res(name, filepath):
         uncertainties_odd = [0]*len(energies_cm_odd)
 
     # Write csv-formatted CONF.RES files with uncertainties
-    convert_res_to_csv(filepath + 'CONFFINALeven.RES', uncertainties_even, name)
-    convert_res_to_csv(filepath + 'CONFFINALodd.RES', uncertainties_odd, name)
+    convert_res_to_csv(filepath + 'CONFFINALeven.RES', uncertainties_even, energies_cm_even, gs_exists, name)
+    convert_res_to_csv(filepath + 'CONFFINALodd.RES', uncertainties_odd, energies_cm_odd, gs_exists, name)
 
     # Determine energy shift between odd and even parity lowest energy levels
     energy_shift = abs(ht_to_cm * (energies_au_even[0] - energies_au_odd[0]))
@@ -247,8 +260,21 @@ def write_new_conf_res(name, filepath):
         gs_parity = 'even'
     else:
         gs_parity = 'odd'
+        
+    # List of J values in theory results
+    theory_J = {}
+    J_even = []
+    J_odd = []
+    for term in terms_even:
+        J = term[-1]
+        if J not in J_even: J_even.append(J)
+    theory_J['even'] = J_even
+    for term in terms_odd:
+        J = term[-1]
+        if J not in J_odd: J_odd.append(J)
+    theory_J['odd'] = J_odd
 
-    return confs, terms, energies_cm, uncertainties, energy_shift, gs_parity, matrix_file_exists
+    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -260,7 +286,7 @@ def convert_type(s): # detect and correct the 'type' of object to 'float', 'inte
     except ValueError:
         return s 
     
-def convert_res_to_csv(filename, uncertainties, name):
+def convert_res_to_csv(filename, uncertainties, energies_cm, gs_exists, name):
 
     f = open(filename, 'r')
     lines = f.readlines()
@@ -288,8 +314,9 @@ def convert_res_to_csv(filename, uncertainties, name):
         if newline.count(',') < num_cols-1:
             num_extra_cols = num_cols - newline.count(',') - 1
             newline += num_extra_cols*',' + str(uncertainties[i]) + '\n'
-        i += 1
         string_to_list = newline.split(",")
+        if not gs_exists: string_to_list[4] = str(energies_cm[i])
+        i += 1
         modified_list = [str(Convert_Type(i)) for i in string_to_list]
         newline = ",".join(modified_list) + '\n'
 
@@ -372,21 +399,30 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     '''
     This function writes the matrix element csv file
     '''
+    include_uncertainties = False
     filename = element + '_Matrix_Elements_Theory.csv'
+    
+    # Read E1.RES
     f = open(filepath + 'E1.RES', 'r') 
     lines = f.readlines()
     f.close()
-
-    f = open(filepath + 'E1MBPT.RES', 'r') 
-    lines_MBPT = f.readlines()
-    f.close()
+    
+    # Read E1MBPT.RES
+    try:
+        f = open(filepath + 'E1MBPT.RES', 'r') 
+        lines_MBPT = f.readlines()
+        f.close()
+        include_uncertainties = True
+    except:
+        print('E1MBPT.RES was not found, so uncertainties will not be calculated')
 
     # Obtain energies from CI+MBPT
-    energies_MBPT = []
-    for line in lines_MBPT[1:]:
-        matrix_element_value = re.findall("\d+\.\d+", line)[:1]
-        matrix_element_value = matrix_element_value[0] if matrix_element_value else None
-        energies_MBPT.append(matrix_element_value)
+    if include_uncertainties:
+        energies_MBPT = []
+        for line in lines_MBPT[1:]:
+            matrix_element_value = re.findall("\d+\.\d+", line)[:1]
+            matrix_element_value = matrix_element_value[0] if matrix_element_value else None
+            energies_MBPT.append(matrix_element_value)
     
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -417,7 +453,10 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
 
         matrix_element_value = re.findall("\d+\.\d+", line)[:1]
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
-        uncertainty = round(abs(float(matrix_element_value) - float(energies_MBPT[i])),5) if matrix_element_value else None
+        if include_uncertainties:
+            uncertainty = round(abs(float(matrix_element_value) - float(energies_MBPT[i])),5) if matrix_element_value else None
+        else:
+            uncertainty = 0
         i += 1
 
         # Use mapping to correct confs and terms and use experimental energies
@@ -506,26 +545,16 @@ def find_energy_shift(df):
     return energy_shift
 
 if __name__ == "__main__":
-    atom = 'Sr I'
-    ri = False
-    fac = 2 # maximum energy difference (in percent) for comparison
+    atom = 'Ti I'
     name = atom.replace(" ","_")
-
-    '''
-    Method:
-    1. Read all CONF*.RES files from the /DATA_RAW directory and add uncertainties to CONF.RES file in csv format
-        - CONFFINALeven.RES
-        - CONFFINALodd.RES
-        - CONFFINALevenMBPT.RES
-        - CONFFINALoddMBPT.RES
-        - E1.RES
-        - E1MBPT.RES
-    2. Use Vipul's code to correct misidentified configurations
-    3. Reformat data for use on Atom portal
-    '''
+    ri = False # 
+    fac = 2 # maximum energy difference (in percent) for comparison
+      
+    # Parse NIST Atomic Spectral Database for full list of energy levels
+    url_nist = generate_asd_url(atom)
+    data_nist = generate_df_from_asd(url_nist)
     
-    # 1. Write new CONF.RES (CONFFINAL.csv) with uncertainties
-    # TODO - modularize this part to export and import output files
+    # Write new CONF.RES (CONFFINAL.csv) with uncertainties
     raw_path = "DATA_RAW/"
     if os.path.isdir(raw_path):
         print('Reading raw files from ' + raw_path)
@@ -534,16 +563,16 @@ if __name__ == "__main__":
         print('Please put raw files in ' + raw_path)
         print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1.RES, E1MBPT.RES')
         sys.exit()
-    confs, terms, energies_cm, uncertainties, theory_shift, gs_parity, matrix_file_exists = write_new_conf_res(name, raw_path)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists = write_new_conf_res(name, raw_path, data_nist)
 
-    # 2. Use Vipul's code to correct misidentified configurations
+    data_nist = reformat_df_to_atomdb(data_nist, theory_J)
+    if gs_exists:
+        NIST_shift = find_energy_shift(data_nist)
+    else:
+        NIST_shift = 0
+        theory_shift = 0
+
     # Store filtered data of even or odd parity in DATA_Filtered/NIST/ 
-    url_nist = generate_asd_url(atom)
-    data_nist = generate_df_from_asd(url_nist)
-    data_nist = reformat_df_to_atomdb(data_nist)
-    NIST_shift = find_energy_shift(data_nist)
-
-    # Create directories for filtered data if it doesn't exist
     path_filtered_nist = "DATA_Filtered/NIST/"
     path_filtered_theory = "DATA_Filtered/UD/"
     os.makedirs(os.path.dirname(path_filtered_nist), exist_ok=True)
@@ -560,18 +589,18 @@ if __name__ == "__main__":
     path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
     path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
     
-    # TODO - automatically set the maximum number of levels
+    # TODO - automatically set the maximum number of levels based on last matching configuration between theory and NIST
     # Set maximum number of levels to be read from NIST for each parity
-    nist_max_odd = 40
-    nist_max_even = 30
+    nist_max_odd = 44
+    nist_max_even = 40
     
     # Export filtered data to output directory
     path_output = "DATA_Output/"
     os.makedirs(os.path.dirname(path_output), exist_ok=True)
     
-    # Filtering
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
+    # Use Vipul's code to correct misidentified configurations
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists)
     
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
