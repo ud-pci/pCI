@@ -400,7 +400,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     This function writes the matrix element csv file
     '''
     include_uncertainties = False
-    filename = element + '_Matrix_Elements_Theory.csv'
+    matrix_element_filename = element + '_Matrix_Elements.csv'
+    transition_rate_filename = element + '_Transition_Rates.csv'
     
     # Read E1.RES
     f = open(filepath + 'E1.RES', 'r') 
@@ -513,9 +514,11 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                    'wavelength(nm)': f"{wavelength:.2f}", 'transition_rate(s-1)': f"{trate:.4e}"}
             tr_df.loc[len(df.index)] = trrow
     
-    tr_df.to_csv('tr_test.csv', index=False)
-    df.to_csv(filename, index=False)
-    print(filename + ' has been written')
+    df.to_csv(matrix_element_filename, index=False)
+    print(matrix_element_filename + ' has been written')
+    
+    tr_df.to_csv(transition_rate_filename, index=False)
+    print(transition_rate_filename + ' has been written')
 
     return
 
