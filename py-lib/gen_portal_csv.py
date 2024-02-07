@@ -496,11 +496,11 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 c2 = True
 
         if c1 and c2:
-            wavelength = 1e7/abs(energy2cm-energy1cm)
+            wavelength = 1e7/(energy2cm-energy1cm)
             if energy2 > energy1:
-                trate = (2.02613*10**18)/((2*int(J1)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
+                trate = (2.02613*10**18)/((2*int(J1)+1)*(abs(wavelength)*10)**3)*float(matrix_element_value)**2
             else:
-                trate = (2.02613*10**18)/((2*int(J2)+1)*(wavelength*10)**3)*float(matrix_element_value)**2
+                trate = (2.02613*10**18)/((2*int(J2)+1)*(abs(wavelength)*10)**3)*float(matrix_element_value)**2
                 
             row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
                    'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
