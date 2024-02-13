@@ -5,6 +5,7 @@ import sys
 import get_atomic_data as libatomic
 import orbitals as liborb
 import os
+import collections.abc
 from pathlib import Path
 from subprocess import run
 
@@ -52,7 +53,7 @@ def get_key_vw(kvw_str):
 
     if kvw_str == 'ci+all-order' or kvw_str == 'all-order' or kvw_str == 'all':
         kvw = 1
-    elif kvw_str == 'ci+all-order' or kvw_str == 'second-order' or kvw_str == 'second':
+    elif kvw_str == 'ci+second-order' or kvw_str == 'second-order' or kvw_str == 'second':
         kvw = 0
 
     return kvw
@@ -581,7 +582,7 @@ def write_spl_in(filename, radius, spl_params):
     f.close()
     print('spl.in has been written')
 
-def write_inputs(system, C_is):
+def write_inputs(system, C_is, kvw):
     # Write HFD.INP
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
@@ -810,8 +811,6 @@ def run_executables(K_is, C_is):
     run('bas_x > bas_x.out', shell=True)
     print("bas_x complete")
 
-    print("CI+all-order basis set construction complete")
-
 if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
@@ -861,7 +860,15 @@ if __name__ == "__main__":
 
     # Write input files for subsequent executables
     if not include_isotope_shifts:
-        write_inputs(config, 0)
+        if isinstance(code_method, collections.abc.Sequence):
+            dir_path = os.getcwd()
+            for dir in code_method:
+                Path(dir_path+'/'+dir).mkdir(parents=True, exist_ok=True)
+                os.chdir(dir)
+                write_inputs(config, 0, get_key_vw(dir))
+                os.chdir('../')
+        else:
+            write_inputs(config, 0, kvw)
     else:
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         for c in c_list:
@@ -874,18 +881,23 @@ if __name__ == "__main__":
             dir_name = dir_prefix+str(abs(c))
             Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
             os.chdir(dir_name)
-            write_inputs(config,c)
+            write_inputs(config,c,kvw)
             os.chdir('../')
 
     # Construct basis set by running sequence of programs if desired
     if run_ao_codes:
-        ## Pure CI
-        if code_method == 'ci':
-            # Run hfd
-            run('./hfd > hfd.out', shell=True)
-            print("hfd complete")        
-            # Run bass
-            #run(["./bass", ">", "bass.out"], shell=True)
+        print("Running codes...")
+        if isinstance(code_method, collections.abc.Sequence):
+            dir_path = os.getcwd()
+            for dir in code_method:
+                Path(dir_path+'/'+dir).mkdir(parents=True, exist_ok=True)
+                os.chdir(dir)
+                run_executables(0, 0)
+                if run_ao_codes: 
+                    script_name = write_job_script(1, 0, dir, 'standard')
+                    run('sbatch ' + script_name, shell=True)
+                os.chdir('../')
+                print(dir + " basis set construction completed")
         elif code_method == 'ci+all-order' or code_method == 'ci+second-order':
             # Run executables
             if not include_isotope_shifts:
