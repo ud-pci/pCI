@@ -175,7 +175,8 @@ Program ine
         End Do
     End Do
 
-    Close(unit=11)
+    Close(unit=11) ! Close INE.RES
+    Close(unit=99) ! Close INEFINAL.RES
     Call stopTimer(start_time, timeStr)
     Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
     
@@ -291,6 +292,10 @@ Contains
         Close(unit=11,status='DELETE')
         Open(unit=11,status='NEW',file='INE.RES')
 
+        Open(unit=99,status='UNKNOWN',file='INEFINAL.RES')
+        Close(unit=99,status='DELETE')
+        Open(unit=99,status='NEW',file='INEFINAL.RES')
+
         Write(*,'(A)') ' kIters= (0- invert and iterate if diverged, 1-invert only, 2-2-step iteration)'
         Read(*,*) kIters
         Write(*,'(A,I2)') ' kIters=', kIters
@@ -350,7 +355,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.21",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.22",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -1839,36 +1844,39 @@ Contains
                  ") (3M^2-J(J+1))/J*(2J-1) a.u.", &
                  /3X,"Alpha_1 =",E12.5," a.u.")'
         if (isk.EQ.0) then
-          write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
-          write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
+            write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
+            write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
         end if
-        If (n.EQ.2) Then
-          alp = (ss(1)+ss(2))/2.d0
-          al  = (s(1)+s(2))/2.d0
-          al0 = (s0(1)+s0(2))/2.d0
-          al2 = (s2(1)+s2(2))/2.d0
-          al1 = (s1(1)-s1(2))
 
-          strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
-          write( 6,strfmt2)
-          write(11,strfmt2)
+        If (n.EQ.2 .or. xlamb.EQ.0_dp) Then
+            alp = (ss(1)+ss(2))/2.d0
+            al  = (s(1)+s(2))/2.d0
+            al0 = (s0(1)+s0(2))/2.d0
+            al2 = (s2(1)+s2(2))/2.d0
+            al1 = (s1(1)-s1(2))
 
-          if (dabs(Q).LT.1.d-5) then
-            write( 6,strfmt) Tj0,Jm0,alp
-            write(11,strfmt) Tj0,Jm0,alp
-          end if
+            strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
+            write( 6,strfmt2)
+            write(11,strfmt2)
 
-          write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
-          write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
-          
-          if (ok) Then
-            strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4,"   CONVERGED")'
-          else
-            strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4,"   DIVERGED")'
-          End If
-          write( 6,strfmt2) abs(xlamb),al0,al2
-          write(11,strfmt2) abs(xlamb),al0,al2
+            if (dabs(Q).LT.1.d-5) then
+              write( 6,strfmt) Tj0,Jm0,alp
+              write(11,strfmt) Tj0,Jm0,alp
+            end if
+
+            write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
+            write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
+
+            if (ok) Then
+              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+            else
+              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
+            End If
+            write( 6,strfmt2) abs(xlamb),al0,al2
+            write(11,strfmt2) abs(xlamb),al0,al2
+            write(99,strfmt2) abs(xlamb),al0,al2
         End If
+
         Return
     End Subroutine RdcE1
 
