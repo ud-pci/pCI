@@ -239,6 +239,14 @@ if __name__ == "__main__":
     run_ci = config['optional']['run_ci']
     include_lsj = config['conf']['include_lsj']
     
+    # Ensure basis and add core orbitals match
+    basis_core = config['basis']['orbitals']['core']
+    add_core = config['add']['orbitals']['core']
+    
+    if basis_core != add_core: 
+        print('ERROR: core orbitals of basis and add do not match in config.yml')
+        sys.exit()
+    
     if run_ci:
         gen_dir = run_ci
     else:
