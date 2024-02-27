@@ -760,7 +760,7 @@ Contains
         if (com(4).ne." ") goto 300
         write(11,35) (com(k),k=1,5),Nc
         write(12,35) (com(k),k=1,5),Nc
- 35     format(5A1,I6)
+ 35     format(5A1,I7)
 
  100    read (10,15) (com(k),k=1,5),string
         if (com(2).ne." ".and.com(2).ne."-") goto 110
