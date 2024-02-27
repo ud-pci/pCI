@@ -6,7 +6,7 @@ Module diff
 
     Private
 
-    Public :: Dif, Origin
+    Public :: Dif, Dif5, Origin, Cut_Short
 
   Contains
 
@@ -123,6 +123,45 @@ Module diff
         Return
     End Subroutine Dif
 
+    Subroutine Dif5(P,CP,k)             
+        ! 5 node derivative without Taylor expansion, first k nodes are skipped
+        Implicit None           
+        
+        Integer :: ih, i0, i1, ix, k, j, ih2, ih3, i
+        Real(dp) :: h12
+        Real(dp), Dimension(IP6) :: P, CP
+
+        ih=2-kt
+        i0=1+k*ih
+        h12=12*ih*h
+  
+        ix=ii                      !### P(ix) is last nonzero value
+        Do j=1,ii,ih
+            i1=ii-j+1
+            if (P(i1).NE.0.d0) Exit
+            ix=i1-ih
+            CP(i1)=0.d0
+        End Do
+    
+        ! Symmetric 5-node differentiation for internal nodes:
+        ih2=2*ih
+        ih3=3*ih
+        Do i=ih2+i0,ix-ih2,ih
+            CP(i)=(-P(i+ih2)+P(i-ih2)+8*(P(i+ih)-P(i-ih)))/(h12*V(i))
+        End Do
+  
+        ! Last two nodes. Extrapolation by (ix-i)**2*(a+b*(i+3-ix)):
+        CP(ix-ih)=CP(ix-ih2)/2-CP(ix-ih3)/9
+        CP(ix)=0.d0
+  
+        ! Short distances are not treated here:
+        Do i=1,i0+ih,ih
+            CP(i)=0.d0
+        End Do
+
+        Return
+    End Subroutine Dif5
+
     Subroutine Origin(P,gam,kap)           ! 19/05/08
         !     >> variant with four terms of Taylor expansion <<
         !# we now match P(1),P(2), dP/dr(1), and dP/dr(2)
@@ -201,5 +240,51 @@ Module diff
 
         Return
     End Subroutine Origin
+
+    subroutine Cut_Short(P)         
+        ! Smoothly brings P to zero between r_1 and r_k.
+        ! Anzatz used: (r-r1)**2*[a(r-rk)**2+b(r-rk)+c]
+        Implicit None
+
+        Integer :: ih, ih2, ih3, k, i, kp, km
+        Real(dp) :: h12, pk, dpk, ddpk, r1, ri, rk, dr, dr2, a, b, c, dpk1
+        Real(dp), Dimension(IP6) :: P
+
+        ih=2-kt
+        h12=12*ih*h
+        ih2=2*ih
+        ih3=3*ih
+ 
+        k=15                          ! defines grid node r_k
+        if (MaxT.EQ.0) MaxT=9         ! hfd uses Nmax instead of MaxT
+        Do i=ii+4,ii+5+MaxT
+            P(i)=0.d0
+        End Do
+ 
+        kp=k+ih
+        km=k-ih
+        pk=P(k)
+        ! first derivative at r_k
+        dpk=(-(P(k+ih2)-P(k-ih2))+8*(P(kp)-P(km)))/(h12*V(k))
+        ! second derivative at r_k
+        ddpk=(-(P(k+ih2)+P(k-ih2))+16*(P(kp)+P(km))-30*pk)/(h12*V(k))**2                        
+ 
+        r1=R(1)
+        rk=R(k)
+        dr = rk-r1
+        dr2=dr*dr
+        c  = pk/dr2                                 ! parameters of anzatz
+        b  = dpk/dr2 - 2*c/dr                       ! which preserves C_2
+        a  = 0.5d0*ddpk/dr2 - c/dr2 - 2*b/dr        ! smoothness
+ 
+        Do i=1,k,ih
+            ri=R(i)
+            P(i)=(ri-r1)**2 * (a*(ri-rk)**2 + b*(ri-rk) + c)
+        End Do
+        ! new value for P'(rk)
+        dpk1=(-(P(k+ih2)-P(k-ih2))+8*(P(kp)-P(km)))/(h12*V(k))
+ 
+        Return
+    End Subroutine Cut_Short
 
 End Module diff

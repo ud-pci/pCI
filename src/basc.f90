@@ -24,8 +24,7 @@ Program basc
     If (mype == 0) Then
         Call recunit
         Call Input
-        ! Norb = number of orbitals to be formed by Fbas:
-        Call Init(Norb)
+        Call Init(Norb) ! Norb = number of orbitals to be formed by Fbas:
         If (Norb /= 0) then
             write (*,*) ' Run "bass" to form ',Norb,' new orbitals.'
             stop
@@ -94,7 +93,7 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.5")'
+        strfmt = '(4X,"PROGRAM BasC v2.6")'
         Write( *,strfmt)
         Write(11,strfmt)
 
@@ -382,8 +381,12 @@ Contains
         Ebcore=0.d0
         ih=2-kt
         hh=h0*ih/3.d0
+        A=0.d0
+        B=0.d0
         C=0.d0
         Y=0.d0
+        CP=0.d0
+        CQ=0.d0
 
         !### Coulomb potential of the core
         If (Nso /= 0) Then
@@ -493,7 +496,7 @@ Contains
                             xjb=jb/2.d0
                             xk=k
                             hgc=(FJ3(xk,xja,xjb,0.d0,-0.5d0,0.5d0))**2
-                            dsb=breit_int(k,ni,p,q,nj,a,b,nj,a,b,ni,p,q)
+                            dsb=breit_int(k,ni,p,q,nj,a,b,nj,a,b,ni,p,q,c,r,v,ii,kt)
                             
                             d=-qa*qb*hgc
                             If (ni == nj) d=-0.5d0*qa*(qa-1.d0)*(ja+1.d0)/ja*hgc 
@@ -716,6 +719,7 @@ Contains
         
         Call MPI_Bcast(ii, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(kt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(H, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(H0, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(r2, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
@@ -918,7 +922,7 @@ Contains
                             tad=tad+dint1-Dint                !## nucleus for j=1/2
                         End If
                         If (K_is == 1) fis = dV_nuc(Pa,Qa,Pd,Qd)     !### Volume IS
-                        If (Kbrt >= 1) tad_br=Br_core(na,nd)         !### Core Breit
+                        If (Kbrt >= 1) tad_br=Br_core(na,nd,c,r,v,ii,kt)         !### Core Breit
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
                         Write(11,'(I6,8X,I3,A1,I2,"/2",2X,I3,A1,I2,"/2",3F15.8)') &
@@ -1017,7 +1021,7 @@ Contains
                                             xld=ld
                                             yld=jd-ld
                                             Do k = kmin, kmax
-                                                Rint_br(k) = breit_int(k-1,na,Pa,Qa,nb,Pb,Qb,nc,Pc,Qc,nd,Pd,Qd)
+                                                Rint_br(k) = breit_int(k-1,na,Pa,Qa,nb,Pb,Qb,nc,Pc,Qc,nd,Pd,Qd,c,r,v,ii,kt)
                                             End Do
                                         End If
                                         Do k1=kmin,kmax
