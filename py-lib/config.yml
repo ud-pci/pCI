@@ -1,15 +1,15 @@
 # General parameters
 system:
-    name: Ca
+    name: Sr
     isotope: 
     include_breit: True
 
 # Parameters used by basis programs
 basis:
-    cavity_radius: 55
+    cavity_radius: 60
     orbitals:
-        core: 1s 2s 2p 3s 3p
-        valence: 4s 4p 3d 5s 5p 4d 6s 6p 5d 4f
+        core: 1s 2s 2p 3s 3p 3d 4s 4p 
+        valence: 5s 5p 4d 6s 6p 5d 4f
         nmax: 35
         lmax: 6
     b_splines:
@@ -17,9 +17,9 @@ basis:
         lmax: 6
         k: 7
     val_aov:
-        s: 5
-        p: 5
-        d: 5
+        s: 4
+        p: 4
+        d: 4
         f: 3
     val_energies:
         kval: 1
@@ -33,11 +33,11 @@ basis:
 add:
     # Lists of even and odd parity reference configurations
     ref_configs:
-        odd: [4s1   4p1]
-        even: [4s2]
-    basis_set: 21spdfgh
+        odd: [5s1   5p1]
+        even: [5s2]
+    basis_set: 22spdfg
     orbitals:
-        core: 1s 2s 2p 3s 3p
+        core: 1s 2s 2p 3s 3p 3d 4s 4p 
         active: [
             4-7p:  0  4,
             4-7d:  0  4,
@@ -48,15 +48,19 @@ add:
         single: True
         double: True
         triple: False
-    generate_directories: False
 
 # Parameters used by conf program
 conf:
     J: 0.0
     JM: 0.0
     J_selection: False
-    num_energy_levels: 5
-    num_dvdsn_iterations: 50
+    num_energy_levels: 24
+    num_dvdsn_iterations: 100
+    include_lsj: True
+
+# Parameters used by dtm program
+dtm:
+    E1: True
     
 # Optional parameters
 optional:
@@ -69,5 +73,7 @@ optional:
         K_is: 1
         C_is: 0.01
 
-    code_method: ci+all-order
+    code_method: [ci+all-order, ci+second-order]
+    generate_directories: False
     run_ao_codes: True
+    run_ci: True
