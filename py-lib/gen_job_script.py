@@ -1,5 +1,6 @@
 import sys
 from subprocess import run
+import os
 
 def find_cluster():
     '''
@@ -31,7 +32,7 @@ def find_cluster():
     
     return cluster
 
-def write_job_script(code, num_nodes, num_procs_per_node, exclusive, mem, partition):
+def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition):
     
     # Determine cluster information
     cluster = find_cluster()
@@ -67,6 +68,8 @@ def write_job_script(code, num_nodes, num_procs_per_node, exclusive, mem, partit
                  'basc': False,
                  'ci': False,
                  'dtm': False}
+    
+    os.chdir(path)
     
     # Write job script
     filename = filenames[code]
