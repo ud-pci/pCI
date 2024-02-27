@@ -12,7 +12,7 @@ def strip_text(str, txt_to_remove):
 
 def scrape_term(configuration):
     '''
-    This function scrapes all possible terms for a given electron configuration from online term calculator
+    This function scrapes all possible terms for a given electronic configuration from online term calculator
     at http://umop.net/spectra/term_calc.php
     '''
     url = 'http://umop.net/spectra/term_calc.php?config=' + configuration.replace(' ', '.')

@@ -11,7 +11,7 @@ def find_missing_terms(filename):
     NIST database and portal files should be csv-formatted
     conf calculation file can be csv-formatted or RES-formatted
     '''
-    # Import csv data
+    # Import data
     f = open(filename, 'r')
     lines = f.readlines()
     f.close()
