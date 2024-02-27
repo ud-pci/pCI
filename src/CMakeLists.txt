@@ -11,6 +11,8 @@ INCLUDE(GNUInstallDirs)
 #SET(CMAKE_Fortran_FLAGS "-g -qopenmp -check all -warn all -traceback -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
 SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
 
+ADD_LIBRARY(hfd_common params.f90 conf_variables.f90 basc_variables.f90 diff.f90 readfff.f90 breit.f90 wigner.f90 sintg.f90 hfd.f90)
+
 ADD_LIBRARY(basc_common params.f90 str_fmt.f90 conf_variables.f90 basc_variables.f90 conf_init.f90 readfff.f90 wigner.f90 sintg.f90 test_ori.f90 diff.f90 pi_pk.f90 breit.f90 str_fmt.f90)
 
 ADD_LIBRARY(conf_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90 mpi_utils.f90 env_var.f90)
@@ -22,6 +24,9 @@ ADD_LIBRARY(dtm_common params.f90 str_fmt.f90 conf_variables.f90 dtm_variables.f
 ADD_LIBRARY(ine_common params.f90 str_fmt.f90 ine_variables.f90 conf_variables.f90 determinants.f90 integrals.f90 conf_init.f90 wigner.f90 solvers.f90)
 
 ADD_LIBRARY(conf_pt_common params.f90 conf_variables.f90 conf_pt_variables.f90 conf_init.f90 integrals.f90 determinants.f90 mpi_utils.f90)
+
+ADD_EXECUTABLE(hfd hfd.f90)
+TARGET_LINK_LIBRARIES(hfd hfd_common) 
 
 ADD_EXECUTABLE(basc basc.f90)
 TARGET_LINK_LIBRARIES(basc basc_common) 
@@ -43,4 +48,4 @@ TARGET_LINK_LIBRARIES(conf_pt conf_pt_common)
 
 ADD_EXECUTABLE(add params.f90 add.f90)
 
-INSTALL(TARGETS add basc conf conf_lsj dtm ine conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
+INSTALL(TARGETS hfd add basc conf conf_lsj dtm ine conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
