@@ -1,3 +1,4 @@
+import yaml
 import re
 import sys
 import os
@@ -6,6 +7,18 @@ from fractions import Fraction
 from UDRead import *
 from parse_asd import *
 from get_atomic_term import *
+from pathlib import Path
+from subprocess import run
+
+def read_yaml(filename):
+    """ 
+    This function reads a configuration file in YAML format and returns a dictionary of config parameters
+    """ 
+
+    with open(filename,'r') as f:
+        config = yaml.safe_load(f)
+
+    return config
 
 def parse_final_res(filename):
     try:
@@ -24,6 +37,7 @@ def parse_final_res(filename):
     Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
     for line in lines[1:]:
         confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
+        confs = [conf.strip() for conf in confs]
         confs = [conf.replace(' ', '.') for conf in confs]
         
         terms = [term for term in line.split('  ') if any(L in term for L in Ls)]
@@ -213,6 +227,7 @@ def write_new_conf_res(name, filepath, data_nist):
         print('ground state found: ', data_nist['Configuration'].iloc[0])
         gs_exists = True
     else:
+        print(data_nist['Configuration'].iloc[0], ' not in', confs)
         th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
         
@@ -478,8 +493,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     energy1cm = float(line_theory[1][3])
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(theory_shift)
-                    
                 c1 = True
+                
             if abs(float(line_theory[1][4]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
@@ -548,11 +563,46 @@ def find_energy_shift(df):
     return energy_shift
 
 if __name__ == "__main__":
-    atom = 'Ti I'
+    # Read atom name from config.yml if it exists
+    config_exists = os.path.isfile('config.yml')
+
+    atom = ''
+    if config_exists:
+        config = read_yaml('config.yml')
+        config_name = config['system']['name']
+        if len(config_name.split()) == 1:
+            atom = config_name + ' I'
+    else:
+        atom = input('Input name of atom: ')
     name = atom.replace(" ","_")
+    
     ri = False # 
     fac = 2 # maximum energy difference (in percent) for comparison
-      
+    
+    # Find input files from directories if they exist and put into DATA_RAW directory
+    dir_path = os.getcwd()
+    data_raw_path = 'DATA_RAW'
+    if not os.path.isdir(data_raw_path):
+        Path(data_raw_path).mkdir(parents=True, exist_ok=True)
+    
+    all_order_path = 'ci+all-order'
+    if os.path.isdir(all_order_path):
+        if os.path.isdir(all_order_path + '/even'):
+            run('cp ci+all-order/even/CONFFINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
+        if os.path.isdir(all_order_path + '/odd'):   
+            run('cp ci+all-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
+        if os.path.isdir(all_order_path + '/dtm'):   
+            run('cp ci+all-order/dtm/E1.RES DATA_RAW/E1.RES', shell=True)
+    
+    second_order_path = 'ci+second-order'
+    if os.path.isdir(second_order_path):
+        if os.path.isdir(second_order_path + '/even'):
+            run('cp ci+second-order/even/CONFFINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
+        if os.path.isdir(second_order_path + '/odd'):   
+            run('cp ci+second-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
+        if os.path.isdir(second_order_path + '/dtm'):   
+            run('cp ci+second-order/dtm/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+        
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
     data_nist = generate_df_from_asd(url_nist)
