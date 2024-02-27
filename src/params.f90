@@ -12,11 +12,11 @@ Module params
     Public
 
     ! defining numerical values for physical constants
-    Real(dp), Parameter :: DPcl = 137.0359922594e0_dp ! speed of light in a.u.
+    Real(dp), Parameter :: DPcl = 137.0359922594d0    ! speed of light in a.u.
     !Real(dp), Parameter :: DPcl = 137.0359922594d0*1.264911064067 ! =sqrt(8/5)
     !Real(dp), Parameter :: DPcl = 137.0359922594d0*1.069044967650 ! =sqrt(8/7)
     !Real(dp), Parameter :: DPcl = 137.0359922594d0*0.942809041582 ! =sqrt(8/9)
-    Real(dp), Parameter :: DPRy = 109737.315709e0_dp  ! Rydberg constant in 1/cm
+    Real(dp), Parameter :: DPRy = 109737.315709d0     ! Rydberg constant in 1/cm
     Real(dp), Parameter :: DPau = 6.5796839e15_dp     ! au = a.u. for energy is Hz
     Real(dp), Parameter :: DPmp = 1836.153e0_dp       ! mp = proton mass in a.u.
     Real(dp), Parameter :: DPrb = 0.529177249e-8_dp   ! rb = Bohr radius in cm
@@ -34,8 +34,10 @@ Module params
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
-    Integer, Parameter :: IPmr  =      1         ! =4 if word=1B (Pentium)
+    Integer, Parameter :: IPmr  =      1         ! word length in direct access files
+                                                 ! =4 if word=1B (Pentium)
                                                  ! =1 if word=4B (Alpha-processor)   
+    Integer, Parameter :: IPns  =     62         ! maximum number of shells
 
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
     Integer, Parameter :: type_real=dp
