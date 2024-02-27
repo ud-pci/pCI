@@ -858,15 +858,15 @@ if __name__ == "__main__":
     # Get valence orbitals for all-order calculations
     val_N, val_kappa = get_ao_valence(core_orbitals, valence_orbitals, val_aov)
 
-    # Write input files for subsequent executables
+    # Write input files to basis directory
     if not include_isotope_shifts:
         if isinstance(code_method, collections.abc.Sequence):
             dir_path = os.getcwd()
             for dir in code_method:
-                Path(dir_path+'/'+dir).mkdir(parents=True, exist_ok=True)
-                os.chdir(dir)
+                Path(dir_path+'/'+dir+'/basis').mkdir(parents=True, exist_ok=True)
+                os.chdir(dir+'/basis')
                 write_inputs(config, 0, get_key_vw(dir))
-                os.chdir('../')
+                os.chdir('../../')
         else:
             write_inputs(config, 0, kvw)
     else:
@@ -890,13 +890,13 @@ if __name__ == "__main__":
         if isinstance(code_method, collections.abc.Sequence):
             dir_path = os.getcwd()
             for dir in code_method:
-                Path(dir_path+'/'+dir).mkdir(parents=True, exist_ok=True)
-                os.chdir(dir)
+                Path(dir_path+'/'+dir+'/basis').mkdir(parents=True, exist_ok=True)
+                os.chdir(dir+'/basis')
                 run_executables(0, 0)
                 if run_ao_codes: 
                     script_name = write_job_script(1, 0, dir, 'standard')
                     run('sbatch ' + script_name, shell=True)
-                os.chdir('../')
+                os.chdir('../../')
                 print(dir + " basis set construction completed")
         elif code_method == 'ci+all-order' or code_method == 'ci+second-order':
             # Run executables
