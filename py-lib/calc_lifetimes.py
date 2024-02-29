@@ -55,16 +55,16 @@ def calc_lifetimes(tr_file):
         config2 = configuration2 + ' ' + termJ2
         if (energy2 < energy1): 
             try:
-                tr_rates[config2].append([config1, tr_rate, matrix_element, wavelength])
-            except KeyError:
-                tr_rates[config2] = []
-                tr_rates[config2].append([config1, tr_rate, matrix_element, wavelength])
-        else:
-            try:
                 tr_rates[config1].append([config2, tr_rate, matrix_element, wavelength])
             except KeyError:
                 tr_rates[config1] = []
                 tr_rates[config1].append([config2, tr_rate, matrix_element, wavelength])
+        else:
+            try:
+                tr_rates[config2].append([config1, tr_rate, matrix_element, wavelength])
+            except KeyError:
+                tr_rates[config2] = []
+                tr_rates[config2].append([config1, tr_rate, matrix_element, wavelength])
     
     # Calculate lifetimes and branching ratios
     lifetimes = []
