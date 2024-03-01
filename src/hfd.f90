@@ -79,8 +79,8 @@ Program hfd
     Call recunit  ! determines word length
     Mrec=ipmr
     Call INPUT
-    eps0=1.d-7                    !### eps0 defines covergence
-    eps1=1.d-3                    !###  criterion
+    eps0=1.d-7         !### eps0 defines covergence criterion
+    eps1=1.d-3 
     If (kl.EQ.2) eps0=0.1d0*eps0
     Call NUCL(0)
     Call INIT1
@@ -99,7 +99,7 @@ Program hfd
             KP(ni)=0
             KF=0
             N12=ni+4
-            Call READF (12,N12,P,Q,2)
+            Call READF(12,N12,P,Q,2)
             Call NUCL(ni)
             If (KL.NE.3) Then
                 Call FED(ni)
@@ -115,7 +115,7 @@ Program hfd
             Write(11,strfmt) ni,NN(ni),LET(L),JJ(ni),QQ(ni),E,D,NIT,M1,M2,M3
             N12=ni+4
             Call WRITEF(12,N12,P,Q,2)
-            Call READF (12,1,P,P,1)
+            Call READF(12,1,P,P,1)
             I=20+6*NS+2*(ni-1)+1
             P(I)=KP(ni)
             Call WRITEF(12,1,P,P,1)
@@ -162,7 +162,7 @@ Program hfd
             ni=nii
             If (Nc(ni).NE.iconf) Cycle
             N12=ni+4
-            Call READF (12,N12,P,Q,2)
+            Call READF(12,N12,P,Q,2)
             If (kp(ni).NE.1) then
                 Call Y0(ni)
                 Call PLEX(ni)
@@ -268,7 +268,7 @@ Contains
         Return
     End Subroutine CloseF
 
-    Subroutine WRITEF(kan,record,V1,V2,nrec)
+    Subroutine WriteF(kan,record,V1,V2,nrec)
         Implicit None
 
         Integer :: kan, record, nrec, i, ii, nr1, nr2
@@ -478,7 +478,7 @@ Contains
         
     End Subroutine inpstr
     
-    Subroutine INPUT
+    Subroutine Input
         Implicit None
         
         Integer :: istr, li, ji, Ns0, nmin, kpa, nca, na, la, ja, k, nj, ni, nii, i, iconf
@@ -494,7 +494,7 @@ Contains
         strfmt = '(1X,16A1)'
         Read(10,strfmt) NAME
 
-        strfmt = '(/2X,"PROGRAM HFD v1.0",4X,16A1)'
+        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.0",4X,16A1)'
         Write( *,strfmt) NAME
         Write(11,strfmt) NAME
 
@@ -785,7 +785,8 @@ Contains
             If (II.LE.IMAX) Then
                 Continue
             Else
-                strfmt = '(/"  II > IMAX"/"  IMAX=",I3/"  II  =",I3/"  H   =",F6.3,"  BT  =",F6.3/"  R1  =",E10.3,"  R2  =",F7.3)'
+                strfmt = '(/"  II > IMAX"/"  IMAX=",I3/"  II  =",I3/"  H   =",F6.3, &
+                            "  BT  =",F6.3/"  R1  =",E10.3,"  R2  =",F7.3)'
                 WRITE( *,strfmt) IMAX,II,H,BT,R1,RMAX
                 STOP
             End If
@@ -799,7 +800,8 @@ Contains
                 Continue
             Else
                 II=(BT*DLOG(R2/R1))/H+1
-                strfmt = '(/"  II > IMAX"/"  IMAX=",I3/"  II  =",I3/"  H   =",F6.3,"  BT  =",F6.3/"  R1  =",E10.3,"  R2  =",F7.3)'
+                strfmt = '(/"  II > IMAX"/"  IMAX=",I3/"  II  =",I3/"  H   =",F6.3, &
+                            "  BT  =",F6.3/"  R1  =",E10.3,"  R2  =",F7.3)'
                 WRITE( *,strfmt) IMAX,II,H,BT,R1,R2
                 STOP
             End If
@@ -828,16 +830,31 @@ Contains
         End If
 
         ! FILE HFD.DAT
+        ! key KL defines initial approximation
+        ! KL = 0 - calculation starts from beginning using standard initial approximation
+        ! KL = 1 - continuation of the previous calculation (used when self-consistency has not been reached)
+        ! KL = 2 - initial approximation is taken from pre-existing HFD.DAT
+        ! KL = 3 - all orbitals in the initial approximation are set to 0
         IF (KL.EQ.1.OR.KL.EQ.2) Then
-            LREC=IP6
+            LREC=IP6 ! record length
             CALL OPENFD('HFD.DAT',12,LREC,0)
             CALL TEST
         Else
+            ! key KP defines where the orbital is found
+            ! KP = 0 means that orbital is found from HFD equations and written to HFD.DAT
+            ! KP = 1 means that the orbital is taken from pre-existing HFD.DAT and kept frozen
+            
+            ! Check if any orbitals have to be calculated from HFD equations
             KPN=0
             Do NI=1,NS
-                IF (KP(NI).EQ.1) KPN=1
-                IF (KP(NI).NE.1) KP(NI)=-1
+                If (KP(NI).EQ.1) Then
+                    KPN=1
+                Else
+                    KP(NI)=-1
+                End If
             End Do
+
+            ! If any orbitals are taken from pre-existing HFD.DAT, test them
             IF ((KPN.EQ.1).OR.(JM.GE.0)) Then
                 LREC=IP6
                 CALL OPENFD('HFD.DAT',12,LREC,0)
@@ -1776,21 +1793,22 @@ Contains
         H1=H*IH
         I0=1
         ! CALCULATION OF THE TOTAL DENSITY (NI=0)
-        IF (NI.GT.0) GOTO 200
+        If (NI.EQ.0) Then
+            Do I=1,IP6
+                RO(I)=0.D0
+            End Do
+            RO(II+4)=G0
+        Else
+            CALL READF(12,4,RO,RO,1)
+            T=QQ(NI)/P(II+2)
+            TH=T*H1
+        End If
 
-        Do I=1,IP6
-            RO(I)=0.D0
-        End Do
-        RO(II+4)=G0
-        GOTO 210
-  200   CALL READF (12,4,RO,RO,1)
-        T=QQ(NI)/P(II+2)
-        TH=T*H1
-  210   Do NJ=1,NS
+        Do NJ=1,NS
             IF (NI.GT.0.AND.NI.NE.NJ) Cycle
             IF (NI.EQ.0.AND.NC(NJ).GT.0.AND.NC(NJ).NE.ICONF) Cycle
             N12=NJ+4
-            CALL READF (12,N12,A,B,2)
+            CALL READF(12,N12,A,B,2)
             D=QQ(NJ)/A(II+2)
             DH=D*H1
             IMAX=A(II+3)+0.01D0
@@ -1825,10 +1843,10 @@ Contains
 
         Integer :: ih, i0, i1, j, n, id, ig0, ig, ik, ni, nj, ip, im, i, imax, m
         Real(dp) :: r0, v0, dt, fm, p0, t0, g, g0, dr, r0d, dh, ww, di, dk, s, f, f0, t, const, h1, d
-        !Real(dp), Dimension(IP6) :: ROO, CC
+        Real(dp), Dimension(IP6) :: RO, C
 
-        !ROO=0_dp
-        !CC=0_dp
+        RO=0_dp
+        C=0_dp
 
         IH=2-KT
         H1=H*IH
@@ -1841,7 +1859,7 @@ Contains
         IF (ni.gt.0) ICONF=NC(NI)
         DI=ZAT(ICONF+1)
 
-        CALL READF (12,4,ROO,ROO,1)
+        CALL READF(12,4,RO,RO,1)
 
         If (NI.EQ.0) Then
             Continue
@@ -1865,11 +1883,11 @@ Contains
                 DH=D*H1
                 IMAX=A(II+3)+CONST
                 Do I=I0,IMAX,IH
-                    ROO(I)=ROO(I)+DH*(A(I)**2+B(I)**2)*V(I)
+                    RO(I)=RO(I)+DH*(A(I)**2+B(I)**2)*V(I)
                 End Do
                 IK=IABS(KK(NJ))
                 IG=IK+IK
-                G0=ROO(II+4)
+                G0=RO(II+4)
                 IG0=G0+0.5D0
                 ID=IG-IG0
                 R0D=R(1)**ID
@@ -1880,38 +1898,38 @@ Contains
                         J=II+5+N
                         DR=DR+D*(A(J)*A(I-N)+B(J)*B(I-N))
                 End Do
-                ROO(I+ID)=ROO(I+ID)+DR*R0D
+                RO(I+ID)=RO(I+ID)+DR*R0D
                 End Do
             End Do
         End If
 
-        G=ROO(II+4)
+        G=RO(II+4)
         T0=0.D0
         P0=0.D0
         Do M=0,NMAX
           I=II+5+M
-          T0=T0+ROO(I)/(G+M+1)
-          P0=P0+ROO(I)*(G+M)
+          T0=T0+RO(I)/(G+M+1)
+          P0=P0+RO(I)*(G+M)
         End Do
         T0=T0*R0**(G+1)
         P0=P0*R0**(G-1)
-        F0=ROO(I0)
+        F0=RO(I0)
         P0=H1*P0*V0*V0+F0*BT/(AL*R0+BT)**2
 
         ! CALCULATION OF THE IMAX
         IMAX=II+IH
   240   IMAX=IMAX-IH
-        IF (ROO(IMAX).EQ.0.D0.AND.IMAX.GT.I0+IH) GOTO 240
-        FM=ROO(IMAX)
+        IF (RO(IMAX).EQ.0.D0.AND.IMAX.GT.I0+IH) GOTO 240
+        FM=RO(IMAX)
 
         ! CALCULATION OF THE FUNCTION Z(0;R)
         DT=T0+0.5D0*F0+H1/12.D0*P0
-        CC(I0)=DT
+        C(I0)=DT
         I1=I0+IH
         Do I=I1,IMAX,IH
-            F=ROO(I)
+            F=RO(I)
             DT=DT+F
-            CC(I)=DT
+            C(I)=DT
         End Do
 
         ! CALCULATION OF THE FUNCTION Y(0;R)
@@ -1932,48 +1950,48 @@ Contains
                 D=1.D0-D
                 S=DH*V(I)/R(I)
             End If
-            F=ROO(IP)
+            F=RO(IP)
             F=F-D*(T+F)
             DT=DT+F
             T=DT
-            CC(I)=CC(I)+DT-(S*ROO(I))
+            C(I)=C(I)+DT-(S*RO(I))
         End Do
-        DT=CC(IMAX)-0.5D0*FM
+        DT=C(IMAX)-0.5D0*FM
         Do I=IMAX,II,IH
-            CC(I)=DT
+            C(I)=DT
         End Do
 
         ! CALCULATION OF THE Y(I)-Z AND CORRECTION
         DT=-1.D0-DI
         IF (NI.EQ.0) DT=-DI
-        DT=DT-CC(II)
+        DT=DT-C(II)
         IF (NITER.EQ.1.AND.KL.EQ.3) DT=-Z
         I1=II+1
         Do I=1,II,IH
             J=I1-I
-            Y(J)=CC(J)+DT
+            Y(J)=C(J)+DT
         End Do
 
-        G0=ROO(II+4)
+        G0=RO(II+4)
         ID=G0+0.5D0
         R0D=R0**ID
         T0=0.D0
         Do M=0,NMAX
             I=II+5+M
-            T0=T0+(ROO(I)/(G0+M)-ROO(I)/(G0+M+1))
+            T0=T0+(RO(I)/(G0+M)-RO(I)/(G0+M+1))
         End Do
         T0=T0*R0**G0
         DO M=0,NMAX
             I=II+1+M
             Y(I)=0.D0
         End Do
-        Y(II+1)=CC(I0)/R0+T0
+        Y(II+1)=C(I0)/R0+T0
         Do M=0,NMAX
             I=II+5+M
-            IF ((M+ID).LE.NMAX) Y(II+1+M+ID)=ROO(I)*(1.D0/(G0+M+1)-1.D0/(G0+M))*R0D
+            IF ((M+ID).LE.NMAX) Y(II+1+M+ID)=RO(I)*(1.D0/(G0+M+1)-1.D0/(G0+M))*R0D
         End Do
 
-        IF (NI.EQ.0) CALL WRITEF (12,4,ROO,Y,2)
+        IF (NI.EQ.0) CALL WRITEF (12,4,RO,Y,2)
 
         Return
     End Subroutine Y0
@@ -1987,7 +2005,7 @@ Contains
         
         iwr=0
 
-        ! CALCULATION OF THE COULOMB (Y(I),I=1,II) AND EXCHANGE (U(I),I=1,II) POTENSIALS
+        ! CALCULATION OF THE COULOMB (Y(I),I=1,II) AND EXCHANGE (U(I),I=1,II) POTENTIALS
         IH=2-KT
         H1=H*IH
         C1=0.01D0
@@ -2929,7 +2947,7 @@ Contains
         Implicit None
 
         Integer :: itest, ns1, ng, nso1, if, ni, nj, njj, nsm, nj1, li, n1, k1, n12
-        Real(dp) :: c1, z1, r1, r21, am1, c2, q1
+        Real(dp) :: c1, z1, r21, am1, c2, q1
         Integer, Dimension(IPns) :: Nn1, Kk1, Kp1, Nc1
         Real(dp), Dimension(IPns) :: Qq1
         Real(dp) :: Jm1
@@ -2968,7 +2986,7 @@ Contains
         GOTO 360
 
   300   ITEST=1
-        strfmt = '(/2X,"INPUT DATA WHERE CHANGED"//10X,"HFD.INP",26X,"HFD.DAT"/)'
+        strfmt = '(/2X,"INPUT DATA WERE CHANGED"//10X,"HFD.INP",26X,"HFD.DAT"/)'
         WRITE( *,strfmt)
         WRITE(11,strfmt)
 
@@ -3070,8 +3088,8 @@ Contains
             WRITE(11,strfmt) NI,NN(NI),LET(LI+1),JJ(NI),QQ(NI),NC(NI),NI,NN(NI),LET(LI+1),JJ(NI),QQ1(NJ),NC(NI)
             GOTO 400
 
-            strfmt = '(I5,2X,I2,A1,I2,"/2"," (",F6.3,")",3X,I1,20X,"----")'
-      390   WRITE( *,strfmt) NI,NN(NI),LET(LL(NI)+1),JJ(NI),QQ(NI),NC(NI)
+      390   strfmt = '(I5,2X,I2,A1,I2,"/2"," (",F6.3,")",3X,I1,20X,"----")'
+            WRITE( *,strfmt) NI,NN(NI),LET(LL(NI)+1),JJ(NI),QQ(NI),NC(NI)
             WRITE(11,strfmt) NI,NN(NI),LET(LL(NI)+1),JJ(NI),QQ(NI),NC(NI)
             KP(NI)=-1
             Cycle
@@ -3119,7 +3137,6 @@ Contains
             N12=NI+NSM+4
             CALL WRITEF(12,N12,P,Q,2)
         End Do
-
 
         IF (NS.GE.NS1) Then
             Continue
@@ -3884,7 +3901,7 @@ Contains
         Implicit None
 
         Integer :: l, na, nb, la, lb, ka, kb, k, id, n, j, i, m
-        Real(dp) :: gab, gab1, gab2, c1, d1, d2, r0d, dpp, dq
+        Real(dp) :: gab, gab1, gab2, d1, d2, r0d, dpp, dq
         Real(dp), dimension(IP6) :: pa,qa,pb,qb,wp,wq,ro=0_dp,c=0_dp
 
         la=ll(na)
