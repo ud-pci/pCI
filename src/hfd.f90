@@ -1119,11 +1119,12 @@ Contains
 
         Do NI=1,NS
             IF (NC(NI).NE.ICONF) Cycle
-            IF (KP(NI).EQ.-1) Exit
-            IF (NI.EQ.NS) Return
+            IF (KP(NI).EQ.-1) GOTO 200
         End Do
 
-        IF (KL.NE.3) Then
+        Return
+
+200     IF (KL.NE.3) Then
             strfmt = '(/"  GASHPAR INITIAL APPROXIMATION")'
             WRITE( *,strfmt)
             WRITE(11,strfmt)
