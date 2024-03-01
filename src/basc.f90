@@ -410,10 +410,10 @@ Contains
                 Write(11,*) ' Core: forming CP and CQ for orbital ',ni
                 Write(*,*) ' Core: Testing P,Q,A,B for orb. ',ni,'..'
             End If
-            Call Test_Origin('Core:    P',P,1.d-6,ir1)
-            Call Test_Origin('Core:    Q',Q,1.d-6,ir2)
-            Call Test_Origin('Core:    A',A,err1,ir3)
-            Call Test_Origin('Core:    B',B,err1,ir4)
+            Call Test_Origin('Core:    P',P,R,MaxT,ii,1.d-6,ir1)
+            Call Test_Origin('Core:    Q',Q,R,MaxT,ii,1.d-6,ir2)
+            Call Test_Origin('Core:    A',A,R,MaxT,ii,err1,ir3)
+            Call Test_Origin('Core:    B',B,R,MaxT,ii,err1,ir4)
             ir=ir1+ir2+ir3+ir4
             Do i=1,ii,ih
                 d= Cl*B(i)-(Z*P(i)+t*Q(i))/R(i)
