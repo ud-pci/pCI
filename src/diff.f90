@@ -106,6 +106,7 @@ Module diff
         ! If (cp1.EQ.0.d0.AND.P(1).EQ.0.d0) CP(1)=0.d0 ! may occur only for
         !                                              ! B-spline.
         err=cp1-CP(1)
+        ierr=0
         If (dabs(cp1).GT.1.d0) err=err/cp1
         If (dabs(err).GT.1.d-1) Then
             Write(*,'(4X,"Dif: matching error at R1. Taylor:",E12.5, &
