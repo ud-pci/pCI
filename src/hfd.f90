@@ -7,7 +7,7 @@ Program hfd
                 m1, m2, m3, ifin, kbr, n_is, Nmax, Imax, Nsmin, Nsmax, Ni0, Niter, ng, Lag, Klag
     Real(dp) :: eps0, eps1, e, d, del, r2, Rnucl, Gs, Es, Al, Bt, Cl, G0, R1, xja, xjc, Hs, Bts, Als
     Real(dp), Dimension(10) :: Vnuc
-    Real(dp), Dimension(IP6) :: P, Q, A, B, C, CC, R, V, Y, CP, CQ, RO, ROO, W, ROIJ
+    Real(dp), Dimension(IP6) :: P, Q, A, B, C, CC, R, V, Y, CP, CQ, RO, ROO, W, ROIJ, RS, FS
     Real(dp), Dimension(IP6) :: Pa, Pc, Qa, Qc, P1a, P1c, Q1a, Q1c, Py, Qy
     Real(dp), Dimension(IPns) :: eadd
     Integer, Dimension(64) :: IGAM
@@ -103,8 +103,6 @@ Program hfd
             Call NUCL(ni)
             If (KL.NE.3) Then
                 Call FED(ni)
-            End If
-            If (KL.NE.3) Then
                 Call NORM
             End If
             L=LL(ni)+1
@@ -653,6 +651,14 @@ Contains
 
         Real(dp), Dimension(11) :: Yy, P1, Q1, Vp, Vq, Xp, Xq
 
+        Yy=0_dp
+        P1=0_dp
+        Q1=0_dp
+        Vp=0_dp
+        Vq=0_dp
+        Xp=0_dp
+        Xq=0_dp
+
         CL=DPcl
         NMAX=9
 
@@ -729,7 +735,6 @@ Contains
             P1(1)=D
             Q1(1)=T
         End If
-
         Do N=1,NMAX
             I=N+1
             D=N*(N+2*GAM)*CL*CL
@@ -762,7 +767,6 @@ Contains
 
         Integer :: lrec, kpn, nrec, if, ih, ms, max, i, ni, nii, n12
         Real(dp) :: c1, rm, d0, rmax, d
-        Real(dp), Dimension(IP6) :: RS, FS
         Character(Len=256) :: strfmt
 
         RS=CP
@@ -983,30 +987,33 @@ Contains
 
         Integer :: ih, ih2, i1, i2, i3, i4, i5, i6
         Real(dp) :: x, ro, pm1, pm2, pm3, pp1, pp2, fi, p, h, d
+        Real(dp), Dimension(IP6) :: R, F
 
-        IF (X.GT.CP(IMAX)) Then
-            D=DSQRT(ES)*(X-CP(IMAX))
+        R = RS
+        F = FS
+        IF (X.GT.R(IMAX)) Then
+            D=DSQRT(ES)*(X-R(IMAX))
             FLAGR=0.D0
-            IF (D.LT.30.D0) FLAGR=CQ(IMAX)*DEXP(-D)
+            IF (D.LT.30.D0) FLAGR=F(IMAX)*DEXP(-D)
             RETURN
         End If
 
-        IF (X.LT.CP(   1)) Then
-            FLAGR=X**(GS)*(CQ(II+5)+CQ(II+6)+CQ(II+7)+CQ(II+8))
+        IF (X.LT.R(   1)) Then
+            FLAGR=X**(GS)*(F(II+5)+F(II+6)+F(II+7)+F(II+8))
             RETURN
         End If
 
         IH=2-KT
         H=IH*HS
         IH2=IH+IH
-        RO=ALS*(X-CP(1))+BTS*DLOG(X/CP(1))
+        RO=AL*(X-R(1))+BT*DLOG(X/R(1))
         I3=1+IH2
 
-        If (X.LE.CP(I3)) Then
+        If (X.LE.R(I3)) Then
             Continue
         Else
             I3=IMAX-(IH2+IH)
-            If (X.GE.CP(I3)) Then
+            If (X.GE.R(I3)) Then
                 Continue
             Else
                 I3=RO/HS+1
@@ -1029,9 +1036,9 @@ Contains
         PM3=P-3.D0
         PP1=P+1.D0
         PP2=P+2.D0
-        FI=0.1D0*PM2*PM1*P*PP1*(PP2*CQ(I6)-PM3*CQ(I1))
-        FI=FI+0.5D0*PM3*PM1*P*PP2*(PM2*CQ(I2)-PP1*CQ(I5))
-        FI=FI+PM3*PM2*PP1*PP2*(P*CQ(I4)-PM1*CQ(I3))
+        FI=0.1D0*PM2*PM1*P*PP1*(PP2*F(I6)-PM3*F(I1))
+        FI=FI+0.5D0*PM3*PM1*P*PP2*(PM2*F(I2)-PP1*F(I5))
+        FI=FI+PM3*PM2*PP1*PP2*(P*F(I4)-PM1*F(I3))
         FLAGR=FI/12.D0
         
         Return
