@@ -1119,8 +1119,8 @@ Contains
 
         Do NI=1,NS
             IF (NC(NI).NE.ICONF) Cycle
-            IF (NI.EQ.NS) Return
             IF (KP(NI).EQ.-1) Exit
+            IF (NI.EQ.NS) Return
         End Do
 
         IF (KL.NE.3) Then
