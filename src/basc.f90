@@ -922,7 +922,11 @@ Contains
                             tad=tad+dint1-Dint                !## nucleus for j=1/2
                         End If
                         If (K_is == 1) fis = dV_nuc(Pa,Qa,Pd,Qd)     !### Volume IS
-                        If (Kbrt >= 1) tad_br=Br_core(na,nd,c,r,v,ii,kt)         !### Core Breit
+                        If (Kbrt >= 1) Then
+                            Qb = Qd
+                            Pb = Pd
+                            tad_br=Br_core(na,nd,c,r,v,ii,kt)         !### Core Breit
+                        End If
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
                         Write(11,'(I6,8X,I3,A1,I2,"/2",2X,I3,A1,I2,"/2",3F15.8)') &
@@ -1144,6 +1148,7 @@ Contains
             Write (13) (Nq(i),Nip(i), i=1,Nsp)
             Write (13) nhint,kbrt
             Write (13) (Rint1(i), i=1,nhint)
+            print*,(Rint1(i), i=1,nhint)
             Write (13) (Iint1(i), i=1,nhint)
             Write (13) ngint,0,nx*nx
             Write (13) ((Rint2(k,i8),k=1,IPbr), i8=1,ngint)
