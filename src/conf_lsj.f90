@@ -1,5 +1,5 @@
 Program conf_lsj
-    use mpi
+    use mpi_f08
     Use conf_variables
     use davidson, Only : Prj_J
     use determinants, Only : Dinit, Jterm
@@ -333,7 +333,7 @@ Contains
     End Subroutine ReadXIJ
 
     Subroutine AllocateLSJArrays(mype)
-        Use mpi
+        use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
@@ -523,14 +523,15 @@ Contains
     End Subroutine calcLSJ
 
     Subroutine lsj(cc,xj,xl,xs,mype,npes)
-        Use mpi
+        use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer
         Implicit None
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
         Integer(Kind=int64) :: s1, s2
         Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, an_id, ncGrowBy, endnc, num_done
-        Integer :: n, j, status(MPI_STATUS_SIZE), sender
+        Integer :: n, j, sender
+        Type(MPI_STATUS) :: status
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Character(Len=16) :: timeStr
         Logical :: moreTimers
@@ -588,7 +589,7 @@ Contains
 
                 Do 
                     Call MPI_RECV(msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    sender = status%MPI_SOURCE
 
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy

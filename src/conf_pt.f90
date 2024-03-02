@@ -6,7 +6,7 @@ Program conf_pt
     ! This code forms the second order corrections to eigenvalues from CONF.XIJ. 
     ! It is supposed that vectors in CONF.XIJ correspond to the same Hamiltonian 
     ! in a smaller space.
-    Use mpi
+    use mpi_f08
     Use conf_pt_variables
     Use integrals, Only : Rint
     Use determinants, Only : Dinit, Jterm, Wdet
@@ -35,6 +35,14 @@ Program conf_pt
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     !Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+
+    ! Set MPI type for type_real
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
 
     If (mype == 0) Then
         ! CONF_PT.RES is opened only by the master process
@@ -345,7 +353,7 @@ Contains
     End Subroutine Init
 
     Subroutine BcastParams
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer :: mpierr
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -390,7 +398,7 @@ Contains
     End Subroutine BcastParams
 
     Subroutine AllocatePTArrays
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer :: mpierr
         
@@ -431,30 +439,30 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nn, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         count = IPbr*Int(Ngint,kind=int64)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(DVnr, Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
         If (K_is /= 0) Then
-            Call MPI_Bcast(R_is(1:Nhint), Nhint, type2_real, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(R_is, Nhint, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -618,7 +626,7 @@ Contains
     End Subroutine Weight_CI
     ! =============================================================================
     Subroutine PT_Init(npes, mype)
-    	Use mpi
+    	use mpi_f08
         Implicit None
         Integer  :: i, ni, j, n, k, kx, ic, kd, ndci
         Integer :: npes, mype, mpierr
@@ -713,7 +721,7 @@ Contains
     End Subroutine PT_Init
 
     Subroutine PTE(npes,mype)
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer  :: n, ic, l, i, k, ix
         Integer, Dimension(Nc)  :: Ndic
@@ -1363,7 +1371,7 @@ Contains
     End function Hmltn
 
     Subroutine DiagH(nd0,npes,mype)
-    	Use mpi
+    	use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
         Integer   :: n, i, nd0, start, End, j

@@ -1,6 +1,6 @@
 Program basc
 
-    Use mpi
+    Use mpi_f08
     Use basc_variables
     Use breit, Only : Gaunt
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -18,6 +18,14 @@ Program basc
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+
+    ! Set MPI type for type_real
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
 
     Call startTimer(start_time)
 
@@ -692,7 +700,7 @@ Contains
     End Subroutine Nxt_to_max
 
     Subroutine AllocateRintArrays(nsx,nsx2,lsx)
-        Use mpi
+        Use mpi_f08
         Implicit None
         Integer, Intent(InOut) :: nsx, nsx2, lsx
         
@@ -723,7 +731,7 @@ Contains
     End Subroutine AllocateRintArrays
 
     Subroutine AllocateRint2Arrays
-        Use mpi
+        Use mpi_f08
         Use readfff, Only : ArrP, ArrQ
         Implicit None
         
@@ -827,7 +835,7 @@ Contains
     End Subroutine countNgint
 
     Subroutine Rint(nsx,nsx2,lsx,mype,npes)
-        Use mpi
+        Use mpi_f08
         Use breit
         Use readfff
         Use sintg
