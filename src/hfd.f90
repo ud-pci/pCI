@@ -2844,7 +2844,7 @@ Contains
     Subroutine PQDif(NI)
         Implicit None
 
-        Integer :: ni, j, n, im, kpi, k, nj, ih, i, m, l, iconf
+        Integer :: ni, j, n, im, kpi, k, nj, ih, i, m, l, iconf, m2
         Real(dp) :: c1, de, rm2, d0, sa, sb, r1gm, gm, xq, yi, qi, pi, rk, cr, t, ep, xp, eq, e, d
 
         Character(Len=256) :: strfmt
