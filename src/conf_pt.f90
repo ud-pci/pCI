@@ -414,7 +414,7 @@ Contains
         If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(DVnr)) allocate(DVnr(Nc))
 
-        If (Ksig /= 0) Then
+        If (K_is /= 0) Then
             If (.not. allocated(R_is)) allocate(R_is(Nhint))
             If (.not. allocated(I_is)) allocate(I_is(Nhint))
         End If
@@ -452,8 +452,8 @@ Contains
         Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        If (Ksig /= 0) Then
-            Call MPI_Bcast(R_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (K_is /= 0) Then
+            Call MPI_Bcast(R_is(1:Nhint), Nhint, type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
 
