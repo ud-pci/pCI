@@ -70,7 +70,12 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v2.4")'
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(4X,"Program conf_lsj v2.4")'
+        Case(dp)            
+            strfmt = '(4X,"Program conf_lsj v2.4 with double precision for 2e integrals")'
+        End Select
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -442,7 +447,7 @@ Contains
         Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         count = IPbr*Int(Ngint,kind=int64)
-        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)

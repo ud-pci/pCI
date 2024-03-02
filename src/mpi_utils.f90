@@ -122,7 +122,7 @@ Module mpi_utils
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
-        Real(type_real), Dimension(*), Intent(InOut)   :: buffer
+        Real(type2_real), Dimension(*), Intent(InOut)   :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
         Integer(Kind=int64)                         :: count_remain, i
@@ -133,12 +133,12 @@ Module mpi_utils
             Read(envvar, '(i)') use_stride
             If (use_stride .le. 0) Then
                 use_stride = MaxStride8Byte
-                If (type_real == sp) use_stride = use_stride * 2
+                If (type2_real == sp) use_stride = use_stride * 2
             End If
         Else
             use_stride = stride
         End If
-        Select Case(type_real)
+        Select Case(type2_real)
         Case(sp)
             If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
         Case(dp)
@@ -148,7 +148,7 @@ Module mpi_utils
         i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
-            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_type_real, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_type2_real, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
@@ -158,7 +158,7 @@ Module mpi_utils
         End Do
         If (count_remain .gt. 0) Then
             count_remain2 = count_remain
-            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_type_real, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_type2_real, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return

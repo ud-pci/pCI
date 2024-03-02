@@ -39,9 +39,13 @@ Module params
                                                  ! =1 if word=4B (Alpha-processor)   
     Integer, Parameter :: IPns  =     62         ! maximum number of shells
 
-    ! Set type_real to determine whether to use single precision (sp) or double precision (dp)
+    ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
     Integer, Parameter :: type_real=dp
     Type(MPI_Datatype) :: mpi_type_real
+
+    ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
+    Integer, Parameter :: type2_real=sp
+    Type(MPI_Datatype) :: mpi_type2_real
 
     ! Set key to turn on extra outputs for developing
     Integer, Parameter :: devmode=1

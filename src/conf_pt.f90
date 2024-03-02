@@ -93,11 +93,20 @@ Contains
         Character(Len=512) :: strfmt
 
         ! Write name of program
-        strfmt = '(/4X,"Program CONF_PT v2.2", &
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(/4X,"Program CONF_PT v2.2", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
+        Case(dp) 
+            strfmt = '(/4X,"Program CONF_PT v2.2 with double precision for 2e integrals", &
+               /4X,"PT corrections to binding energy", & 
+               /4X,"Zero approximation is taken from CONF.XIJ", &
+               /4X,"New vectors are in CONF_PT.XIJ and", &
+               /4X,"new input is in CONF_new.INP")'           
+        End Select
         Write( 6,strfmt) 
         Write(11,strfmt)
 
@@ -405,7 +414,7 @@ Contains
         If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(DVnr)) allocate(DVnr(Nc))
 
-        If (Ksig /= 0) Then
+        If (K_is /= 0) Then
             If (.not. allocated(R_is)) allocate(R_is(Nhint))
             If (.not. allocated(I_is)) allocate(I_is(Nhint))
         End If
@@ -435,7 +444,7 @@ Contains
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
-        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -443,8 +452,8 @@ Contains
         Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        If (Ksig /= 0) Then
-            Call MPI_Bcast(R_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (K_is /= 0) Then
+            Call MPI_Bcast(R_is(1:Nhint), Nhint, type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
 
