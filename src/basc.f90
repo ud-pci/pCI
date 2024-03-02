@@ -1148,7 +1148,6 @@ Contains
             Write (13) (Nq(i),Nip(i), i=1,Nsp)
             Write (13) nhint,kbrt
             Write (13) (Rint1(i), i=1,nhint)
-            print*,(Rint1(i), i=1,nhint)
             Write (13) (Iint1(i), i=1,nhint)
             Write (13) ngint,0,nx*nx
             Write (13) ((Rint2(k,i8),k=1,IPbr), i8=1,ngint)
