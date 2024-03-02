@@ -93,7 +93,12 @@ Contains
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
-        strfmt = '(4X,"PROGRAM BasC v2.6")'
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(4X,"PROGRAM BasC v2.6")'
+        Case(dp)            
+            strfmt = '(4X,"PROGRAM BasC v2.6 with double precision for 2e integrals")'
+        End Select
         Write( *,strfmt)
         Write(11,strfmt)
 
@@ -631,7 +636,12 @@ Contains
         Write( *,strfmt) ngint,ngint2
         Write(11,strfmt) ngint,ngint2
 
-        mem = Ngint*4*(2 + 1 + 1) ! 2 for Rint2, 1 for Iint2, 1 for Iint3
+        Select Case(type2_real)
+        Case(sp)
+            mem = Ngint*4*(2 + 1 + 1) ! 2 for Rint2, 1 for Iint2, 1 for Iint3
+        Case(dp)
+            mem = Ngint*4*(4 + 1 + 1) ! 4 for Rint2, 1 for Iint2, 1 for Iint3
+        End Select
         Call FormattedMemSize(mem, memStr)
         print*, 'MEMORY: 2-el radial integrals will require ', Trim(memStr), ' of memory per core' 
         
@@ -1093,8 +1103,8 @@ Contains
                     cut1 = Ngint/2
                     rem = Ngint - cut1 + 1
                     Do i=1,IPbr
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:cut1), cut1, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,cut1+1:Ngint), rem, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:cut1), cut1, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,cut1+1:Ngint), rem, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
                     End Do
                     Call MPI_AllReduce(MPI_IN_PLACE, Iint2(1:cut1), cut1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, Iint2(cut1+1:Ngint), rem, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1103,7 +1113,7 @@ Contains
                 Else
                     ngint4 = Ngint
                     Do i=1,IPbr
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:ngint4), ngint4, MPI_REAL, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:ngint4), ngint4, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
                     End Do
                     Call MPI_AllReduce(MPI_IN_PLACE, Iint2, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, Iint3, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)

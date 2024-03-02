@@ -77,6 +77,13 @@ Program conf
         mpi_type_real = MPI_DOUBLE_PRECISION
     End Select
 
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
+
     ! Give ConfFilePaths a chance to decide what filenames/paths to use:
     !Call ConfFileInit()
 
@@ -201,8 +208,13 @@ Contains
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program conf v5.16 with single precision")'
-        Case(dp)
-            strfmt = '(4X,"Program conf v5.16")'
+        Case(dp)            
+            Select Case(type2_real)
+            Case(sp)
+                strfmt = '(4X,"Program conf v5.16")'
+            Case(dp)
+                strfmt = '(4X,"Program conf v5.16 with double precision for 2e integrals")'
+            End Select
         End Select
         
         Write( 6,strfmt)
@@ -943,7 +955,7 @@ Contains
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         count = IPbr*Int(Ngint,kind=int64)
-        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
@@ -952,20 +964,20 @@ Contains
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         If (K_is /= 0) Then
-            Call MPI_Bcast(R_is, num_is, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(R_is, num_is, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Rsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Dsig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Esig, NhintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rsig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dsig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Esig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Iint1S, NhintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Iint2S, NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Iint3S, NgintS, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Rint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Dint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Eint2S, NgintS, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Rint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Dint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Eint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(IntOrdS, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)

@@ -28,13 +28,14 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: IntOrdS, Iconverge, iconf1, iconf2, In, Nrnrc
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Integer,  Allocatable, Dimension(:)    :: num_gaunts_per_partial_wave ! counts number of gaunt factors calculated in each partial wave
-    Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
-    Real,     Allocatable, Dimension(:,:)  :: Rint2
     Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D
     Real(dp), Allocatable, Dimension(:,:)  :: W
+
+    Real(type2_real), Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
+    Real(type2_real), Allocatable, Dimension(:,:)  :: Rint2
     
-    Real(type_real), Allocatable, Dimension(:,:) :: ArrB, P, Z1
-    Real(type_real), Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
+    Real(type_real),  Allocatable, Dimension(:,:) :: ArrB, P, Z1
+    Real(type_real),  Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
 
     Real(dp), Dimension(IPs)   :: Eps
     Real(dp), Dimension(IP1)   :: C

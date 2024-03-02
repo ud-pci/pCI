@@ -93,11 +93,20 @@ Contains
         Character(Len=512) :: strfmt
 
         ! Write name of program
-        strfmt = '(/4X,"Program CONF_PT v2.2", &
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(/4X,"Program CONF_PT v2.2", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
+        Case(dp) 
+            strfmt = '(/4X,"Program CONF_PT v2.2 with double precision for 2e integrals", &
+               /4X,"PT corrections to binding energy", & 
+               /4X,"Zero approximation is taken from CONF.XIJ", &
+               /4X,"New vectors are in CONF_PT.XIJ and", &
+               /4X,"new input is in CONF_new.INP")'           
+        End Select
         Write( 6,strfmt) 
         Write(11,strfmt)
 
@@ -435,7 +444,7 @@ Contains
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
-        Call BroadcastR(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
