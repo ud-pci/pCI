@@ -141,9 +141,6 @@ Module breit
         Real(dp), Dimension(IP6) :: c, r, v
         Character(Len=512) :: strfmt
 
-        Qb = Qd
-        Pb = Pd
-
         z12=0.5d0
         z00=0.0d0
         Br_core=z00
@@ -210,7 +207,6 @@ Module breit
         If (2*(i/2).ne.i) Return
 
         Call breit_pot_magn(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
-
         ds1=brint_magn(l,nb,pb,qb,nd,pd,qd,c)
         ds2=0.d0
 
@@ -218,7 +214,6 @@ Module breit
             Call breit_pot_ret(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
             ds2=brint_ret(l,nb,pb,qb,nd,pd,qd,c)
         End If
-
         breit_int=ds1+ds2
 
         Return
@@ -421,6 +416,8 @@ Module breit
         Real(dp), Dimension(IP6) :: pa,qa,pc,qc
         Real(dp), Dimension(IP6) :: ro,c,r,v
 
+        ro=0_dp
+        c=0_dp
         la=Ll(na)
         lc=Ll(nc)
 
@@ -437,7 +434,7 @@ Module breit
     
             g1=coefb( 1,k,l,na,nc)
             g2=coefb(-1,k,l,na,nc)
-            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,ii,kt)
+            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
             Call ykt(k,MaxT,ro,c,r,v,r2,ii,kt)
             Do i=1,IP6
                 yy(i,k+1)=c(i)
@@ -466,7 +463,7 @@ Module breit
     
             g1=coefb( 1,k1,l,na,nc)
             g2=coefb(-1,k1,l,na,nc)
-            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,ii,kt)
+            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
     
             Do k2=l-1,l+1,2
                 If (k2 < 0) Cycle
@@ -483,7 +480,7 @@ Module breit
         
                 g1=coefb( 1,k1,l,na,nc)
                 g2=coefb(-1,k1,l,na,nc)
-                Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,ii,kt)
+                Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
         
                 If (k1 == k2) Then
                     If (k1 > maxk) Then
@@ -524,12 +521,13 @@ Module breit
         Return
     End Subroutine breit_pot_ret
 
-    Subroutine rho_pq_tot(coef1,coef2,p,q,a,b,ro,ii,kt)
+    Subroutine rho_pq_tot(coef1,coef2,p,q,a,b,ro,c,r,v,ii,kt)
         Implicit None
 
         Integer :: i, imax, j, n, ih, ii, m, kt
         Real(dp) :: coef1, coef2, d1, d2, ulam, c1, dh1, dh2, dr, h0, h1
-        Real(dp), Dimension(IP6) :: p, q, a, b, ro
+        Real(dp), Dimension(IP6) :: p, q, a, b, c, r, v
+        Real(dp), Dimension(IP6), Intent(Out) :: ro
 
         c1=0.01
 
