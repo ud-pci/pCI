@@ -1114,26 +1114,28 @@ Contains
 
         Allocate(strc1(nterm2-nterm1+1))
         Allocate(strt1(nterm2-nterm1+1))
-        Open(97,file='CONFSTR.RES',status='OLD',iostat=err_stat,iomsg=err_msg)
-        If (err_stat /= 0) Then
-            strc1 = ''
-            strt1 = ''
-            existStr = .false.
-        Else
-            i=1
-            Do n=1,nterm2
-                If (n >= ntrm .and. n <= ntrm1) Then
-                    Read(97,'(A)') strc1(i)
-                    Read(97,'(A)') strt1(i)
-                    i=i+1
-                Else
-                    Read(97,'(A)')
-                    Read(97,'(A)') 
-                End If
-            End Do
-            i=1
-            existStr = .true.
-        End If 
+        if (mype == 0) Then
+            Open(97,file='CONFSTR.RES',status='OLD',iostat=err_stat,iomsg=err_msg)
+            If (err_stat /= 0) Then
+                strc1 = ''
+                strt1 = ''
+                existStr = .false.
+            Else
+                i=1
+                Do n=1,nterm2
+                    If (n >= ntrm .and. n <= ntrm1) Then
+                        Read(97,'(A)') strc1(i)
+                        Read(97,'(A)') strt1(i)
+                        i=i+1
+                    Else
+                        Read(97,'(A)')
+                        Read(97,'(A)') 
+                    End If
+                End Do
+                i=1
+                existStr = .true.
+            End If 
+        End If
     
         ! Divide workload into npes
         If (mype==0) Then
