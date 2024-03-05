@@ -32,7 +32,7 @@ def find_cluster():
     
     return cluster
 
-def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition):
+def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version):
     
     # Determine cluster information
     cluster = find_cluster()
@@ -90,7 +90,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         f.write('#SBATCH --time=05-00:00:00 \n')
         f.write('#SBATCH --export=NONE \n')
         f.write(' \n')
-        f.write('vpkg_require pci \n')
+        if pci_version != 'default':
+            f.write('vpkg_require pci' + '/' + pci_version + ' \n')
+        else:
+            f.write('vpkg_require pci \n')
         if cluster == 'darwin':
             f.write(' \n')
             f.write('UD_PREFER_MEM_PER_CPU=YES \n')

@@ -188,7 +188,7 @@ def form_conf_inp(parity):
     run("cp CONF.INP CONF" + parity + ".INP", shell=True)
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(parity, run_ci, include_lsj):
+def move_conf_inp(parity, run_ci, include_lsj, pci_version):
     if os.path.isfile('../basis/HFD.DAT'):
         run("cp ../basis/HFD.DAT .", shell=True)
     if os.path.isfile('../CONF' + parity + '.INP'):
@@ -214,7 +214,7 @@ def move_conf_inp(parity, run_ci, include_lsj):
     if run_ci: 
         if not os.path.isfile('ci.qs'):
             print('generating new ci.qs in ' + os.getcwd() + ' directory')
-        write_job_script('.','ci', 2, 64, True, 0, 'standard')
+        write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
         run("sbatch ci.qs", shell=True)
         
     os.chdir('../')
@@ -238,6 +238,7 @@ if __name__ == "__main__":
     code_method = config['optional']['code_method']
     run_ci = config['optional']['run_ci']
     include_lsj = config['conf']['include_lsj']
+    pci_version = config['optional']['pci_version']
     
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
@@ -292,13 +293,13 @@ if __name__ == "__main__":
                     even_path = full_path + '/even'
                     Path(even_path).mkdir(parents=True, exist_ok=True)
                     os.chdir(even_path)
-                    move_conf_inp('even', run_ci, include_lsj)
+                    move_conf_inp('even', run_ci, include_lsj, pci_version)
                     os.chdir('../')
                 if odd_exists: 
                     odd_path = full_path + '/odd'
                     Path(odd_path).mkdir(parents=True, exist_ok=True)
                     os.chdir(odd_path)
-                    move_conf_inp('odd', run_ci, include_lsj)
+                    move_conf_inp('odd', run_ci, include_lsj, pci_version)
                     os.chdir('../')
                 os.chdir('../')
         else:

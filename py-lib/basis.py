@@ -1,6 +1,5 @@
 import yaml 
 import re
-import math
 import sys
 import get_atomic_data as libatomic
 import orbitals as liborb
@@ -8,6 +7,7 @@ import os
 import collections.abc
 from pathlib import Path
 from subprocess import run
+from gen_job_script import write_job_script
 
 def read_yaml(filename):
     """ 
@@ -601,39 +601,6 @@ def write_inputs(system, C_is, kvw):
     # Write inf.vw
     write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
-def write_job_script(nprocs, mem, code_method, partition):
-    if code_method == 'ci':
-        filename = 'ci_qs'
-    elif code_method == 'ci+all-order' or code_method == 'all-order':
-        filename = 'ao.qs'
-    elif code_method == 'ci+second-order' or code_method == 'second-order':
-        filename = 'cis.qs'
-    else:
-        print('error detecting code method ' + code_method)
-                
-    with open(filename,'w') as f:
-        f.write('#!/bin/bash -l \n')
-        f.write('#SBATCH --ntasks=' + str(nprocs) + ' \n')
-        f.write('#SBATCH --mem=' + str(mem) + ' \n')
-        f.write('#SBATCH --job-name=' + code_method + ' \n')
-        f.write('#SBATCH --partition=' + partition + ' \n')
-        f.write('#SBATCH --time=1-00:00:00 \n')
-        f.write('#SBATCH --export=NONE \n')
-        f.write('. /opt/shared/slurm/templates/libexec/common.sh \n')
-        f.write('vpkg_require pci \n\n')
-        if code_method == 'all-order' or code_method == 'ci+all-order':
-            f.write('time allcore-rle-ci <inf.aov >out.core \n')
-            f.write('time valsd-rle-cis <inf.aov >out.val \n')
-            f.write('time sdvw-rle-cis <inf.aov >out.vw \n')
-            f.write('time second-cis <inf.vw >out.second.vw \n')
-        elif code_method == 'second-order' or code_method == 'ci+second-order':
-            f.write('time second-cis <inf.vw >out.second.vw \n')
-        else:
-            print(code_method + ' not supported.')
-    f.close()
-    
-    return filename
-
 def generate_batch_qed(kqed, krot, kbrt):
     """ Writes batch.qed """
     with open('q.in','w') as f:
@@ -834,6 +801,7 @@ if __name__ == "__main__":
 
     code_method = config['optional']['code_method']
     run_ao_codes = config['optional']['run_ao_codes']
+    pci_version = config['optional']['pci_version']
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(name, isotope)
@@ -889,22 +857,21 @@ if __name__ == "__main__":
         print("Running codes...")
         if isinstance(code_method, collections.abc.Sequence):
             dir_path = os.getcwd()
-            for dir in code_method:
-                Path(dir_path+'/'+dir+'/basis').mkdir(parents=True, exist_ok=True)
-                os.chdir(dir+'/basis')
+            for method in code_method:
+                Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
+                os.chdir(method+'/basis')
                 run_executables(0, 0)
                 if run_ao_codes: 
-                    script_name = write_job_script(1, 0, dir, 'standard')
+                    script_name = write_job_script('.',method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
                 os.chdir('../../')
-                print(dir + " basis set construction completed")
+                print(method + " basis set construction completed")
         elif code_method == 'ci+all-order' or code_method == 'ci+second-order':
             # Run executables
             if not include_isotope_shifts:
                 run_executables(0, 0)
-                # TODO: implement error checking
                 if run_ao_codes: 
-                    script_name = write_job_script(1, 0, code_method, 'standard')
+                    script_name = write_job_script('.',code_method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
             else:
                 c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
@@ -921,7 +888,7 @@ if __name__ == "__main__":
                     run_executables(K_is, c)
                     # TODO: implement error checking
                     if run_ao_codes: 
-                        script_name = write_job_script(1, 0, code_method, 'standard')
+                        script_name = write_job_script('.',code_method, 1, 1, True, 0, 'standard', pci_version)
                         run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
         else:
