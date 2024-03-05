@@ -769,8 +769,6 @@ Contains
         Real(dp) :: c1, rm, d0, rmax, d
         Character(Len=256) :: strfmt
 
-        RS=CP
-        FS=CQ
         c1=0.01D0
 
         KLAG=1
@@ -882,8 +880,8 @@ Contains
             Continue
         Else
             ! OLD GRID
-            CALL READF (12,1,FS,FS,1)
-            CALL READF (12,2,RS,RS,1)
+            CALL READF (12,1,CQ,CQ,1)
+            CALL READF (12,2,CP,CP,1)
         End If
 
         NI0=1
@@ -931,10 +929,10 @@ Contains
 
         ! INTERPOLATION
         IH=2-KT
-        IIS=FS(3)+C1
-        HS =FS(6)
-        BTS=FS(7)
-        ALS=FS(8)
+        IIS=CQ(3)+C1
+        HS =CQ(6)
+        BTS=CQ(7)
+        ALS=CQ(8)
         Do NII=1,NS
             NI=NII
             IF (KP(NI).EQ.-1) Cycle
@@ -947,10 +945,10 @@ Contains
             IMAX=P(IIS+3)+C1
             MS  =P(IIS+15)+C1
             Do I=1,IP6
-                FS(I)=P(I)
+                CQ(I)=P(I)
             End Do
             M1=MS
-            RM=RS(MS)
+            RM=CP(MS)
             D0=DABS(RM-R(M1))
             Do I=1,II,IH
                 P(I)=FLAGR(R(I))
@@ -962,19 +960,19 @@ Contains
             End Do
             MAX=8+NMAX
             Do I=1,MAX
-                P(II+I)=FS(IIS+I)
+                P(II+I)=CQ(IIS+I)
             End Do
             P(II+3)=II
             P(II+15)=M1
             Do I=1,IP6
-                FS(I)=Q(I)
+                CQ(I)=Q(I)
             End Do
             Do I=1,II,IH
                 Q(I)=FLAGR(R(I))
             End Do
             MAX=8+NMAX
             Do I=1,MAX
-                Q(II+I)=FS(IIS+I)
+                Q(II+I)=CQ(IIS+I)
             End Do
             CALL WRITEF(12,N12,P,Q,2)
         End Do
@@ -987,33 +985,30 @@ Contains
 
         Integer :: ih, ih2, i1, i2, i3, i4, i5, i6
         Real(dp) :: x, ro, pm1, pm2, pm3, pp1, pp2, fi, p, h, d
-        Real(dp), Dimension(IP6) :: R, F
 
-        R = RS
-        F = FS
-        IF (X.GT.R(IMAX)) Then
-            D=DSQRT(ES)*(X-R(IMAX))
+        IF (X.GT.CP(IMAX)) Then
+            D=DSQRT(ES)*(X-CP(IMAX))
             FLAGR=0.D0
-            IF (D.LT.30.D0) FLAGR=F(IMAX)*DEXP(-D)
+            IF (D.LT.30.D0) FLAGR=CQ(IMAX)*DEXP(-D)
             RETURN
         End If
 
-        IF (X.LT.R(   1)) Then
-            FLAGR=X**(GS)*(F(II+5)+F(II+6)+F(II+7)+F(II+8))
+        IF (X.LT.CP(   1)) Then
+            FLAGR=X**(GS)*(CQ(II+5)+CQ(II+6)+CQ(II+7)+CQ(II+8))
             RETURN
         End If
 
         IH=2-KT
         H=IH*HS
         IH2=IH+IH
-        RO=AL*(X-R(1))+BT*DLOG(X/R(1))
+        RO=AL*(X-CP(1))+BT*DLOG(X/CP(1))
         I3=1+IH2
 
-        If (X.LE.R(I3)) Then
+        If (X.LE.CP(I3)) Then
             Continue
         Else
             I3=IMAX-(IH2+IH)
-            If (X.GE.R(I3)) Then
+            If (X.GE.CP(I3)) Then
                 Continue
             Else
                 I3=RO/HS+1
@@ -1036,9 +1031,9 @@ Contains
         PM3=P-3.D0
         PP1=P+1.D0
         PP2=P+2.D0
-        FI=0.1D0*PM2*PM1*P*PP1*(PP2*F(I6)-PM3*F(I1))
-        FI=FI+0.5D0*PM3*PM1*P*PP2*(PM2*F(I2)-PP1*F(I5))
-        FI=FI+PM3*PM2*PP1*PP2*(P*F(I4)-PM1*F(I3))
+        FI=0.1D0*PM2*PM1*P*PP1*(PP2*CQ(I6)-PM3*CQ(I1))
+        FI=FI+0.5D0*PM3*PM1*P*PP2*(PM2*CQ(I2)-PP1*CQ(I5))
+        FI=FI+PM3*PM2*PP1*PP2*(P*CQ(I4)-PM1*CQ(I3))
         FLAGR=FI/12.D0
         
         Return
