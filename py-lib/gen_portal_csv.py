@@ -317,7 +317,7 @@ def convert_res_to_csv(filename, uncertainties, energies_cm, gs_exists, name):
     f = open(csvfile, 'w')
     f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
 
-    num_cols = 13
+    num_cols = 14
     i = 0
     for line in lines[1:]:
         # reformatting
@@ -479,8 +479,10 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         c1, c2 = False, False
         energy1cm, energy2cm = 0.0, 0.0
         for line_theory in mapping:
-            if line_theory[1][4] == '-': continue
-            if abs(float(line_theory[1][4]) - float(energy1)) < 1e-7:
+            # mapping structure:
+            # [expt=[conf, term, J, energy, unc], theory=[conf, term, J, energy, unc, final_conf, energy_au]]
+            if line_theory[1][6] == '-': continue
+            if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 J1 = line_theory[1][2]
@@ -495,7 +497,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                         energy1cm = energy1cm + float(theory_shift)
                 c1 = True
                 
-            if abs(float(line_theory[1][4]) - float(energy2)) < 1e-7:
+            if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 J2 = line_theory[1][2]
