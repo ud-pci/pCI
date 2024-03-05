@@ -128,7 +128,8 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         f.write('exit $mpi_rc \n')
     f.close()  
     print(filename + ' has been generated')
-     
+    
+    return filename    
     
 if __name__ == '__main__':
     code = 'ci+all-order'
