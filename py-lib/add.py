@@ -214,8 +214,8 @@ def move_conf_inp(parity, run_ci, include_lsj, pci_version):
     if run_ci: 
         if not os.path.isfile('ci.qs'):
             print('generating new ci.qs in ' + os.getcwd() + ' directory')
-        write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
-        run("sbatch ci.qs", shell=True)
+        script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+        run("sbatch " + script_name, shell=True)
         
     os.chdir('../')
 

@@ -77,3 +77,4 @@ optional:
     generate_directories: False
     run_ao_codes: True
     run_ci: True
+    pci_version: default
