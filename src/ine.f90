@@ -106,7 +106,6 @@ Program ine
     End If
 
     Do k=1,nrange
-        print*,k
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
         xlambstep = xlambsteps(k)
