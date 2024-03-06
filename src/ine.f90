@@ -51,18 +51,40 @@ Program ine
     !         General convention: GLOBAL VARIABLES     |||
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
-    Use ine_variables
+    Use params, ipmr1 => IPmr, IP1conf => IP1
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
+    
     Integer, Parameter :: IP2 = 50000
+    Integer, Parameter :: IPad = 8
+
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Real(dp) :: dlamb
+    Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
+    Integer(kind=int64) :: NumH, NumJ
+    
+    Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin, dlamb
+    Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
+    Integer, Allocatable, Dimension(:) :: Int
+    Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
+    Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
+    logical :: ok
+
+    Character(Len=1), Dimension(9)          :: Let
+    Character(Len=4), Dimension(13)         :: Alet
+    Character(Len=4), Dimension(5)          :: Blet
+
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
-    logical :: ok
+
+    Type Matrix
+        Integer,  Allocatable, Dimension(:) :: n, k
+        Real(dp), Allocatable, Dimension(:) ::  t
+    End Type Matrix
+    Type(Matrix) :: Hamil, Jsq
 
     Call startTimer(start_time)
 
@@ -84,6 +106,7 @@ Program ine
     End If
 
     Do k=1,nrange
+        print*,k
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
         xlambstep = xlambsteps(k)

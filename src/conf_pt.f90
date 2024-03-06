@@ -7,12 +7,25 @@ Program conf_pt
     ! It is supposed that vectors in CONF.XIJ correspond to the same Hamiltonian 
     ! in a smaller space.
     use mpi_f08
-    Use conf_pt_variables
+    Use conf_variables
     Use integrals, Only : Rint
     Use determinants, Only : Dinit, Jterm, Wdet
     Implicit None
+    
+    ! global variables for conf_pt
+    integer, parameter :: IPPT = 5000
+    integer     :: Nd1, Ncci, Nmax, Ncp0, Ncnr, Ncnrci, Ncnr0, Ncnew, &
+                   NcOld, n_is, KmaxScr, KsymScr, NsumScr, MaxScr, ktf, kvar
+    real(dp)    :: dvnrx, dvnrn
+    logical     :: average_diag
+
     Integer  :: Nc_0, mpierr, mype, npes
     Real :: start_time, stop_time
+
+    integer, allocatable, dimension(:)    :: Ndcnr, Nvcnr, NRR, NRN, Ndirc
+    real(dp), allocatable, dimension(:)   :: B1h, En, Xj, EnG, Ey, DEnr, DVnr
+    real(dp), allocatable, dimension(:,:) :: X0
+
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
