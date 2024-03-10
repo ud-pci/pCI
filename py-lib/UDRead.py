@@ -169,7 +169,7 @@ def Data_Nist(ith,df_nist):
 
 
 def SubtractStr(a,b,w=True): # give subtraction between string a and b : "3p6.4s.4p" - "4s.4p" = "3p6."
-    ri,i="",0
+    ri,i=a,0
     if ("".join(a.rsplit(b))==a)==False:ri,i = "".join(a.rsplit(b)),1
     if ("".join(b.rsplit(a))==b)==False:ri,i = "".join(b.rsplit(a)),2
     #print(ri,i,a,b)
@@ -443,7 +443,7 @@ def Correct_Config(jth,config,mul,new_config,list_config,list_term,list_number,c
 
 
 def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
-    print("Correcting theory configurations")
+    print("Correcting ud configurations")
     new_config = np.full(len(df_ud),"",dtype=object)
     list_config,list_term,list_number,count = StartingConfigs(df_nist)
 
@@ -472,7 +472,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             if jf==1 and config=="5s.9p" and mul==1:config="4d.5p"
 
         new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
-    print("Correcting theory configurations : Complete..!")
+    print("Correcting ud configurations : Complete..!")
     return new_config
 
 

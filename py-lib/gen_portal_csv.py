@@ -223,10 +223,21 @@ def write_new_conf_res(name, filepath, data_nist):
 
     # Determine if ground state level exists in theory results
     gs_exists = False
-    if data_nist['Configuration'].iloc[0] in confs:
-        print('ground state found: ', data_nist['Configuration'].iloc[0])
-        gs_exists = True
-    else:
+    nist_conf = data_nist['Configuration'].iloc[0]
+    nist_term = data_nist['Term'].iloc[0]
+    nist_J = data_nist['J'].iloc[0]
+    for i in range(len(confs)): 
+        conf = confs[i]
+        term = terms[i].split(',')[0]
+        J = terms[i].split(',')[1]
+        
+        str_diff, num_diff = SubtractStr(nist_conf, conf)
+        if num_diff > 0:
+            if nist_conf.replace(str_diff, '') == conf and nist_term == term and nist_J == J:
+                gs_exists = True
+                print('ground state found:', confs[i])
+        
+    if not gs_exists:
         print(data_nist['Configuration'].iloc[0], ' not in', confs)
         th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
