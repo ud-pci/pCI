@@ -9,6 +9,7 @@ from parse_asd import *
 from get_atomic_term import *
 from pathlib import Path
 from subprocess import run
+from compare_res import *
 
 def read_yaml(filename):
     """ 
@@ -32,6 +33,7 @@ def parse_final_res(filename):
     energies_au = []
     energies_cm = []
     main_confs = []
+    sec_confs = []
     terms_list = []
     ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
     Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
@@ -47,6 +49,11 @@ def parse_final_res(filename):
         energies_cm.append(float(nums[1]))
         main_confs.append(confs[0])
         terms_list.append(terms[0].replace(' ', ''))
+        
+        try:
+            sec_confs.append(confs[1])
+        except:
+            sec_confs.append('')
 
     # Separate terms
     i = 0
@@ -55,7 +62,7 @@ def parse_final_res(filename):
         terms_list[i] = term
         i += 1
 
-    return main_confs, terms_list, energies_au, energies_cm
+    return main_confs, terms_list, energies_au, energies_cm, sec_confs
 
 def calc_uncertainties(energies_cm1, energies_cm2):
     '''
@@ -122,26 +129,6 @@ def reorder_levels(confs1, terms1, confs2, terms2, energies_au2, energies_cm2):
                     print('Different configurations that are not re-ordered found for Level #' + str(n), confs1[n], terms1[n], '->', confs2[n], terms2[n])
 
     return confs1, terms1, energies_au2, energies_cm2
-
-
-def merge_res(res1, res2):
-    '''
-    This function merges the results of two CONFFINAL.RES files and returns relevant data
-
-    confs - configurations
-    terms - terms ^(2S+1)L_J
-    energies_au - energies in a.u.
-    energies_cm - energies in cm-1
-    '''
-    confs1, terms1, energies_au1, energies_cm1 = parse_final_res(res1)
-    confs2, terms2, energies_au2, energies_cm2 = parse_final_res(res2)
-
-    confs = confs1 + confs2
-    terms = terms1 + terms2
-    energies_au = energies_au1 + energies_au2
-    energies_cm = energies_cm1 + energies_cm2
-    
-    return confs, terms, energies_au, energies_cm
 
 def create_mapping():
     '''
@@ -211,21 +198,32 @@ def write_new_conf_res(name, filepath, data_nist):
         print('E1MBPT.RES not found in', filepath)
 
     # Read CONF.RES files
-    _, terms_even, energies_au_even, energies_cm_even = parse_final_res(filepath + 'CONFFINALeven.RES')
-    _, _, energies_au_even_MBPT, _ = parse_final_res(filepath + 'CONFFINALevenMBPT.RES')
-
-    _, terms_odd, energies_au_odd, energies_cm_odd = parse_final_res(filepath + 'CONFFINALodd.RES')
-    _, _, energies_au_odd_MBPT, _ = parse_final_res(filepath + 'CONFFINALoddMBPT.RES')
-
-    # Merge even and odd parity CONF.RES files
-    confs, terms, energies_au, energies_cm = merge_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALodd.RES')
-    _, _, energies_au_MBPT, energies_cm_MBPT = merge_res(filepath + 'CONFFINALevenMBPT.RES', filepath + 'CONFFINALoddMBPT.RES')
+    conf_res_odd, swaps_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
+    conf_res_even, swaps_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
+    swaps = swaps_odd + swaps_even
+    
+    # Merge even and odd parity CONF.RES files and obtain uncertainties
+    gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd)
+    merged_res_unc = add_uncertainties(merged_res)
+    confs, terms, energies_au, energies_cm, energies_au_MBPT, energies_cm_MBPT, uncertainties = [], [], [], [], [], [], []
+    for conf in merged_res_unc:
+        confs.append(conf[0])
+        terms.append(conf[1])
+        energies_au.append(conf[2])
+        energies_cm.append(conf[3])
+        energies_au_MBPT.append(conf[4])
+        energies_cm_MBPT.append(conf[5])
+        uncertainties.append(conf[6])
+    
+    even_res = [conf for conf in merged_res if find_parity(conf[0]) == 'even']
+    odd_res = [conf for conf in merged_res if find_parity(conf[0]) == 'odd']
 
     # Determine if ground state level exists in theory results
     gs_exists = False
     nist_conf = data_nist['Configuration'].iloc[0]
     nist_term = data_nist['Term'].iloc[0]
     nist_J = data_nist['J'].iloc[0]
+
     for i in range(len(confs)): 
         conf = confs[i]
         term = terms[i].split(',')[0]
@@ -242,65 +240,27 @@ def write_new_conf_res(name, filepath, data_nist):
         th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
         
-    # Determine minimum energies
-    if gs_exists:
-        min_energy = max(energies_au)
-    else:
-        min_energy = th_gs_au
-    
-    # Determine if MBPT energy exists
-    try:
-        min_energy_MBPT = max(energies_au_MBPT)
-    except:
-        min_energy_MBPT = 0
-
-    # Calculate energies in cm-1 from ground state energy
-    ht_to_cm = 219474.63 # hartree to cm-1
-    energies_cm_even = [(-energy + min_energy) * ht_to_cm for energy in energies_au_even]
-    if min_energy_MBPT: energies_cm_MBPT_even = [(-energy + min_energy_MBPT) * ht_to_cm for energy in energies_au_even_MBPT]
-    energies_cm_odd = [(-energy + min_energy) * ht_to_cm for energy in energies_au_odd]
-    if min_energy_MBPT: energies_cm_MBPT_odd = [(-energy + min_energy_MBPT) * ht_to_cm for energy in energies_au_odd_MBPT]
-    energies_cm = [(-energy + min_energy) * ht_to_cm for energy in energies_au]
-    if min_energy_MBPT: energies_cm_MBPT = [(-energy + min_energy_MBPT) * ht_to_cm for energy in energies_au_MBPT]
-
-    # Calculate uncertainties
-    uncertainties = []
-    if min_energy_MBPT:
-        uncertainties_even = calc_uncertainties(energies_cm_even, energies_cm_MBPT_even)
-        uncertainties_odd = calc_uncertainties(energies_cm_odd, energies_cm_MBPT_odd)
-        uncertainties = calc_uncertainties(energies_cm, energies_cm_MBPT)
-    else:
-        uncertainties_even = [0]*len(energies_cm_even)
-        uncertainties_odd = [0]*len(energies_cm_odd)
-
     # Write csv-formatted CONF.RES files with uncertainties
+    uncertainties_even = [conf[6] for conf in even_res]
+    uncertainties_odd = [conf[6] for conf in odd_res]
+    energies_cm_even = [conf[3] for conf in even_res]
+    energies_cm_odd = [conf[3] for conf in odd_res]
+
     convert_res_to_csv(filepath + 'CONFFINALeven.RES', uncertainties_even, energies_cm_even, gs_exists, name)
     convert_res_to_csv(filepath + 'CONFFINALodd.RES', uncertainties_odd, energies_cm_odd, gs_exists, name)
 
     # Determine energy shift between odd and even parity lowest energy levels
-    energy_shift = abs(ht_to_cm * (energies_au_even[0] - energies_au_odd[0]))
-    
-    # Determine parity of ground state level
-    gs_parity = ''
-    if energies_au_even[0] > energies_au_odd[0]:
-        gs_parity = 'even'
-    else:
-        gs_parity = 'odd'
+    ht_to_cm = 219474.63 # hartree to cm-1
+    min_energy_even = even_res[0][2]
+    min_energy_odd = odd_res[0][2]
+    energy_shift = abs(ht_to_cm * (min_energy_even - min_energy_odd))
         
     # List of J values in theory results
     theory_J = {}
-    J_even = []
-    J_odd = []
-    for term in terms_even:
-        J = term[-1]
-        if J not in J_even: J_even.append(J)
-    theory_J['even'] = J_even
-    for term in terms_odd:
-        J = term[-1]
-        if J not in J_odd: J_odd.append(J)
-    theory_J['odd'] = J_odd
+    theory_J['even'] = [conf[1].split(',')[1] for conf in even_res]
+    theory_J['odd'] = [conf[1].split(',')[1] for conf in odd_res]
 
-    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists
+    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -421,35 +381,15 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps):
     '''
     This function writes the matrix element csv file
     '''
-    include_uncertainties = False
     matrix_element_filename = element + '_Matrix_Elements.csv'
     transition_rate_filename = element + '_Transition_Rates.csv'
-    
-    # Read E1.RES
-    f = open(filepath + 'E1.RES', 'r') 
-    lines = f.readlines()
-    f.close()
-    
-    # Read E1MBPT.RES
-    try:
-        f = open(filepath + 'E1MBPT.RES', 'r') 
-        lines_MBPT = f.readlines()
-        f.close()
-        include_uncertainties = True
-    except:
-        print('E1MBPT.RES was not found, so uncertainties will not be calculated')
 
-    # Obtain energies from CI+MBPT
-    if include_uncertainties:
-        energies_MBPT = []
-        for line in lines_MBPT[1:]:
-            matrix_element_value = re.findall("\d+\.\d+", line)[:1]
-            matrix_element_value = matrix_element_value[0] if matrix_element_value else None
-            energies_MBPT.append(matrix_element_value)
+    # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
+    e1_res = cmp_matrix_res(filepath + 'E1.RES', filepath + 'E1MBPT.RES',swaps)
     
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -461,30 +401,19 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                                'energy1(cm-1)', 'energy2(cm-1)',
                                'wavelength(nm)','transition_rate(s-1)'])
     
-    i = 0
-    for line in lines[1:]:
-        # E1.RES format: < conf2 || E1 || conf1 > E1_L  E1_V  E2  E1  E2-E1  WL  Tr. Rate
-        matrix_element = re.findall(r'\<.*?\>', line)[0]
-        Tk = re.findall(r'\|\|.*?\|\|', matrix_element)[0].replace('||', '').replace(' ', '')
-        state1 = re.findall(r'\|\|.*?\>', matrix_element)[0].replace(Tk, '').replace('||', '').replace('>', '')
-        state2 = re.findall(r'\<.*?\|\|', matrix_element)[0].replace('<', '').replace('||', '')
-        conf1 = '.'.join(state1.split()[:-1])
-        conf2 = '.'.join(state2.split()[:-1])
-        term1 = state1.split()[-1][0:2]
-        term2 = state2.split()[-1][0:2]
-        J1 = state1.split()[-1][-1]
-        J2 = state2.split()[-1][-1]
-        energy1 = re.findall("\d+\.\d+", line)[2:4][1]
-        energy2 = re.findall("\d+\.\d+", line)[2:4][0]
-        wavelength = float(re.findall("\d+\.\d+", line)[5])
-
-        matrix_element_value = re.findall("\d+\.\d+", line)[:1]
-        matrix_element_value = matrix_element_value[0] if matrix_element_value else None
-        if include_uncertainties:
-            uncertainty = round(abs(float(matrix_element_value) - float(energies_MBPT[i])),5) if matrix_element_value else None
-        else:
-            uncertainty = 0
-        i += 1
+    for line in e1_res:
+        # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
+        conf1 = line[0]
+        conf2 = line[2]
+        term1 = line[1][0:2]
+        term2 = line[3][0:2]
+        J1 = line[1][2]
+        J2 = line[3][2]
+        matrix_element_value = line[4]
+        uncertainty = line[5]
+        energy1 = line[6]
+        energy2 = line[7]
+        wavelength = line[8]
 
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
@@ -600,21 +529,27 @@ if __name__ == "__main__":
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
-        if os.path.isdir(all_order_path + '/even'):
-            run('cp ci+all-order/even/CONFFINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
-        if os.path.isdir(all_order_path + '/odd'):   
-            run('cp ci+all-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
-        if os.path.isdir(all_order_path + '/dtm'):   
-            run('cp ci+all-order/dtm/E1.RES DATA_RAW/E1.RES', shell=True)
+        use_path = re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(all_order_path + ' directory was found - use data from this directory? '))))
+        if use_path:
+            if os.path.isdir(all_order_path + '/even'):
+                run('cp ci+all-order/even/CONFFINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
+            if os.path.isdir(all_order_path + '/odd'):   
+                run('cp ci+all-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
+            if os.path.isdir(all_order_path + '/dtm'):   
+                run('cp ci+all-order/dtm/E1.RES DATA_RAW/E1.RES', shell=True)
+            print('data from ' + all_order_path + ' moved to DATA_RAW directory')
     
     second_order_path = 'ci+second-order'
     if os.path.isdir(second_order_path):
-        if os.path.isdir(second_order_path + '/even'):
-            run('cp ci+second-order/even/CONFFINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
-        if os.path.isdir(second_order_path + '/odd'):   
-            run('cp ci+second-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
-        if os.path.isdir(second_order_path + '/dtm'):   
-            run('cp ci+second-order/dtm/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+        use_path = re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(second_order_path + ' directory was found - use data from this directory? '))))
+        if use_path:
+            if os.path.isdir(second_order_path + '/even'):
+                run('cp ci+second-order/even/CONFFINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
+            if os.path.isdir(second_order_path + '/odd'):   
+                run('cp ci+second-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
+            if os.path.isdir(second_order_path + '/dtm'):   
+                run('cp ci+second-order/dtm/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+            print('data from ' + second_order_path + ' moved to DATA_RAW directory')
         
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
@@ -629,7 +564,7 @@ if __name__ == "__main__":
         print('Please put raw files in ' + raw_path)
         print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1.RES, E1MBPT.RES')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists = write_new_conf_res(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps = write_new_conf_res(name, raw_path, data_nist)
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
     if gs_exists:
@@ -688,6 +623,6 @@ if __name__ == "__main__":
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift)
+        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')

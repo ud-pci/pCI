@@ -68,6 +68,7 @@ def calc_lifetimes(tr_file):
     
     # Calculate lifetimes and branching ratios
     lifetimes = []
+    f = open('transitions.txt','w')
     for config, rates in tr_rates.items():
         configuration = config.split(' ')[0]
         term = config.split(' ')[1][0:2]
@@ -80,7 +81,9 @@ def calc_lifetimes(tr_file):
         lifetime = 1/total_rates*1e9
         lifetimes.append([configuration, term, J, round(lifetime,3)])
         
+        f.write(config+' ->\n')
         for rate in rates:
+            f.write('      ' + rate[0] + ' ' + str(rate[1]) + ' ' + rate[2] + ' ' +  str(rate[3]) + '\n')
             configuration2 = rate[0].split(' ')[0]
             term2 = rate[0].split(' ')[1][0:2]
             J2 = rate[0].split(' ')[1][-1]
@@ -93,7 +96,7 @@ def calc_lifetimes(tr_file):
                    'wavelength_display': f"{wavelength:.2f}", 'matrix_element_display': matrix_element, 
                    'branching_ratio_display': f"{branching_ratio:.3e}", 'transition_rate_display': f"{tr_rate:.3e}"}
             br_ratios_df.loc[len(br_ratios_df.index)] = row
-            
+    f.close()
 
     # Write lifetimes to file
     for lifetime in lifetimes:
