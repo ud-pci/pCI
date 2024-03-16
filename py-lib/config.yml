@@ -61,6 +61,10 @@ conf:
 # Parameters used by dtm program
 dtm:
     E1: True
+
+# Parameters used by portal script
+portal:
+    ignore_g: True
     
 # Optional parameters
 optional:
