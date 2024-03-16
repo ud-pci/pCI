@@ -331,7 +331,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
 
     if ignore_g:
         print('IGNORING G STATES')
-    
+
     for line in e1_res:
         # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
         conf1 = line[0]
@@ -452,10 +452,13 @@ if __name__ == "__main__":
     atom = ''
     if config_exists:
         config = read_yaml('config.yml')
-        ignore_g = config['portal']['ignore_g']
         config_name = config['system']['name']
         if len(config_name.split()) == 1:
             atom = config_name + ' I'
+        try:
+            ignore_g = config['portal']['ignore_g']
+        except KeyError:
+            ignore_g = True
     else:
         atom = input('Input name of atom: ')
     name = atom.replace(" ","_")
