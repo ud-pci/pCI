@@ -21,71 +21,6 @@ def read_yaml(filename):
 
     return config
 
-def parse_final_res(filename):
-    try:
-        f = open(filename, 'r')
-        lines = f.readlines()
-        f.close()
-    except:
-        print(filename + ' not found')
-        return [], [], [], []
-
-    energies_au = []
-    energies_cm = []
-    main_confs = []
-    sec_confs = []
-    terms_list = []
-    ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
-    Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
-    for line in lines[1:]:
-        confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
-        confs = [conf.strip() for conf in confs]
-        confs = [conf.replace(' ', '.') for conf in confs]
-        
-        terms = [term for term in line.split('  ') if any(L in term for L in Ls)]
-        nums = [num for num in line.split('  ') if '.' in num]
-      
-        energies_au.append(float(nums[0]))
-        energies_cm.append(float(nums[1]))
-        main_confs.append(confs[0])
-        terms_list.append(terms[0].replace(' ', ''))
-        
-        try:
-            sec_confs.append(confs[1])
-        except:
-            sec_confs.append('')
-
-    # Separate terms
-    i = 0
-    for term in terms_list:
-        term = term[0:2] + ',' + term[2:]
-        terms_list[i] = term
-        i += 1
-
-    return main_confs, terms_list, energies_au, energies_cm, sec_confs
-
-def calc_uncertainties(energies_cm1, energies_cm2):
-    '''
-    This function parses calculates energy uncertainties between them
-    '''
-
-    # Check if number of levels are the same
-    if len(energies_cm1) != len(energies_cm2):
-        print('Number of levels are not the same')
-        sys.exit()
-    nlv = len(energies_cm1)
-
-    # Calculate uncertainties
-    uncertainties = []
-    for n in range(nlv):
-        if energies_cm1[n] > 0 or energies_cm2[n] > 0:
-            uncertainty = round(abs(energies_cm2[n] - energies_cm1[n]))
-        else:
-            uncertainty = 0
-        uncertainties.append(uncertainty)
-    
-    return uncertainties
-
 def reorder_levels(confs1, terms1, confs2, terms2, energies_au2, energies_cm2):
     '''
     This function swaps energies of any re-ordered levels
@@ -198,15 +133,18 @@ def write_new_conf_res(name, filepath, data_nist):
         print('E1MBPT.RES not found in', filepath)
 
     # Read CONF.RES files
-    conf_res_odd, swaps_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
-    conf_res_even, swaps_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
     swaps = swaps_odd + swaps_even
+    fixes = fixes_odd + fixes_even
     
     # Merge even and odd parity CONF.RES files and obtain uncertainties
     gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd)
-    merged_res_unc = add_uncertainties(merged_res)
+
     confs, terms, energies_au, energies_cm, energies_au_MBPT, energies_cm_MBPT, uncertainties = [], [], [], [], [], [], []
-    for conf in merged_res_unc:
+    f = open('final_res.csv','w')
+    f.write('conf,term,J,energy(a.u.),energy(cm-1),energy_MBPT(a.u.),energy_MBPT(cm-1),uncertainty\n')
+    for conf in merged_res:
         confs.append(conf[0])
         terms.append(conf[1])
         energies_au.append(conf[2])
@@ -214,9 +152,17 @@ def write_new_conf_res(name, filepath, data_nist):
         energies_au_MBPT.append(conf[4])
         energies_cm_MBPT.append(conf[5])
         uncertainties.append(conf[6])
+        f.write(','.join(str(i) for i in conf) + '\n')
+    f.close()
     
     even_res = [conf for conf in merged_res if find_parity(conf[0]) == 'even']
     odd_res = [conf for conf in merged_res if find_parity(conf[0]) == 'odd']
+    
+    # Update uncertainties after merging even and odd parity CONF.RES files
+    for ilvl in range(len(even_res)):
+        full_res_even[ilvl][13] = even_res[ilvl][6]
+    for ilvl in range(len(odd_res)):
+        full_res_odd[ilvl][13] = odd_res[ilvl][6]
 
     # Determine if ground state level exists in theory results
     gs_exists = False
@@ -234,21 +180,15 @@ def write_new_conf_res(name, filepath, data_nist):
             if nist_conf.replace(str_diff, '') == conf and nist_term == term and nist_J == J:
                 gs_exists = True
                 print('ground state found:', confs[i])
-        
+    
+    # If ground state level not found in theory results, ask user for energy (a.u.) of ground state level
     if not gs_exists:
         print(data_nist['Configuration'].iloc[0], ' not in', confs)
         th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
-        
-    # Write csv-formatted CONF.RES files with uncertainties
-    uncertainties_even = [conf[6] for conf in even_res]
-    uncertainties_odd = [conf[6] for conf in odd_res]
-    energies_cm_even = [conf[3] for conf in even_res]
-    energies_cm_odd = [conf[3] for conf in odd_res]
 
-    convert_res_to_csv(filepath + 'CONFFINALeven.RES', uncertainties_even, energies_cm_even, gs_exists, name)
-    convert_res_to_csv(filepath + 'CONFFINALodd.RES', uncertainties_odd, energies_cm_odd, gs_exists, name)
-
+    # TODO - reimplement shift by user-inputted ground state
+    
     # Determine energy shift between odd and even parity lowest energy levels
     ht_to_cm = 219474.63 # hartree to cm-1
     min_energy_even = even_res[0][2]
@@ -259,8 +199,12 @@ def write_new_conf_res(name, filepath, data_nist):
     theory_J = {}
     theory_J['even'] = [conf[1].split(',')[1] for conf in even_res]
     theory_J['odd'] = [conf[1].split(',')[1] for conf in odd_res]
+    
+    # Write csv-formatted CONF.RES files with uncertainties
+    convert_res_to_csv(filepath + 'CONFFINALeven.RES', full_res_even, gs_exists, name)
+    convert_res_to_csv(filepath + 'CONFFINALodd.RES', full_res_odd, gs_exists, name)
 
-    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps
+    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -272,7 +216,7 @@ def convert_type(s): # detect and correct the 'type' of object to 'float', 'inte
     except ValueError:
         return s 
     
-def convert_res_to_csv(filename, uncertainties, energies_cm, gs_exists, name):
+def convert_res_to_csv(filename, full_res, gs_exists, name):
 
     f = open(filename, 'r')
     lines = f.readlines()
@@ -288,25 +232,9 @@ def convert_res_to_csv(filename, uncertainties, energies_cm, gs_exists, name):
     f = open(csvfile, 'w')
     f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
 
-    num_cols = 14
-    i = 0
-    for line in lines[1:]:
-        # reformatting
-        newline = re.sub('\s{3,}', '  ', line).replace('  ', ',') 
-        if newline[0] == ',':
-            newline = newline[1:]
-        newline = newline.lstrip()[:-1]
+    for row in full_res:
+        f.write(','.join([str(item) for item in row[0:2]]) + ',' + row[2].replace(',','') + ',' + ','.join([str(item) for item in row[3:]]) + '\n')
 
-        if newline.count(',') < num_cols-1:
-            num_extra_cols = num_cols - newline.count(',') - 1
-            newline += num_extra_cols*',' + str(uncertainties[i]) + '\n'
-        string_to_list = newline.split(",")
-        if not gs_exists: string_to_list[4] = str(energies_cm[i])
-        i += 1
-        modified_list = [str(Convert_Type(i)) for i in string_to_list]
-        newline = ",".join(modified_list) + '\n'
-
-        f.write(newline)
     f.close()
     print(csvfile + ' has been written')
 
@@ -381,7 +309,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes):
     '''
     This function writes the matrix element csv file
     '''
@@ -389,7 +317,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     transition_rate_filename = element + '_Transition_Rates.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res = cmp_matrix_res(filepath + 'E1.RES', filepath + 'E1MBPT.RES',swaps)
+    e1_res = cmp_matrix_res(filepath + 'E1.RES', filepath + 'E1MBPT.RES', swaps, fixes)
     
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -425,9 +353,12 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
+                #if 'G' in term1:
+                #    continue
                 J1 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy
                 if line_theory[0][3] != '-': 
+                    conf1 = line_theory[0][0]
                     energy1cm = float(line_theory[0][3])
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(expt_shift)
@@ -440,9 +371,12 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
+                #if 'G' in term2:
+                #    continue
                 J2 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy
                 if line_theory[0][3] != '-': 
+                    conf2 = line_theory[0][0]
                     energy2cm = float(line_theory[0][3])
                     if find_parity(conf2) != gs_parity:
                         energy2cm = energy2cm + float(expt_shift)
@@ -564,7 +498,7 @@ if __name__ == "__main__":
         print('Please put raw files in ' + raw_path)
         print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1.RES, E1MBPT.RES')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps = write_new_conf_res(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes = write_new_conf_res(name, raw_path, data_nist)
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
     if gs_exists:
@@ -623,6 +557,6 @@ if __name__ == "__main__":
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps)
+        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')

@@ -1,4 +1,6 @@
 import re
+import math
+import os
 
 '''
 This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt results
@@ -11,41 +13,135 @@ def parse_final_res(filename):
         f.close()
     except:
         print(filename + ' not found')
-        return [], [], [], [], []
+        return []
 
-    energies_au = []
-    energies_cm = []
-    main_confs = []
-    sec_confs = []
-    terms_list = []
+    print('========== PARSING', filename,'==========')
+    conf_res = []
+
     ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
     Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
     for line in lines[1:]:
+        index = int(re.findall("\d+",line)[0])
         confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
         confs = [conf.strip() for conf in confs]
         confs = [conf.replace(' ', '.') for conf in confs]
         
         terms = [term for term in line.split('  ') if any(L in term for L in Ls)]
         nums = [num for num in line.split('  ') if '.' in num]
-      
-        energies_au.append(float(nums[0]))
-        energies_cm.append(float(nums[1]))
-        main_confs.append(confs[0])
-        terms_list.append(terms[0].replace(' ', ''))
+
+        main_conf = confs[0]
+        term = terms[0].replace(' ', '')
+        
+        energies_au = float(nums[0])
+        energies_cm = float(nums[1])
+        s = float(nums[2])
+        l = float(nums[3])
+        j = int(float(nums[4]))
+        if '%' in nums[5]:
+            gf = '-----'
+        else:
+            gf = float(nums[5])
+        
+        cntrb1 = re.findall("\d+.\d+%",line)[0]
+        try:
+            cntrb2 = re.findall("\d+.\d+%",line)[1]
+        except:
+            cntrb2 = ''
+        
+        if 'True' in line:
+            converged = 'True'
+        else:
+            converged = 'False'
         
         try:
-            sec_confs.append(confs[1])
+            sec_conf = confs[1]
         except:
-            sec_confs.append('')
+            sec_conf = ''
+                
+        conf_res.append([index, main_conf, term, energies_au, energies_cm, s, l, j, gf, cntrb1, converged, sec_conf, cntrb2])
 
-    # Separate terms
-    i = 0
-    for term in terms_list:
-        term = term[0:2] + ',' + term[2:]
-        terms_list[i] = term
+    # Count number of electrons
+    even = False
+    num_electrons = 0
+    for orbital in conf_res[0][1].split('.'):
+        if orbital[-1].isnumeric():
+            num_electrons += int(orbital[-1])
+        else:
+            num_electrons += 1
+    if num_electrons % 2 == 0:
+        even = True
+    
+    # Save copy of old confs and terms
+    confs_terms_old = [[level[1],level[2][0:2] + ',' + level[2][2]] for level in conf_res]
+    
+    # Separate terms and J
+    fixes = []
+    i = 1
+    for level in conf_res:
+        # Fix term if 2 appears for even number of electrons
+        conf = level[1]
+        term = level[2]
+        s = level[5]
+        old_term = term[0:2] + ',' + term[2]
+        if even and term[0] == '2':
+            if float(s) > 0.5:
+                new_s = '3'
+            else:
+                new_s = '1'
+            new_term = new_s + term[1] + ',' + term[2:]
+            
+            fixes.append([i,conf,old_term,new_term])
+        else:
+            new_term = term[0:2] + ',' + term[2:]
+            
+        level[2] = new_term
         i += 1
 
-    return main_confs, terms_list, energies_au, energies_cm, sec_confs
+    # Check for duplicates
+    confs_terms = [[level[1],level[2]] for level in conf_res]
+    for ilvl in range(1, len(confs_terms)):
+        if confs_terms[ilvl] in confs_terms[:ilvl-1]:
+            print('DUPLICATE FOUND:', confs_terms[ilvl], 'AT INDICES', ilvl+1, 'AND', confs_terms[:ilvl-1].index(confs_terms[ilvl])+1)
+            existing_ilvl = confs_terms[:ilvl-1].index(confs_terms[ilvl])
+            
+            # Check duplicates of term
+            old_term = conf_res[ilvl][2]
+            s = conf_res[ilvl][5]
+            existing_s = conf_res[existing_ilvl][5]
+            if s > existing_s:
+                conf_res[existing_ilvl][2] = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                conf_res[ilvl][2] = str(round(2*math.ceil(float(s))+1)) + conf_res[ilvl][2][1:]
+            else:
+                conf_res[existing_ilvl][2] = str(round(2*math.ceil(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                conf_res[ilvl][2] = str(round(2*math.floor(float(s))+1)) + conf_res[ilvl][2][1:]
+                
+            # If term is remains same, check duplicates of configuration
+            if conf_res[existing_ilvl][2] == confs_terms[ilvl][1]:
+                if conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
+                    # Check secondary config already in list
+                    if [conf_res[existing_ilvl][11],conf_res[existing_ilvl][2]] not in confs_terms[:ilvl-1]:
+                        main_conf = conf_res[existing_ilvl][1]
+                        conf_res[existing_ilvl][1] = conf_res[existing_ilvl][11]
+                        conf_res[existing_ilvl][11] = main_conf
+                        
+                
+            print('     TERM OF LEVEL',existing_ilvl+1,'HAS BEEN UPDATED TO',conf_res[existing_ilvl][1],conf_res[existing_ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
+            print('     TERM OF LEVEL',ilvl+1,'HAS BEEN UPDATED TO',conf_res[ilvl][1],conf_res[ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
+            
+            # Check if duplicate is in list of fixes
+            for fix in fixes:
+                if fix[0] == existing_ilvl+1:
+                    fix[3] = conf_res[existing_ilvl][2]
+                    if [ilvl+1,conf_res[ilvl][1],confs_terms_old[ilvl][1],conf_res[ilvl][2]] not in fixes:
+                        fixes.append([ilvl+1,conf_res[ilvl][1],old_term,conf_res[ilvl][2]])
+
+    # Print fixes
+    if fixes:
+        print('FIXES for', filename + ':')
+        for fix in fixes:
+            print('#' + str(fix[0]) + ':',fix[1],fix[2],'->',fix[3])
+
+    return conf_res, fixes
 
 def parse_matrix_res(filename):
     try:
@@ -72,21 +168,45 @@ def parse_matrix_res(filename):
         energy1 = re.findall("\d+\.\d+", line)[2:4][1]
         energy2 = re.findall("\d+\.\d+", line)[2:4][0]
         wavelength = float(re.findall("\d+\.\d+", line)[5])
+        index1 = int(re.findall("\d+",line)[0])
+        index2 = int(re.findall("\d+",line)[1])
 
         matrix_element_value = re.findall("\d+\.\d+", line)[:1]
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
         
-        matrix_res.append([conf1, term1, J1, conf2, term2, J2, matrix_element_value, energy1, energy2, wavelength])
+        matrix_res.append([conf1, term1, J1, conf2, term2, J2, matrix_element_value, energy1, energy2, wavelength, index1, index2])
         
     return matrix_res
-        
-def cmp_matrix_res(res1, res2, swaps):
+
+def fix_matrix_res(fixes, res):
+    for row in res:
+        index1 = row[11]
+        index2 = row[10]
+        conf1 = row[3]
+        term1 = row[4] + ',' + row[5]
+        conf2 = row[0]
+        term2 = row[1] + ',' + row[2]
+        for fix in fixes:
+            if index1 == fix[0] and conf2 == fix[1] and term2 == fix[2]:
+                term = fix[3].split(',')[0]
+                J = fix[3].split(',')[1]
+                row[1] = term
+                row[2] = J
+            if index2 == fix[0] and conf1 == fix[1] and term1 == fix[2]:
+                term = fix[3].split(',')[0]
+                J = fix[3].split(',')[1]
+                row[4] = term
+                row[5] = J
+
+    return res
+
+def cmp_matrix_res(res1, res2, swaps, fixes):
     matrix_res1 = parse_matrix_res(res1)
     matrix_res2 = parse_matrix_res(res2)
     
     # Check if a swap has to be made in res2 (second-order)
-    for row in matrix_res2:
-        if swaps:
+    if swaps:
+        for row in matrix_res2:
             for swap in swaps:
                 # Check state 1
                 term = row[1] + ',' + row[2]
@@ -99,9 +219,15 @@ def cmp_matrix_res(res1, res2, swaps):
                 if row[3] == swap[1] and term == swap[2]:
                     #print('SWAP FOUND:', row[3], '-->', swap[0])
                     row[3] = swap[0]
-        
+    
+    # Check if any levels have to be fixed
+    if fixes:
+        matrix_res1 = fix_matrix_res(fixes, matrix_res1)
+        matrix_res2 = fix_matrix_res(fixes, matrix_res2)
+
     # Make a E1.RES array starting with results from res1
     matrix_res = []
+    num_matches = 0
     for row1 in matrix_res1:
         matched = False
         conf11 = row1[0]
@@ -122,19 +248,32 @@ def cmp_matrix_res(res1, res2, swaps):
                 uncertainty = round(abs(float(me2) - float(me1)),5)
                 matrix_res.append([conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength])
                 matched = True
+                num_matches += 1
                 continue
         if not matched:
             print('NOT MATCHED:', row1)
             matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
     
-    print(len(matrix_res), 'MATRIX ELEMENTS MATCHED')
+    print(num_matches,'/',len(matrix_res), 'MATRIX ELEMENTS MATCHED')
             
     
     return matrix_res
 
 def cmp_res(res1, res2):
-    confs1, terms1, energies_au1, energies_cm1, sec_confs1 = parse_final_res(res1)
-    confs2, terms2, energies_au2, energies_cm2, sec_confs2 = parse_final_res(res2)
+    conf_res1, fixes1 = parse_final_res(res1)
+    conf_res2, fixes2 = parse_final_res(res2)
+    
+    confs1 = [level[1] for level in conf_res1]
+    terms1 = [level[2] for level in conf_res1]
+    energies_au1 = [level[3] for level in conf_res1]
+    energies_cm1 = [level[4] for level in conf_res1]
+    sec_confs1 = [level[11] for level in conf_res1]
+    
+    confs2 = [level[1] for level in conf_res2]
+    terms2 = [level[2] for level in conf_res2]
+    energies_au2 = [level[3] for level in conf_res2]
+    energies_cm2 = [level[4] for level in conf_res2]
+    sec_confs2 = [level[11] for level in conf_res2]
     
     # Make a CONF.RES array starting with results from res1
     conf_res = []
@@ -185,8 +324,16 @@ def cmp_res(res1, res2):
         if len(row) == 4:
             row.append(0)
             row.append(0)
+
+    # Combine list of fixes
+    fixes = fixes1 + fixes2
     
-    return conf_res, matched_with_sec_confs
+    # Add uncertainties
+    conf_res = add_uncertainties(conf_res)
+    for i in range(len(conf_res1)):
+        conf_res1[i].append(conf_res[i][-1])
+        
+    return conf_res, conf_res1, matched_with_sec_confs, fixes
     
 def add_uncertainties(combined_conf_res):
     
@@ -209,26 +356,31 @@ def merge_res(res_even, res_odd):
         for conf in res_odd:
             energy_cm2_shifted = round((res_even[0][2]-conf[2])*ht_to_cm, 2)
             energy_cm2_shifted2 = round((res_even[0][4]-conf[4])*ht_to_cm, 2)
+            uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
             if conf[4] == 0:
-                merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],0])
+                merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],0,0])
             else:
-                merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],energy_cm2_shifted2])
+                merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],energy_cm2_shifted2,uncertainty])
     else:
         gs_parity = 'odd'
         merged_res = res_odd
         for conf in res_even:
             energy_cm1_shifted = round((res_odd[0][2]-conf[2])*ht_to_cm, 2)
             energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*ht_to_cm, 2)
+            uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
             if conf[4] == 0:
-                merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],0])
+                merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],0,0])
             else:
-                merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],energy_cm1_shifted2])
+                merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],energy_cm1_shifted2,uncertainty])
     
     return gs_parity, merged_res
 
 if __name__ == "__main__":
-    conf_res_odd, swaps_odd = cmp_res('ci+all-order/odd/CONFFINAL.RES','ci+second-order/odd/CONFFINAL.RES')
-    conf_res_even, swaps_even = cmp_res('ci+all-order/even/CONFFINAL.RES','ci+second-order/even/CONFFINAL.RES')
-    
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res('ci+all-order/odd/CONFFINAL.RES','ci+second-order/odd/CONFFINAL.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even = cmp_res('ci+all-order/even/CONFFINAL.RES','ci+second-order/even/CONFFINAL.RES')
+        
     swaps = swaps_odd + swaps_even
-    e1_res = cmp_matrix_res('ci+all-order/dtm/E1.RES','ci+second-order/dtm/E1.RES',swaps)
+    fixes = fixes_odd + fixes_even
+
+    e1_res = cmp_matrix_res('ci+all-order/dtm/E1.RES','ci+second-order/dtm/E1.RES',swaps,fixes)
+    
