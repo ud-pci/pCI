@@ -90,7 +90,7 @@ def parse_final_res(filename):
                 new_s = '1'
             new_term = new_s + term[1] + ',' + term[2:]
             
-            fixes.append([i,conf,old_term,new_term])
+            fixes.append([i,conf,old_term,conf,new_term])
         else:
             new_term = term[0:2] + ',' + term[2:]
             
@@ -101,7 +101,7 @@ def parse_final_res(filename):
     confs_terms = [[level[1],level[2]] for level in conf_res]
     for ilvl in range(1, len(confs_terms)):
         if confs_terms[ilvl] in confs_terms[:ilvl-1]:
-            print('DUPLICATE FOUND:', confs_terms[ilvl], 'AT INDICES', ilvl+1, 'AND', confs_terms[:ilvl-1].index(confs_terms[ilvl])+1)
+            print('DUPLICATE FOUND:', confs_terms[ilvl], 'AT INDICES', confs_terms[:ilvl-1].index(confs_terms[ilvl])+1, 'AND', ilvl+1)
             existing_ilvl = confs_terms[:ilvl-1].index(confs_terms[ilvl])
             
             # Check duplicates of term
@@ -123,23 +123,27 @@ def parse_final_res(filename):
                         main_conf = conf_res[existing_ilvl][1]
                         conf_res[existing_ilvl][1] = conf_res[existing_ilvl][11]
                         conf_res[existing_ilvl][11] = main_conf
-                        
+                                    
+            # Check if there's currently a list of fixes
+            if fixes:
+                # Check if duplicate is in list of fixes
+                for fix in fixes:
+                    # If index to fix is in list of fixes, update the configuration and term in fixes
+                    if fix[0] == existing_ilvl+1:
+                        fix[3] = conf_res[existing_ilvl][1]
+                        fix[4] = conf_res[existing_ilvl][2]
+                    if [ilvl+1,conf_res[ilvl][1],confs_terms_old[ilvl][1],conf_res[ilvl][1],conf_res[ilvl][2]] not in fixes:
+                        fixes.append([existing_ilvl+1,confs_terms[ilvl][0],confs_terms[ilvl][1],conf_res[existing_ilvl][1],conf_res[existing_ilvl][2]])
+                        fixes.append([ilvl+1,conf_res[ilvl][1],old_term,conf_res[ilvl][1],conf_res[ilvl][2]])
                 
             print('     TERM OF LEVEL',existing_ilvl+1,'HAS BEEN UPDATED TO',conf_res[existing_ilvl][1],conf_res[existing_ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
             print('     TERM OF LEVEL',ilvl+1,'HAS BEEN UPDATED TO',conf_res[ilvl][1],conf_res[ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
-            
-            # Check if duplicate is in list of fixes
-            for fix in fixes:
-                if fix[0] == existing_ilvl+1:
-                    fix[3] = conf_res[existing_ilvl][2]
-                    if [ilvl+1,conf_res[ilvl][1],confs_terms_old[ilvl][1],conf_res[ilvl][2]] not in fixes:
-                        fixes.append([ilvl+1,conf_res[ilvl][1],old_term,conf_res[ilvl][2]])
 
     # Print fixes
     if fixes:
         print('FIXES for', filename + ':')
         for fix in fixes:
-            print('#' + str(fix[0]) + ':',fix[1],fix[2],'->',fix[3])
+            print('#' + str(fix[0]) + ':',fix[1],fix[2],'->',fix[3],fix[4])
 
     return conf_res, fixes
 
@@ -187,14 +191,21 @@ def fix_matrix_res(fixes, res):
         conf2 = row[0]
         term2 = row[1] + ',' + row[2]
         for fix in fixes:
-            if index1 == fix[0] and conf2 == fix[1] and term2 == fix[2]:
-                term = fix[3].split(',')[0]
-                J = fix[3].split(',')[1]
+            fix_index = fix[0]
+            old_conf = fix[1]
+            old_term = fix[2]
+            new_conf = fix[3]
+            new_term = fix[4]
+            if index1 == fix_index and conf2 == old_conf and term2 == old_term:
+                term = new_term.split(',')[0]
+                J = new_term.split(',')[1]
+                row[0] = new_conf
                 row[1] = term
                 row[2] = J
-            if index2 == fix[0] and conf1 == fix[1] and term1 == fix[2]:
-                term = fix[3].split(',')[0]
-                J = fix[3].split(',')[1]
+            if index2 == fix_index and conf1 == old_conf and term1 == old_term:
+                term = fix[4].split(',')[0]
+                J = fix[4].split(',')[1]
+                row[3] = new_conf
                 row[4] = term
                 row[5] = J
 
@@ -249,7 +260,7 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
                 matrix_res.append([conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength])
                 matched = True
                 num_matches += 1
-                continue
+                break
         if not matched:
             print('NOT MATCHED:', row1)
             matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
@@ -376,11 +387,11 @@ def merge_res(res_even, res_odd):
     return gs_parity, merged_res
 
 if __name__ == "__main__":
-    conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res('ci+all-order/odd/CONFFINAL.RES','ci+second-order/odd/CONFFINAL.RES')
-    conf_res_even, full_res_even, swaps_even, fixes_even = cmp_res('ci+all-order/even/CONFFINAL.RES','ci+second-order/even/CONFFINAL.RES')
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res('DATA_RAW/CONFFINALodd.RES','DATA_RAW/CONFFINALoddMBPT.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
         
     swaps = swaps_odd + swaps_even
     fixes = fixes_odd + fixes_even
 
-    e1_res = cmp_matrix_res('ci+all-order/dtm/E1.RES','ci+second-order/dtm/E1.RES',swaps,fixes)
+    e1_res = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
     
