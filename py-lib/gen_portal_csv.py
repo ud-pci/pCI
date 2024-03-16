@@ -309,7 +309,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g):
     '''
     This function writes the matrix element csv file
     '''
@@ -328,6 +328,9 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                                'matrix_element', 'matrix_element_uncertainty', 
                                'energy1(cm-1)', 'energy2(cm-1)',
                                'wavelength(nm)','transition_rate(s-1)'])
+
+    if ignore_g:
+        print('IGNORING G STATES')
     
     for line in e1_res:
         # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
@@ -353,8 +356,9 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
-                #if 'G' in term1:
-                #    continue
+                if ignore_g:
+                    if 'g' in conf1 or 'G' in term1:
+                        continue
                 J1 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy
                 if line_theory[0][3] != '-': 
@@ -371,8 +375,9 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
-                #if 'G' in term2:
-                #    continue
+                if ignore_g:
+                    if 'g' in conf2 or 'G' in term2:
+                        continue
                 J2 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy
                 if line_theory[0][3] != '-': 
@@ -404,6 +409,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                    'energy1(cm-1)': f"{energy1cm:.2f}", 'energy2(cm-1)': f"{energy2cm:.2f}",
                    'wavelength(nm)': f"{wavelength:.2f}", 'transition_rate(s-1)': f"{trate:.4e}"}
             tr_df.loc[len(df.index)] = trrow
+    
+    print('TOTAL MATRIX ELEMENTS:',len(df))
     
     df.to_csv(matrix_element_filename, index=False)
     print(matrix_element_filename + ' has been written')
@@ -445,6 +452,7 @@ if __name__ == "__main__":
     atom = ''
     if config_exists:
         config = read_yaml('config.yml')
+        ignore_g = config['portal']['ignore_g']
         config_name = config['system']['name']
         if len(config_name.split()) == 1:
             atom = config_name + ' I'
@@ -557,6 +565,6 @@ if __name__ == "__main__":
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes)
+        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
