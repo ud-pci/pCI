@@ -313,7 +313,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     '''
     This function writes the matrix element csv file
     '''
-    matrix_element_filename = element + '_Matrix_Elements.csv'
+    matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
     transition_rate_filename = element + '_Transition_Rates.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
