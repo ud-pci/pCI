@@ -6,8 +6,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.30] - 2024-03-19
+- dtm.f90 - added option to only form DTM.INT if Kl1 = 3
+
+## [0.11.29] - 2024-03-05
+- hfd.f90 - fixes for discrepancies in HFD.DAT, remaining discrepancies seem to be due to floating point precision
+- ine.f90 - moved global arrays from ine_variables.f90 to main program
+- conf_pt.f90 - moved global arrays from conf_pt_variables.f90 to main program
+
+## [0.11.28] - 2024-03-02
+- introduced key so double precision can now be used for two-electron and IS integrals
+
+## [0.11.27] - 2024-03-01
+- bass v1.0 - initial commit of modernized bass
+
+## [0.11.26] - 2024-02-27
+- hfd v1.0 - initial commit of modernized hfd, includes reformatting of relevant subroutines
+
+## [0.11.25] - 2024-02-19
+- ine v1.22 - include result line for lambda=0, added new output file INEFINAL.RES with only result lines
+
+## [0.11.24] - 2024-02-07
+- dtm.f90 - fixed missing E2 transition for 1st matrix element
+
+## [0.11.23] - 2024-01-24
+- ine.f90 - moved converged/diverged statement to result line
+
+## [0.11.22] - 2024-01-23
+- ine v1.21 - added kIters as a parameter in ine.in
+
+## [0.11.21] - 2024-01-21
+- ine v1.20 - fixed alpha averaging
+
+## [0.11.20] - 2023-12-12
+- conf v5.16 - updated CONFFINAL.RES energy tables to include convergence
+- conf.f90 - added check for J value convergence
+
+## [0.11.19] - 2023-10-28
+- ine.f90 - fixed order of IP1, Nddir
+
 ## [0.11.18] - 2023-09-19
-- dtm.v3.4 - fixed error in transition rate calculations: tj2 -> tj1 in denominator
+- dtm v3.4 - fixed error in transition rate calculations: tj2 -> tj1 in denominator
 
 ## [0.11.17] - 2023-09-11
 - dtm v3.3 - changed labels of matrix elements to reduced matrix elements and bug fix for missing first M1 transition

@@ -41,11 +41,13 @@ Program dtm
         Call Input   ! reads file CONF.INP
         Call Init    ! reads file CONF.DAT
         Call RintA   ! either reads or calculates radial integrals
-        Call Dinit   ! forms list of determinants (CONF.DET)
-        Call Jterm   ! produces table of levels and generates basis set of determinants from CONF.INP
+        If (Kl1 < 3) Then
+            Call Dinit   ! forms list of determinants (CONF.DET)
+            Call Jterm   ! produces table of levels and generates basis set of determinants from CONF.INP
+        End If
     End If
 
-    Call InitTDM
+    If (Kl1 < 3) Call InitTDM
 
     Select Case(Kl1)
     Case(1) 
@@ -56,12 +58,14 @@ Program dtm
 
     Call CloseKeys
     If (mype==0) Then  
-        Write( *,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
-        Write(11,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
-    
-        If (Gj /= 0.d0) Then
-            Write( *,'(4X,"Note that Gj=",F8.5," is assumed for ALL levels")') Gj
-            Write(11,'(4X,"Note that Gj=",F8.5," is assumed for ALL levels")') Gj
+        If (Kl1 < 3) Then
+            Write( *,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
+            Write(11,'(4X,"Threshold: ",E8.1,";",2X,A4," form of M1 operator ")') Trd,chm1(K_M1)
+            
+            If (Gj /= 0.d0) Then
+                Write( *,'(4X,"Note that Gj=",F8.5," is assumed for ALL levels")') Gj
+                Write(11,'(4X,"Note that Gj=",F8.5," is assumed for ALL levels")') Gj
+            End If
         End If
         Close(11)
         Call stopTimer(start_time, timeStr)
@@ -289,6 +293,12 @@ Contains
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
                 Call SetKeys(99)
+            Case(3) ! regime to construct DTM.INT
+                strfmt = '(/4X,"Program DTM v1.0: Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
+                    /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
+                    /4X,"Do you want DM (1) OR TM (2) OR FORM DTM.INT (3)? ",I1)'
+                Call OpenFS('DTM.RES',0,11,1)
+                Call SetKeys(99)
         End Select
         Close(99)
 
@@ -296,7 +306,7 @@ Contains
 
         Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
-        If ((Kl1-1)*(Kl1-2) /= 0) Stop
+        If (Kl1 < 0 .or. Kl1 > 3) Stop
 
         Trd=1.d-10
         Kdm=0
