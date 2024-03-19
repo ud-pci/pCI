@@ -2050,7 +2050,7 @@ Contains
         End Type WeightTable
         Type(WeightTable) :: wgtconfs
         Data Let/'s','p','d','f','g','h','i','k','l'/
-        nconfs = 20
+        nconfs = 100
         strsp = ''
         If (.not. Allocated(C)) Allocate(C(Nd))
         If (.not. Allocated(Weights)) Allocate(Weights(Nc,Nlv))
@@ -2894,7 +2894,7 @@ Contains
         data st1/11*'='/, st2/11*'-'/
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
-        nconfs = 20
+        nconfs = 100
         strsp = ''
         If (.not. Allocated(C)) Allocate(C(Nd))
         If (.not. Allocated(W)) Allocate(W(Nc,Nlv))
