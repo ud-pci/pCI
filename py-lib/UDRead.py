@@ -469,7 +469,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
 
         # Manual Corrections
         if ManCorr==True:
-            if jf==1 and config=="5s.9p" and mul==1:config="4d.5p"
+            if jf==1 and config=="5s.8p" and mul==1:config="4d.5p"
 
         new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
     print("Correcting ud configurations : Complete..!")
