@@ -114,6 +114,7 @@ def write_new_conf_res(name, filepath, data_nist):
     This function creates a new CONF.RES file with theory uncertainties
     '''
     
+    second_order_exists = True
     matrix_file_exists = True
     # Check if raw files exist
     if not os.path.exists(filepath + 'CONFFINALeven.RES'):
@@ -124,13 +125,16 @@ def write_new_conf_res(name, filepath, data_nist):
         sys.exit()
     if not os.path.exists(filepath + 'CONFFINALevenMBPT.RES'):
         print('CONFFINALevenMBPT.RES not found in', filepath)
+        second_order_exists = False
     if not os.path.exists(filepath + 'CONFFINALoddMBPT.RES'):
         print('CONFFINALoddMBPT.RES not found in', filepath)
+        second_order_exists = False
     if not os.path.exists(filepath + 'E1.RES'):
         print('E1.RES not found in', filepath)
         matrix_file_exists = False
     if not os.path.exists(filepath + 'E1MBPT.RES'):
         print('E1MBPT.RES not found in', filepath)
+        second_order_exists = False
 
     # Read CONF.RES files
     conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
@@ -139,7 +143,7 @@ def write_new_conf_res(name, filepath, data_nist):
     fixes = fixes_odd + fixes_even
     
     # Merge even and odd parity CONF.RES files and obtain uncertainties
-    gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd)
+    gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd, second_order_exists)
 
     confs, terms, energies_au, energies_cm, energies_au_MBPT, energies_cm_MBPT, uncertainties = [], [], [], [], [], [], []
     f = open('final_res.csv','w')
@@ -159,10 +163,11 @@ def write_new_conf_res(name, filepath, data_nist):
     odd_res = [conf for conf in merged_res if find_parity(conf[0]) == 'odd']
     
     # Update uncertainties after merging even and odd parity CONF.RES files
-    for ilvl in range(len(even_res)):
-        full_res_even[ilvl][13] = even_res[ilvl][6]
-    for ilvl in range(len(odd_res)):
-        full_res_odd[ilvl][13] = odd_res[ilvl][6]
+    if second_order_exists:
+        for ilvl in range(len(even_res)):
+            full_res_even[ilvl][13] = even_res[ilvl][6]
+        for ilvl in range(len(odd_res)):
+            full_res_odd[ilvl][13] = odd_res[ilvl][6]
 
     # Determine if ground state level exists in theory results
     gs_exists = False

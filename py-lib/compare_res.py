@@ -1,6 +1,7 @@
 import re
 import math
 import os
+import sys
 
 '''
 This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt results
@@ -154,7 +155,7 @@ def parse_matrix_res(filename):
         f.close()
     except:
         print(filename + ' not found')
-        return [], [], [], []
+        return []
     
     matrix_res = []
     for line in lines[1:]:
@@ -214,6 +215,8 @@ def fix_matrix_res(fixes, res):
 def cmp_matrix_res(res1, res2, swaps, fixes):
     matrix_res1 = parse_matrix_res(res1)
     matrix_res2 = parse_matrix_res(res2)
+    if not matrix_res2:
+        second_order_exists = False
     
     # Check if a swap has to be made in res2 (second-order)
     if swaps:
@@ -234,7 +237,8 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
     # Check if any levels have to be fixed
     if fixes:
         matrix_res1 = fix_matrix_res(fixes, matrix_res1)
-        matrix_res2 = fix_matrix_res(fixes, matrix_res2)
+        if second_order_exists: 
+            matrix_res2 = fix_matrix_res(fixes, matrix_res2)
 
     # Make a E1.RES array starting with results from res1
     matrix_res = []
@@ -249,30 +253,36 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
         energy1 = row1[7]
         energy2 = row1[8]
         wavelength = row1[9]
-        for row2 in matrix_res2:
-            conf21 = row2[0]
-            term21 = row2[1] + row2[2]
-            conf22 = row2[3]
-            term22 = row2[4] + row2[5]
-            me2 = row2[6]
-            if conf11 == conf21 and term11 == term21 and conf12 == conf22 and term12 == term22:
-                uncertainty = round(abs(float(me2) - float(me1)),5)
-                matrix_res.append([conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength])
-                matched = True
-                num_matches += 1
-                break
-        if not matched:
-            print('NOT MATCHED:', row1)
+        if second_order_exists:
+            for row2 in matrix_res2:
+                conf21 = row2[0]
+                term21 = row2[1] + row2[2]
+                conf22 = row2[3]
+                term22 = row2[4] + row2[5]
+                me2 = row2[6]
+                if conf11 == conf21 and term11 == term21 and conf12 == conf22 and term12 == term22:
+                    uncertainty = round(abs(float(me2) - float(me1)),5)
+                    matrix_res.append([conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength])
+                    matched = True
+                    num_matches += 1
+                    break
+            if not matched:
+                print('NOT MATCHED:', row1)
+                matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
+        else:
             matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
     
     print(num_matches,'/',len(matrix_res), 'MATRIX ELEMENTS MATCHED')
-            
     
     return matrix_res
 
 def cmp_res(res1, res2):
     conf_res1, fixes1 = parse_final_res(res1)
-    conf_res2, fixes2 = parse_final_res(res2)
+    second_order_exists = True
+    try:
+        conf_res2, fixes2 = parse_final_res(res2)
+    except:
+        second_order_exists = False
     
     confs1 = [level[1] for level in conf_res1]
     terms1 = [level[2] for level in conf_res1]
@@ -280,11 +290,12 @@ def cmp_res(res1, res2):
     energies_cm1 = [level[4] for level in conf_res1]
     sec_confs1 = [level[11] for level in conf_res1]
     
-    confs2 = [level[1] for level in conf_res2]
-    terms2 = [level[2] for level in conf_res2]
-    energies_au2 = [level[3] for level in conf_res2]
-    energies_cm2 = [level[4] for level in conf_res2]
-    sec_confs2 = [level[11] for level in conf_res2]
+    if second_order_exists:
+        confs2 = [level[1] for level in conf_res2]
+        terms2 = [level[2] for level in conf_res2]
+        energies_au2 = [level[3] for level in conf_res2]
+        energies_cm2 = [level[4] for level in conf_res2]
+        sec_confs2 = [level[11] for level in conf_res2]
     
     # Make a CONF.RES array starting with results from res1
     conf_res = []
@@ -292,57 +303,68 @@ def cmp_res(res1, res2):
         conf_res.append([confs1[ilvl], terms1[ilvl], energies_au1[ilvl], energies_cm1[ilvl]])
     
     # Loop through res2 results and find matches to res1 results
-    not_matched1 = []
-    not_matched2 = []
-    matched_with_sec_confs = []
-    for ilvl in range(len(confs2)):
-        matched = False
-        for ilvl2 in range(len(conf_res)):
-            if confs2[ilvl] == conf_res[ilvl2][0] and terms2[ilvl] == conf_res[ilvl2][1]:
-                conf_res[ilvl2].append(energies_au2[ilvl])
-                conf_res[ilvl2].append(energies_cm2[ilvl])
-                matched = True
-                continue
-        # If primary configurations were not matched, check secondary configurations
-        if not matched:
-            for ilvl2 in range(len(sec_confs1)):
-                if confs2[ilvl] == sec_confs1[ilvl2] and terms2[ilvl] == conf_res[ilvl2][1]:
-                    conf_res[ilvl2].append(energies_au2[ilvl2])
-                    conf_res[ilvl2].append(energies_cm2[ilvl2])
-                    matched_with_sec_confs.append([conf_res[ilvl2][0],confs2[ilvl],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
+    if second_order_exists:
+        not_matched1 = []
+        not_matched2 = []
+        matched_with_sec_confs = []
+        for ilvl in range(len(confs2)):
+            matched = False
+            for ilvl2 in range(len(conf_res)):
+                if confs2[ilvl] == conf_res[ilvl2][0] and terms2[ilvl] == conf_res[ilvl2][1]:
+                    conf_res[ilvl2].append(energies_au2[ilvl])
+                    conf_res[ilvl2].append(energies_cm2[ilvl])
                     matched = True
-            # Add res2 data that were not matched to array not_matched2
+                    continue
+            # If primary configurations were not matched, check secondary configurations
             if not matched:
-                not_matched2.append([ilvl+1,confs2[ilvl], terms2[ilvl]])
-        
-    # Add res1 data that were not matched to array not_matched1
-    for ilvl in range(len(confs1)):
-        if len(conf_res[ilvl]) <= 4:
-            not_matched1.append([ilvl+1,conf_res[ilvl][0],conf_res[ilvl][1]])
-            
-    # Print matched configurations from comparing secondary configurations
-    for match in matched_with_sec_confs:
-        print('SECONDARY MATCH FOUND: ', match)
-    
-    # Print unmatched configurations from each CONFFINAL.RES file
-    if not_matched1 or not_matched2:
-        print('UNMATCHED CONFIGURATIONS FOUND:')
-        print('from ' + res1 + ': ', not_matched1)
-        print('from ' + res2 + ': ', not_matched2)
-    
-    # Assign uncertainty of 0 if no match was found
-    for row in conf_res:
-        if len(row) == 4:
-            row.append(0)
-            row.append(0)
+                for ilvl2 in range(len(sec_confs1)):
+                    if confs2[ilvl] == sec_confs1[ilvl2] and terms2[ilvl] == conf_res[ilvl2][1]:
+                        conf_res[ilvl2].append(energies_au2[ilvl2])
+                        conf_res[ilvl2].append(energies_cm2[ilvl2])
+                        matched_with_sec_confs.append([conf_res[ilvl2][0],confs2[ilvl],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
+                        matched = True
+                # Add res2 data that were not matched to array not_matched2
+                if not matched:
+                    not_matched2.append([ilvl+1,confs2[ilvl], terms2[ilvl]])
 
-    # Combine list of fixes
-    fixes = fixes1 + fixes2
+        # Add res1 data that were not matched to array not_matched1
+        for ilvl in range(len(confs1)):
+            if len(conf_res[ilvl]) <= 4:
+                not_matched1.append([ilvl+1,conf_res[ilvl][0],conf_res[ilvl][1]])
+            
+        # Print matched configurations from comparing secondary configurations
+        for match in matched_with_sec_confs:
+            print('SECONDARY MATCH FOUND: ', match)
+
+        # Print unmatched configurations from each CONFFINAL.RES file
+        if not_matched1 or not_matched2:
+            print('UNMATCHED CONFIGURATIONS FOUND:')
+            print('from ' + res1 + ': ', not_matched1)
+            print('from ' + res2 + ': ', not_matched2)
     
-    # Add uncertainties
-    conf_res = add_uncertainties(conf_res)
-    for i in range(len(conf_res1)):
-        conf_res1[i].append(conf_res[i][-1])
+        # Assign uncertainty of 0 if no match was found
+        for row in conf_res:
+            if len(row) == 4:
+                row.append(0)
+                row.append(0)
+        
+        # Add uncertainties
+        conf_res = add_uncertainties(conf_res)
+        for i in range(len(conf_res1)):
+            conf_res1[i].append(conf_res[i][-1])
+        
+        # Combine list of fixes
+        fixes = fixes1 + fixes2
+        
+    else:
+        for level in conf_res:
+            level.append('-')
+            level.append('-')
+            level.append('-')
+        for level in conf_res1:
+            level.append('-')
+        fixes = fixes1
+        matched_with_sec_confs = []
         
     return conf_res, conf_res1, matched_with_sec_confs, fixes
     
@@ -357,17 +379,21 @@ def add_uncertainties(combined_conf_res):
     
     return combined_conf_res
 
-def merge_res(res_even, res_odd):
+def merge_res(res_even, res_odd, second_order_exists):
     ht_to_cm = 219474.63 # hartree to cm-1
     gs_parity = ''
     merged_res = []
+    energy_cm1_shifted2 = '-'
+    energy_cm2_shifted2 = '-'
+    uncertainty = '-'
     if res_even[0][2] > res_odd[0][2]:
         gs_parity = 'even'
         merged_res = res_even
         for conf in res_odd:
             energy_cm2_shifted = round((res_even[0][2]-conf[2])*ht_to_cm, 2)
-            energy_cm2_shifted2 = round((res_even[0][4]-conf[4])*ht_to_cm, 2)
-            uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
+            if second_order_exists: 
+                energy_cm2_shifted2 = round((res_even[0][4]-conf[4])*ht_to_cm, 2)
+                uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
             if conf[4] == 0:
                 merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],0,0])
             else:
@@ -377,8 +403,9 @@ def merge_res(res_even, res_odd):
         merged_res = res_odd
         for conf in res_even:
             energy_cm1_shifted = round((res_odd[0][2]-conf[2])*ht_to_cm, 2)
-            energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*ht_to_cm, 2)
-            uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
+            if second_order_exists:
+                energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*ht_to_cm, 2)
+                uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
             if conf[4] == 0:
                 merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],0,0])
             else:
