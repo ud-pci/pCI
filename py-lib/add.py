@@ -188,7 +188,7 @@ def form_conf_inp(parity):
     run("cp CONF.INP CONF" + parity + ".INP", shell=True)
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(parity, run_ci, include_lsj, pci_version):
+def move_conf_inp(parity, run_ci, include_lsj, write_hij, pci_version):
     if os.path.isfile('../basis/HFD.DAT'):
         run("cp ../basis/HFD.DAT .", shell=True)
     if os.path.isfile('../CONF' + parity + '.INP'):
@@ -197,20 +197,17 @@ def move_conf_inp(parity, run_ci, include_lsj, pci_version):
         run("cp ../basis/SGC.CON .", shell=True)
     if os.path.isfile('../basis/SCRC.CON'):
         run("cp ../basis/SCRC.CON .", shell=True)
+        
+    Kw = '1' if write_hij else '0'
+    kLSJ = '1' if include_lsj else '0'
+
     if os.path.isfile('../basis/SGC.CON') and os.path.isfile('../basis/SCRC.CON'):
         with open('c.in', 'w') as f:
-            if include_lsj:
-                f.write('2, 2, 0, 0, 1')
-            else:
-                f.write('2, 2, 0, 0, 0')
-            f.close()
+            f.write('2, 2, 0, ' + Kw + ', ' + kLSJ)
     else:
         with open('c.in', 'w') as f:
-            if include_lsj:
-                f.write('0, 0, 0, 0, 1')
-            else:
-                f.write('0, 0, 0, 0, 0')
-            f.close()
+            f.write('0, 0, 0, ' + Kw + ', ' + kLSJ)
+            
     if run_ci: 
         if not os.path.isfile('ci.qs'):
             print('generating new ci.qs in ' + os.getcwd() + ' directory')
@@ -239,6 +236,7 @@ if __name__ == "__main__":
     run_ci = config['optional']['run_ci']
     include_lsj = config['conf']['include_lsj']
     pci_version = config['optional']['pci_version']
+    write_hij = config['conf']['write_hij']
     
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
@@ -293,13 +291,13 @@ if __name__ == "__main__":
                     even_path = full_path + '/even'
                     Path(even_path).mkdir(parents=True, exist_ok=True)
                     os.chdir(even_path)
-                    move_conf_inp('even', run_ci, include_lsj, pci_version)
+                    move_conf_inp('even', run_ci, include_lsj, write_hij, pci_version)
                     os.chdir('../')
                 if odd_exists: 
                     odd_path = full_path + '/odd'
                     Path(odd_path).mkdir(parents=True, exist_ok=True)
                     os.chdir(odd_path)
-                    move_conf_inp('odd', run_ci, include_lsj, pci_version)
+                    move_conf_inp('odd', run_ci, include_lsj, write_hij, pci_version)
                     os.chdir('../')
                 os.chdir('../')
         else:
