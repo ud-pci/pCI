@@ -215,6 +215,7 @@ def fix_matrix_res(fixes, res):
 def cmp_matrix_res(res1, res2, swaps, fixes):
     matrix_res1 = parse_matrix_res(res1)
     matrix_res2 = parse_matrix_res(res2)
+    second_order_exists = True
     if not matrix_res2:
         second_order_exists = False
     
