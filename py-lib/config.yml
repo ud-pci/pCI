@@ -57,7 +57,7 @@ conf:
     num_energy_levels: 24
     num_dvdsn_iterations: 100
     include_lsj: True
-    write_hij: True
+    write_hij: False
 
 # Parameters used by dtm program
 dtm:
