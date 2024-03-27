@@ -392,7 +392,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 c2 = True
 
         if c1 and c2:
-            wavelength = 1e7/(energy2cm-energy1cm)
+            wavelength = 1e7/abs(energy2cm-energy1cm)
             if energy2 > energy1:
                 trate = (2.02613*10**18)/((2*int(J1)+1)*(abs(wavelength)*10)**3)*float(matrix_element_value)**2
             else:
@@ -445,6 +445,26 @@ def find_energy_shift(df):
     
     return energy_shift
 
+def convert_roman_to_num(roman):
+    roman_val = {'I':1, 'V':5, 'X':10, 'L':50}
+    num = 0
+    i = 0
+    while (i < len(roman)):
+        c1 = roman_val[roman[i]]
+        if (i + 1 < len(roman)):
+            c2 = roman_val[roman[i + 1]]
+            if (c1 >= c2):
+                num = num + c1
+                i = i + 1
+            else:
+                num = num + c2 - c1
+                i = i + 2
+        else:
+            num = num + c1
+            i = i + 1
+    
+    return num
+
 if __name__ == "__main__":
     # Read atom name from config.yml if it exists
     config_exists = os.path.isfile('config.yml')
@@ -455,6 +475,16 @@ if __name__ == "__main__":
         config_name = config['system']['name']
         if len(config_name.split()) == 1:
             atom = config_name + ' I'
+        elif len(config_name.split()) == 2:
+            if '+' in config_name.split()[1]: 
+                atom = config_name
+            elif config_name.split()[1].isnumeric():
+                atom = config_name.split()[0] + ' ' + str(int(config_name.split()[1])-1) + '+'
+            else:
+                atom = config_name.split()[0] + ' ' + str(convert_roman_to_num(config_name.split()[1])-1) + '+'
+        else:
+            print('ERROR: atom name not supported')
+            sys.exit()
         try:
             ignore_g = config['portal']['ignore_g']
         except KeyError:
@@ -565,6 +595,12 @@ if __name__ == "__main__":
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping()
 
+    # Reformat atom name to numerical value for filenames
+    if name.split('_')[1].isalpha():
+        name = name.split('_')[0] + str(convert_roman_to_num(name.split('_')[1]))
+    else:
+        name = name.split('_')[0] + name.split('_')[1]
+        
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         print('Writing matrix elements...')
