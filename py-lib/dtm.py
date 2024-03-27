@@ -97,7 +97,7 @@ if __name__ == "__main__":
                 else:
                     f.write('2\n')
                 f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                f.write('E1')
+                if calc_E1: f.write('E1')
 
             run('mv dtm.in dtm/dtm.in', shell=True)
             if include_rpa:
