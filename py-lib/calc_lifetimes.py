@@ -23,7 +23,7 @@ def calc_lifetimes(tr_file):
     lines = f.readlines()
     f.close()
     
-    atom = tr_file.split('_')[0] + '_' + tr_file.split('_')[1]
+    atom = tr_file.split('_')[0]
     
     # Open files to write lifetimes and branching ratios
     filename_lifetimes = atom + '_Lifetimes_Error_Check.csv'    
