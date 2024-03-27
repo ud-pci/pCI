@@ -57,7 +57,8 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'conf': 'conf.qs',
                  'basc': 'basc.qs',
                  'ci': 'ci.qs',
-                 'dtm': 'dtm.qs'}
+                 'dtm': 'dtm.qs',
+                 'dtm_rpa': 'dtm_rpa.qs'}
     
     # Serial codes
     is_serial = {'ci+all-order': True, 
@@ -67,7 +68,8 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'conf': False,
                  'basc': False,
                  'ci': False,
-                 'dtm': False}
+                 'dtm': False,
+                 'dtm_rpa': False,}
     
     os.chdir(path)
     
@@ -111,6 +113,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write('${UD_MPIRUN} basc \n')
             f.write('${UD_MPIRUN} conf \n')
         elif code == 'dtm':
+            f.write('${UD_MPIRUN} dtm \n')
+        elif code == 'dtm_rpa':
+            f.write('rpa < rpa.in \n')
+            f.write('rpa_dtm \n')
             f.write('${UD_MPIRUN} dtm \n')
         elif code == 'all-order' or code == 'ci+all-order':
             f.write('time allcore-rle-ci <inf.aov >out.core \n')
