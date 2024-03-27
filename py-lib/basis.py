@@ -828,7 +828,7 @@ if __name__ == "__main__":
 
     # Write input files to basis directory
     if not include_isotope_shifts:
-        if isinstance(code_method, collections.abc.Sequence):
+        if isinstance(code_method, list):
             dir_path = os.getcwd()
             for dir in code_method:
                 Path(dir_path+'/'+dir+'/basis').mkdir(parents=True, exist_ok=True)
@@ -855,7 +855,7 @@ if __name__ == "__main__":
     # Construct basis set by running sequence of programs if desired
     if run_ao_codes:
         print("Running codes...")
-        if isinstance(code_method, collections.abc.Sequence):
+        if isinstance(code_method, list):
             dir_path = os.getcwd()
             for method in code_method:
                 Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
