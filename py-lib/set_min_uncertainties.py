@@ -12,7 +12,10 @@ def set_min_uncertainties(filename, min_percentage):
     cnt = 0
     for line in matrix_res[1:]:
         val = float(line[6]) # matrix element value
-        unc = float(line[7]) # matrix element uncertainty
+        try:
+            unc = float(line[7]) # matrix element uncertainty
+        except ValueError:
+            continue
         if val*min_percentage/100 >= unc: cnt += 1
         line[7] = '{:,.5f}'.format(max(val*min_percentage/100, unc))
         
