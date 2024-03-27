@@ -61,7 +61,7 @@ conf:
 
 # Parameters used by dtm program
 dtm:
-    E1: True
+    matrix_elements: E1
     include_rpa: True
 
 # Parameters used by portal script

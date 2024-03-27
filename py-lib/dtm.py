@@ -21,7 +21,7 @@ def read_yaml(filename):
 
     return config
 
-def write_mbpt_inp(basis):
+def write_mbpt_inp(basis, matrix_elements):
     core_orbitals = basis['orbitals']['core']
     Nso = 0
     for orbital in core_orbitals.split(' '):
@@ -29,6 +29,27 @@ def write_mbpt_inp(basis):
             Nso += 1
         else:
             Nso += 2
+    
+    key_dict = {
+        'A_hf': '0',
+        'B_hf': '0',
+        'E1_L': '0',
+        'EDM': '0',
+        'PNC': '0',
+        'E1_V': '0',
+        'AM': '0',
+        'MQM': '0',
+        'M1': '0',
+        'E2': '0',
+        'E3': '0',
+        'M2': '0',
+        'M3': '0'
+    }
+    for matrix_element in matrix_elements:
+        key_dict[matrix_element] = '1'
+        if matrix_element == 'E1':
+            key_dict['E1_L'] = '1'
+            key_dict['E1_V'] = '1'
 
     with open('MBPT.INP','w') as f:
         f.write('MBPT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Used by ALL MBPT programs \n')
@@ -48,19 +69,19 @@ def write_mbpt_inp(basis):
         f.write('Klow=  1         - lower component included/ignored \n')
         f.write('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n')
         f.write('RPA >>>>>>>>>>>>>>>>>>Used by programs which deal with RPA MEs \n')
-        f.write('A_hf   0 | \n')
-        f.write('B_hf   0 | \n')
-        f.write('E1_L   1 | \n')
-        f.write('EDM    0 | - Right hand side operators \n')
-        f.write('PNC    0 | \n')
-        f.write('E1_V   0 | \n')
-        f.write('AM     0 | \n')
-        f.write('MQM    0 | \n')
-        f.write('M1     0 | \n')
-        f.write('E2     0 | \n')
-        f.write('E3     0 | \n')
-        f.write('M2     0 | \n')
-        f.write('M3     0 | \n')
+        f.write('A_hf   ' + key_dict['A_hf'] + ' | \n')
+        f.write('B_hf   ' + key_dict['B_hf'] + ' | \n')
+        f.write('E1_L   ' + key_dict['E1_L'] + ' | \n')
+        f.write('EDM    ' + key_dict['EDM']  + ' | - Right hand side operators \n')
+        f.write('PNC    ' + key_dict['PNC']  + ' | \n')
+        f.write('E1_V   ' + key_dict['E1_V'] + ' | \n')
+        f.write('AM     ' + key_dict['AM']   + ' | \n')
+        f.write('MQM    ' + key_dict['MQM']  + ' | \n')
+        f.write('M1     ' + key_dict['M1']   + ' | \n')
+        f.write('E2     ' + key_dict['E2']   + ' | \n')
+        f.write('E3     ' + key_dict['E3']   + ' | \n')
+        f.write('M2     ' + key_dict['M2']   + ' | \n')
+        f.write('M3     ' + key_dict['M3']   + ' | \n')
         f.write('========================= \n')
         f.write('Nhf = 12 - SCF procedure includes Nhf upper shells (Nsh,Nsh-1,...) \n')
         f.write('Kmg =  0 - if not zero, Omega gives frequency of external field \n')
@@ -76,13 +97,23 @@ if __name__ == "__main__":
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
     code_method = config['optional']['code_method']
-    calc_E1 = config['dtm']['E1']
+    matrix_elements = config['dtm']['matrix_elements']
     num_levels = config['conf']['num_energy_levels']
     include_rpa = config['dtm']['include_rpa']
     pci_version = config['optional']['pci_version']
     basis = config['basis']
     
-    if isinstance(code_method, collections.abc.Sequence):
+    key_list = []
+    if isinstance(matrix_elements, list):
+        key_list = matrix_elements
+    else:
+        if len(matrix_elements.split(' ')) == 1:
+            key_list = [matrix_elements]
+        else:
+            for matrix_element in matrix_elements.split(' '):
+                key_list.append(matrix_element.replace('[','').replace(']','').replace(',',''))
+
+    if isinstance(code_method, list):
         dir_path = os.getcwd()
         for method in code_method:
             full_path = dir_path+'/'+method
@@ -97,11 +128,12 @@ if __name__ == "__main__":
                 else:
                     f.write('2\n')
                 f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                if calc_E1: f.write('E1')
+                for key in key_list:
+                    f.write(key + '\n')
 
             run('mv dtm.in dtm/dtm.in', shell=True)
             if include_rpa:
-                write_mbpt_inp(basis)
+                write_mbpt_inp(basis, key_list)
                 write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
                 run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
             else:
@@ -135,12 +167,63 @@ if __name__ == "__main__":
                 with open('dtm.in', 'w') as f:
                     f.write('2\n')
                     f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                    f.write('E1')
+                    for key in key_list:
+                        f.write(key + '\n')
                 run('sbatch dtm_rpa.qs', shell=True)
             else:    
                 run('sbatch dtm.qs', shell=True)
             
     else:
-        # TODO - run dtm for even + odd directories
-        print('not supported yet')
-        sys.exit()
+        # Make dtm directory with dtm input and job script
+        dir_path = os.getcwd()
+        dtm_path = dir_path+'/dtm'
+        Path(dir_path+'/dtm').mkdir(parents=True, exist_ok=True)
+        with open('dtm.in', 'w') as f:
+            if include_rpa:
+                f.write('3\n')
+            else:
+                f.write('2\n')
+            f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
+            for key in key_list:
+                f.write(key + '\n')
+
+        run('mv dtm.in dtm/dtm.in', shell=True)
+        if include_rpa:
+            write_mbpt_inp(basis, key_list)
+            write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
+            run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
+        else:
+            write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
+            run('mv dtm.qs dtm/dtm.qs', shell=True)
+        
+        # Find even and odd directories with completed ci runs
+        if os.path.isfile('even/CONFFINAL.RES'):
+            if include_rpa: 
+                run('cp even/HFD.DAT dtm/HFD.DAT', shell=True)
+                run('cp MBPT.INP dtm/MBPT.INP', shell=True)
+            run('cp even/CONF.INP dtm/CONF.INP', shell=True)
+            run('cp even/CONF.DET dtm/CONF.DET', shell=True)
+            run('cp even/CONF.XIJ dtm/CONF.XIJ', shell=True)
+            run('cp even/CONFSTR.RES dtm/CONFSTR.RES', shell=True)
+            run('cp even/CONF.DAT dtm/CONF.DAT', shell=True)
+            run('cp even/CONF.INT dtm/CONF.INT', shell=True)
+        if os.path.isfile('odd/CONFFINAL.RES'):
+            run('cp odd/CONF.INP dtm/CONF1.INP', shell=True)
+            run('cp odd/CONF.DET dtm/CONF1.DET', shell=True)
+            run('cp odd/CONF.XIJ dtm/CONF1.XIJ', shell=True)
+            run('cp odd/CONFSTR.RES dtm/CONFSTR1.RES', shell=True)
+                    
+        # cd into new dtm directory and submit job script
+        os.chdir(dtm_path)
+        if include_rpa:
+            with open('rpa.in', 'w') as f:
+                f.write('2')
+            run('mpirun -n 1 dtm', shell=True)
+            with open('dtm.in', 'w') as f:
+                f.write('2\n')
+                f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
+                for key in key_list:
+                    f.write(key + '\n')
+            run('sbatch dtm_rpa.qs', shell=True)
+        else:    
+            run('sbatch dtm.qs', shell=True)
