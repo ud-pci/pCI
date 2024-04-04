@@ -509,7 +509,7 @@ if __name__ == "__main__":
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
-        use_path = re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(all_order_path + ' directory was found - use data from this directory? '))))
+        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(all_order_path + ' directory was found - use data from this directory? ')))))
         if use_path:
             if os.path.isdir(all_order_path + '/even'):
                 run('cp ci+all-order/even/CONFFINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
@@ -521,7 +521,7 @@ if __name__ == "__main__":
     
     second_order_path = 'ci+second-order'
     if os.path.isdir(second_order_path):
-        use_path = re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(second_order_path + ' directory was found - use data from this directory? '))))
+        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(second_order_path + ' directory was found - use data from this directory? ')))))
         if use_path:
             if os.path.isdir(second_order_path + '/even'):
                 run('cp ci+second-order/even/CONFFINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
