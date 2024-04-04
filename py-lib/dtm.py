@@ -83,7 +83,7 @@ def write_mbpt_inp(basis, matrix_elements):
         f.write('M2     ' + key_dict['M2']   + ' | \n')
         f.write('M3     ' + key_dict['M3']   + ' | \n')
         f.write('========================= \n')
-        f.write('Nhf = 12 - SCF procedure includes Nhf upper shells (Nsh,Nsh-1,...) \n')
+        f.write('Nhf = ' + str(Nso) + ' - SCF procedure includes Nhf upper shells (Nsh,Nsh-1,...) \n')
         f.write('Kmg =  0 - if not zero, Omega gives frequency of external field \n')
         f.write('Omega= 0.057580(a.u.) \n')
         f.write('Kex =  1 - key for exchange (0 - skip, 1 - include) \n')
