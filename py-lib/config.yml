@@ -67,6 +67,7 @@ dtm:
 # Parameters used by portal script
 portal:
     ignore_g: True
+    min_uncertainty: 1.5
     
 # Optional parameters
 optional:

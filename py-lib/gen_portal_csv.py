@@ -314,7 +314,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per):
     '''
     This function writes the matrix element csv file
     '''
@@ -336,6 +336,18 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
 
     if ignore_g:
         print('IGNORING G STATES')
+        
+    # List of default minimum uncertainties for different systems
+    default_min_uncertainties = {
+        'Mg1': 0.3,
+        'Ca1': 1.3,
+        'Sr1': 1.5
+    }
+    
+    # Use default uncertainty if defined
+    if element in default_min_uncertainties:
+        min_unc_per = default_min_uncertainties[element]
+        print('DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR', element + ':', str(min_unc_per) + '%')
 
     for line in e1_res:
         # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
@@ -351,6 +363,12 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         energy2 = line[7]
         wavelength = line[8]
 
+        # Set minimum uncertainty
+        try:
+            uncertainty = '{:,.5f}'.format(max(float(matrix_element_value)*min_unc_per/100, uncertainty))
+        except TypeError:
+            uncertainty = '-'
+        
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
         energy1cm, energy2cm = 0.0, 0.0
@@ -494,6 +512,10 @@ if __name__ == "__main__":
             ignore_g = config['portal']['ignore_g']
         except KeyError:
             ignore_g = True
+        try:
+            min_uncertainty = float(config['portal']['min_uncertainty'])
+        except KeyError:
+            min_uncertainty = 1.5  # default minimum uncertainty as percentage of value
     else:
         atom = input('Input name of atom: ')
     name = atom.replace(" ","_")
@@ -609,6 +631,6 @@ if __name__ == "__main__":
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g)
+        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
