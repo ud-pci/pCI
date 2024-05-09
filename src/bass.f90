@@ -278,7 +278,7 @@ Contains
 
         data str1,str2,str3 /'   DF','Brcnr','Breit','Br+Bt',' NO','YES','YES','E = V = 0','E=0, V_c ','E_hf, V_c'/
 
-        strfmt = '(/4X,"Program Bass")'
+        strfmt = '(/4X,"Program Bass v1.1")'
         write( *,strfmt)
         write(11,strfmt)
 
@@ -325,7 +325,7 @@ Contains
         strfmt = '(6(4X,F7.4))'
         read (10,strfmt) (Qnl(i),i=1,Nso)
 200     Nsp=Nso
-        Allocate(Kbas(100*Nsp), Qnl1(100*Nsp))
+        Allocate(Kbas(1000*Nsp), Qnl1(1000*Nsp))
         if (kautobas.NE.0) then
             call GenOrbList
         else
@@ -2913,6 +2913,7 @@ Contains
         itail=0
         ix= 7                                   !### length of the tail
         small=1.d-6
+        ierr=0
    
         call ReadF (12,ni+4,P,Q,2)
         if (dabs(P(ii)).LT.small) return
