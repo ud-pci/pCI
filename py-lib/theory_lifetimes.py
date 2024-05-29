@@ -162,7 +162,10 @@ def add_res_to_dict(matrix_element_type, res, dict):
         
         # recalculated wavelength for more precision
         ht_to_cm = 219474.63 # hartree to cm-1
-        wavelength_nm = 1e7/(abs(energy2-energy1)*ht_to_cm) # in nm
+        try:
+            wavelength_nm = 1e7/(abs(energy2-energy1)*ht_to_cm) # in nm
+        except ZeroDivisionError:
+            continue
         wavelength = wavelength_nm*10 # wavelength in angstroms
         
         # calculate transition rate from formulae (https://www1.udel.edu/atom/about.html)
