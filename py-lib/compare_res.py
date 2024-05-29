@@ -160,6 +160,7 @@ def parse_matrix_res(filename):
     matrix_res = []
     for line in lines[1:]:
         # E1.RES format: < conf2 || E1 || conf1 > E1_L  E1_V  E2  E1  E2-E1  WL  Tr. Rate
+        # M2.RES format: < conf2 || M2 || conf1 > M2   E2  E1  E2-E1  WL
         matrix_element = re.findall(r'\<.*?\>', line)[0]
         Tk = re.findall(r'\|\|.*?\|\|', matrix_element)[0].replace('||', '').replace(' ', '')
         state1 = re.findall(r'\|\|.*?\>', matrix_element)[0].replace(Tk, '').replace('||', '').replace('>', '')
@@ -170,9 +171,15 @@ def parse_matrix_res(filename):
         term2 = state2.split()[-1][0:2]
         J1 = state1.split()[-1][-1]
         J2 = state2.split()[-1][-1]
-        energy1 = re.findall("\d+\.\d+", line)[2:4][1]
-        energy2 = re.findall("\d+\.\d+", line)[2:4][0]
-        wavelength = float(re.findall("\d+\.\d+", line)[5])
+        
+        if Tk == 'E1': 
+            energy1 = re.findall("\d+\.\d+", line)[2:4][1]
+            energy2 = re.findall("\d+\.\d+", line)[2:4][0]
+            wavelength = float(re.findall("\d+\.\d+", line)[5])
+        else:
+            energy1 = re.findall("\d+\.\d+", line)[1:3][1]
+            energy2 = re.findall("\d+\.\d+", line)[1:3][0]
+            wavelength = float(re.findall("\d+\.\d+", line)[4])
         index1 = int(re.findall("\d+",line)[0])
         index2 = int(re.findall("\d+",line)[1])
 
