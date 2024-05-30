@@ -10,10 +10,10 @@ Program bass
     Logical :: intrpl
     Integer, Dimension(IPs) :: Jj3, Nn3, Ll3
     Integer, Dimension(IPs) :: kw, numw, nb, jjw ! PW
-    Integer, Allocatable, Dimension(:) :: Kbas, Rint2
+    Integer, Allocatable, Dimension(:) :: Kbas
     Integer, Dimension(IP6) :: Nintrpl
     Real(dp), Dimension(IP6) :: Y, CP, CQ, CA, CB, A, B, R3, V3
-    Real(dp), Allocatable, Dimension(:) :: Qnl1, Qq
+    Real(dp), Allocatable, Dimension(:) :: Qnl1, Qq, Rint2
     Character(Len=1) :: let(9), ch1, ch3, ch4, ch5, FNAME*12, str_is(4)*3, ltr(IPs), FNAME3*12
     Character(Len=256) :: strfmt
 
