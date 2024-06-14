@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.32] - 2024-06-14
 - hfd v1.1 - resolved SMS-related bugs
-- bass v1.2 - resolves SMS-related bugs
+- bass v1.2 - resolved SMS-related bugs
+- basc v2.7 - resolved SMS-related bugs
 
 ## [0.11.31] - 2024-05-09
 - bass v1.1 - resolved array overflow error and undefined variable warning

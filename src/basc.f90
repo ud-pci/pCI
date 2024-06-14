@@ -103,9 +103,9 @@ Contains
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(4X,"PROGRAM BasC v2.6")'
+            strfmt = '(4X,"PROGRAM BasC v2.7")'
         Case(dp)            
-            strfmt = '(4X,"PROGRAM BasC v2.6 with double precision for 2e integrals")'
+            strfmt = '(4X,"PROGRAM BasC v2.7 with double precision for 2e integrals")'
         End Select
         Write( *,strfmt)
         Write(11,strfmt)
@@ -400,6 +400,7 @@ Contains
         Y=0.d0
         CP=0.d0
         CQ=0.d0
+        irr=0
 
         !### Coulomb potential of the core
         If (Nso /= 0) Then
@@ -703,6 +704,7 @@ Contains
         Use mpi_f08
         Implicit None
         Integer, Intent(InOut) :: nsx, nsx2, lsx
+        Integer :: maxn, num_is
         
         Call MPI_Bcast(Kecp, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -724,7 +726,10 @@ Contains
         Call MPI_Bcast(Kk, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
-        allocate(Rint1(nhint),Iint1(nhint),I_is(nhint),R_is(nhint))
+        call countNum_IS(lsx, num_is)
+        maxn = max(num_is, nhint)
+
+        allocate(Rint1(nhint),Iint1(nhint),I_is(maxn),R_is(maxn))
         allocate(Rint2(IPbr,ngint),Iint2(ngint),Iint3(ngint))
         allocate(IntOrd(IPx*IPx))
 
@@ -753,6 +758,39 @@ Contains
         Call MPI_Bcast(V, IP6, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
     End Subroutine AllocateRint2Arrays
+
+    Subroutine countNum_IS(lsx,num_is)
+        Implicit None
+
+        Integer :: num_is, nna, lla, jja, nnb, llb, jjb, na, nb, lsx, nmin
+        Logical :: one_e, two_e
+
+        num_is=0
+        nmin=Nso+1
+
+        ! evaluation of one-electron SMS and NMS verteces
+        Do na=nmin,nsx
+            If (Ll(na) > lsx) Cycle
+            nna=nn(na)
+            lla=ll(na)
+            jja=jj(na)
+            Do nb=na,nsx
+                If (Ll(nb) > lsx) Cycle
+                nnb=nn(nb)
+                llb=ll(nb)
+                jjb=jj(nb)
+        
+                one_e=lla == llb .and. jja == jjb
+                two_e=iabs(lla-llb) == 1 .and. iabs(jja-jjb) <= 2
+                two_e=two_e .and. K_is /= 3             ! No two-e integrals for NMS
+                If (.not.one_e .and. .not.two_e) Cycle
+
+                num_is=num_is+1
+            End Do
+        End Do
+
+    End Subroutine countNum_IS
+
 
     Subroutine countNhint(nmin,nhint)
         Implicit None
