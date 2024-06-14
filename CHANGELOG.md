@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.32] - 2024-06-14
+- hfd v1.1 - resolved SMS-related bugs
+- bass v1.2 - resolves SMS-related bugs
+
+## [0.11.31] - 2024-05-09
+- bass v1.1 - resolved array overflow error and undefined variable warning
+
 ## [0.11.30] - 2024-03-19
 - dtm.f90 - added option to only form DTM.INT if Kl1 = 3
 

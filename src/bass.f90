@@ -278,7 +278,7 @@ Contains
 
         data str1,str2,str3 /'   DF','Brcnr','Breit','Br+Bt',' NO','YES','YES','E = V = 0','E=0, V_c ','E_hf, V_c'/
 
-        strfmt = '(/4X,"Program Bass v1.1")'
+        strfmt = '(/4X,"Program Bass v1.2")'
         write( *,strfmt)
         write(11,strfmt)
 
@@ -1154,9 +1154,9 @@ Contains
         ! Derivatives of P & Q:
         if (sum.GT.1.d-1) then               !### direct differentiation
             write(*,*) ' Dif(P):'
-            call Dif(P,A,P(ii+4))
+            call Dif(P,A,R,V,P(ii+4),ii,kt,MaxT,h)
             write(*,*) ' Dif(Q):'
-            call Dif(Q,B,P(ii+4))
+            call Dif(Q,B,R,V,P(ii+4),ii,kt,MaxT,h)
         else                                 !### derivatives calculated
             call ReadF (12,ni+4+ns1,A,B,2)     !#### using matrix S
             snorm=1.d0                         !### snorm accounts for
@@ -1316,8 +1316,8 @@ Contains
         s1=dsqrt(s1/s)
     
         if (s1.GT.small) then      !### Q1 substitutes Q
-            call Origin(Q,gj,-kn)    !### Expansion at the origin
-            call Dif(Q,CQ,gj)        !### derivative of the lower component
+            call Origin(Q,R,V,gj,-kn,ii,MaxT,h)    !### Expansion at the origin
+            call Dif(Q,CQ,R,V,gj,ii,kt,MaxT,h)        !### derivative of the lower component
             call Test_Origin('Change_Q:Q',Q,R,MaxT,ii,1.d-5,ir1)
             call Test_Origin('Change_Q:B',CQ,R,MaxT,ii,2.d-2,ir2)
             call WriteF(12,ni+4,P,Q,2)
@@ -1720,7 +1720,7 @@ Contains
                 call FormBspl(llk,nbk,m1,mx,nnk,P,ii)
                 
                 P(ii+4)=gj
-                call Origin(P,gj,kkj)             !### expansion at the origin
+                call Origin(P,R,V,gj,kkj,ii,MaxT,h)             !### expansion at the origin
             end if
 
             if(kbk.EQ.3) then  
@@ -2117,8 +2117,8 @@ Contains
             if ( Emin.GT.ez(i) ) emin=ez(i)
             
             if (sorb.LT.crit) then           !### direct differentiation
-                call Dif(a,ca,a(ii+4))         !#### is used only for large
-                call Dif(b,cb,a(ii+4))         !##### rotations
+                call Dif(a,ca,R,V,a(ii+4),ii,kt,MaxT,h)         !#### is used only for large
+                call Dif(b,cb,R,V,a(ii+4),ii,kt,MaxT,h)         !##### rotations
                 n_num=n_num+1
             else
                 do k=1,nd
@@ -2673,7 +2673,7 @@ Contains
             rrn=R(i)**np
             P(i)=rrn*si*P(i)
         end do
-        call Origin(P,gj,kkj)         !### expansion at the origin
+        call Origin(P,R,V,gj,kkj,ii,MaxT,h)         !### expansion at the origin
         strfmt = '(4X,"(r**",I2,"*",A3,")")'
         write(11,strfmt) icase,str1(ksin)
 
@@ -2697,7 +2697,7 @@ Contains
         Data str2 /'   0   ','V_c-Z/r','V_c-Z/r'/
 
         gj=P(ii+4)
-        call Dif(P,A,gj)              !### first derivative
+        call Dif(P,A,R,V,gj,ii,kt,MaxT,h)              !### first derivative
         if (Kkin.EQ.2) then
             call NonRelE(P,A,llj,e_nr)  !### Non-relativistic energy
         else
@@ -2718,9 +2718,9 @@ Contains
         end do
 
         Q(ii+4)=gj
-        call Origin(Q,gj,-kkj)
+        call Origin(Q,R,V,gj,-kkj,ii,MaxT,h)
         write(*,*) ' Orbit2 calls Dif(Q)'
-        call Dif(Q,B,gj)              !### first derivative
+        call Dif(Q,B,R,V,gj,ii,kt,MaxT,h)              !### first derivative
     
         call Test_Origin('Orbit_2: P',P,R,MaxT,ii,1.d-6,ir1)
         call Test_Origin('Orbit_2: A',A,R,MaxT,ii,2.d-3,ir2)
@@ -2836,9 +2836,9 @@ Contains
             gj=P(ii3+4)
             ka=((2*la-ja)*(ja+1))/2
             call Interpolation (P,A,gj,ka)
-            call Dif(P,A,gj)
+            call Dif(P,A,R,V,gj,ii,kt,MaxT,h)
             call Interpolation (Q,B,gj,-ka)
-            call Dif(Q,B,gj)
+            call Dif(Q,B,R,V,gj,ii,kt,MaxT,h)
         end if
         strfmt = '(/4X,"Orbital ",I3,A1,I2,"/2 is taken from ",A12," (both P & Q)")'
         write( *,strfmt) na,let(la+1),ja,FNAME3
@@ -2896,7 +2896,7 @@ Contains
             P(i)=P1(i)
         end do
     
-        call Origin(P,gj,kkj)
+        call Origin(P,R,V,gj,kkj,ii,MaxT,h)
         
         Return
     End Subroutine Interpolation
@@ -2907,13 +2907,12 @@ Contains
         ! itail - =0 no changes & =1 when changes made
         Implicit None
 
-        Integer :: ni, ns, itail, ix, ierr, i1
+        Integer :: ni, ns, itail, ix, i1
         Real(dp) :: small, c, x, pi, cpi, dx, rx, r0
 
         itail=0
         ix= 7                                   !### length of the tail
         small=1.d-6
-        ierr=0
    
         call ReadF (12,ni+4,P,Q,2)
         if (dabs(P(ii)).LT.small) return

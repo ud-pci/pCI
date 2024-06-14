@@ -3,7 +3,7 @@ Program hfd
 
     Implicit None
 
-    Integer :: Mrec, iconf, MaxNc, is, ni, kt, ki, kf, n12, l, i, ii, nii, nit, iwr, iis, &
+    Integer :: Mrec, iconf, MaxNc, is, ni, kt, ki, kf, n12, l, i, ii, nii, nit, iwr, iis, MaxT, &
                 m1, m2, m3, ifin, kbr, n_is, Nmax, Imax, Nsmin, Nsmax, Ni0, Niter, ng, Lag, Klag
     Real(dp) :: eps0, eps1, e, d, del, r2, Rnucl, Gs, Es, Al, Bt, Cl, G0, R1, xja, xjc, Hs, Bts, Als
     Real(dp), Dimension(10) :: Vnuc
@@ -30,6 +30,7 @@ Program hfd
     str1(2)='Breit'
     
     ! Initialize global arrays with zeros
+    MaxT=0
     P=0_dp
     Q=0_dp
     A=0_dp
@@ -306,6 +307,7 @@ Contains
         Character(Len=256) :: strfmt, err_msg
 
         lrec=2*lr*Mrec
+        nblo=0
 
         IF (nrec.NE.0) Then
             nr=IABS(NREC)
@@ -349,6 +351,7 @@ Contains
         txt(3)=' '
         txt(4)=' '
         txt(5)=' '
+        n_is = 0
 
         strfmt = '(5a1,a)'
         read (10,strfmt) (txt(i),i=1,5),string
@@ -492,7 +495,7 @@ Contains
         strfmt = '(1X,16A1)'
         Read(10,strfmt) NAME
 
-        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.0",4X,16A1)'
+        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.1",4X,16A1)'
         Write( *,strfmt) NAME
         Write(11,strfmt) NAME
 
@@ -1686,6 +1689,7 @@ Contains
 
         NMAX=30
         IFIN=0
+        KPN=0
 
         EPS=EPS0
         IF (KT.EQ.0) EPS=EPS1
@@ -2494,8 +2498,8 @@ Contains
             Pa(i)=P(i)
             Qa(i)=Q(i)
         end do
-        call Dif(Pa,P1a,Pa(ii+4))
-        if (klow.GE.1) call Dif(Qa,Q1a,Pa(ii+4))
+        call Dif(Pa,P1a,R,V,Pa(ii+4),ii,kt,MaxT,h)
+        if (klow.GE.1) call Dif(Qa,Q1a,R,V,Pa(ii+4),ii,kt,MaxT,h)
 
         ja=Jj(na)
         la=Ll(na)
@@ -2523,9 +2527,8 @@ Contains
                 write(*,strfmt) nc,err
                 read(*,*)
             end if
-            call Dif(Pc,P1c,Pc(ii+4))
-            if (klow.GE.1) call Dif(Qc,Q1c,Pc(ii+4))
-
+            call Dif(Pc,P1c,R,V,Pc(ii+4),ii,kt,MaxT,h)
+            if (klow.GE.1) call Dif(Qc,Q1c,R,V,Pc(ii+4),ii,kt,MaxT,h)
             f0=(jc+1)*FJ3(xja,xjc,1.d0,0.5d0,-0.5d0,0.d0)**2 ! we assume closed
             s1=+c_is*f0*P_eff(na,ja,la,nc,jc,lc)             !! shells for core
             if (dabs(s1).LT.small) Cycle
@@ -3408,11 +3411,11 @@ Contains
             Qa(i)=Q(i)
         end do
 
-        call Dif5(Pa,Py,0)     ! first derivative
-        call Dif5(Py,P1a,2)    ! second derivative
+        call Dif5(Pa,Py,0,V,ii,kt,h)     ! first derivative
+        call Dif5(Py,P1a,2,V,ii,kt,h)    ! second derivative
         if (klow.GT.0) then
-            call Dif5(Qa,Qy,0)   ! first derivative
-            call Dif5(Qy,Q1a,2)  ! second derivative
+            call Dif5(Qa,Qy,0,V,ii,kt,h)   ! first derivative
+            call Dif5(Qy,Q1a,2,V,ii,kt,h)  ! second derivative
         end if
 
         ja=Jj(na)
@@ -3442,8 +3445,8 @@ Contains
             end if
         end do
 
-        call Cut_Short(Py)
-        if (klow.GT.0) call Cut_Short(Qy)
+        call Cut_Short(Py,R,V,ii,kt,MaxT,h)
+        if (klow.GT.0) call Cut_Short(Qy,R,V,ii,kt,MaxT,h)
 
         do i=1,ii,ih
             CP(i)=CP(i)+Qy(i)*R(i)

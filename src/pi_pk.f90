@@ -59,7 +59,7 @@ Module pi_pk
         End Do
 
         If (kout.GE.1) Then
-            strfmt='(/2X,"<",I2,A1,I1,"/2| V_SMS^core |",I2,A1,I1,"/2> = ",E12.5)'
+            strfmt='(/2X,"<",I2,A1,I2,"/2| V_SMS^core |",I2,A1,I2,"/2> = ",E12.5)'
             write( *,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
             write(11,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
         End If
@@ -93,14 +93,14 @@ Module pi_pk
 
         ga=Pa(ii+4)               !### upper component
         C(ii+4)=Pc(ii+4)+ga-1
-        Call Dif(Pa,Da,ga)
+        Call Dif(Pa,Da,R,V,ga,ii,kt,MaxT,h)
 
         Do i=1,Ii,ih
             C(i)=Pc(i)*(Da(i)+(la-lc)*lmax/R(i)*Pa(i))
         End Do
 
         If (klow.GT.0) Then       !### lower component
-            Call Dif(Qa,Da,ga)
+            Call Dif(Qa,Da,R,V,ga,ii,kt,MaxT,h)
             Do i=1,Ii,ih
                 C(i)=C(i)+Qc(i)*(Da(i)+(ila-ilc)*ilmax/R(i)*Qa(i))
             End Do
@@ -176,13 +176,13 @@ Module pi_pk
         Call ReadF(kan,na+4,Pa,Qa,2)
         Call ReadF(kan,nb+4,Pb,Qb,2)
         ga=Pa(ii+4)
-        Call Dif(Pa,P1a,ga)
-        Call Dif(Pb,P1b,ga)
+        Call Dif(Pa,P1a,R,V,ga,ii,kt,MaxT,h)
+        Call Dif(Pb,P1b,R,V,ga,ii,kt,MaxT,h)
         ip=la*(la+1)
         cis2=0.5d0                !  No c_is here
         If (klow.GT.0) Then
-            Call Dif(Qa,Q1a,ga)
-            Call Dif(Qb,Q1b,ga)
+            Call Dif(Qa,Q1a,R,V,ga,ii,kt,MaxT,h)
+            Call Dif(Qb,Q1b,R,V,ga,ii,kt,MaxT,h)
             ila=ja-la
             iq=ila*(ila+1)
             xja=0.5d0*ja

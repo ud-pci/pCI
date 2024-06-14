@@ -10,13 +10,13 @@ Module diff
 
   Contains
 
-    Subroutine Dif(P,CP,gm)          
+    Subroutine Dif(P,CP,R,V,gm,ii,kt,MaxT,h)          
         ! This subroutine should be used for functions which are not very smooth at R=R(1).
         Implicit None
 
-        Integer :: i, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap
-        Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err
-        Real(dp), Dimension(IP6) :: P, CP                 !
+        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT
+        Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err, h
+        Real(dp), Dimension(IP6) :: P, CP, R, V                 !
 
         If (MaxT.EQ.0) MaxT=9      !### hfd uses Nmax instead of MaxT
         ih=2-kt
@@ -117,20 +117,20 @@ Module diff
             Else                                 ! goes over even powers
                 kap=-1
             End If
-            call Origin(CP,CP(ii+4),kap)
+            call Origin(CP,R,V,CP(ii+4),kap,ii,MaxT,h)
             Read(*,*)
         End If
 
         Return
     End Subroutine Dif
 
-    Subroutine Dif5(P,CP,k)             
+    Subroutine Dif5(P,CP,k,V,ii,kt,h)             
         ! 5 node derivative without Taylor expansion, first k nodes are skipped
         Implicit None           
         
-        Integer :: ih, i0, i1, ix, k, j, ih2, ih3, i
-        Real(dp) :: h12
-        Real(dp), Dimension(IP6) :: P, CP
+        Integer :: ih, i0, i1, ix, k, j, ih2, ih3, i, ii, kt
+        Real(dp) :: h12, h
+        Real(dp), Dimension(IP6) :: P, CP, V
 
         ih=2-kt
         i0=1+k*ih
@@ -163,14 +163,14 @@ Module diff
         Return
     End Subroutine Dif5
 
-    Subroutine Origin(P,gam,kap)           ! 19/05/08
+    Subroutine Origin(P,R,V,gam,kap,ii,MaxT,h)           ! 19/05/08
         !     >> variant with four terms of Taylor expansion <<
         !# we now match P(1),P(2), dP/dr(1), and dP/dr(2)
         Implicit None
-        Integer :: k, kap, ier, iyes, ierr
-        Real(dp) :: gam, rn, g, dp1, dp2, p1, p2, d2, r1, y, p21, p11, d1
+        Integer :: k, kap, ier, iyes, ierr, ii, MaxT
+        Real(dp) :: gam, rn, g, dp1, dp2, p1, p2, d2, r1, y, p21, p11, d1, h
         Real(dp) :: p22, p2111, p2211, c2, c3, c1, c0, rk, pr1, dr1, pr2, dr2
-        Real(dp), Dimension(IP6) :: P
+        Real(dp), Dimension(IP6) :: P, R, V
         Character(Len=512) :: strfmt
 
         If (MaxT.EQ.0) MaxT=9        !### hfd uses Nmax instead of MaxT
@@ -242,14 +242,14 @@ Module diff
         Return
     End Subroutine Origin
 
-    subroutine Cut_Short(P)         
+    subroutine Cut_Short(P,R,V,ii,kt,MaxT,h)         
         ! Smoothly brings P to zero between r_1 and r_k.
         ! Anzatz used: (r-r1)**2*[a(r-rk)**2+b(r-rk)+c]
         Implicit None
 
-        Integer :: ih, ih2, ih3, k, i, kp, km
-        Real(dp) :: h12, pk, dpk, ddpk, r1, ri, rk, dr, dr2, a, b, c, dpk1
-        Real(dp), Dimension(IP6) :: P
+        Integer :: ih, ih2, ih3, k, i, kp, km, ii, kt, MaxT
+        Real(dp) :: h12, pk, dpk, ddpk, r1, ri, rk, dr, dr2, a, b, c, dpk1, h
+        Real(dp), Dimension(IP6) :: P, R, V
 
         ih=2-kt
         h12=12*ih*h
