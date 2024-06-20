@@ -288,7 +288,7 @@ Contains
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
                 Read (99,*) nterm1, nterm1f, nterm2, nterm2f
-                strfmt = '(/4X,"Program TM v3.3: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program TM v3.4: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
@@ -1905,7 +1905,11 @@ Contains
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| E1 ||",1X,A,2X,A,">",2X,F12.5,2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AE1 /= 0.d0 .and. AE1V /= 0.d0) Then
-                tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1**2
+                If (e2 > e1) Then
+                    tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1**2
+                Else
+                    tr = (2.02613e18/((2*tj2+1)*(wl*10)**3))*AE1**2
+                End If
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, AE1V, -e1, -e2, -delEcm, wl
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1, AE1V, -e1, -e2, -delEcm, wl, tr
             End If
@@ -1921,7 +1925,11 @@ Contains
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| E1 ||",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AE1 /= 0.d0) Then
-                tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1**2
+                If (e2 > e1) Then
+                    tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1**2
+                Else
+                    tr = (2.02613e18/((2*tj2+1)*(wl*10)**3))*AE1**2
+                End If
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1, -e1, -e2, -delEcm, wl
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1, -e1, -e2, -delEcm, wl, tr
             End If
@@ -1937,7 +1945,11 @@ Contains
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| E1 ||",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AE1V /= 0.d0) Then
-                tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1V**2
+                If (e2 > e1) Then
+                    tr = (2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1V**2
+                Else
+                    tr = (2.02613e18/((2*tj2+1)*(wl*10)**3))*AE1V**2
+                End If
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE1V, -e1, -e2, -delEcm, wl
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1V, -e1, -e2, -delEcm, wl, tr
             End If
@@ -1954,7 +1966,11 @@ Contains
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| E2 ||",1X,A,2X,A,">",2X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AE2 /= 0.d0) Then
-                tr = (1.11995e18/((2*tj1+1)*(wl*10)**5))*AE2**2
+                If (e2 > e1) Then
+                    tr = (1.11995e18/((2*tj1+1)*(wl*10)**5))*AE2**2
+                Else
+                    tr = (1.11995e18/((2*tj2+1)*(wl*10)**5))*AE2**2
+                End If
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), AE2, -e1, -e2, -delEcm, wl
                 Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE2, -e1, -e2, -delEcm, wl, tr
             End If
@@ -1987,7 +2003,11 @@ Contains
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| M1 ||",1X,A,2X,A,">",7X,F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (G /= 0.d0) Then
-                tr = (2.69735e13/((2*tj1+1)*(wl*10)**3))*G**2
+                If (e2 > e1) Then
+                    tr = (2.69735e13/((2*tj1+1)*(wl*10)**3))*G**2
+                Else
+                    tr = (2.69735e13/((2*tj2+1)*(wl*10)**3))*G**2
+                End If
                 !Write( 6,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), strt1(k1), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), strt2(k2), G, -e1, -e2, -delEcm, wl
                 Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), G, -e1, -e2, -delEcm, wl, tr
             End If

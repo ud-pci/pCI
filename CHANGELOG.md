@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.33] - 2024-06-20
+- dtm v3.4 - corrected transition rate formulas for correct J in denominator depending on lower/upper level
+
 ## [0.11.32] - 2024-06-14
 - hfd v1.1 - resolved SMS-related bugs
 - bass v1.2 - resolved SMS-related bugs
