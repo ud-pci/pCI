@@ -97,7 +97,7 @@ Contains
         Implicit None
 
         Integer           :: Ncci, key
-        Character(Len=32) :: strfmt
+        Character(Len=64) :: strfmt
 
         ! Write name of program
         Open(unit=11,status='UNKNOWN',file='BASC.RES')

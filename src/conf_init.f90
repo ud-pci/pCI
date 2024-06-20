@@ -123,8 +123,8 @@ Module conf_init
         If (txt(3) /= 'i'   .and.   txt(3) /= 'I') goto 220
         If (txt(4) /= 's'   .and.   txt(4) /= 'S') goto 220
         Read (string,*) C_is
-        Write( *,'(5a1,F6.3)') (txt(i),i=1,5),C_is
-        Write(11,'(5a1,F6.3)') (txt(i),i=1,5),C_is
+        Write( *,'(5a1,F7.4)') (txt(i),i=1,5),C_is
+        Write(11,'(5a1,F7.4)') (txt(i),i=1,5),C_is
         Return
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
     220 If (txt(1) /= 'k'   .and.   txt(1) /= 'K') goto 230
