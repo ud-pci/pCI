@@ -3212,7 +3212,7 @@ Contains
             strfmt2 = '(4X,"ICONF",4X,5F11.5)'
             Write(11,strfmt2) (Tk(i),i=j1,j2)
             Write(11,strfmt) (st2,i=j1,j3)
-            strfmt2 = '(2X,I7,"      ",5F11.6)'
+            strfmt2 = '(2X,I7,6X,5(E9.3,2X))'
             Do ic=1,Nc
                 Write(11,strfmt2) ic,(W(ic,j),j=j1,j2)
             End Do
