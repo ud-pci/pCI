@@ -20,8 +20,11 @@ CMakeFiles
 cmake_install.cmake
 Makefile
 
-# Test directory
+# Test directory and files
 test/
+*.csv
+*.INP
+*.RES
 
 # vscode
 .vscode
