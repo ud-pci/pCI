@@ -30,6 +30,8 @@ def find_cluster():
     else:
         cluster = 'cluster could not be identified'
     
+    run('rm sinfo.out', shell=True)
+    
     return cluster
 
 def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version):
