@@ -77,11 +77,11 @@ optional:
 
     isotope_shifts: 
         include: False
-        K_is: 1
-        C_is: 0.01
+        K_is: 0
+        C_is: 0
 
     code_method: [ci+all-order, ci+second-order]
     generate_directories: False
-    run_ao_codes: True
-    run_ci: True
+    run_ao_codes: False
+    run_ci: False
     pci_version: default
