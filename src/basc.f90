@@ -726,8 +726,12 @@ Contains
         Call MPI_Bcast(Kk, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
-        call countNum_IS(lsx, num_is)
-        maxn = max(num_is, nhint)
+        If (K_is > 0) Then
+            call countNum_IS(num_is)
+            maxn = max(num_is, nhint)
+        Else
+            maxn = nhint
+        End If
 
         allocate(Rint1(nhint),Iint1(nhint),I_is(maxn),R_is(maxn))
         allocate(Rint2(IPbr,ngint),Iint2(ngint),Iint3(ngint))
@@ -759,10 +763,10 @@ Contains
 
     End Subroutine AllocateRint2Arrays
 
-    Subroutine countNum_IS(lsx,num_is)
+    Subroutine countNum_IS(num_is)
         Implicit None
 
-        Integer :: num_is, nna, lla, jja, nnb, llb, jjb, na, nb, lsx, nmin
+        Integer :: num_is, nna, lla, jja, nnb, llb, jjb, na, nb, nmin
         Logical :: one_e, two_e
 
         num_is=0
@@ -964,7 +968,7 @@ Contains
                         jjd=jj(nd)
                         Call ReadFF (12,nd+4,Pd,Qd,2)    ! a,b
                         Call readf (12,nd+Ns+4,ca,cb,2)
-                        Do i=1,Ii,ih
+                        Do i=1,ii,ih
                             C(i)=cp(i)*Pd(i)+cq(i)*Qd(i)
                             ! >>>>>>>>>>>>>>> EFFECTIVE CORE POTENTIAL >>>>>>>>>>>>>>>>>
                             If (Kecp /= 0) C(i)=C(i)- &
