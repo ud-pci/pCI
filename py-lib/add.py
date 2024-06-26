@@ -9,8 +9,7 @@ import orbitals as orb_lib
 import get_atomic_data as libatomic
 from pathlib import Path
 from gen_job_script import write_job_script
-    
-    
+
 def read_yaml(filename):
     """ 
     This function reads a configuration file in YAML format and returns a dictionary of config parameters
@@ -188,33 +187,29 @@ def form_conf_inp(parity):
     run("cp CONF.INP CONF" + parity + ".INP", shell=True)
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(parity, run_ci, include_lsj, write_hij, pci_version):
-    if os.path.isfile('../basis/HFD.DAT'):
-        run("cp ../basis/HFD.DAT .", shell=True)
-    if os.path.isfile('../CONF' + parity + '.INP'):
-        run("cp ../CONF" + parity + ".INP CONF.INP", shell=True)
-    if os.path.isfile('../basis/SGC.CON'):
-        run("cp ../basis/SGC.CON .", shell=True)
-    if os.path.isfile('../basis/SCRC.CON'):
-        run("cp ../basis/SCRC.CON .", shell=True)
+def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
+    if not os.path.isdir(parity):
+        run("mkdir " + parity, shell=True)
+    if os.path.isfile('basis/HFD.DAT'):
+        run("cp basis/HFD.DAT " + parity, shell=True)
+    if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
+        run("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
+    if os.path.isfile('basis/SGC.CON'):
+        run("cp basis/SGC.CON "  + parity, shell=True)
+    if os.path.isfile('basis/SCRC.CON'):
+        run("cp basis/SCRC.CON "  + parity, shell=True)
+    if run_ci and os.path.isfile(root_dir + '/ci.qs'):
+        run("cp " + root_dir + "/ci.qs " + parity, shell=True)
         
     Kw = '1' if write_hij else '0'
     kLSJ = '1' if include_lsj else '0'
 
-    if os.path.isfile('../basis/SGC.CON') and os.path.isfile('../basis/SCRC.CON'):
-        with open('c.in', 'w') as f:
+    if os.path.isfile('basis/SGC.CON') and os.path.isfile('basis/SCRC.CON'):
+        with open(parity + '/c.in', 'w') as f:
             f.write('2, 2, 0, ' + Kw + ', ' + kLSJ)
     else:
-        with open('c.in', 'w') as f:
+        with open(parity + '/c.in', 'w') as f:
             f.write('0, 0, 0, ' + Kw + ', ' + kLSJ)
-            
-    if run_ci: 
-        if not os.path.isfile('ci.qs'):
-            print('generating new ci.qs in ' + os.getcwd() + ' directory')
-        script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
-        run("sbatch " + script_name, shell=True)
-        
-    os.chdir('../')
 
 def check_conf_inp_exists(dir):
     if not os.path.isfile('HFD.DAT'):
@@ -232,6 +227,13 @@ if __name__ == "__main__":
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
     
+    include_isotope_shifts = config['optional']['isotope_shifts']['include']
+    if include_isotope_shifts:
+        K_is = config['optional']['isotope_shifts']['K_is']
+        C_is = config['optional']['isotope_shifts']['C_is']
+        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+        K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
+        
     code_method = config['optional']['code_method']
     run_ci = config['optional']['run_ci']
     include_lsj = config['conf']['include_lsj']
@@ -246,88 +248,110 @@ if __name__ == "__main__":
         print('ERROR: core orbitals of basis and add do not match in config.yml')
         sys.exit()
     
-    if run_ci:
-        gen_dir = run_ci
-    else:
-        gen_dir = config['optional']['generate_directories']
-        
+    # Check if user wants to generate directories for CI computations
+    gen_dir = run_ci if run_ci else config['optional']['generate_directories']
+    
+    # CONF.INP should only need to be constructed once, then copied to respective directories
+    # Read input to add from add.in if it exists, otherwise create it
+    try:
+        open("add.in", 'rb').read()
+    except:
+        f = open("add.in", "w")
+        f.write("0 \n 0")
+        f.close()
+    
+    # BASS.INP will dictate order of orbitals in ADD.INP, so find a BASS.INP file from any basis directory
+    if not os.path.isfile('BASS.INP'):
+        for root, dirs, files in os.walk('.'):
+            if 'BASS.INP' in files:
+                run('cp ' + root + '/BASS.INP .', shell=True)
+                break
+    
+    # Run script to generate ADD.INP for even and odd configurations
+    create_add_inp(config)
+    
+    # Cleanup BASS.INP
+    run('rm BASS.INP', shell=True)
+    
+    # Check if ADDeven.INP and ADDodd.INP exist
+    even_exists = os.path.isfile('ADDeven.INP')
+    odd_exists = os.path.isfile('ADDodd.INP')
+    
+    # Run add and form CONF.INP from respective ADD.INP files
+    parities = []
+    if even_exists: 
+        form_conf_inp('even')
+        parities.append('even')
+    if odd_exists: 
+        form_conf_inp('odd')
+        parities.append('odd')
+    
+    # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
+    run("rm add.in ADD.INP CONF.INP CONF_.INP", shell=True)
+    
+    # Create a ci.qs job script if it doesn't exist yet
+    if not os.path.isfile('ci.qs'):
+        print('generating new ci.qs in ' + os.getcwd() + ' directory')
+        script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+    
+    # Copy ADD.INP and CONF.INP to all directories if gen_dir == True
     if gen_dir:
-        if isinstance(code_method, collections.abc.Sequence):
-            dir_path = os.getcwd()
+        root_dir = os.getcwd()
+        if include_isotope_shifts and K_is > 0:
             for method in code_method:
-                full_path = dir_path+'/'+method
-                Path(full_path).mkdir(parents=True, exist_ok=True)
-                os.chdir(full_path)
-                
-                # Read input to add from add.in if it exists, otherwise create it
-                try:
-                    open("add.in", 'rb').read()
-                except:
-                    f = open("add.in", "w")
-                    f.write("0 \n 0")
-                    f.close()
-                
-                # Pull BASS.INP from basis directory if it exists
-                if os.path.isfile('basis/BASS.INP'):
-                    run('cp basis/BASS.INP .', shell=True)
-            
-                # Run script to generate ADD.INP for even and odd configurations
-                create_add_inp(config)
-                
-                # Cleanup BASS.INP
-                run('rm BASS.INP', shell=True)
-            
-                # Check if ADDeven.INP and ADDodd.INP exist
-                even_exists = os.path.isfile('ADDeven.INP')
-                odd_exists = os.path.isfile('ADDodd.INP')
-            
-                if even_exists: form_conf_inp('even')
-                if odd_exists: form_conf_inp('odd')
-            
-                # Cleanup - remove add.in
-                run("rm add.in", shell=True)
-                
-                if even_exists: 
-                    even_path = full_path + '/even'
-                    Path(even_path).mkdir(parents=True, exist_ok=True)
-                    os.chdir(even_path)
-                    move_conf_inp('even', run_ci, include_lsj, write_hij, pci_version)
+                dir_path = os.getcwd()
+                is_dir = method + '/' + K_is_dict[K_is]
+                Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
+                os.chdir(dir_path+'/'+is_dir)
+                for c in c_list:
+                    dir_path = os.getcwd()
+                    if c < 0:
+                        dir_prefix = 'minus' 
+                    elif c > 0:
+                        dir_prefix = 'plus'
+                    else:
+                        dir_prefix = ''
+                    dir_name = dir_prefix+str(abs(c))
+                    Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
+                    os.chdir(dir_name)
+                    run('pwd', shell=True)
+                    for parity in parities:
+                        move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
+                        # Submit CI job if run_ci == True
+                        if run_ci: 
+                            os.chdir(parity)
+                            run("sbatch " + script_name, shell=True)
+                            os.chdir('../')
                     os.chdir('../')
-                if odd_exists: 
-                    odd_path = full_path + '/odd'
-                    Path(odd_path).mkdir(parents=True, exist_ok=True)
-                    os.chdir(odd_path)
-                    move_conf_inp('odd', run_ci, include_lsj, write_hij, pci_version)
+                if K_is_dict[K_is]:
+                    os.chdir('../../')
+                else:
                     os.chdir('../')
-                os.chdir('../')
         else:
-            # Read input to add from add.in if it exists, otherwise create it
-            try:
-                open("add.in", 'rb').read()
-            except:
-                f = open("add.in", "w")
-                f.write("0 \n 0")
-                f.close()
-            
-            # Run script to generate ADD.INP for even and odd configurations
-            create_add_inp(config)
-            
-            # Check if ADDeven.INP and ADDodd.INP exist
-            even_exists = os.path.isfile('ADDeven.INP')
-            odd_exists = os.path.isfile('ADDodd.INP')
-            
-            if even_exists: form_conf_inp('even')
-            if odd_exists: form_conf_inp('odd')
-            
-            # Cleanup - remove add.in
-            run("rm add.in", shell=True)
-                
-            dir_path = os.getcwd()
-            for dirs in ['even','odd']:
-                Path(dir_path+'/'+dirs).mkdir(parents=True, exist_ok=True)
-                os.chdir(dirs)
-                move_conf_inp(dirs)
-                os.chdir('../')
+            if isinstance(code_method, list):
+                dir_path = os.getcwd()
+                for method in code_method:
+                    Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
+                    os.chdir(method)
+                    run('pwd', shell=True)
+                    for parity in parities:
+                        move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
+                        # Submit CI job if run_ci == True
+                        if run_ci: 
+                            os.chdir(parity)
+                            run("sbatch " + script_name, shell=True)
+                            os.chdir('../')
+                    os.chdir('../')
+            else:
+                dir_path = os.getcwd()
+                run('pwd', shell=True)
+                for parity in parities:
+                    move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
+                    # Submit CI job if run_ci == True
+                    if run_ci: 
+                        os.chdir(parity)
+                        run("sbatch " + script_name, shell=True)
+                        os.chdir('../')
 
     print('add script completed')
 
