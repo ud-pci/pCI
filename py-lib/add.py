@@ -1,5 +1,25 @@
+""" Add
+
+This script allows the user to automate the configuration list construction from inputted parameters in a "config.yml" file. 
+The "config.yml" file should have the following blocks:
+
+    * system - general parameters (name of atomic system, isotope number, inclusion of breit)
+    * basis.orbitals.core - core orbitals are read to ensure consistent basis set
+    * add - parameters used by add program (reference configurations, basis set, orbitals, excitations)
+    * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
+
+From these parameters, this script will create all input files required for execution of the add program.
+After the input files are created, the add program will be executed to create the list of configurations CONF.INP.
+If optional.generate_directories is set to "True", the script will generate respective directories for CI calculations (e.g. /even and /odd)
+If optional.run_ci is set to "True", the script will then submit the slurm job in the generated directories. 
+
+This python script has 3 main capabilities for configuration list construction:
+1. General construction of configuration lists in root directory
+2. Construction of configuration lists for isotope shift calculations 
+3. Construction of configuration lists for multiple code methods
+
+"""
 import yaml
-import collections.abc
 from subprocess import run
 import os
 import sys

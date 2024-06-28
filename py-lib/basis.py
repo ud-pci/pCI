@@ -1,10 +1,26 @@
+""" Basis
+
+This script allows the user to automate the basis set construction from inputted parameters in a "config.yml" file.
+The "config.yml" file should have the following blocks:
+
+    * system - general parameters (name of atomic system, isotope number, inclusion of breit)
+    * basis - parameters used by basis programs (cavity radius, core and valence orbitals, b-splines)
+    * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
+
+From these parameters, this script will create all input files required for the various basis codes.
+After the input files are created, the sequence of basis set codes will be executed if the parameter run_ao_codes is set to "True".
+
+This python script has 2 main capabilities for basis set construction:
+1. Construction of basis for isotope shift calculations 
+2. Construction of basis for multiple code methods
+
+"""
 import yaml 
 import re
 import sys
 import get_atomic_data as libatomic
 import orbitals as liborb
 import os
-import collections.abc
 from pathlib import Path
 from subprocess import run
 from gen_job_script import write_job_script
