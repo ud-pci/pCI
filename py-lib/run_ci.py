@@ -1,103 +1,40 @@
-import yaml
-import re
-import math
-import sys
-import os
-from subprocess import Popen, PIPE, STDOUT, run
-from functools import reduce
+""" Isotope shifts
 
+This script allows the user to automate isotope shift calculations from an already completed non-IS calculation.
+The root/non-IS calculation should be in a directory called "0", and should contain the following files:
 
-'''
+    * basis.sh - shell script to construct the basis set
+    * HFD.INP - input file for hfd
+    * BASS.INP - input file for bass
+    * inf.aov, inf.vw (optional) - input files for all-order 
+    * CONF.INP, c.in - input file for CI procedure
+    * ci.qs - job script for parallel ci 
+
 This python script has 3 main capabilities for isotope shift calculations:
-1. Run basc in IS directories
-2. Run conf in IS directories
+1. Reconstruct basis in IS directories
+2. Run CI procedure in IS directories
 3. Analyze and compile the outputs from IS directories
 
-'''
-def read_yaml(filename):
-    """ Reads yaml input file and returns contents """ 
+If the user needs to start isotope shift calculations from scratch, e.g. do not have a "0" directory already completed,
+the script 'basis.py" can be used instead.
 
-    isotope = 0
-    val_aov = []
-    # read yaml file with inputs
+"""
+import re
+import yaml
+import sys
+import os
+from subprocess import run
+from functools import reduce
+
+def read_yaml(filename):
+    """ 
+    This function reads a configuration file in YAML format and returns a dictionary of config parameters
+    """ 
+
     with open(filename,'r') as f:
         config = yaml.safe_load(f)
 
-        # Check to see if isotope is specified. If not, set to 0
-        try:
-            isotope = config['isotope']
-        except KeyError as e:
-            config[e.args[0]] = 0
-        
-        # Check to see if val_aov is specified. If not, set to []
-        try:
-            val_aov = config['val_aov']
-        except KeyError as e:
-            config[e.args[0]] = []
-
-        # Check to see if energies are specified. If not, set to []
-        try:
-            energies = config['energies']
-        except KeyError as e:
-            config[e.args[0]] = []
-
-        # Check to see if isotope shift key is specified. If not, set to 0
-        try:
-            isotope = config['K_is']
-        except KeyError as e:
-            config[e.args[0]] = 0
-        try:
-            C_is = config['C_is']
-        except KeyError as e:
-            config[e.args[0]] = 0 
-
-        # Check whether or not to run all-order codes after basis set construction
-        try:
-            run_ao_codes = config['run_ao_codes']
-        except KeyError as e:
-            config[e.args[0]] = 0 
-
     return config
-
-def write_job_script(filename, code, num_nodes, num_procs_per_node, exclusive, mem, partition):
-    if code == 'conf' or code == 'ci':
-        with open('c.in', 'w') as f:
-            f.write('2, 2, 0, 0, 1')
-        f.close()
-
-    with open(filename, 'w') as f:
-        f.write('#!/bin/bash -l \n')
-        f.write(' \n')
-        f.write('#SBATCH --nodes=' + str(num_nodes) + ' \n')
-        f.write('#SBATCH --tasks-per-node=' + str(num_procs_per_node) + ' \n')
-        if exclusive: 
-            f.write('#SBATCH --exclusive=user \n')
-        f.write('#SBATCH --cpus-per-task=1 \n')
-        f.write('#SBATCH --mem=' + str(mem) + ' \n')
-        f.write('#SBATCH --job-name=' + code + ' \n')
-        f.write('#SBATCH --partition=' + partition + ' \n')
-        f.write('#SBATCH --time=05-00:00:00 \n')
-        f.write('#SBATCH --export=NONE \n')
-        f.write(' \n')
-        f.write('vpkg_require pci \n')
-        f.write(' \n')
-        f.write('UD_PREFER_MEM_PER_CPU=YES \n')
-        f.write('UD_REQUIRE_MEM_PER_CPU=YES \n')
-        f.write(' \n')
-        f.write('. /opt/shared/slurm/templates/libexec/openmpi.sh \n')
-        f.write(' \n')
-        f.write('ulimit -s unlimited \n')
-        f.write('CONF_MAX_BYTES_PER_CPU=$((SLURM_MEM_PER_CPU*1024*1024)) \n')
-        f.write('export CONF_MAX_BYTES_PER_CPU \n')
-        if code == 'basc' or code == 'ci':
-            f.write('${UD_MPIRUN} basc \n')
-        if code == 'conf' or code == 'ci':
-            f.write('${UD_MPIRUN} conf \n')
-
-        f.write('mpi_rc=$? \n')
-        f.write(' \n')
-        f.write('exit $mpi_rc \n')
-    f.close()
 
 def parse_final_res():
     f = open('CONFFINAL.RES', 'r')
@@ -131,19 +68,26 @@ def get_radius():
     return radius
 
 if __name__ == "__main__":
-    # Read yaml file for system configurations
-    yml_file = input("Input yml-file: ")
-    system = read_yaml(yml_file)
-
-    program = input("Enter program you want to run: ")
+    # Check if config.yml file exists - if so, take K_is and C_is from there
+    if os.path.isfile('config.yml'):
+        config = read_yaml('config.yml')
+        K_is = int(config['optional']['isotope_shifts']['K_is'])
+        C_is = float(config['optional']['isotope_shifts']['C_is'])
+    
+    # If K_is in config.yml is 0, ask user for K_is
+    if K_is == 0:
+        K_is = int(input("Enter K_is: "))
+        C_is = float(input("Enter C_is: "))
+    
+    # Ask user for program to run
+    program = input("Enter program you want to run (basis, ci, analysis): ")
 
     if program == 'analysis':  
-        K_is = system['K_is']
         if K_is != 0:
-            C_is = system['C_is']
             step_size = C_is/2
             c_list = [-C_is, -C_is/2, 0, C_is/2, C_is] 
 
+            # Parse CONFFINAL.RES files in IS directories for energies 
             energies = []
             for c in c_list:
                 dir_path = os.getcwd()
@@ -152,26 +96,32 @@ if __name__ == "__main__":
                     dir_prefix = 'minus'
                 elif c > 0:
                     dir_prefix = 'plus'
-                dir_name = dir_prefix+str(abs(c))
+                dir_name = dir_prefix+'{:.5f}'.format(abs(c))
+                if c == 0: dir_name = dir_prefix + '0'
                 os.chdir(dir_name)
                 main_confs, terms_list, energies_ev = parse_final_res()
                 energies.append(energies_ev)
                 os.chdir('../')
 
-            # calculate 4-point derivatives and field shift coefficients K_fs
+            # calculate 2-point and 4-point derivatives and isotope coefficients (K_fs, K_sms, K_nms, K_ms)
             points = [1, -8, 0, 8, -1] 
             radius = get_radius()
             au_to_si_conversion_factor_fs = 2.3497*10**-3  # 1 a.u. = 2.3497 x 10^-3 GHz/fm^2
+            au_to_si_conversion_factor_ms = 3609.48        # 1 a.u. = 3609.48 GHz*amu
             derivatives = [] 
-            K_fs = [] 
+            K_is = [] 
             for num_energy in range(len(energies[0])): # runs over the total number of energy levels
-                derivative = 0
+                derivative  = 0
                 for num_energy2 in range(len(energies)): # runs over the 5 c_is values
                     derivative += points[num_energy2] * float(energies[num_energy2][num_energy]) 
-                derivative = derivative / (12*step_size)
+                derivative = derivative / (12*step_size) 
                 derivatives.append(derivative)
-                coefficient = (5/6) * au_to_si_conversion_factor_fs * derivative / (radius**2)
-                K_fs.append(coefficient)
+                if K_is == 1:
+                    coefficient = (5/6) * au_to_si_conversion_factor_fs * derivative / (radius**2)
+                else:    
+                    coefficient = au_to_si_conversion_factor_ms * derivative
+                
+                K_is.append(coefficient)
 
             # calculate uncertainties
             zero_plus1 = [0]*len(energies[0])
@@ -186,33 +136,21 @@ if __name__ == "__main__":
                 uncertainty1[num_energy] = plus1_minus1[num_energy] - zero_plus1[num_energy]
                 uncertainty2[num_energy] = zero_minus1[num_energy] - plus1_minus1[num_energy]
 
-            with open('energies.csv','w') as f:
-                conf_len = len(reduce(lambda x, y: x if len(x) > len(y) else y, main_confs))
-                f.write('conf.' + ',' + 'term' + ',')
-                for c in c_list:
-                    f.write(str(c).rjust(len(energies[0][0]), ' ') + ',')
-                f.write(' 4pt deriv,' + 'K_fs (GHz/fm2),' + '0-p1,' + '0-m1,' + 'p1-m1,' + 'uncertainty1,' + 'uncertainty2')
-                f.write('\n')
-
-                for num_energy in range(len(energies[0])): # runs over the total number of energy levels
-                    f.write(main_confs[num_energy].rjust(conf_len, ' ') + ',' + terms_list[num_energy].strip() + ',')
-                    for num_energy2 in range(len(energies)): # runs over the 5 c_is values
-                        f.write(str(energies[num_energy2][num_energy]) + ',')
-                    f.write("%.8f" % derivatives[num_energy])
-                    f.write(',')
-                    f.write("%.2f" % K_fs[num_energy])
-                    f.write(',' + str(zero_plus1[num_energy]) + ',' + str(zero_minus1[num_energy]) + ',' + \
-                                str(plus1_minus1[num_energy]) + ',' + str(uncertainty1[num_energy]) + ',' + \
-                                str(uncertainty2[num_energy]) + ',')
-                    f.write('\n')
-
-            with open('energies.res','w') as f:
+            filename = 'is' + C_is + '.out'
+            with open(filename,'w') as f:
                 conf_len = len(reduce(lambda x, y: x if len(x) > len(y) else y, main_confs))
                 f.write('conf.'.rjust(conf_len, ' ') + ' ' + 'term' + '  ')
                 for c in c_list:
                     f.write(str(c).rjust(len(energies[0][0]), ' ') + '  ')
                 f.write('4pt deriv'.rjust(11, ' '))
-                f.write('K_fs'.rjust(13, ' '))
+                if K_is == 1: 
+                    f.write('K_fs'.rjust(13, ' '))
+                elif K_is == 2:
+                    f.write('K_sms'.rjust(13, ' '))
+                elif K_is == 3:
+                    f.write('K_nms'.rjust(13, ' '))
+                elif K_is == 4:
+                    f.write('K_ms'.rjust(13, ' '))
                 f.write('0-p1'.rjust(13, ' '))
                 f.write('0-m1'.rjust(13, ' '))
                 f.write('p1-m1'.rjust(13, ' '))
@@ -225,7 +163,7 @@ if __name__ == "__main__":
                     for num_energy2 in range(len(energies)): # runs over the 5 c_is values
                         f.write(str(energies[num_energy2][num_energy]) + '  ')
                     f.write('{: .8f}'.format(derivatives[num_energy]) + '  ')
-                    f.write('{: .8f}'.format(K_fs[num_energy]) + '  ')
+                    f.write('{: .8f}'.format(K_is[num_energy]) + '  ')
                     f.write('{: .8f}'.format(zero_plus1[num_energy]) + '  ')
                     f.write('{: .8f}'.format(zero_minus1[num_energy]) + '  ')
                     f.write('{: .8f}'.format(plus1_minus1[num_energy]) + '  ')
@@ -273,91 +211,28 @@ if __name__ == "__main__":
 
             print('analysis complete')
 
-    elif program == 'add':
-        ## If attempting to generate configuration lists for IS calculations, we will need to start from either
-        ## a pre-existing CONF.INP file or create new lists using the add.py script
-        add_input = input("Create new configuration lists from add.yml or use existing CONF.INP? ")
-        if add_input == 'add.yml':
-            # generate CONF.INP using add.py
-            print('Generating CONF.INP for each C_is using add.yml')
-            with open('add.in', 'w') as f:
-                f.write("0 \n 0")
-            with open('add2.in', 'w') as f:
-                f.write("add.yml")
-
-            # Run script to generate ADD.INP for even and odd configurations
-            run('python3 create_add_inp.py < add2.in', shell=True)
-
-            # Check if ADDeven.INP and ADDodd.INP exist
-            even_exists = os.path.isfile('ADDeven.INP')
-            odd_exists = os.path.isfile('ADDodd.INP')
-
-            if even_exists and odd_exists:
-                parity = input("Choose even or odd parity configurations to create CONF.INP for: ")
-            elif even_exists:
-                parity = 'even'
-            elif odd_exists: 
-                parity = 'odd'
-            else:
-                print("No ADD.INP exists.")
+    elif program == 'ci':
+        # Run executables
+        if K_is == 0:
+            print('nothing to do')
+            sys.exit()
+        else:
+            c_list = [-C_is,-C_is/2,C_is/2,C_is]
+            
+            # Check if directories already exist, else exit and have them run basis first
+            dir_exists = True
+            for c in c_list:
+                if c < 0:
+                    dir_prefix = 'minus'
+                elif c > 0:
+                    dir_prefix = 'plus'
+                if not os.path.isdir(dir_prefix + '{:.5f}'.format(abs(c))):
+                    print(dir_prefix + '{:.5f}'.format(abs(c)) + ' does not exist')
+                    dir_exists = False
+            if not dir_exists:
+                print('Please re-run with "basis" option to generate basis for IS directories first')
                 sys.exit()
             
-            if parity:
-                # Generate CONF.INP from ADD.INP
-                run("cp ADD" + parity + ".INP ADD.INP", shell=True)
-                run("add_nr < add.in", shell=True)
-                print("CONF.INP created")
-        elif add_input == 'CONF.INP':
-            print('Using existing CONF.INP')
-        else:
-            print(add_input + " is not compatible")
-            sys.exit()
-
-        # Copy CONF.INP to IS directories
-        print('Copying CONF.INP to IS directories with respective IS coefficients')
-        try:
-            f = open('CONF.INP', 'r')
-            lines = f.readlines()
-            f.close()
-        except FileNotFoundError:
-            print("CONF.INP is not in currently directory")
-            sys.exit()
-        C_is = system['C_is']
-        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
-        for c in c_list:
-            dir_path = os.getcwd()
-            dir_prefix = ''
-            if c < 0:
-                dir_prefix = 'minus'
-            elif c > 0:
-                dir_prefix = 'plus'
-            dir_name = dir_prefix+str(abs(c))
-            os.chdir(dir_name)
-            # Find line with 'Kbrt' in CONF.INP and write K_is and C_is after it
-            with open('CONF.INP', 'w') as f:
-                for line in lines:
-                    if 'Kbrt' in line:
-                        f.write(line)
-                        f.write('K_is= 1 \n')
-                        f.write('C_is= ' + str(c) + '\n')
-                    else:
-                        f.write(line)
-            os.chdir('../')
-        print("CONF.INP has been copied to IS directories")
-        
-    elif program == 'basc':
-        ## TODO - check if CONFFINAL.RES exists - then ask user if they REALLY want to restart calculations
-        # Run executables
-        if system['K_is'] == 0:
-            dir_path = os.getcwd()
-            for dir_name in ['EVEN','ODD']:
-                os.chdir(dir_name)
-                write_job_script('basc.qs', program, 5, 64, True, 0, 'large-mem')
-                run('sbatch basc.qs', shell=True)
-                os.chdir('../')
-        else:
-            C_is = system['C_is']
-            c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
             for c in c_list:
                 dir_path = os.getcwd()
                 dir_prefix = ''
@@ -365,49 +240,43 @@ if __name__ == "__main__":
                     dir_prefix = 'minus'
                 elif c > 0:
                     dir_prefix = 'plus'
-                dir_name = dir_prefix+str(abs(c))
+                dir_name = dir_prefix+'{:.5f}'.format(abs(c))
+                print(dir_name)
                 os.chdir(dir_name)
-                write_job_script(program + '.qs', program, 5, 64, True, 0, 'large-mem')
-                run('sbatch ' + program + '.qs', shell=True)
-                os.chdir('../')
-    elif program == 'conf':
-        ## TODO - check if CONFFINAL.RES exists - then ask user if they REALLY want to restart calculations
-        # Run executables
-        if system['K_is'] == 0:
-            dir_path = os.getcwd()
-            for dir_name in ['EVEN','ODD']:
-                os.chdir(dir_name)
-                write_job_script('conf.qs', program, 5, 64, True, 0, 'large-mem')
-                run('sbatch conf.qs', shell=True)
-                os.chdir('../')
-        else:
-            C_is = system['C_is']
-            c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
-            for c in c_list:
-                dir_path = os.getcwd()
-                dir_prefix = ''
-                if c < 0:
-                    dir_prefix = 'minus'
-                elif c > 0:
-                    dir_prefix = 'plus'
-                dir_name = dir_prefix+str(abs(c))
-                os.chdir(dir_name)
-                write_job_script(program + '.qs', program, 5, 64, True, 0, 'large-mem')
-                run('sbatch ' + program + '.qs', shell=True)
-                os.chdir('../')
-    elif program == 'ci':
-        ## TODO - check if CONFFINAL.RES exists - then ask user if they REALLY want to restart calculations
-        # Run executables
-        if system['K_is'] == 0:
-            dir_path = os.getcwd()
-            for dir_name in ['EVEN','ODD']:
-                os.chdir(dir_name)
-                write_job_script('ci.qs', program, 5, 64, True, 0, 'xlarge-mem')
                 run('sbatch ci.qs', shell=True)
-                os.chdir('../')
+                os.chdir('../')  
+        
+    elif program == 'basis':
+        # Creating basis sets for isotopes shifts from an already completed /0 directory
+        if K_is == 0:
+            print('nothing to do')
+            sys.exit()
         else:
-            C_is = system['C_is']
-            c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+            c_list = [-C_is,-C_is/2,C_is/2,C_is]
+            
+            # Check if directories already exist and prompt user to delete them
+            dir_exists = False
+            for c in c_list:
+                if c < 0:
+                    dir_prefix = 'minus'
+                elif c > 0:
+                    dir_prefix = 'plus'
+                if os.path.isdir(dir_prefix + '{:.5f}'.format(abs(c))):
+                    print(dir_prefix + '{:.5f}'.format(abs(c)) + ' already exists')
+                    dir_exists = True
+            if dir_exists:
+                del_dirs =  eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Would you like to delete these directory? ')))))
+                if del_dirs:
+                    for c in c_list:
+                        if c < 0:
+                            dir_prefix = 'minus'
+                        elif c > 0:
+                            dir_prefix = 'plus'
+                        run('rm -r ' + dir_prefix + '{:.5f}'.format(abs(c)), shell=True)
+                else:
+                    print('Please move directories before continuing..')
+                    sys.exit()
+            
             for c in c_list:
                 dir_path = os.getcwd()
                 dir_prefix = ''
@@ -415,11 +284,19 @@ if __name__ == "__main__":
                     dir_prefix = 'minus'
                 elif c > 0:
                     dir_prefix = 'plus'
-                dir_name = dir_prefix+str(abs(c))
+                dir_name = dir_prefix+'{:.5f}'.format(abs(c))
+                print(dir_name)
+                run("pwd", shell=True)
+                run("cp -r 0 " + dir_name, shell=True)
                 os.chdir(dir_name)
-                write_job_script(program + '.qs', program, 5, 64, True, 0, 'xlarge-mem')
-                run('sbatch ' + program + '.qs', shell=True)
-                os.chdir('../')
+                if abs(c) > 0.0:
+                    run("find . -type f -name \"*.INP\" -exec sed -i 's/K_is= 0/C_is= " + '{:.5f}'.format(K_is) + "/g' \{\} \;", shell=True)
+                    run("find . -type f -name \"*.INP\" -exec sed -i 's/C_is= 0/C_is= " + '{:.5f}'.format(c) + "/g' \{\} \;", shell=True)
+                    if K_is > 1:
+                        run("find . -type f -name \"*.INP\" -exec sed -i 's/Klow= 0/Klow= 2" + "/g' \{\} \;", shell=True)
+                run('./basis.sh', shell=True)
+                os.chdir('../')  
+              
     else:
         print(program + ' is not supported')
         sys.exit()
