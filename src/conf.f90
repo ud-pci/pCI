@@ -2,7 +2,7 @@ Program conf
     ! ======== original version by I.I.Tupitsin =======
     ! ======== parallel version by C. Cheung ==========
     ! latest version of parallel code can be found at
-    ! >>>   https://github.com/ccheung93/pCI  <<<
+    ! >>>   https://github.com/ud-pci/pCI   <<<
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     ! this code needs radial integrals in CONF.INT, which are calculated by basc.
     ! the file CONF.DAT is still needed for Init subroutine.
@@ -30,17 +30,30 @@ Program conf
     !   17 - 'CONF.XIJ'   eigenvectors in basis of determinants
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   main variables:
-    !   Ns      - number of orbitals (different)
+    !   Ns      - number of basis orbitals
     !   Nso     - number of core orbitals
-    !   Nsp     - total number of shells (>=Ns, can be equal).
-    !   Qnl(I)  - atomic configurations (I=1,Nsp)
+    !   Nsp     - total number of subshells with occupations for each configuration
+    !   Nsu     - number of used orbitals
+    !   Nst     - number of used orbital positions
+    !   Qnl(i)  - atomic configurations (i=1,Nsp)
     !   Jm      - projection of total momentum J
-    !   Nc      - number of configurations
-    !   Nd      - number of dets
+    !   Nc      - number of relativistic configurations
+    !   Nd      - number of determinants
     !   Ne      - number of valence electrons
     !   Nec     - number of core electrons
     !   Ecore   - core energy
     !   IPmr    - equivalent of 4 Bytes for the DIRECT files
+    ! - - - - - - - - - - - - - - - - - - - - - - - - -
+    !   main arrays:
+    !   Nn(i)   - principal quantum number n (i=1,Ns)
+    !   Ll(i)   - orbital angular momentum quantum number l (i=1,Ns)
+    !   Kk(i)   - relativistic quantum number k (i=1,Ns)
+    !   Jj(i)   - total angular momentum quantum number j (i=1,Ns)
+    !   Iarr    - basis set of determinants
+    !   ArrB    - eigenvectors
+    !   Nh(i)   - orbital index for total magnetic quantum number (i=1,Ns)
+    !   Jz(i)   - total magnetic quantum number of orbital index Nh(i) (i=1,Ns)
+    !   Nq(i)   - number of electron occupancy for atomic orbital (i,Nsp)
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
@@ -90,20 +103,11 @@ Program conf
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
     If (.not. GetEnvIsPresent("CONF_MAX_BYTES_PER_CPU")) Then
-        print*, "ERROR:  CONF_MAX_BYTES_PER_CPU not set in environment"
+        print*, "WARNING: CONF_MAX_BYTES_PER_CPU not set in environment"
     End If
     memTotalPerCPU = GetEnvInteger64("CONF_MAX_BYTES_PER_CPU", 0_int64)
-    
-    !!! TESTING LARGE ARRAY MPI BCAST
-    !Call testBcast(mype)
 
-    !Call BLACS_EXIT(0)
-    !Stop
-
-    !!! TESTING LARGE ARRAY MPI BCAST
-
-    ! Initialization subroutines
-    ! master processor will read input files and broadcast parameters and arrays to all processors
+    ! Initialization subroutines (core 0 will read input files and broadcast parameters and arrays to all others)
     If (mype == 0) Then
         ! Open the generic logging file:
         open(unit=11,status='UNKNOWN',file='CONF.RES')
@@ -165,35 +169,6 @@ Program conf
     Call BLACS_EXIT(0)
 
 Contains
-
-    Subroutine testBcast(mype)
-        Use mpi_utils
-        Use mpi_f08
-        Implicit None
-
-        Integer :: mpierr, mype, i
-        Integer(Kind=int64) :: count, ngint, j
-        Real, Allocatable, Dimension(:,:) :: arrayR
-
-        ngint = 2374771125 ! Taken from basc
-        Allocate(arrayR(2, ngint))
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        print*, 'arrayR allocated', allocated(arrayR), shape(arrayR, kind=int64)
-        
-        count = 2*ngint
-        If (mype == 0) Then
-            arrayR = 1_sp
-        Else
-            arrayR = 0_sp
-        End If
-
-        If (mype == 0) print*, 'arrayR values assigned'  
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)      
-
-        Call BroadcastR(arrayR, count, 0, 0, MPI_COMM_WORLD, mpierr)
-        print*,'testBcast passed'
-
-    End Subroutine testBcast
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
@@ -436,8 +411,8 @@ Contains
                 Nst=Nst+1
             End Do
         End Do
-        strfmt = '(4X,"Number of actually Used orbitals: Nsu =",I3, &
-                    /4X,"Ne  =",I3,7X,"nec =",I3,7X,"Nst =",I7)'
+        strfmt = '(4X,"Number of actually used orbitals: Nsu =",I3, &
+                    /4X,"Ne  =",I3,7X,"Nec =",I3,7X,"Nst =",I7)'
         Write( 6,strfmt) Nsu,Ne,nec,Nst
         Write(11,strfmt) Nsu,Ne,nec,Nst
 
@@ -760,7 +735,7 @@ Contains
             Do i=1,Ne
                 ie=Iarr(i,n)
                 ke=Nh(ie)
-                x=x+Eps(ke)
+                x=x+Eps(ke) ! Eps - HFD energies read from CONF.DAT
             End Do
             x=E_0-x
             Diag(n)=Real(x,kind=type_real)
@@ -1667,7 +1642,7 @@ Contains
     Subroutine Diag4(mype, npes)
         ! this Subroutine executes the Davidson procedure for diagonalization
         ! the Subroutine Mxmpy is a computational bottleneck and was the only Subroutine to be parallelized
-        ! all other Subroutines are performed by the master core
+        ! all other subroutines are performed by the root core
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson

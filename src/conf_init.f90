@@ -11,7 +11,7 @@ Module conf_init
   Contains
 
     Subroutine ReadConfInp
-        ! This subroutine Reads input parameters from CONF.INP
+        ! This subroutine reads input parameters from the header of CONF.INP
         Implicit None
         Integer :: istr
         Character(Len=1) :: name(16)
@@ -23,18 +23,21 @@ Module conf_init
         Read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
         Read(10,'(5X,I7)') Nso, Nc, Kv, Nlv, Ne
 
+        ! Dimension of ArrB
         IPlv = 3*Nlv
-        K_is = 0                ! 
-        Kbrt = 0                !  
-        Kout = 1                !   Optional
-        Kecp = 0                !   parameters
-        C_is = 0.d0             !      
-        Gj   = 0.d0             !   
-        n_it = 20               !
-        Cut0 = 0.001            !       
-        Ncpt = 0                !  
-        Gnuc=1.d0               !
-        Qnuc=1.d0               !
+
+        ! Optional parameters
+        K_is = 0 
+        Kbrt = 0 
+        Kout = 1 
+        Kecp = 0 
+        C_is = 0.d0 
+        Gj   = 0.d0 
+        n_it = 20 
+        Cut0 = 0.001 
+        Ncpt = 0 
+        Gnuc = 1.d0 
+        Qnuc = 1.d0 
 
         istr = 0
         Do While (istr /= 1)
@@ -44,13 +47,41 @@ Module conf_init
         Return
     End subroutine ReadConfInp
 
+    Subroutine GotoConfigurations
+        ! This subroutine reads to the end of the header of CONF.INP
+        Implicit None
+
+        character(len=80) :: line
+        logical :: equals_in_str
+
+        ! roll back to beginning of CONF.INP
+        Rewind(10)
+
+        ! read the first line
+        Read(10, '(A)') 
+
+        ! read parameters (lines with "=")
+        equals_in_str = .true.
+        Do While (equals_in_str)
+            Read(10, '(A)') line
+            If (index(string=line, substring="=") == 0) equals_in_str = .false.
+        End Do
+
+        Return
+    End Subroutine GotoConfigurations
+
     Subroutine ReadConfigurations
         ! This subroutine Reads configurations from CONF.INP
         Implicit None
         Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
+        logical  :: equals_in_str
         ! - - - - - - - - - - - - - - - - - - - - - -
-        Allocate(Qnl(100000000)) ! upper bound = 100 million rel. conf-s = 0.8 GB
+        
+        Call calcNsp
+        Call GotoConfigurations
+
+        Allocate(Qnl(Nsp+6)) ! the '6' is a buffer for number of orbitals per line for conf-s
         
         If (Nso /= 0) Then 
             Read (10,'(6(4X,F7.4))') (Qnl(i),i=1,Nso) ! Read core conf-s
@@ -84,6 +115,40 @@ Module conf_init
         Close(unit=10)
         Return
     End subroutine ReadConfigurations
+
+    Subroutine calcNsp
+        ! This subroutine calculates the total number of orbitals in conf-s
+        Implicit None
+
+        Integer :: i, ic, ne0, nx, ny, nz, num_orbitals_per_line, counter
+        Real(dp) :: x
+        Real(dp), Dimension(:), Allocatable :: line
+
+        num_orbitals_per_line = 6
+        Allocate(line(num_orbitals_per_line))
+
+        counter = 0
+        Do ic=1,Nc
+            ne0=0
+            Do While (ne0 < Ne)
+                Read (10,'(6(4X,F7.4))') (line(i), i=1,num_orbitals_per_line)
+                Do i=1,num_orbitals_per_line
+                   x=abs(line(i))+1.d-9
+                   If (x < 1.d-8) Exit
+                   nx=10000*x
+                   ny=100*x
+                   nz=(nx-100*ny)
+                   ne0=ne0+nz
+                   counter = counter + 1
+                End Do
+            End Do
+        End Do
+
+        Deallocate(line)
+        Nsp = counter
+
+        Return
+    End Subroutine calcNsp
 
     Subroutine inpstr(istr)
         Implicit None

@@ -56,18 +56,18 @@ Module determinants
             else
                 NRorb=.FALSE.
             end if
-            nem=Jj(ni)+1
+            nem=Jj(ni)+1 
             Nf0(ni)=i0
             imax=2*Jj(ni)+1
             Do j=1,imax,2
                 i0=i0+1
-                Jz(i0)=j-nem
-                Nh(i0)=ni
+                Jz(i0)=j-nem ! total magnetic quantum number m_j (unit of 1/2)
+                Nh(i0)=ni    ! orbital index for Jz 
                 if (NRorb) then
                     Nh0(i0)=ni-1
-                  else
+                else
                     Nh0(i0)=ni
-                  end if
+                end if
             End Do
         End Do
         n=0
