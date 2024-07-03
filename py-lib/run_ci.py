@@ -76,7 +76,7 @@ if __name__ == "__main__":
     
     # If K_is in config.yml is 0, ask user for K_is
     if K_is == 0:
-        K_is = int(input("Enter K_is: "))
+        K_is = int(input("Enter K_is (1 - FS, 2 - SMS, 3 - NMS, 4 - MS): "))
         C_is = float(input("Enter C_is: "))
     
     # Ask user for program to run
@@ -290,7 +290,7 @@ if __name__ == "__main__":
                 run("cp -r 0 " + dir_name, shell=True)
                 os.chdir(dir_name)
                 if abs(c) > 0.0:
-                    run("find . -type f -name \"*.INP\" -exec sed -i 's/K_is= 0/C_is= " + '{:.5f}'.format(K_is) + "/g' \{\} \;", shell=True)
+                    run("find . -type f -name \"*.INP\" -exec sed -i 's/K_is= 0/K_is= " + '{:.5f}'.format(K_is) + "/g' \{\} \;", shell=True)
                     run("find . -type f -name \"*.INP\" -exec sed -i 's/C_is= 0/C_is= " + '{:.5f}'.format(c) + "/g' \{\} \;", shell=True)
                     if K_is > 1:
                         run("find . -type f -name \"*.INP\" -exec sed -i 's/Klow= 0/Klow= 2" + "/g' \{\} \;", shell=True)
