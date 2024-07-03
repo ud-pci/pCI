@@ -9,6 +9,125 @@ Module conf_init
     Public :: ReadConfInp, ReadConfigurations, inpstr
 
   Contains
+    
+    Subroutine PrintParamI(key, val)
+        ! This subroutine prints a parameter from a key-value pair
+        Implicit None
+        character(len=4), intent(in) :: key
+        integer, intent(in) :: val
+
+        Write( *,'(a5,i6)') adjustr(key) // '=', val
+        Write(11,'(a5,i6)') adjustr(key) // '=', val
+
+    End Subroutine PrintParamI
+
+    Subroutine PrintParamR(key, val, strfmt)
+        ! This subroutine prints a parameter from a key-value pair
+        Implicit None
+        character(len=4), intent(in) :: key
+        character(len=9), intent(in) :: strfmt
+        real(dp), intent(in) :: val
+
+        Write( *, strfmt) adjustr(key) // '=', val
+        Write(11, strfmt) adjustr(key) // '=', val
+
+    End Subroutine PrintParamR
+
+    Subroutine ReadConfParams
+        ! This subroutine reads parameters from the header of CONF.INP
+        Implicit None
+
+        integer :: index_equals, index_hashtag
+        character(len=4) :: key
+        character(len=10) :: val
+        character(len=80) :: line
+        logical :: equals_in_str
+
+        ! roll back to beginning of CONF.INP
+        Rewind(10)
+
+        ! read the first line
+        Read(10, '(A)') 
+
+        ! read parameters (lines with "=")
+        equals_in_str = .true.
+        Do While (equals_in_str)
+            Read(10, '(A)') line
+            If (index(string=line, substring="=") == 0) Then
+                equals_in_str = .false.
+            Else
+                index_equals = index(string=line, substring="=")
+                key = trim(adjustl(line(1:index_equals-1)))
+                val = trim(adjustl(line(index_equals+1:len(line))))
+                index_hashtag = index(string=val, substring="#") ! account for comments
+                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+                Select Case(key)
+                Case('Z')
+                    Read(val, *) Z
+                Case('Am')
+                    Read(val, *) Am
+                Case('J')
+                    Read(val, *) XJ_av
+                Case('Jm')
+                    Read(val, *) Jm
+                Case('Nso')
+                    Read(val, *) Nso
+                Case('Nc')
+                    Read(val, *) Nc
+                Case('Kv')
+                    Read(val, *) Kv
+                Case('Nlv')
+                    Read(val, *) Nlv
+                Case('Ne')
+                    Read(val, *) Ne
+                Case('Kl4')
+                    Read(val, *) Kl4
+                    Call PrintParamI(key, Kl4)
+                Case('Nc4')
+                    Read(val, *) Nc4
+                    Call PrintParamI(key, Nc4)
+                Case('Gj')
+                    Read(val, *) Gj
+                    Call PrintParamR(key, Gj, '(A5,F6.3)')
+                Case('Crt4')
+                    Read(val, *) Crt4
+                    Call PrintParamR(key, Crt4, '(A5,F8.5)')
+                Case('kout')
+                    Read(val, *) Kout
+                    Call PrintParamI(key, Kout)
+                Case('Ncpt')
+                    Read(val, *) Ncpt
+                    Call PrintParamI(key, Ncpt)
+                Case('Cut0')
+                    Read(val, *) Cut0
+                    Call PrintParamR(key, Cut0, '(A5,F8.5)')
+                Case('N_it')
+                    Read(val, *) N_it
+                    Call PrintParamI(key, N_it)
+                Case('Kbrt')
+                    Read(val, *) Kbrt
+                    Call PrintParamI(key, Kbrt)
+                Case('K_is')
+                    Read(val, *) K_is
+                    Call PrintParamI(key, K_is)
+                Case('C_is')
+                    Read(val, *) C_is
+                    Call PrintParamR(key, C_is, '(A5,F7.4)')
+                Case('Klow')
+                    Read(val, *) Klow
+                    Call PrintParamI(key, Klow)
+                Case('Gnuc')
+                    Read(val, *) Gnuc
+                    Call PrintParamR(key, Gnuc, '(A5,F8.5)')
+                Case('Qnuc')
+                    Read(val, *) Qnuc
+                    Call PrintParamR(key, Qnuc, '(A5,F8.5)')
+                End Select
+            End If
+        End Do
+        
+        Return
+    End Subroutine ReadConfParams
 
     Subroutine ReadConfInp
         ! This subroutine reads input parameters from the header of CONF.INP
@@ -16,33 +135,28 @@ Module conf_init
         Integer :: istr
         Character(Len=1) :: name(16)
         ! - - - - - - - - - - - - - - - - - - - - - -
-        Open(unit=10,file='CONF.INP',status='OLD')
-        Read(10,'(1X,16A1)') name
-        Write(*,'(4X,16A1)') name
-        Write(11,'(4X,16A1)') name
-        Read(10,'(5X,F5.1)') Z, Am, XJ_av, Jm
-        Read(10,'(5X,I7)') Nso, Nc, Kv, Nlv, Ne
-
-        ! Dimension of ArrB
-        IPlv = 3*Nlv
-
         ! Optional parameters
         K_is = 0 
+        C_is = 0.d0 
+        Klow = 0
         Kbrt = 0 
         Kout = 1 
         Kecp = 0 
-        C_is = 0.d0 
         Gj   = 0.d0 
         n_it = 20 
         Cut0 = 0.001 
         Ncpt = 0 
         Gnuc = 1.d0 
-        Qnuc = 1.d0 
+        Qnuc = 1.d0  
 
-        istr = 0
-        Do While (istr /= 1)
-          Call inpstr(istr)  
-        End Do    
+        Open(unit=10,file='CONF.INP',status='OLD')
+        Read(10,'(1X,16A1)') name
+        Write(*,'(4X,16A1)') name
+        Write(11,'(4X,16A1)') name
+        Call ReadConfParams
+
+        ! Dimension of ArrB
+        IPlv = 3*Nlv
 
         Return
     End subroutine ReadConfInp
