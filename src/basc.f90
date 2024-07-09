@@ -882,6 +882,7 @@ Contains
         Use readfff
         Use sintg
         Use str_fmt, Only : FormattedTime
+        Use mpi_utils
         Implicit None
 
         Integer :: mype, npes, mpierr
@@ -889,7 +890,7 @@ Contains
         Integer :: nna, lla, jjd, lb, la, nnc, nnb, iis, nb, n4, n3, n2, n1
         Integer :: nsx2, kmin, kmax, k, k1, lc, ld, ja, jb, jc, jd, Iab, nm_br
         Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, cut1, rem, ngint4
-        Integer(Kind=int64) :: ngint2, i8
+        Integer(Kind=int64) :: ngint2, i8, count
         Real(dp) :: dint1, r_e1, r_e2, fis, tab_br, tad_br, r_br, rabcd, r_c, tad
         Real(dp), Dimension(IP6) :: cp, cq, ca, cb
         Integer, Dimension(11) :: ilogr
@@ -1149,26 +1150,10 @@ Contains
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 Call MPI_AllReduce(MPI_IN_PLACE, ngint, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
                 
-                If (Ngint > 2147483647) Then
-                    cut1 = Ngint/2
-                    rem = Ngint - cut1 + 1
-                    Do i=1,IPbr
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:cut1), cut1, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,cut1+1:Ngint), rem, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    End Do
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2(1:cut1), cut1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2(cut1+1:Ngint), rem, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3(1:cut1), cut1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3(cut1+1:Ngint), rem, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                Else
-                    ngint4 = Ngint
-                    Do i=1,IPbr
-                        Call MPI_AllReduce(MPI_IN_PLACE, Rint2(i,1:ngint4), ngint4, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    End Do
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint2, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                    Call MPI_AllReduce(MPI_IN_PLACE, Iint3, ngint4, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-                End If
-                
+                count = ngint*Int(IPbr, kind=int64)
+                Call AllReduceR(Rint2, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call AllReduceI(Iint2, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call AllReduceI(Iint3, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
                 Call MPI_AllReduce(nm_br, nm_br, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Call MPI_AllReduce(MPI_IN_PLACE, IntOrd, IPx*IPx, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
