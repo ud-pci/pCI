@@ -59,7 +59,7 @@ Contains
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
+        Use conf_init, only : ReadConfInp, ReadConfigurations
         Implicit None
         Character(Len=32) :: strfmt
 
