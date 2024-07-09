@@ -109,7 +109,7 @@ Contains
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, Only : inpstr, ReadConfInp, ReadConfigurations
+        Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
         Character(Len=512) :: strfmt
 
@@ -163,7 +163,6 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use conf_init, Only : inpstr
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, err_stat, &
                                        nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
