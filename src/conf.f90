@@ -172,13 +172,10 @@ Contains
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
+        Use conf_init, only : ReadConfInp, ReadConfigurations
         Implicit None
         Integer :: err_stat
         Character(Len=64) :: strfmt
-
-        ! Write name of program
-        !open(unit=11,status='UNKNOWN',file='CONF.RES')
 
         Select Case(type_real)
         Case(sp)
