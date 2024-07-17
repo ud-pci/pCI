@@ -231,8 +231,6 @@ Module integrals
                 If (kmax > k) kmax=k
                 iab = nx*(na-Nso-1)+(nb-Nso)
                 minint8 = IntOrd(iab)
-                !if (minint8 <= 0) print*, minint8, IntOrd(iab), iab
-                !if (minint8 <= 0) Cycle
                 i_br=la+lc+kmin-1
                 If (i_br /= 2*(i_br/2)) Then
                     is_br=ibr
@@ -248,7 +246,6 @@ Module integrals
                         iac=nx*nx*k+iac0
                         ibd=ibd0
                         Do i8=minint8,ngint
-                            !if (i8 <= 0) print*, i8, minint8, ngint
                             mi8=i8
                             kac=Iint2(i8)
                             kbd=Iint3(i8)
@@ -263,7 +260,7 @@ Module integrals
                             End If
                         End Do
                         rabcd=Rint2(1,mi8)
-                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi8) ! changed 13/3/12
+                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi8)
                         If (Ksig >= 2) Then
                             If (max(na,nb,nc,nd) > Nd .or. max(la,lb,lc,ld) > Lmax) Then
                                 If (k < 10) Then
@@ -305,7 +302,6 @@ Module integrals
         Else
             iab=IPx*(nb-Nso-1)+na-Nso
         End If
-        !Write(*,*) ' na=',na,' nb=',nb,' iab=',iab
         nmin=1
         nmax=num_is
         If(I_is(nmax) == iab) Then
@@ -321,9 +317,6 @@ Module integrals
         End If
         n=(nmax+nmin)/2
         kab=I_is(n)
-        ! Write(*,*) ' nmin=',nmin,' nmax=',nmax
-        ! Write(*,*) ' n=',n,' kab=',kab
-        ! Read(*,*)
         If (iab-kab) 100,300,200
   100   nmax=n
         Goto 1
@@ -392,15 +385,20 @@ Module integrals
                         Kherr=Kherr+1
                         dd=0.5d0
                     End If
-                    If (d1 > 0.d0) Then           ! <= NORMAL VARIANT
+                    ! NORMAL VARIANT
+                    If (d1 > 0.d0) Then
                         e=e/(1.d0-dd)
-                    Else                           ! <= ANOMALOUS VARIANT
+                    ! ANOMALOUS VARIANT
+                    Else
                         Select Case(Kexn)
-                            Case(1) ! <= two side extrapolation
+                            ! two-side extrapolation
+                            Case(1) 
                                 e=e*(1.d0+dd)
-                            Case(2)  ! <= one side extrapolation
+                            ! one-side extrapolation
+                            Case(2) 
                                 e=e*(1.d0+dmin1(0.d0,dd))
-                            Case(3)   ! <= nonlenear extrapolation
+                            ! nonlinear extrapolation
+                            Case(3) 
                                 dr=1.d0+dd-0.1*de*de
                                 e=e*dmax1(dr,0.d0)
                         End Select
