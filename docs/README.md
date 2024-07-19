@@ -1,16 +1,22 @@
-Preview Changes Locally
------------------------
+Installing and building the docs locally
+----------------------------------------
 
-1. Install Sphinx
+1. Create a Python virtual environment
 
    ```bash
-   $ pip install sphinx sphinx_rtd_theme sphinxcontrib.bibtex
+   $ python3 -m venv venv
    ```
 
-2. Build the documentation
+2. Install dependencies
+
+   ```bash
+   $ pip install -r requirements.txt
+   ```
+
+3. Build the documentation
 
    ```bash
    $ make html    
    ```
 
-3. View `_build/html/index.html` in your browser
+4. View the built site `_build/html/index.html` in your browser
