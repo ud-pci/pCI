@@ -32,3 +32,6 @@ test/
 
 # Python cache files
 __pycache__/
+
+# Documentation builds
+docs/_build
