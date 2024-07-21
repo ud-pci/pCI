@@ -5,40 +5,46 @@ Required libraries
 ------------------
 In order to compile pCI the following software libraries and tools are required:
 
-* Fortran compiler.
-* CMake build tool.
-* MPI library to run on high-performance computing clusters. The codes have only been tested with OpenMPI so far.
-* Python v3.xx
+* `Intel Fortran compiler 2020u4+ <https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html>`_
+* `CMake v3.12+ <https://cmake.org/download>`_
+* `OpenMPI v4.1+ <https://www-lb.open-mpi.org/software/ompi>`_
+* `Python v3.x <https://www.python.org/downloads/>`_
 
 VALET on UD clusters
 --------------------
 
-If working on a UD cluster, a pre-built copy of the latest pCI package can be readily obtainable via VALET:
+If working on a UD cluster, a pre-built copy of the latest pCI package is available via VALET:
 
 .. code-block:: 
 
    vpkg_require pci
 
-This command automatically configures your environment to include all necessary libraries to run pCI: an Intel Fortran compiler and OpenMPI library, as well as latest version of Python to run auxiliary scripts. If using the pre-built pCI distribution, you do not have to compile anything and can ignore the rest of this page.
+This command automatically configures your environment to include all necessary libraries to run pCI: OpenMPI with an Intel Fortran compiler, as well as latest version of Python to run auxiliary scripts. If using the pre-built pCI distribution, you do not have to compile anything and can ignore the rest of this page.
+
+If working on another HPC cluster, a similar method of setting up your environment may already be available using ``module load <package>``. Please check your cluster's documentations for more information. 
 
 Obtaining the source code
 -------------------------
-Users can download the latest version of the pCI code package from
+Users can download the latest version of the pCI code package from our `GitHub repository <https://github.com/ud-pci/pCI>`_.
 
-.. code-block:: 
+via direct download
+~~~~~~~~~~~~~~~~~~~
 
-   https://github.com/ud-pci/pCI
+From the GitHub repository, click on the green ``<> Code`` button towards the top, then click ``Download ZIP``. You can then unzip the downloaded file to obtain the source codes.
+
+via git
+~~~~~~~
 
 From the command line, you can clone the latest version:
 
 .. code-block:: 
 
-   git clone https://github.com/ud-pci/pCI.git pci
+   git clone https://github.com/ud-pci/pCI.git
 
 Compiling with CMake
 --------------------
 
-The codes are built using the ``CMakeLists.txt`` files. The following are some example builds on the DARWIN computing cluster.
+The codes are built using CMake and the ``CMakeLists.txt`` files in the root and ``/src`` directories. The following are some example builds on the DARWIN computing cluster.
 
 A standard build can be done:
 
