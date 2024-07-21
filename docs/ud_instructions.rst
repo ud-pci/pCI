@@ -14,7 +14,7 @@ The University of Delaware currently houses and maintains the Caviness community
    * - DARWIN
      - 2x32-core AMD EPYC 7002 Series Processors
 
-More information about the UD clusters can be found `here <https://docs.hpc.udel.edu/>`_.
+Here's more information about the `UD clusters <https://docs.hpc.udel.edu/>`.
 
 Compiling at UD
 ---------------
@@ -81,7 +81,7 @@ Running Jobs at UD
 
 The UD clusters utilize the Slurm workload manager (job scheduling system) to manage and control the resources available to computational tasks. Users can either run their jobs interactively or submit in batch. For an interacive job, the user must type the commands they wish to execute in real time. For a batch job, those sequence of commands are saved to a file, known as a job script, which is submitted to Slurm. Using batch job scripts have several advantages such as reusability and increased job throughput. 
 
-More information about running jobs can be found `here <http://docs.hpc.udel.edu/abstract/darwin/runjobs/runjobs>`_.  
+Here's more information about `running jobs <http://docs.hpc.udel.edu/abstract/darwin/runjobs/runjobs>`_.  
 
 Job scripts
 ~~~~~~~~~~~
