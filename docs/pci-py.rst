@@ -175,4 +175,4 @@ calc_lifetimes.py
 The ``calc_lifetimes.py`` script generates csv-formatted datafiles of lifetimes and transition rates given output files from ``gen_portal_csv.py``.
 
 
-_More information about atomic data generation for the UD ATOM portal can be found `here <portal_codes.rst>`_._
+*More information about atomic data generation for the UD ATOM portal can be found* :doc:`here <portal_codes>`.
