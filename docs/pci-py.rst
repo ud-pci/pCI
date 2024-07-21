@@ -3,7 +3,7 @@ pci-py scripts
 
 In this section, we describe supplementary python scripts used to automate the entire pCI process, from the generation of basis sets and configuration lists to the actual calculations themselves. These python scripts read a user-defined YAML-formatted configuration file ``config.yml`` to set general parameters defining the atomic system of interest, as well as parameters defining the types of the calculations.
 
-_These python scripts are currently designed primarily for massive data generation via CI+all-order and CI+MBPT calculations on the UD clusters. They can be modified in the future for more general calculations._
+*These python scripts are currently designed primarily for massive data generation via CI+all-order and CI+MBPT calculations on the UD clusters. They can be modified in the future for more general calculations.*
 
 config.yml
 ----------
@@ -92,7 +92,7 @@ In addition, the script will read the ``optional`` block:
 add.py
 ------
 
-The ``add.py`` script automatically generates the list of configurations given information about the atomic system of interest via a configuration file ``config.yml``. Note that if ``BASS.INP`` is not present, the order of the conigurations will be by $nl$, and not how it is defined in the basis set construction. This script reads the ``add`` block:
+The ``add.py`` script automatically generates the list of configurations given information about the atomic system of interest via a configuration file ``config.yml``. Note that if ``BASS.INP`` is not present, the order of the conigurations will be by :math:`nl`, and not how it is defined in the basis set construction. This script reads the ``add`` block:
 
 .. code-block:: 
 
