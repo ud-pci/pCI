@@ -14,7 +14,7 @@ The University of Delaware currently houses and maintains the Caviness community
    * - DARWIN
      - 2x32-core AMD EPYC 7002 Series Processors
 
-Here's more information about the `UD clusters <https://docs.hpc.udel.edu/>`.
+Here's more information about the `UD clusters <https://docs.hpc.udel.edu/>`_.
 
 Compiling at UD
 ---------------
