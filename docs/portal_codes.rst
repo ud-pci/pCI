@@ -1,7 +1,7 @@
 Portal codes
 ============
 
-In this section, we describe supplementary python scripts used to generate csv-formatted databases of energy levels and matrix elements for the University of Delaware's `Portal for High-Precision Atomic Data and Computation <https://www1.udel.edu/atom/>`_. The required input files can be obtained from ``conf`` for energies and ``dtm`` for matrix elements. This process has been heavily automated using the `pCI-py scripts <pci-py.md>`_. 
+In this section, we describe supplementary python scripts used to generate csv-formatted databases of energy levels and matrix elements for the University of Delaware's `Portal for High-Precision Atomic Data and Computation <https://www1.udel.edu/atom/>`_. The required input files can be obtained from ``conf`` for energies and ``dtm`` for matrix elements. This process has been heavily automated using the :doc:`pCI-py scripts <pci-py>`. 
 
 Method
 ------
