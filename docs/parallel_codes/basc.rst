@@ -5,3 +5,9 @@ Before you run ``basc``, make sure the following input files have been appropria
 
 - ``HFD.DAT`` (obtained from basis)
 - ``CONF.INP`` (obtained from add)
+
+To run parallel ``basc``, run the command:
+
+.. code-block:: 
+
+    mpirun -n <nprocs> ./basc
