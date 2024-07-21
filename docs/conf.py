@@ -27,7 +27,7 @@ source_suffix = {
 bibtex_bibfiles = ['refs.bib']
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'correspondence_code', 'README.md']
 
 
 

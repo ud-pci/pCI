@@ -15,43 +15,57 @@ For example, if we want to calculate polarizabilities for an even state:
     cp CONFodd.HIJ CONF.HIJ
     cp CONFodd.JJJ CONF.JJJ
 
+Running ine
+~~~~~~~~~~~
 
-``ine_dyn_E28`` can either solve the inhomogeneous equation iteratively by solving for a smaller matrix first, or by direct matrix inversion via the LAPACK library. It is controlled by the parameter ``IP1`` in ``conf.par``:
+Before parallel ``ine`` can be run, the parallel matrix files ``CONFp.HIJ`` and ``CONFp.JJJ`` have to be sorted. This can be done using the python script ``/pCI/src/auxiliary/sort.py``. 
 
-.. code-block:: 
+1. First load the python3
+   
+    .. code-block:: 
 
-    PARAMETER(IP1   =  15000,  ! Nd1    - number of determinants for direct diagonalization
+        vpkg_require python/3
+    
 
-This parameter can be set to be larger than the number of determinants in your problem if you don't want the program to iterate at all. The problem with iterations is that they diverge in many cases for dynamic polarizabilities. However, the problem with the direct solution is that it takes a long time to run (about 20-30 min even for 10, 000 determinants).
+2. Run python script ``sort.py``
+   
+    .. code-block:: 
 
-The program can be executed via the command:
+        python3 sort.py
+    
 
-.. code-block:: 
+3. The program will ask which file you want sorted, so enter ``CONFp.HIJ`` or ``CONFp.JJJ``
+   
+    .. code-block:: 
 
-    ./ine_dyn_E28 <inf.ine
+        CONFp.HIJ
 
-.. code-block:: 
 
-    0  # start new computation
-    1  # calculate polarizability of the first level
-    0  # 0 for static, omega for dynamic
+4. Now re-run the program for the other matrix
+   
+    .. code-block:: 
 
-For dynamic polarizability, you need to run ``ine_dyn_E28`` twice: once with :math:`+\omega` and once with :math:`-\omega`. For example, if one needs the polarizability for :math:`\lambda=800 \text{ nm}`, compute :math:`\omega` in a.u.:  
-:math:`\omega=1.0\times 10^7 / (au\times\lambda) = 0.056954191`, where \( au=219474.6313705 \).  
-Run ``ine_dyn_E28`` twice, once with 
+        python3 sort.py  
+        CONFp.JJJ
 
-.. code-block:: 
+5. After these files are obtained, the input file ``ine.in`` must be constructed:
 
-    0
-    1
-    0.056954191 
+    .. code-block:: 
 
-and once with 
+        0                          | kIters= (0- invert and iterate if diverged, 1-invert only, 2-2-step iteration)
+        0                          | Kl = (0-new, 1-use X1, 2-use X1,Y1,Y2)
+        2                          | Kli = (1 - H_p, 2 - E1(L), 5 - E2) for RHS of equation
+        2                          | Klf = (1 - H_p, 2 - E1(L), 3 - H_am, 4 - E1(V), 5 - E2) for LHS of equation
+        5                          | N0 = record number of X0
+        5                          | N2 = record number of X2
+        3                          | nlambda - number of ranges of wavelengths to include (in this case, 3)
+        813.01 813.02 0.01         | range 1   (lambda1, lambda2, step_size)
+        813.02 813.025 0.001       | range 2
+        813.025 813.03 0.01        | range 3
 
-.. code-block:: 
+6. Finally, ``ine`` can be run:
 
-    0
-    1
-    -0.056954191 
+    .. code-block::
 
-then average the two results. 
+        ./ine
+
