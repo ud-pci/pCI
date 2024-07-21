@@ -16,7 +16,7 @@ pCI is a high-precision relativistic atomic structure code package based on the 
    :caption: Using pCI
 
    ud_instructions
-   parallel_codes
+   parallel_codes/index.rst
    
 
 .. toctree::
