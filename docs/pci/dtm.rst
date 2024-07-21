@@ -25,3 +25,25 @@ For the diagonal matrix elements, the list of determinants and eigenvectors corr
 .. note::
 
     Some :math:`3J`-coefficients might be zero in some cases, such as trying to compute :math:`E1` matrix element for  :math:`5s^2\, {}^1S_0 \rightarrow 5s5p\,{}^3P_1`. This will fail if the odd run had :math:`J=0`, :math:`M_J=0`. You would need to have an odd run with :math:`J=1`, :math:`M_J=1`.
+
+
+Running dtm
+~~~~~~~~~~~
+Next, you must create a file named ``dtm.in`` with the following parameters:
+
+.. code-block:: 
+
+    Kl1                 ! (1 - density matrices, 2 - transition matrices, 3 - form DTM.INT)
+    l01 l11 l10 l11     ! range of initial and final levels for desired matrix elements
+                        ! l01 = initial level of first file, l11 - final level of first file
+                        ! l10 - final level of second file, l11 - final level of second file
+                        ! e.g. 1 3 1 4 corresponds to matrix elements between 1st to 3rd level of file 1 and 1st to 4th level of file 2 
+    operator1           ! (optional) first matrix operator to summarize
+    operator2           ! (optional) second matrix operator to summarize
+    ...                 ! matrix operators: E1, E2, E3, M1, M2, M3, EDM, PNC, AM, MQM, A_hf, B_hf, GF
+
+To run parallel ``dtm``, run the command:
+
+.. code-block:: 
+
+    mpirun -n <nprocs> ./dtm

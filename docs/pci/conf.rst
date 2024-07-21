@@ -19,6 +19,8 @@ Input Files:
 	* ``Kl`` = (0 - start, 1 - continue calculation, 2 - include corrections, 3 - add configurations)
 	* ``Ksig`` = (0 - pure CI, 1 - include one-electron corrections, 2 - include one- and two-electron corrections)
 	* ``Kdsig`` = (0 - no energy dependence on Sigma, 1 - energy dependence on Sigma)
+	* ``Kw`` = (0 - do not write CONF.HIJ, 1 - write CONF.HIJ)
+	* ``kLSJ`` = (0 - do not calculate expectation values of :math:`S^2` and :math:`L^2` and form approximate terms for each energy level, 1 - calculate :math:`LSJ`)
 
 Output Files:
 
@@ -78,3 +80,23 @@ The following is a sample of the head of a ``CONF.INP`` for calculating the even
 	The list of core shells are fixed to have a maximum of 6 shells per row.
 
 In the ``CONF.INP`` file shown above, we include 481 relativistic configurations in the CI space, and 1132 relativistic configurations in the PT space (if ``conf_pt`` is to be used after ``conf``).
+
+
+Running conf
+~~~~~~~~~~~~
+Next, you must create a file named ``c.in`` with the following parameters:
+
+.. code-block:: 
+
+    Kl         ! (0 - start, 1 - continue calculation, 2 - include corrections, 3 - add configurations)
+    Ksig       ! (0 - pure CI, 1 - include one-electron corrections, 2 - include one- and two-electron corrections)
+    Kdsig      ! (0 - no energy dependence on Sigma, 1 - energy dependence on Sigma)
+    Kw         ! (0 - do not write CONF.HIJ, 1 - write CONF.HIJ)
+    kLSJ       ! (0 - do not calculate expectation values of S^2 and L^2 and form approximate terms for each energy level, 1 - calculate LSJ)
+
+
+To run parallel ``conf``, run the command:
+
+.. code-block:: 
+
+    mpirun -n <nprocs> ./conf
