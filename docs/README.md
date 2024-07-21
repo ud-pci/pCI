@@ -1,5 +1,5 @@
 Installing and building the docs locally
-----------------------------------------
+========================================
 
 1. Create a Python virtual environment
 
