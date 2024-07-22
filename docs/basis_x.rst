@@ -64,4 +64,4 @@ Now we will discuss the steps to build the basis set for CI+all-order and CI+MBP
 	``hfd`` can work with partially opened shells, whereas ``tdhf`` and ``bdhf`` cannot.
 
 
-The final ``hfspl.1`` and ``hfspl.2`` files are the basis set files that can be read from the :doc:`all-order part of the package <all-order>`.
+The final ``hfspl.1`` and ``hfspl.2`` files are the basis set files that can be read from the :doc:`all-order part of the package <extensions/all-order>`.
