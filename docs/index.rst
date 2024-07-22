@@ -23,7 +23,7 @@ pCI is a high-precision relativistic atomic structure code package based on the 
    :caption: pCI Technical Details
 
    pci/index.rst
-   all-order
+   extensions/index.rst
    radial_grid
    isotope_shifts
    supplementary
