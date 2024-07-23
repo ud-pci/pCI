@@ -1,11 +1,11 @@
-Example: Sr with pCI-py
-=======================
+Sr with pCI-py
+==============
 
-In this example, we will utilize the pCI-py scripts detailed :doc:`here <pci-py>` to generate atomic data for neutral Sr. 
+In this example, we will utilize the pCI-py scripts detailed :doc:`here <../pci-py>` to generate atomic data for neutral Sr. 
 
 config.yml
 ----------
-The ``config.yml`` file defines the entire calculation from beginning to end. You can find a detailed explanation of the contents of this configuration file :doc:`here <pci-py>`. 
+The ``config.yml`` file defines the entire calculation from beginning to end. You can find a detailed explanation of the contents of this configuration file :doc:`here <../pci-py>`. 
 
 .. raw:: html
 

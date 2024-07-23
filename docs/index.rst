@@ -38,9 +38,9 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    :maxdepth: 1
    :caption: Examples
 
-   pci-py-example
-   example_neutral
-   example_hci
+   examples/pci-py-sr.rst
+   examples/neutral.rst
+   examples/hci.rst
    
 
 .. toctree::
