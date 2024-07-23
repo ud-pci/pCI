@@ -1,5 +1,5 @@
-Example: Fe XVII and Ni XIX
-===========================
+Fe XVII and Ni XIX
+==================
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 

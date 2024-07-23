@@ -3,12 +3,14 @@ Installation
 
 Required libraries
 ------------------
-In order to compile pCI the following software libraries and tools are required:
+In order to compile pCI the following software libraries and tools are required: 
 
 * `Intel Fortran compiler 2020u4+ <https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html>`_
 * `CMake v3.12+ <https://cmake.org/download>`_
 * `OpenMPI v4.1+ <https://www-lb.open-mpi.org/software/ompi>`_
 * `Python v3.x <https://www.python.org/downloads/>`_
+
+*Older versions of each library may be usable, but the listed versions have been tested.*
 
 VALET on UD clusters
 --------------------

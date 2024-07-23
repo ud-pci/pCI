@@ -1,5 +1,5 @@
-Example: Neutral atoms
-======================
+Ac and Sr
+=============
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 
