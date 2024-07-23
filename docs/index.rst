@@ -6,7 +6,7 @@ The calculations are based on the configuration interaction method, and extendab
 
 pCI is developed and maintained at the University of Delaware. All of its development is done in the GitHub repository under the development branch.
 
-We welcome all contributions to the pCI software package, including bug fixes, feature enhancements, and docuemtnation improvements. In order to contribute, open an `issue <https://github.com/ud-pci/pCI/issues/new/choose>`_ or a `pull request <https://github.com/ud-pci/pCI/pulls>`_ on GitHub. 
+We welcome all contributions to the pCI software package, including bug fixes, feature enhancements, and documentation improvements. In order to contribute, open an `issue <https://github.com/ud-pci/pCI/issues/new/choose>`_ or a `pull request <https://github.com/ud-pci/pCI/pulls>`_ on GitHub. 
 
 To learn how to use pCI, there are walk-through guides and smaller examples that demonstrate how to use different parts of the pCI software package. 
 
