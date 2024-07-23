@@ -25,12 +25,13 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    theory
    pci/index.rst
    extensions/index.rst
-   radial_grid
-   isotope_shifts
-   qed
+   upscaling
    supplementary
    pci-py
+   isotope_shifts
+   qed
    portal_codes
+   radial_grid
 
 
 .. toctree:: 
@@ -38,7 +39,6 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    :caption: Examples
 
    pci-py-example
-   upscaling
    example_neutral
    example_hci
    
