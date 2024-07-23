@@ -1,10 +1,10 @@
-Building a basis for CI+all-order and CI+MBPT
-=============================================
+Basis for CI+all-order and CI+MBPT
+==================================
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 
-CI and all-order basis sets
----------------------------
+CI+all-order basis sets
+-----------------------
 
 In this section, we describe the general method of building basis sets for the CI+all-order and CI+MBPT code packages. As the CI and all-order code packages were developed separately, they use basis sets in different formats. CI uses ``HFD.DAT`` and all-order uses ``hfspl.1`` and ``hfspl.2`` files. For all-order/CI+all-order/CI+MBPT calculations, most of the basis is constructed via the B-splines. However, one needs too many B-splines to reproduce core and lower valence stats with high enough accuracy for heavier atoms. Therefore, core and a few few valence electron wave functions are taken from Dirac-Hartree-Fock (DHF), and a combined basis with splines is built. More splines will mean larger basis for the CI as well, so we would like to avoid this. There also seems to be an issue with the basis converter codes for larger numbers of B-splines.
 
@@ -64,4 +64,4 @@ Now we will discuss the steps to build the basis set for CI+all-order and CI+MBP
 	``hfd`` can work with partially opened shells, whereas ``tdhf`` and ``bdhf`` cannot.
 
 
-The final ``hfspl.1`` and ``hfspl.2`` files are the basis set files that can be read from the :doc:`all-order part of the package <extensions/all-order>`.
+The final ``hfspl.1`` and ``hfspl.2`` files are the basis set files that can be read from the :doc:`all-order part of the package <all-order>`.
