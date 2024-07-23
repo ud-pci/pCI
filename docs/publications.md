@@ -1,5 +1,7 @@
 # Publications
 
+Here is a non-exhaustive list of publications that employ the pCI software package.
+
 ## 2024
 - **Prospects of a thousand-ion Sn2+ Coulomb-crystal clock with sub-10-19 inaccuracy**, David R. Leibrandt, Sergey G. Porsev, Charles Cheung, and Marianna S. Safronova, *[Nature Communications 15, 5663 (2024)](https://www.nature.com/articles/s41467-024-49241-w)*. 
 - **High-Precision Transition Energy Measurements of Neon-like Fe XVII Ions**, Chintan Shah, Moto Togawa, Marc Botz, Jonas Danisch, Joschka J. Goes, Sonja Bernitt, Marleen Maxton, Kai Köbnick, Jen Buck, Jörn Seltmann, Moritz Hoesch, Ming Feng Gu, F. Scott Porter, Thomas Pfeifer, Maurice A. Leutenegger, Charles Cheung, Marianna S. Safronova, José R. Crespo López-Urrutia, *[ApJ 969 52 (2024)](https://iopscience.iop.org/article/10.3847/1538-4357/ad454b)*. 
