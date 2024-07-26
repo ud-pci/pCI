@@ -23,6 +23,7 @@ Module params
     Real(dp), Parameter :: DPsw = 0.2319_dp           ! sin**2(Qeta_W)
     Real(dp), Parameter :: DPcw = 1.00050e-14_dp      ! sqrt(2)*G_F*alpha/pi (a.u.)
     Real(dp), Parameter :: DPef = 5.14225e9_dp        ! au for electric field in V/cm
+    Real(dp), Parameter :: DPma = 1.15965218046e-3_dp ! electron magnetic moment anomaly
     
     ! defining Parameters which determine dimensions of main arrays
     !                     Array dimension          Associated variable

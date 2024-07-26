@@ -27,6 +27,7 @@ Program dtm
         Integer :: AM = 0
         Integer :: MQM = 0
         Integer :: GF = 0
+        Integer :: gQED = 0
     End Type Key
 
     Type(Key) :: Keys
@@ -96,6 +97,9 @@ Contains
                     Case('GF')
                         Keys%GF = 1
                         Call OpenFS('GF.RES',0,112,1)
+                    Case('gQED')
+                        Keys%gQED = 1
+                        Call OpenFS('gQED.RES',0,113,1)
                     Case Default
                         If (str_key /= str_key0) print*, Trim(AdjustL(str_key)), ' is not a valid key for DM'
                 End Select
@@ -197,6 +201,10 @@ Contains
         If (Keys%GF == 1) Then
             Close(112)
         End If
+
+        If (Keys%gQED == 1) Then
+            Close(113)
+        End If
     
     End Subroutine CloseKeys
 
@@ -204,7 +212,7 @@ Contains
         Implicit None
 
         Character(Len=1), Dimension(6) :: Let
-        Character(Len=4), Dimension(13) :: Alet
+        Character(Len=4), Dimension(14) :: Alet
         Character(Len=4), Dimension(5) :: Blet
         Character(Len=4), Dimension(2) :: yes*3, chm1
 
@@ -228,6 +236,7 @@ Contains
         Alet(11)='E3  '
         Alet(12)='M2  '
         Alet(13)='M3  '
+        Alet(14)='gQED'
 
         Blet(1)= 'Rint'
         Blet(2)= 'RPA1'
@@ -642,6 +651,8 @@ Contains
                 If (K_M1 /= 1) Then
                     cnt=cnt+1
                 End If
+                ! gQED
+                cnt=cnt+2
                 ! DIPOLE HFS:
                 cnt=cnt+1
     210             If (jab > 4 .or. ja+jb < 4) Goto 211
@@ -775,6 +786,20 @@ Contains
                     Call Sint1(tab)
                     Call AddRint(9,na,nb,0.d0,tab)
                 End If
+                ! gQED-amplitude
+                Do i=1,Ii,ih
+                   C(i)=p(i)*a(i)
+                End Do
+                C(ii+4)=gab
+                Call Sint1(tab)
+                Call AddRint(14,na,nb,0.d0,tab)
+
+                Do i=1,Ii,ih
+                   C(i)=q(i)*b(i)
+                End Do
+                C(ii+4)=gab
+                Call Sint1(tab)
+                Call AddRint(15,na,nb,0.d0,tab)
                 ! DIPOLE HFS:
                 Do i=1,Ii,ih
                     C(i)=-(p(i)*b(i)+q(i)*a(i))/(R(i)**2)
@@ -2120,7 +2145,7 @@ Contains
                    nspaces0, lll, il1, il2, nk, nol, jl, ml, lk, jk, ippx, il, ik1, ik2, l, &
                    nok, l1, ipp, nk0, lk0, jt, mj, ntrm
         Real(dp) :: A, B, G, ppl, tj, tm, tj1, Etrm, s, g1, xjl, xmk, &
-                    xpp, dme, c, xjk, tl, x
+                    xpp, dme, c, xjk, tl, x, gQ
         Integer, Dimension(3*IPx) :: ind
         Integer, Dimension(IPx) :: i1, i2
         Real(dp), Dimension(IPx) :: pp
@@ -2170,6 +2195,7 @@ Contains
         G=0.d0          !### = G-FACTOR,
         A=0.d0          !### A,B - HFS CONSTANTS
         B=0.d0
+        gQ=0.d0
         lk0=-1          ! lk0,nk0,ipp,xpp used to calculate
         nk0=-1          !!  occupation numbers for n,l shells
         ipp=0
@@ -2241,6 +2267,7 @@ Contains
                                     End If
                                 End If
                                 G=G+g1
+                                gQ=gQ+gQED(dme, nol,xjl,lll, nok,xjk,lk)
                             End If
                             If (l1 == 3) B=B+HfsB(dme, nol,xjl,lll, nok,xjk,lk)
                         End If
@@ -2278,18 +2305,19 @@ Contains
         If (B /= 0.d0) &
             B=-2*Qnuc*dsqrt(tj*(2*tj-1)/((tj+1)*(2*tj+1)*(2*tj+3))) &
             *B*DPau/(DPrb*DPrb)*1.d-30
+        If (gQ /= 0.d0) gQ=gQ*DPma/dsqrt(tj*(tj+1)*(2*tj+1))
         ippx=4
         Do i=5,ipp
             If (pp(i) > 0.5d-4) ippx=i
         End Do
-        Write ( 6,'(" Num. of El.=",F8.4,"; G =",F8.5, &
-               "; A =",E15.8," MHz; B =",E15.8," MHz" &
+        Write ( 6,'(" Num. of El.=",F8.4,"; G =",F8.5,"; gQ =",F10.7, &
+               /" A =",E15.8," MHz; B =",E15.8," MHz" &
                /" oc.num.(n,l)",4(i3,i2,F8.4),/5(i3,i2,F8.4))') &
-               ppl,G,A,B,(npp(i),lpp(i),pp(i),i=1,ippx)
-        Write (11,'(" Num. of El.=",F8.4,"; G =",F8.5, &
-               "; A =",E15.8," MHz; B =",E15.8," MHz" &
+               ppl,G,gQ,A,B,(npp(i),lpp(i),pp(i),i=1,ippx)
+        Write (11,'(" Num. of El.=",F8.4,"; G =",F8.5,"; gQ =",F10.7, &
+               /" A =",E15.8," MHz; B =",E15.8," MHz" &
                /" oc.num.(n,l)",4(i3,i2,F8.4),/5(i3,i2,F8.4))') &
-               ppl,G,A,B,(npp(i),lpp(i),pp(i),i=1,ippx)
+               ppl,G,gQ,A,B,(npp(i),lpp(i),pp(i),i=1,ippx)
 
         strsp = ''
         nspaces1 = 0
@@ -2339,6 +2367,18 @@ Contains
             End If
             strfmt = '(I2,2X,A,3X,A,4X,E15.8,8X,F10.5)'
             Write(107,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), B, Etrm
+        End If
+
+        If (Keys%gQED == 1) Then
+            If (ntrm == 1) Then
+                If (existStr == .true.) Then
+                    Write(113,'(A)') ' n   conf' // strsp(1:nspaces0) // 'term     gQED      E_n (a.u.)'
+                Else
+                    Write(113,'(A)') ' n  J1       M1      gQED      E_n (a.u.)'
+                End If
+            End If
+            strfmt = '(I2,2X,A,3X,A,4X,F8.5,5X,F10.5)'
+            Write(113,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), gQ, Etrm
         End If
 
         Return

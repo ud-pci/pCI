@@ -20,7 +20,7 @@ Module dtm_variables
     Real(dp), Dimension(IP6)                :: C, R, V
     Character(Len=4), Dimension(2)          :: chm1
     Character(Len=1), Dimension(6)          :: Let
-    Character(Len=4), Dimension(13)         :: Alet
+    Character(Len=4), Dimension(14)         :: Alet
     Character(Len=4), Dimension(5)          :: Blet
 
     Save
