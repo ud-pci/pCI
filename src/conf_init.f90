@@ -178,7 +178,10 @@ Module conf_init
         equals_in_str = .true.
         Do While (equals_in_str)
             Read(10, '(A)') line
-            If (index(string=line, substring="=") == 0) equals_in_str = .false.
+            If (index(string=line, substring="=") == 0) Then
+                Backspace(10)
+                equals_in_str = .false.
+            End If
         End Do
 
         Return

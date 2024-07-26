@@ -400,8 +400,11 @@ Contains
 
         Deallocate(Qnl)
 
+        ! Calculate Nec - number of core electrons
         nec=0
         If (Nso /= 0) nec=sum(Nq(1:Nso))
+
+        ! Calculate Nst - number of used orbital positions
         Do ni=1,Nsu
             imax=2*Jj(ni)+1
             Do j=1,imax,2
@@ -1043,7 +1046,7 @@ Contains
 
             cntarray=0
 
-            ! Get accumulator vectors setup (or re-setup If this is rank 0):
+            ! Get accumulator vectors setup (or re-setup if this is rank 0):
             If (Kl == 3) Then
                 Call IVAccumulatorContinue(iva1, vaGrowBy)
                 Call IVAccumulatorContinue(iva2, vaGrowBy)

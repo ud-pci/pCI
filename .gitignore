@@ -18,7 +18,6 @@ build/
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
-Makefile
 
 # Test directory and files
 test/
@@ -32,3 +31,9 @@ test/
 
 # Python cache files
 __pycache__/
+
+# Python virtual environment
+venv
+
+# Documentation builds
+docs/_build
