@@ -13,6 +13,7 @@ Module amp_ops
     !       AE3  = REDUCED E3 AMPLITUDE
     !       AM2  = REDUCED M2 AMPLITUDE
     !       AM3  = REDUCED M3 AMPLITUDE
+    !       gQED = REDUCED gfactor QED AMPLITUDE
     Use dtm_variables
     Implicit None
 
@@ -20,6 +21,7 @@ Module amp_ops
 
     Public :: AmpE1, AmpE2, AmpE3, AmpM1, AmpM2, AmpM3, AmpEDM, AmpPNC
     Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
+    Public :: gQED
 
   Contains 
 
@@ -333,5 +335,34 @@ Module amp_ops
             HfsB=B
         Return
     End function HfsB
+
+
+    Real(dp) function gQED(Ro, nk,xjk,lk, nl,xjl,ll)   
+        ! this function calculates electric quadrupole hyperfine structure constant <k|B|l>
+        Use wigner    
+        Implicit None
+        Integer :: nk, nl, lk, ll, lkbar, llbar, kd1, kd2, is, k
+        Real(dp) :: Ro, G, G1, G2, xjk, xjl, xll
+            kd1 = 0 
+            if (lk == ll) kd1 = 1
+            kd2 = 0
+            lkbar = 2*xjk-lk
+            llbar = 2*xjl-ll
+            if (lkbar == llbar) kd2 = 1
+            G1=Ro*Fint(14,nk,nl,+1)*kd1
+            G2=Ro*Fint(15,nk,nl,+1)*kd2            
+            If ((G1 /= 0.d0).or.(G2 /= 0.d0)) Then
+              is = 1
+              k=xjk+lk+1.51d0
+              If (k /= 2*(k/2)) is=-is
+              xll=ll
+              G=is*dsqrt(6*(2*xjk+1)*(2*xjl+1)) &
+                 *(Fj6(xjk,1.d0,xjl,0.5d0,xll,0.5d0)*G1 &
+                  +Fj6(xjk,1.d0,xjl,0.5d0,2.d0*xjl-xll,0.5d0)*G2)
+              If (Kl == 1) Call AmpOut(14,Ro,nl,nk,xjl,xjk,ll,lk,G)
+            End If
+            gQED=G
+        Return
+    End function gQED
 
 End Module amp_ops
