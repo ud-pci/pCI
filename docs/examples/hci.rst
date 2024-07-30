@@ -36,13 +36,13 @@ In this section, we describe a method used to construct basis sets for the cases
          9     3D (5/2)   0.0000    0    0          |          9     3D (5/2)   0.0000    1    3
         
         
-3. ``h_m_3.inp`` - Here we freeze the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals, then construct the :math:`4s, 4p, 4d, 4f, 5g` orbitals from the :math:`2s^2 2p^5 4s, 2s^2 2p^5 4p, \dots, 2s^2 2p^5 5g` configurations. Note that the number of orbitals ``Ns`` has changed from 9 to 13. 
+3. ``h_m_3.inp`` - Here we freeze the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals, then construct the :math:`4s, 4p, 4d, 4f, 5g` orbitals from the :math:`2s^2 2p^5 4s, 2s^2 2p^5 4p, \dots, 2s^2 2p^5 5g` configurations. Note that the number of orbitals ``Ns`` has changed from 9 to 18. 
 
     .. code-block:: 
 
         Fe XVII & Ni XIX
         KL =   0                #    
-        NS =  13                # number of orbitals   
+        NS =  18                # number of orbitals   
         NSO=   2                # number of closed orbitals (in this case only 1s2, 2s2)   
         Z  =  26.0              # atomic number     
         AM =  56.000            # atomic mass       
@@ -61,10 +61,15 @@ In this section, we describe a method used to construct basis sets for the cases
          7     3P (3/2)   0.0000    1    0
          8     3D (3/2)   0.0000    1    0
          9     3D (5/2)   0.0000    1    0
-        10     4F (5/2)   1.0000    0    1
-        11     4F (7/2)   0.0000    0    1
-        12     5G (7/2)   1.0000    0    2
-        13     5G (9/2)   0.0000    0    2
+        10     4S (1/2)   1.0000    0    1
+        11     4P (1/2)   1.0000    0    2
+        12     4P (3/2)   0.0000    0    2
+        13     4D (3/2)   1.0000    0    3
+        14     4D (5/2)   0.0000    0    3     
+        15     4F (5/2)   1.0000    0    4
+        16     4F (7/2)   0.0000    0    4
+        17     5G (7/2)   1.0000    0    5
+        18     5G (9/2)   0.0000    0    5
 
 
 4. ``b_m_2.inp`` - Here we update ``HFD.DAT`` by including virtual orbitals to account for correlations.
