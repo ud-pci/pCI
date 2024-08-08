@@ -2884,8 +2884,8 @@ Contains
             strfmt = '(I8,I6,F11.7)'
         End If
 
-        Open(99,file='CONFFINAL.RES',status='UNKNOWN')
-        Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
+        Open(99,file='FINAL.RES',status='UNKNOWN')
+        Open(98,file='LEVELS.RES',status='UNKNOWN')
         Open(97,file='CONFSTR.RES',status='UNKNOWN')
 
         ! Form array of booleans of converged levels
