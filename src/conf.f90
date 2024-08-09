@@ -2982,7 +2982,7 @@ Contains
             If (len_trim(strcsave(1,i)) > maxlenconfig) maxlenconfig = len_trim(strcsave(1,i))
         End Do
 
-        ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to CONFFINAL.RES
+        ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to FINAL.RES
         Do j=1,Nlv
             ! Calculate g-factors if including L, S, J
             If (KLSJ == 1) Then
