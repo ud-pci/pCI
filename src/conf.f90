@@ -2861,8 +2861,8 @@ Contains
             strfmt = '(I8,I6,F11.7)'
         End If
 
-        Open(99,file='CONFFINAL.RES',status='UNKNOWN')
-        Open(98,file='CONFLEVELS.RES',status='UNKNOWN')
+        Open(99,file='FINAL.RES',status='UNKNOWN')
+        Open(98,file='LEVELS.RES',status='UNKNOWN')
         Open(97,file='CONFSTR.RES',status='UNKNOWN')
 
         ! Form array of booleans of converged levels
@@ -2982,7 +2982,7 @@ Contains
             If (len_trim(strcsave(1,i)) > maxlenconfig) maxlenconfig = len_trim(strcsave(1,i))
         End Do
 
-        ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to CONFFINAL.RES
+        ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to FINAL.RES
         Do j=1,Nlv
             ! Calculate g-factors if including L, S, J
             If (KLSJ == 1) Then
