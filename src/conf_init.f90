@@ -179,7 +179,7 @@ Module conf_init
         Do While (equals_in_str)
             Read(10, '(A)') line
             If (index(string=line, substring="=") == 0) Then
-                Backspace(10)
+                If (line /= "") Backspace(10) ! handle blank line before list of core orbitals
                 equals_in_str = .false.
             End If
         End Do
@@ -237,7 +237,7 @@ Module conf_init
         ! This subroutine calculates the total number of orbitals in conf-s
         Implicit None
 
-        Integer :: i, ic, ne0, nx, ny, nz, num_orbitals_per_line, counter
+        Integer :: i, j, ic, ne0, nx, ny, nz, num_orbitals_per_line, counter, num_lines
         Real(dp) :: x
         Real(dp), Dimension(:), Allocatable :: line
 
@@ -245,6 +245,18 @@ Module conf_init
         Allocate(line(num_orbitals_per_line))
 
         counter = 0
+
+        ! Read core orbitals
+        If (Nso /= 0) Then 
+            x = Nso/6
+            num_lines = Ceiling(x)
+            Do j=1,num_lines
+                Read (10,'(6(4X,F7.4))') (line(i), i=1,num_orbitals_per_line) 
+            End Do
+            counter = counter + Nso
+        End If
+
+        ! Read configuration list
         Do ic=1,Nc
             ne0=0
             Do While (ne0 < Ne)
