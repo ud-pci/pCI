@@ -598,7 +598,7 @@ def write_spl_in(filename, radius, spl_params):
     f.close()
     print('spl.in has been written')
 
-def write_inputs(system, C_is, kvw):
+def write_ao_inputs(system, C_is, kvw):
     # Write HFD.INP
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
@@ -686,6 +686,9 @@ def check_errors(filename):
         return num_errors
     else:
         print(filename + "not currently supported")
+
+def run_ci_executables():
+    return
 
 def run_ao_executables(K_is, C_is):
     # Run hfd
@@ -863,7 +866,7 @@ if __name__ == "__main__":
                 Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                 os.chdir(dir_name)
                 run('pwd', shell=True)
-                write_inputs(config,c,get_key_vw(method))
+                write_ao_inputs(config,c,get_key_vw(method))
                 os.chdir('../../')
             if K_is_dict[K_is]:
                 os.chdir('../../')
@@ -876,14 +879,14 @@ if __name__ == "__main__":
                 Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                 os.chdir(method+'/basis')
                 run('pwd', shell=True)
-                write_inputs(config, 0, get_key_vw(method))
+                write_ao_inputs(config, 0, get_key_vw(method))
                 os.chdir('../../')
         else:
             dir_path = os.getcwd()
             Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
             os.chdir('basis')
             run('pwd', shell=True)
-            write_inputs(config, 0, kvw)
+            write_ao_inputs(config, 0, kvw)
             os.chdir('../')
 
     # Construct basis set by running sequence of programs if desired
