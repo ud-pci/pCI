@@ -687,7 +687,7 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_executables(K_is, C_is):
+def run_ao_executables(K_is, C_is):
     # Run hfd
     run('hfd > hfd.out', shell=True)
     print("hfd complete")
@@ -906,7 +906,7 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))+'/basis'
                     os.chdir(dir_name)
                     run('pwd', shell=True)
-                    run_executables(K_is, c)
+                    run_ao_executables(K_is, c)
                     script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../../')
@@ -921,7 +921,7 @@ if __name__ == "__main__":
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method+'/basis')
                     run('pwd', shell=True)
-                    run_executables(0, 0)
+                    run_ao_executables(0, 0)
                     script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../../')
@@ -930,7 +930,7 @@ if __name__ == "__main__":
                 Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                 os.chdir('basis')
                 run('pwd', shell=True)
-                run_executables(0, 0)
+                run_ao_executables(0, 0)
                 script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
                 run('sbatch ' + script_name, shell=True)
                 os.chdir('../')
