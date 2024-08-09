@@ -143,8 +143,8 @@ Program conf
     ! Print table of final energies
     If (mype==0) Call PrintEnergies
 
-    ! Call LSJ routines if kLSJ=1
-    If (kLSJ == 1) Then
+    ! Call LSJ routines if KLSJ=1
+    If (KLSJ == 1) Then
         If (mype == 0) Call Rdet('CONF.DET')
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call AllocateLSJArrays(mype)
@@ -171,8 +171,8 @@ Program conf
 Contains
 
     Subroutine Input
-        ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, only : ReadConfInp, ReadConfigurations
+        ! This subroutine reads in parameters and list of configurations from CONF.INP and job configuration from ci.in
+        Use conf_init, only : ReadConfInp, ReadConfigurations, ReadCiIn
         Implicit None
         Integer :: err_stat
         Character(Len=64) :: strfmt
@@ -198,38 +198,15 @@ Contains
         If (dabs(C_is) < 1.d-6) K_is=0
         If (K_is == 0) C_is=0.d0
 
-        ! Read job parameters from file c.in
-        ! Kl = 0 - new computation
-        ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
-        ! Kl = 2 - new computation with MBPT
-        ! Kl = 3 - extending computation with new configurations (not implemented yet)
-        Open(unit=99,file='c.in',status='OLD')
-        Read(99,*) Kl, Ksig, Kdsig, Kw, kLSJ
+        ! Read job parameters from file ci.in
+        Call ReadCiIn
         
-        Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         If (K_is == 2.OR.K_is == 4) Then
             Read(99,*) K_sms
             Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
             If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
-        Close(99)
 
-        ! Kw determines whether CONF.HIJ will be written or not
-        ! Kw=0 - CONF.HIJ will not be written
-        ! Kw=1 - CONF.HIJ will be written
-        Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
-
-        ! kLSJ determines whether CONF.HIJ will be written or not
-        ! kLSJ=0 - LSJ will not be written in CONFFINAL.RES
-        ! kLSJ=1 - LSJ will be written CONFFINAL.RES
-        Write( 6,'(/4X,"kLSJ = (0-do not calculate LSJ, 1-calculate LSJ) ",I1)') kLSJ
-
-        ! If starting new computation with MBPT
-        ! Ksig = 0 - no MBPT included (same as Kl = 0)
-        ! Ksig = 1 - include 1-electron MBPT corrections 
-        ! Ksig = 2 - include 1-electron and 2-electron MBPT corrections
-        ! Kdsig = 0 - automatic approximation of the energy dependence of Sigma
-        ! Kdsig = 1 - manually include energy dependence of Sigma
         If (Kl == 2) Then
             Write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
             If (Ksig /= 0) Then
@@ -886,7 +863,7 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(kLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1449,7 +1426,7 @@ Contains
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
 
-        If (kLSJ == 1) Then
+        If (KLSJ == 1) Then
             If (.not. Allocated(xj)) Allocate(xj(Nlv))
             If (.not. Allocated(xl)) Allocate(xl(Nlv))
             If (.not. Allocated(xs)) Allocate(xs(Nlv))
@@ -3008,7 +2985,7 @@ Contains
         ! Write table of configurations, L, S, J, energies, and weights of top 2 configurations to CONFFINAL.RES
         Do j=1,Nlv
             ! Calculate g-factors if including L, S, J
-            If (kLSJ == 1) Then
+            If (KLSJ == 1) Then
                 If (Nint(Tj(j)) == 0) Then
                     Write(strgf,'(A)') '-----'
                 Else
@@ -3021,7 +2998,7 @@ Contains
             Write(97,'(A)') Trim(AdjustL(strcsave(1,j)))
 
             ! If LSJ is calculated, also include terms in CONFSTR.RES
-            If (kLSJ == 1) Then
+            If (KLSJ == 1) Then
                 strterm = term(Xl(j), Xs(j), Tj(j))
                 Write(97,'(A)') Trim(AdjustL(strterm))
             End If
@@ -3034,7 +3011,7 @@ Contains
             End If
 
             ! If L, S, J is needed
-            If (kLSJ == 1) Then
+            If (KLSJ == 1) Then
                 ! Write column names if first iteration
                 If (j == 1) Write(99, '(A)') '  n' // '  ' // repeat(' ', maxlenconfig-4+1) // 'conf  term     E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%  converged'// repeat(' ', maxlenconfig-4+1) // ' conf2  conf2%'
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
