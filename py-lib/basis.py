@@ -836,62 +836,22 @@ if __name__ == "__main__":
     # Generate body of HFD.INP including orbitals, values of J, and occupation numbers
     NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
     
-    # Assign keys for which inputs to generate
-    kvw = get_key_vw(code_method)
+    ao_methods = ['all-order','second-order','ci+all-order','ci+second-order']
+    ao_method_in_code_methods = any(x in code_method for x in ao_methods)
 
-    vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+    if ao_method_in_code_methods:
+        # Assign keys for which inputs to generate
+        kvw = get_key_vw(code_method)
 
-    # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
-    N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals)
+        vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
 
-    # Get valence orbitals for all-order calculations
-    val_N, val_kappa = get_ao_valence(core_orbitals, valence_orbitals, val_aov)
+        # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
+        N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals)
 
-    # Write input files to basis directory
-    if include_isotope_shifts and K_is > 0:
-        for method in code_method:
-            dir_path = os.getcwd()
-            is_dir = method + '/' + K_is_dict[K_is]
-            Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
-            os.chdir(dir_path+'/'+is_dir)
-            for c in c_list:
-                dir_path = os.getcwd()
-                if c < 0:
-                    dir_prefix = 'minus' 
-                elif c > 0:
-                    dir_prefix = 'plus'
-                else:
-                    dir_prefix = ''
-                dir_name = dir_prefix+str(abs(c))+'/basis'
-                Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
-                os.chdir(dir_name)
-                run('pwd', shell=True)
-                write_ao_inputs(config,c,get_key_vw(method))
-                os.chdir('../../')
-            if K_is_dict[K_is]:
-                os.chdir('../../')
-            else:
-                os.chdir('../')
-    else:
-        if isinstance(code_method, list):
-            dir_path = os.getcwd()
-            for method in code_method:
-                Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
-                os.chdir(method+'/basis')
-                run('pwd', shell=True)
-                write_ao_inputs(config, 0, get_key_vw(method))
-                os.chdir('../../')
-        else:
-            dir_path = os.getcwd()
-            Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
-            os.chdir('basis')
-            run('pwd', shell=True)
-            write_ao_inputs(config, 0, kvw)
-            os.chdir('../')
+        # Get valence orbitals for all-order calculations
+        val_N, val_kappa = get_ao_valence(core_orbitals, valence_orbitals, val_aov)
 
-    # Construct basis set by running sequence of programs if desired
-    if run_ao_codes:
-        print("Running codes...")
+        # Write input files to basis directory
         if include_isotope_shifts and K_is > 0:
             for method in code_method:
                 dir_path = os.getcwd()
@@ -907,11 +867,10 @@ if __name__ == "__main__":
                     else:
                         dir_prefix = ''
                     dir_name = dir_prefix+str(abs(c))+'/basis'
+                    Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
                     run('pwd', shell=True)
-                    run_ao_executables(K_is, c)
-                    script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
-                    run('sbatch ' + script_name, shell=True)
+                    write_ao_inputs(config,c,get_key_vw(method))
                     os.chdir('../../')
                 if K_is_dict[K_is]:
                     os.chdir('../../')
@@ -919,22 +878,67 @@ if __name__ == "__main__":
                     os.chdir('../')
         else:
             if isinstance(code_method, list):
+                dir_path = os.getcwd()
                 for method in code_method:
-                    dir_path = os.getcwd()
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method+'/basis')
                     run('pwd', shell=True)
-                    run_ao_executables(0, 0)
-                    script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
-                    run('sbatch ' + script_name, shell=True)
+                    write_ao_inputs(config, 0, get_key_vw(method))
                     os.chdir('../../')
             else:
                 dir_path = os.getcwd()
                 Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                 os.chdir('basis')
                 run('pwd', shell=True)
-                run_ao_executables(0, 0)
-                script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
-                run('sbatch ' + script_name, shell=True)
+                write_ao_inputs(config, 0, kvw)
                 os.chdir('../')
-                
+
+        # Construct basis set by running sequence of programs if desired
+        if run_ao_codes:
+            print("Running codes...")
+            if include_isotope_shifts and K_is > 0:
+                for method in code_method:
+                    dir_path = os.getcwd()
+                    is_dir = method + '/' + K_is_dict[K_is]
+                    Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
+                    os.chdir(dir_path+'/'+is_dir)
+                    for c in c_list:
+                        dir_path = os.getcwd()
+                        if c < 0:
+                            dir_prefix = 'minus' 
+                        elif c > 0:
+                            dir_prefix = 'plus'
+                        else:
+                            dir_prefix = ''
+                        dir_name = dir_prefix+str(abs(c))+'/basis'
+                        os.chdir(dir_name)
+                        run('pwd', shell=True)
+                        run_ao_executables(K_is, c)
+                        script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                        run('sbatch ' + script_name, shell=True)
+                        os.chdir('../../')
+                    if K_is_dict[K_is]:
+                        os.chdir('../../')
+                    else:
+                        os.chdir('../')
+            else:
+                if isinstance(code_method, list):
+                    for method in code_method:
+                        dir_path = os.getcwd()
+                        Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
+                        os.chdir(method+'/basis')
+                        run('pwd', shell=True)
+                        run_ao_executables(0, 0)
+                        script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                        run('sbatch ' + script_name, shell=True)
+                        os.chdir('../../')
+                else:
+                    dir_path = os.getcwd()
+                    Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+                    os.chdir('basis')
+                    run('pwd', shell=True)
+                    run_ao_executables(0, 0)
+                    script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
+                    run('sbatch ' + script_name, shell=True)
+                    os.chdir('../')
+
