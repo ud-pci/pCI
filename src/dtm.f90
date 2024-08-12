@@ -48,6 +48,7 @@ Program dtm
         End If
     End If
 
+    Call MPI_Bcast(Kl1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
     If (Kl1 < 3) Call InitTDM
 
     Select Case(Kl1)
@@ -1373,7 +1374,6 @@ Contains
         Integer :: mpierr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kl1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
