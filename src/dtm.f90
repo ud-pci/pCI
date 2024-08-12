@@ -98,7 +98,7 @@ Contains
                     Keys%gQED = 1
                     Call OpenFS('gQED.RES',0,113,1)
                 Case Default
-                    print*, Trim(AdjustL(str_key)), ' is not a valid key for DM'
+                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for DM.'
                     Return
             End Select
         Case(2)
@@ -141,7 +141,7 @@ Contains
                     Keys%MQM = 1
                     Call OpenFS('MQM.RES',0,111,1)
                 Case Default
-                    print*, Trim(AdjustL(str_key)), ' is not a valid key for TM'
+                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for TM.'
                     Return
             End Select
         End Select
@@ -294,9 +294,9 @@ Contains
 
         integer :: index_equals, index_hashtag, err_stat, keycount, i, num_ops
         character(len=5) :: key
-        character(len=10) :: val
+        character(len=80) :: val
         character(len=80) :: line, lvls, ops
-        character(len=4), dimension(14) :: keyList 
+        character(len=4), dimension(:), allocatable :: keyList 
         logical :: equals_in_str
 
         Open(unit=99, file='dtm.in', status='OLD')
@@ -327,13 +327,18 @@ Contains
                     End If
                 Case('Ops')
                     num_ops = CountSubstr(val, ',') + 1
+                    Allocate(keyList(num_ops))
                     Read(val, *, iostat=err_stat) (keyList(i), i=1,num_ops)
                     If (err_stat /= 0) Then
-                        print*, 'ERROR reading operators'
+                        print*, 'ERROR: list of operators could not be read.'
+                        Exit
                     End If
                     Do i=1, num_ops
                         Call SetKey(keyList(i))
                     End Do
+                    Deallocate(keyList)
+                Case Default
+                    print*, 'WARNING: The key "', Trim(AdjustL(key)), '" is not supported.'
                 End Select
             End If
         End Do
@@ -369,13 +374,15 @@ Contains
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2) OR FORM DTM.INT (3)? ",I1)'
                 Call OpenFS('DTM.RES',0,11,1)
+            Case Default
+                print*, 'Kl1=', Kl1, ' is not supported'
+                Stop
         End Select
 
         Call Init_Char(Let, Alet, Blet, yes, chm1)
 
         Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
-        If (Kl1 < 0 .or. Kl1 > 3) Stop
 
         Trd=1.d-10
         Kdm=0
