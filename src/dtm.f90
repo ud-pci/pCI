@@ -316,8 +316,17 @@ Contains
                 index_hashtag = index(string=val, substring="#") ! account for comments
                 If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
                 Select Case(key)
-                Case('Kl1')
-                    Read(val, *) Kl1
+                Case('Mode')
+                    If (Trim(AdjustL(val)) == 'DM') Then
+                        Kl1 = 1
+                    Else If (Trim(AdjustL(val)) == 'TM') Then
+                        Kl1 = 2
+                    Else If (Trim(AdjustL(val)) == 'Init') Then
+                        Kl1 = 3
+                    Else
+                        print*, 'ERROR: Value "', Trim(AdjustL(val)), '" for key Mode is not supported.'
+                        Stop
+                    End If
                 Case('Lvls')
                     If (Kl1 == 1) Then 
                         Read(val, *) nterm1, nterm2
