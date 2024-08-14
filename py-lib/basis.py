@@ -941,4 +941,7 @@ if __name__ == "__main__":
                     script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
-
+    elif code_method == 'ci':
+        print('pure CI regime not supported yet')
+    else:
+        print('that code method is not supported')
