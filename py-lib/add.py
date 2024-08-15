@@ -226,14 +226,22 @@ def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
         run("cp " + root_dir + "/ci.qs " + parity, shell=True)
         
     Kw = '1' if write_hij else '0'
-    kLSJ = '1' if include_lsj else '0'
+    KLSJ = '1' if include_lsj else '0'
 
     if os.path.isfile('basis/SGC.CON') and os.path.isfile('basis/SCRC.CON'):
-        with open(parity + '/c.in', 'w') as f:
-            f.write('2, 2, 0, ' + Kw + ', ' + kLSJ)
+        with open(parity + '/ci.in', 'w') as f:
+            f.write('Kl = 2 \n')
+            f.write('Ksig = 2 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
     else:
-        with open(parity + '/c.in', 'w') as f:
-            f.write('0, 0, 0, ' + Kw + ', ' + kLSJ)
+        with open(parity + '/ci.in', 'w') as f:
+            f.write('Kl = 0 \n')
+            f.write('Ksig = 0 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
 
 def check_conf_inp_exists(dir):
     if not os.path.isfile('HFD.DAT'):
@@ -242,8 +250,8 @@ def check_conf_inp_exists(dir):
     if not os.path.isfile('CONF.INP'):
         print('CONF.INP is missing from ' + dir + ' directory')
         sys.exit()
-    if not os.path.isfile('c.in'):
-        print('c.in is missing from ' + dir + ' directory')
+    if not os.path.isfile('ci.in'):
+        print('ci.in is missing from ' + dir + ' directory')
         sys.exit()
 
 if __name__ == "__main__":
