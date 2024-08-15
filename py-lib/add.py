@@ -264,6 +264,7 @@ if __name__ == "__main__":
     pci_version = config['system']['pci_version']
     write_hij = config['conf']['write_hij']
     bin_dir = config['system']['bin_directory']
+    on_hpc = config['system']['on_hpc']
     
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
@@ -315,7 +316,7 @@ if __name__ == "__main__":
     run("rm add.in ADD.INP CONF.INP CONF_.INP", shell=True)
     
     # Create a ci.qs job script if it doesn't exist yet
-    if not os.path.isfile('ci.qs'):
+    if on_hpc and not os.path.isfile('ci.qs'):
         print('generating new ci.qs in ' + os.getcwd() + ' directory')
         script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
     
@@ -343,10 +344,12 @@ if __name__ == "__main__":
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
-                        if run_ci: 
+                        if on_hpc and run_ci: 
                             os.chdir(parity)
                             run("sbatch " + script_name, shell=True)
                             os.chdir('../')
+                        else:
+                            print("run_ci option is only available with HPC access")
                     os.chdir('../')
                 if K_is_dict[K_is]:
                     os.chdir('../../')
@@ -362,10 +365,12 @@ if __name__ == "__main__":
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
-                        if run_ci: 
+                        if on_hpc and run_ci: 
                             os.chdir(parity)
                             run("sbatch " + script_name, shell=True)
                             os.chdir('../')
+                        else:
+                            print("run_ci option is only available with HPC access - please run ci codes manually")
                     os.chdir('../')
             else:
                 dir_path = os.getcwd()
@@ -373,10 +378,12 @@ if __name__ == "__main__":
                 for parity in parities:
                     move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                     # Submit CI job if run_ci == True
-                    if run_ci: 
+                    if on_hpc and run_ci: 
                         os.chdir(parity)
                         run("sbatch " + script_name, shell=True)
                         os.chdir('../')
+                    else:
+                        print("run_ci option is only available with HPC access - please run ci codes manually")
 
     print('add script completed')
 
