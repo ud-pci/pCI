@@ -207,7 +207,8 @@ def create_add_inp(config):
 
 def form_conf_inp(parity, bin_dir):
     run("cp ADD" + parity + ".INP ADD.INP", shell=True)
-    run(bin_dir + "/add < add.in", shell=True)
+    run(bin_dir + "/add < add.in > add" + parity + ".out", shell=True)
+    print("output of add saved to add" + parity + ".out")
     run("cp CONF.INP CONF" + parity + ".INP", shell=True)
     print("CONF" + parity + ".INP created")
 
