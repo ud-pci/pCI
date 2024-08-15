@@ -1,4 +1,5 @@
-SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
+SET(CMAKE_Fortran_FLAGS "-g -qopenmp -check all -warn all -traceback -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
+#SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
 
 ADD_LIBRARY(pci_common params.f90 conf_variables.f90 basc_variables.f90 str_fmt.f90 readfff.f90 
         breit.f90 wigner.f90 sintg.f90 bspl.f90 conf_init.f90 test_ori.f90 pi_pk.f90 integrals.f90 determinants.f90 

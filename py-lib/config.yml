@@ -1,8 +1,18 @@
-# General parameters
+# System parameters
 system:
+    bin_directory: ""
+    generate_directories: False
+    run_ao_codes: False
+    run_ci: False
+    on_hpc: True
+    pci_version: default
+
+# Atomic information
+atom:
     name: Sr
     isotope: 
     include_breit: True
+    code_method: [ci+all-order, ci+second-order]
 
 # Parameters used by basis programs
 basis:
@@ -54,15 +64,15 @@ conf:
     J: 0.0
     JM: 0.0
     J_selection: False
-    num_energy_levels: 24
-    num_dvdsn_iterations: 100
+    num_energy_levels: 5
+    num_dvdsn_iterations: 50
     include_lsj: True
     write_hij: False
 
 # Parameters used by dtm program
 dtm:
     matrix_elements: E1
-    include_rpa: True
+    include_rpa: False
 
 # Parameters used by portal script
 portal:
@@ -79,9 +89,3 @@ optional:
         include: False
         K_is: 0
         C_is: 0
-
-    code_method: [ci+all-order, ci+second-order]
-    generate_directories: False
-    run_ao_codes: False
-    run_ci: False
-    pci_version: default
