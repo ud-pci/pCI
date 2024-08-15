@@ -24,6 +24,7 @@ test/
 *.csv
 *.INP
 *.RES
+*.DAT
 
 # vscode
 .vscode

@@ -3,7 +3,7 @@ Program add
     Implicit None
 
     ! add.par parameters
-    Integer, Parameter :: IPad1 = 2000000 ! # max number of configurations
+    Integer, Parameter :: IPad1 = 10000 ! # max number of configurations
     Integer, Parameter :: IPad2 = 18      ! # max number of shells in configuration
 
     Integer :: Ncor, Nsv, NsvNR, Mult, l, keyPT
