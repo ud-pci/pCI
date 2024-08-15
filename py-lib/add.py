@@ -97,7 +97,7 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     else:
         core_formatted = []
         
-    config_sys = config['system']
+    config_sys = config['atom']
     config_conf = config['conf']
     # Write head of CONF.INP
     f.write('>>>>>>>>>>>>> Head of the file CONF.INP >>>>>>>>>>>>>>>>>>>>>>>>\n')
@@ -183,9 +183,13 @@ def format_orb_occ(orb, occ):
 
 def create_add_inp(config):
     # Get atomic data
-    config_sys = config['system']
-    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], config_sys['isotope'])
-
+    config_sys = config['atom']
+    
+    try:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], config_sys['isotope'])
+    except KeyError as e:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], "")
+    
     config_add = config['add']
     num_val = orb_lib.count_valence(config_add['ref_configs'])
     orb_occ = orb_lib.expand_orbitals(config_add['basis_set'], config_add['orbitals'])
@@ -201,9 +205,9 @@ def create_add_inp(config):
     else:
         print('no odd reference configurations specified')
 
-def form_conf_inp(parity):
+def form_conf_inp(parity, bin_dir):
     run("cp ADD" + parity + ".INP ADD.INP", shell=True)
-    run("add < add.in", shell=True)
+    run(bin_dir + "/add < add.in", shell=True)
     run("cp CONF.INP CONF" + parity + ".INP", shell=True)
     print("CONF" + parity + ".INP created")
 
@@ -254,11 +258,12 @@ if __name__ == "__main__":
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
         
-    code_method = config['optional']['code_method']
-    run_ci = config['optional']['run_ci']
+    code_method = config['atom']['code_method']
+    run_ci = config['system']['run_ci']
     include_lsj = config['conf']['include_lsj']
-    pci_version = config['optional']['pci_version']
+    pci_version = config['system']['pci_version']
     write_hij = config['conf']['write_hij']
+    bin_dir = config['system']['bin_directory']
     
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
@@ -269,7 +274,7 @@ if __name__ == "__main__":
         sys.exit()
     
     # Check if user wants to generate directories for CI computations
-    gen_dir = run_ci if run_ci else config['optional']['generate_directories']
+    gen_dir = run_ci if run_ci else config['system']['generate_directories']
     
     # CONF.INP should only need to be constructed once, then copied to respective directories
     # Read input to add from add.in if it exists, otherwise create it
@@ -300,10 +305,10 @@ if __name__ == "__main__":
     # Run add and form CONF.INP from respective ADD.INP files
     parities = []
     if even_exists: 
-        form_conf_inp('even')
+        form_conf_inp('even', bin_dir)
         parities.append('even')
     if odd_exists: 
-        form_conf_inp('odd')
+        form_conf_inp('odd', bin_dir)
         parities.append('odd')
     
     # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
