@@ -375,9 +375,12 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
     frozen_found = { }
     frozen_shells = []
     
-    core_shells = []
+    core_shells = []        
     for orbital in core_orbitals.split(" "):
         core_shells.append(orbital[0] + orbital[1].capitalize())
+        
+    if num_core_electrons == num_electrons:
+        core_shells.pop()
     
     # Loop through list of shells to form orbitals from
     for shell_list in order:
