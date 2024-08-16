@@ -96,11 +96,13 @@ if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
-    code_method = config['optional']['code_method']
+    code_method = config['atom']['code_method']
     matrix_elements = config['dtm']['matrix_elements']
     num_levels = config['conf']['num_energy_levels']
     include_rpa = config['dtm']['include_rpa']
-    pci_version = config['optional']['pci_version']
+    pci_version = config['system']['pci_version']
+    on_hpc = config['system']['on_hpc']
+    bin_directory = config['system']['bin_directory']
     basis = config['basis']
     
     key_list = []
@@ -134,8 +136,9 @@ if __name__ == "__main__":
             run('mv dtm.in dtm/dtm.in', shell=True)
             if include_rpa:
                 write_mbpt_inp(basis, key_list)
-                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
-                run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
+                if on_hpc:
+                    write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
+                    run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
             else:
                 write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
                 run('mv dtm.qs dtm/dtm.qs', shell=True)
@@ -169,9 +172,11 @@ if __name__ == "__main__":
                     f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
                     for key in key_list:
                         f.write(key + '\n')
-                run('sbatch dtm_rpa.qs', shell=True)
+                if on_hpc: 
+                    run('sbatch dtm_rpa.qs', shell=True)
             else:    
-                run('sbatch dtm.qs', shell=True)
+                if on_hpc:
+                    run('sbatch dtm.qs', shell=True)
             
     else:
         # Make dtm directory with dtm input and job script
@@ -190,11 +195,13 @@ if __name__ == "__main__":
         run('mv dtm.in dtm/dtm.in', shell=True)
         if include_rpa:
             write_mbpt_inp(basis, key_list)
-            write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
-            run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
+            if on_hpc:
+                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
+                run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
         else:
-            write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
-            run('mv dtm.qs dtm/dtm.qs', shell=True)
+            if on_hpc:
+                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
+                run('mv dtm.qs dtm/dtm.qs', shell=True)
         
         # Find even and odd directories with completed ci runs
         if os.path.isfile('even/CONFFINAL.RES'):
@@ -224,6 +231,8 @@ if __name__ == "__main__":
                 f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
                 for key in key_list:
                     f.write(key + '\n')
-            run('sbatch dtm_rpa.qs', shell=True)
+            if on_hpc:
+                run('sbatch dtm_rpa.qs', shell=True)
         else:    
-            run('sbatch dtm.qs', shell=True)
+            if on_hpc:
+                run('sbatch dtm.qs', shell=True)
