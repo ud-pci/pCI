@@ -17,6 +17,7 @@ atom:
 # Parameters used by basis programs
 basis:
     cavity_radius: 60
+    diagonalized: True
     orbitals:
         core: 1s 2s 2p 3s 3p 3d 4s 4p 
         valence: 5s 5p 4d 6s 6p 5d 4f

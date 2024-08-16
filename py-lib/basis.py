@@ -560,7 +560,11 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
     # Define default values
     Nv = len(valence.split())
     Ksg = 1
-    Kdg = 1
+    
+    if system['basis']['diagonalized']:
+        Kdg = 1
+    else:
+        Kdg = 0
     Kkin = 1
     kout = 0
 
@@ -581,7 +585,7 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
     frorb = frorb_str[0] + " " + frorb_str[1][0]    
 
     with open(filename, 'w') as f:
-        f.write(' ' + system['system']['name'] + '\n')
+        f.write(' ' + system['atom']['name'] + '\n')
         f.write(' Z  =  ' + str(Z) + '\n')
         f.write(' Am =  ' + '{:.1f}'.format(round(AM)) + '\n')
         f.write(' Nso=' + str(NSO).rjust(5," ") + '# number of core orbitals (defines DF operator)\n')
