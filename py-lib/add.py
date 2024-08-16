@@ -97,22 +97,22 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     else:
         core_formatted = []
         
-    config_sys = config['atom']
-    config_conf = config['conf']
+    atom = config['atom']
+    conf = config['conf']
     # Write head of CONF.INP
     f.write('>>>>>>>>>>>>> Head of the file CONF.INP >>>>>>>>>>>>>>>>>>>>>>>>\n')
-    f.write('  ' + config_sys['name'] + ' ' + parity + '\n')
+    f.write('  ' + atom['name'] + ' ' + parity + '\n')
     f.write('  Z = ' + str(Z) + '\n')
     f.write(' Am = ' + "{:.1f}".format(round(AM)) + '\n')
-    f.write('  J = ' + str(config_conf['J']) + '\n')
-    f.write(' Jm = ' + str(config_conf['JM']) + '\n')
+    f.write('  J = ' + str(conf['J']) + '\n')
+    f.write(' Jm = ' + str(conf['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
-    if config_conf['J_selection']:
+    if conf['J_selection']:
         f.write(' Kv =  3 \n')
     else:
         f.write(' Kv =  4 \n')
-    f.write(' Nlv=  ' + str(config_conf['num_energy_levels']) + '\n')
+    f.write(' Nlv=  ' + str(conf['num_energy_levels']) + '\n')
     f.write(' Ne =  ' + str(num_val) + '\n')
     f.write(' Kl4=  1 \n')
     f.write(' Nc4=999 \n')
@@ -121,8 +121,8 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     f.write('kout= 0 \n')
     f.write('Ncpt= 0 \n')
     f.write('Cut0= 0.0001 \n')
-    f.write('N_it= ' + str(config_conf['num_dvdsn_iterations']) + '\n')
-    if config_sys['include_breit']:
+    f.write('N_it= ' + str(conf['num_dvdsn_iterations']) + '\n')
+    if atom['include_breit']:
         kbrt = 2
     else:
         kbrt = 0
@@ -183,24 +183,24 @@ def format_orb_occ(orb, occ):
 
 def create_add_inp(config):
     # Get atomic data
-    config_sys = config['atom']
+    atom = config['atom']
     
     try:
-        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], config_sys['isotope'])
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], atom['isotope'])
     except KeyError as e:
-        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], "")
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], "")
     
-    config_add = config['add']
-    num_val = orb_lib.count_valence(config_add['ref_configs'])
-    orb_occ = orb_lib.expand_orbitals(config_add['basis_set'], config_add['orbitals'])
-    multiplicity = orb_lib.count_excitations(config_add['excitations'])
+    add = config['add']
+    num_val = orb_lib.count_valence(add['ref_configs'])
+    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
+    multiplicity = orb_lib.count_excitations(add['excitations'])
 
-    if config_add['ref_configs']['even']:
+    if add['ref_configs']['even']:
         write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'even')
     else:
         print('no even reference configurations specified')
         
-    if config_add['ref_configs']['odd']:
+    if add['ref_configs']['odd']:
         write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd')
     else:
         print('no odd reference configurations specified')
