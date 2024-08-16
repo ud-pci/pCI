@@ -328,7 +328,7 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
     JM = -2.0
 
     with open(filename, 'w') as f:
-        f.write(' ' + system['system']['name'] + '\n')
+        f.write(' ' + system['atom']['name'] + '\n')
         f.write(' KL =  ' + str(KL) + '\n')
         f.write(' NS =  ' + str(NS) + '\n')
         f.write(' NSO=  ' + str(NSO) + '\n')
@@ -344,13 +344,143 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
         if C_is != 0:
             f.write('K_is= ' + str(K_is) + '\n')
             f.write('C_is= ' + str(C_is) + '\n')
-        f.write('rnuc= ' + '{:.4f}'.format(rnuc) + '\n\n')
+        if rnuc:
+            f.write('rnuc= ' + '{:.4f}'.format(rnuc) + '\n\n')
+        else:
+            f.write('\n')
         f.write('        NL   J       QQ     KP   NC\n\n')
         for i in range(len(NL)):
             f.write(str(i+1).rjust(3," ") + '     ' + NL[i] + ' (' + J[i] + ')' + '   ' 
-                        + QQ[i] + '    ' + KP[i] + '   ' + NC[i].rjust(2,' ') + '\n')
+                        + QQ[i] + '    ' + str(KP[i]) + '   ' + str(NC[i]).rjust(2,' ') + '\n')
     f.close()
     print(filename + ' has been written')
+
+def write_hfd_inp_ci(filename, system, num_electrons):
+    """ Write multiple HFD.INP files for case of pure CI"""
+
+    basis = system['basis']
+    cavity_radius = basis['cavity_radius']
+    core_orbitals = basis['orbitals']['core']
+    valence_orbitals = basis['orbitals']['valence']
+    order = [shell.strip() for shell in basis['orbitals']['order'].split('/')]
+    
+    num_hfd_inps = len(order)
+    
+    # Obtain base list of shells
+    NL_base, J_base, QQ_base, KP_base, NC_base, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
+    
+    index = 1
+    shells_found = {}
+    frozen_found = { }
+    frozen_shells = []
+    
+    core_shells = []
+    for orbital in core_orbitals.split(" "):
+        core_shells.append(orbital[0] + orbital[1].capitalize())
+    
+    # Loop through list of shells to form orbitals from
+    for shell_list in order:
+        NL, J, QQ, KP, NC = [], [], [], [], []
+
+        shells = shell_list.split(" ")
+        
+        # Count the number of electrons when forming orbitals
+        electron_cnt = 0
+        electron_removed = False
+        
+        # Reset shells found
+        shells_found = shells_found.fromkeys(shells_found, False)
+        frozen_found = frozen_found.fromkeys(frozen_found, False)
+        
+        # Add new shells to shells_found
+        for shell in shells:
+            # Get the shell in the same format as NL
+            shell_fmt = shell[0] + shell[1].capitalize()        
+            shells_found[shell_fmt] = False
+        
+        nc_it = 0
+        
+        # Loop through base list of shells formed from all core and valence orbitals
+        for i in range(len(NL_base)):
+            NL.append(NL_base[i])
+            J.append(J_base[i])
+            
+            QQ_num = int(float(QQ_base[i]))
+            electron_cnt += QQ_num
+            
+            # If NL is in the list of found shells, set shells_found to 'True'
+            if NL[i] in list(shells_found.keys()): 
+                shells_found[NL[i]] = True
+                
+            # If NL is in the list of frozen shells, set frozen_found to 'True
+            if NL[i] in list(frozen_found.keys()):
+                frozen_found[NL[i]] = True
+            
+            # Exit the loop if the following conditions are met:
+            # 1. all shells in the "order" list have been found
+            # 2. NL is not in the list of "order" shells
+            all_shells_found = all(found == True for found in shells_found.values())
+            if all_shells_found and NL[i] not in shells_found.keys():
+                NL.pop()
+                J.pop()
+                break
+            
+            # Finding when to remove an electron distinguishes core and valence shells  
+            # If an electron hasn't been removed yet, check if the electron count has surpassed the N-1 threshold
+            if not electron_removed:
+                # If it has, remove an electron from QQ
+                if electron_cnt > num_electrons - 1:
+                    QQ.append(f"{QQ_num - 1:.4f}")
+                    electron_removed = True
+                else:
+                    QQ.append(QQ_base[i])
+                    
+            # If an electron has already been removed, set QQ to 0.0000 if any of the following conditions match:
+            # 1. if the current shell is frozen
+            # 2. current shell is the same shell as last iteration
+            # 3. current shell is not in the shells_found list
+            else:
+                if NL[i] in frozen_shells or NL[i] == NL[i-1] or NL[i] not in shells_found.keys():
+                    QQ.append(f"{0:.4f}")
+                else:
+                    QQ.append(f"{1:.4f}")
+            
+            # By default, first list has KP = 0 and NC = 0 for all shells
+            if index == 1:
+                KP.append(0)
+                NC.append(0)
+            else:
+                NL_low = NL[i][0] + NL[i][1].lower()
+                
+                # Set KP = 1 if the current shell is in core or is frozen, else 0
+                if NL[i] in core_shells or NL[i] in frozen_found.keys():
+                    KP.append(1)
+                else:
+                    KP.append(0)
+                
+                
+                # Set NC = 0 if the current shell is in core or is frozen, else iterate per shell
+                if NL[i] in core_shells or NL[i] in frozen_found.keys() and NC[i-1] == 0:
+                    NC.append(0)
+                else:
+                    if NL[i] != NL[i-1]:
+                        nc_it += 1
+                    NC.append(nc_it)
+        
+        # Freeze the shells for next iteration
+        for shell in shells:
+            shell_fmt = shell[0] + shell[1].capitalize() 
+            if shell_fmt not in frozen_shells:
+                frozen_shells.append(shell_fmt)
+                frozen_found[shell_fmt] = False
+        
+        NS = len(NL)
+        NSO = len(core_shells) - 1
+        write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], system['optional']['isotope_shifts']['C_is'])
+        
+        index += 1
+            
+    return
 
 def construct_vvorbs(core, valence, codename, nmax, lmax):
 # Construct list of valence and virtual orbitals
@@ -799,10 +929,12 @@ def run_ao_executables(K_is, C_is):
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
-    yml_file = input("Input yml-file: ")
+    #yml_file = input("Input yml-file: ")
+    yml_file = "config.yml"
     config = read_yaml(yml_file)
     system = config['system']
     atom = config['atom']
+    basis = config['basis']
     
     # Set parameters from config
     name = atom['name']
@@ -810,13 +942,13 @@ if __name__ == "__main__":
         isotope = atom['isotope']
     except KeyError:
         isotope = ""
-    core_orbitals = config['basis']['orbitals']['core']
-    valence_orbitals = config['basis']['orbitals']['valence']
+    core_orbitals = basis['orbitals']['core']
+    valence_orbitals = basis['orbitals']['valence']
     include_breit = atom['include_breit']
-    basis_nmax = config['basis']['orbitals']['nmax']
-    basis_lmax = config['basis']['orbitals']['lmax']
-    kval = config['basis']['val_energies']['kval']
-    val_aov = config['basis']['val_aov']
+    basis_nmax = basis['orbitals']['nmax']
+    basis_lmax = basis['orbitals']['lmax']
+    kval = basis['val_energies']['kval']
+    val_aov = basis['val_aov']
 
     include_isotope_shifts = config['optional']['isotope_shifts']['include']
     if include_isotope_shifts:
@@ -830,7 +962,7 @@ if __name__ == "__main__":
     pci_version = system['pci_version']
 
     # Get atomic data
-    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(name, isotope)
+    Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
 
     # Get orbital information
     NS, NSO, num_val_orbitals = count_total_orbitals(core_orbitals, valence_orbitals)
@@ -947,6 +1079,7 @@ if __name__ == "__main__":
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
     elif code_method == 'ci':
+        write_hfd_inp_ci('HFD.INP', config, num_electrons)
         print('pure CI regime not supported yet')
     else:
         print('that code method is not supported')
