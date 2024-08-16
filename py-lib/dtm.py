@@ -91,6 +91,12 @@ def write_mbpt_inp(basis, matrix_elements):
 
     return
 
+def write_dtm_in(mode, levels, operators):
+    """ Write dtm.in """
+    with open('dtm.in','w') as f:
+        f.write('Mode = ' + mode + '\n')
+        f.write('Lvls = ' + levels + '\n')
+        f.write('Ops = ' + operators)
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
@@ -124,14 +130,14 @@ if __name__ == "__main__":
             
             # Make dtm directory with dtm input and job script
             Path(full_path+'/dtm').mkdir(parents=True, exist_ok=True)
-            with open('dtm.in', 'w') as f:
-                if include_rpa:
-                    f.write('3\n')
-                else:
-                    f.write('2\n')
-                f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                for key in key_list:
-                    f.write(key + '\n')
+            if include_rpa:
+                write_dtm_in('Init',
+                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             ', '.join(key_list))
+            else:
+                write_dtm_in('TM',
+                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             ', '.join(key_list))
 
             run('mv dtm.in dtm/dtm.in', shell=True)
             if include_rpa:
@@ -166,12 +172,12 @@ if __name__ == "__main__":
             if include_rpa:
                 with open('rpa.in', 'w') as f:
                     f.write('2')
-                run('mpirun -n 1 dtm', shell=True)
-                with open('dtm.in', 'w') as f:
-                    f.write('2\n')
-                    f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                    for key in key_list:
-                        f.write(key + '\n')
+                    
+                run('mpirun -n 1 ' + bin_directory + 'dtm', shell=True)
+                write_dtm_in('TM',
+                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             ', '.join(key_list))
+                
                 if on_hpc: 
                     run('sbatch dtm_rpa.qs', shell=True)
             else:    
@@ -183,14 +189,14 @@ if __name__ == "__main__":
         dir_path = os.getcwd()
         dtm_path = dir_path+'/dtm'
         Path(dir_path+'/dtm').mkdir(parents=True, exist_ok=True)
-        with open('dtm.in', 'w') as f:
-            if include_rpa:
-                f.write('3\n')
-            else:
-                f.write('2\n')
-            f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-            for key in key_list:
-                f.write(key + '\n')
+        if include_rpa:
+            write_dtm_in('Init',
+                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         ', '.join(key_list))
+        else:
+            write_dtm_in('TM',
+                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         ', '.join(key_list))
 
         run('mv dtm.in dtm/dtm.in', shell=True)
         if include_rpa:
@@ -225,12 +231,13 @@ if __name__ == "__main__":
         if include_rpa:
             with open('rpa.in', 'w') as f:
                 f.write('2')
-            run('mpirun -n 1 dtm', shell=True)
-            with open('dtm.in', 'w') as f:
-                f.write('2\n')
-                f.write('1 ' + str(num_levels) + ' 1 ' + str(num_levels) + '\n')
-                for key in key_list:
-                    f.write(key + '\n')
+                
+            run('mpirun -n 1 ' + bin_directory + 'dtm', shell=True)
+            
+            write_dtm_in('TM',
+                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         ', '.join(key_list))
+            
             if on_hpc:
                 run('sbatch dtm_rpa.qs', shell=True)
         else:    
