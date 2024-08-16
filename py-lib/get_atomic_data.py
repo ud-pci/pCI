@@ -1111,9 +1111,9 @@ def get_atomic_data(name, isotope):
     rtable = get_radii()
     symbol = re.findall('[a-zA-Z]+', name)[0]
     try:
-        num_rem_ele = re.findall('[0-9]+', name)[0]
+        num_electrons_removed = int(re.findall('[0-9]+', name)[0])
     except:
-        num_rem_ele = 0
+        num_electrons_removed = 0
     rnuc = 0
     cfermi = 0
     Z = 0
@@ -1157,8 +1157,11 @@ def get_atomic_data(name, isotope):
     if Z == 0 or AM == 0:
         print('ERROR: Element could not be found')
         sys.exit()
+    
+    # Calculate number of electrons
+    num_electrons = int(Z) - num_electrons_removed
 
-    return Z, AM, symbol, cfermi, rnuc, num_rem_ele
+    return Z, AM, symbol, cfermi, rnuc, num_electrons
 
 def calc_c_fermi(rnuc):
     """ Calculates c fermi from rms radius """
