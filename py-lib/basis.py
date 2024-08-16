@@ -1078,7 +1078,7 @@ if __name__ == "__main__":
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
         else:
-            print('run_ao_codes option is only available with HPC acess')
+            print('run_ao_codes option is only available with HPC access')
             
     elif code_method == 'ci':
         if include_isotope_shifts:
