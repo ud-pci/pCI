@@ -405,7 +405,8 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
             NL.append(NL_base[i])
             J.append(J_base[i])
             
-            QQ_num = int(float(QQ_base[i]))
+            QQ_num = int(J_base[i].split('/')[0]) + 1
+            
             electron_cnt += QQ_num
             
             # If NL is in the list of found shells, set shells_found to 'True'
@@ -433,7 +434,7 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
                     QQ.append(f"{QQ_num - 1:.4f}")
                     electron_removed = True
                 else:
-                    QQ.append(QQ_base[i])
+                    QQ.append(f"{QQ_num:.4f}")
                     
             # If an electron has already been removed, set QQ to 0.0000 if any of the following conditions match:
             # 1. if the current shell is frozen
@@ -473,7 +474,7 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
         
         # Write the HFD.INP to construct orbitals for this shell
         NS = len(NL)
-        NSO = len(core_shells) - 1
+        NSO = len(core_shells)
         write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         
         index += 1
