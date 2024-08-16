@@ -584,6 +584,29 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
     frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core.split()[-1])[-1])
     frorb = frorb_str[0] + " " + frorb_str[1][0]    
 
+    # Handle custom orbitals
+    custom = system['basis']['orbitals']['custom']
+    
+    # Keep custom orbital builds in a dictionary
+    custom_orbs = {}
+    custom_vorbs = {}
+    for orbital in custom:
+        orb = orbital.split(' ')[0]
+        from_orb = orbital.split(' ')[-1]
+        custom_orbs[orb] = from_orb
+        for vorb in liborb.convert_char_to_digital(orb):
+            vorb_fmt = vorb[:-2] + '01'
+            orb_fmt = orb[:-2] + '01'
+            from_orb_fmt = from_orb[:-2] + '01'
+            # If virtual orbital constructed from hfd, set value same as key
+            if from_orb == 'hfd':
+                custom_vorbs[vorb_fmt] = vorb_fmt
+            else:
+                for from_orb_fmt in liborb.convert_char_to_digital(from_orb):
+                    if vorb_fmt[0] == from_orb_fmt[0]:
+                        from_orb_fmt = from_orb_fmt[:-2] + '01'
+                        custom_vorbs[vorb_fmt] = from_orb_fmt    
+    
     with open(filename, 'w') as f:
         f.write(' ' + system['atom']['name'] + '\n')
         f.write(' Z  =  ' + str(Z) + '\n')
@@ -621,8 +644,18 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
         # Write valence and virtual orbitals
         for i, orb in enumerate(vorbs):
             orb = orb[:-2] + '01'
-            if (i < nval):
-                f.write(str(i+1).rjust(3," ") + orb.rjust(8," ") + "\n")
+            if (i < nval) or codename == 'ci':
+                f.write(str(i+1).rjust(3," ") + orb.rjust(8," "))
+                # Check if orbital is in the list of custom virtual orbitals
+                if orb in list(custom_vorbs.keys()):
+                    # Check if key and value for the custom orbital is the same 
+                    if orb == custom_vorbs[orb]:
+                        f.write("  3 ")
+                    else:
+                        f.write("    ")
+                    f.write(custom_vorbs[orb].rjust(7," ") + "\n")
+                else:
+                    f.write("\n")
             else:
                 f.write(str(i+1).rjust(3," ") + orb.rjust(8," ") + "  3 " + orb.rjust(7," ") + "\n")
             
@@ -1089,6 +1122,8 @@ if __name__ == "__main__":
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         else:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
+            vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, basis['orbitals']['nmax'], basis['orbitals']['lmax'], atom['code_method'], basis['orbitals']['core'], basis['orbitals']['valence'], 0, 0)
         print('pure CI regime not supported yet')
     else:
         print('that code method is not supported')
