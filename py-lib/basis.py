@@ -927,13 +927,13 @@ def run_ao_executables(K_is, C_is):
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
-    #yml_file = input("Input yml-file: ")
-    yml_file = "config.yml"
+    yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
     system = config['system']
     atom = config['atom']
     basis = config['basis']
     optional = config['optional']
+    on_hpc = system['on_hpc']
     
     # Set parameters from config
     name = atom['name']
@@ -1030,7 +1030,7 @@ if __name__ == "__main__":
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
-        if run_ao_codes:
+        if on_hpc and run_ao_codes:
             print("Running codes...")
             if include_isotope_shifts and K_is > 0:
                 for method in code_method:
@@ -1077,6 +1077,9 @@ if __name__ == "__main__":
                     script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
+        else:
+            print('run_ao_codes option is only available with HPC acess')
+            
     elif code_method == 'ci':
         if include_isotope_shifts:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
