@@ -370,6 +370,7 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
     NL_base, J_base, QQ_base, KP_base, NC_base, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
     
     index = 1
+    base_hfd_index = 1
     shells_found = {}
     frozen_found = { }
     frozen_shells = []
@@ -554,9 +555,20 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
     return vorbs, norbs, nval, nvvorbs
 
 
-def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, codename, core, valence, K_is, C_is):
+def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs):
     """ Writes BASS.INP """
     # Define default values
+    basis = system['basis']
+    nmax = basis['orbitals']['nmax']
+    lmax = basis['orbitals']['lmax']
+    codename = atom['code_method']
+    core = basis['orbitals']['core']
+    valence = basis['orbitals']['valence']
+    
+    optional = system['optional']
+    K_is = optional['isotope_shifts']['K_is']
+    C_is = optional['isotope_shifts']['C_is']
+    
     Nv = len(valence.split())
     Ksg = 1
     
@@ -608,18 +620,18 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, nmax, lmax, 
     
     with open(filename, 'w') as f:
         f.write(' ' + system['atom']['name'] + '\n')
-        f.write(' Z  =  ' + str(Z) + '\n')
-        f.write(' Am =  ' + '{:.1f}'.format(round(AM)) + '\n')
-        f.write(' Nso=' + str(NSO).rjust(5," ") + '# number of core orbitals (defines DF operator)\n')
-        f.write(' Nv =' + str(nvvorbs).rjust(5," ") + '# number of valence & virtual orbitals\n')
-        f.write(' Ksg=' + str(Ksg).rjust(5," ") + '# defines Hamiltonian: 1-DF, 3-DF+Breit\n')
-        f.write(' Kdg=' + str(Kdg).rjust(5," ") + '# diagonalization of Hamiltonian (0=no,1,2=yes)\n')
-        f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
-        f.write(' Kkin' + str(Kkin).rjust(5," ") + '# kinetic balance (0,1,or 2)\n')
-        f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
-        f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
-        f.write('kout=' + str(0).rjust(5," ") + '# detail rate in the output\n')
-        f.write('kbrt=' + str(kbr).rjust(5," ") + '# 0,1,2 - Coulomb, Gaunt, Breit\n')
+        f.write(' Z  = ' + str(Z) + '\n')
+        f.write(' Am = ' + '{:.1f}'.format(round(AM)) + '\n')
+        f.write(' Nso=' + str(NSO).rjust(5," ") + ' # number of core orbitals (defines DF operator)\n')
+        f.write(' Nv =' + str(nvvorbs).rjust(5," ") + ' # number of valence & virtual orbitals\n')
+        f.write(' Ksg=' + str(Ksg).rjust(5," ") + ' # defines Hamiltonian: 1-DF, 3-DF+Breit\n')
+        f.write(' Kdg=' + str(Kdg).rjust(5," ") + ' # diagonalization of Hamiltonian (0=no,1,2=yes)\n')
+        f.write(' orb=' + fvalorb.rjust(5," ") + ' # first orbital for diagonalization\n')
+        f.write(' Kkin' + str(Kkin).rjust(5," ") + ' # kinetic balance (0,1,or 2)\n')
+        f.write(' orb=' + fvirorb.rjust(5," ") + ' # first orbital to apply kin.bal.\n')
+        f.write(' orb=' + frorb.rjust(5," ") + ' # last frozen orbital\n')
+        f.write('kout=' + str(0).rjust(5," ") + ' # detail rate in the output\n')
+        f.write('kbrt=' + str(kbr).rjust(5," ") + ' # 0,1,2 - Coulomb, Gaunt, Breit\n')
         if C_is != 0:
             f.write('K_is= ' + str(K_is) + '\n')
             f.write('C_is= ' + str(C_is) + '\n')
@@ -767,7 +779,7 @@ def write_ao_inputs(system, C_is, kvw):
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
     # Write BASS.INP
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], system['optional']['code_method'], system['basis']['orbitals']['core'], system['basis']['orbitals']['valence'], system['optional']['isotope_shifts']['K_is'], C_is)
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs)
 
     # Write bas_wj.in
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
@@ -851,7 +863,7 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_ci_executables(on_hpc, bin_directory):
+def run_ci_executables(on_hpc, bin_directory, order, custom):
     
     # Strip '/' from end of bin_directory
     if bin_directory[-1] == '/':
@@ -874,11 +886,59 @@ def run_ci_executables(on_hpc, bin_directory):
             run(bin_directory + '/hfd > hfd' + file[-5] + '.out', shell=True)
         run('cp HFD.DAT ' + file[:-3] + 'DAT', shell=True)
         run('cp HFD.RES ' + file[:-3] + 'RES', shell=True)
+        print('hfd completed with ' + file)
         
     # Clean up
     run('rm HFD.INP HFD.RES', shell=True)
     
-    # Find BASS.INP file
+    # Find base HFD.DAT to construct basis set
+    # Check if key and value is the same in custom_vorbs (from hfd)
+    # We assume corresponding HFD.DAT was constructed to make orbitals, and use previous as the base
+    from_hfd = []
+    for shell_origin in custom:
+        shell = shell_origin.split(' ')[0]
+        origin = shell_origin.split(' ')[-1]
+        if origin == 'hfd':
+            from_hfd.append(shell)
+
+    # Figure out which HFD.INP created those orbitals - HFD.DAT should correspond to the latest HFD.INP that does not contain those orbitals
+    order_list = order.split('/')
+    for base_hfd_index in range(len(order_list)):
+        order_list_fmt = order_list[base_hfd_index].strip()
+        shells = order_list_fmt.split(' ')
+        if not any(shell in from_hfd for shell in shells):
+            base_hfd_index += 1
+    
+    # Prepare inputs for bass
+    run('cp HFD' + str(base_hfd_index) + '.DAT HFD.DAT', shell=True)
+    with open('bass.in', 'w') as f:
+        f.write('HFD' + str(base_hfd_index + 1) + '.DAT')
+    
+    # Run bass
+    # check if bass.out exists and remove if it does
+    if os.path.isfile('bass.out'):
+        run(['rm','bass.out'])
+        
+    maxNumTries = 5
+    nTry = 1
+
+    while check_errors('bass.out') > 0:
+        print('bass attempt', nTry)
+        if on_hpc:
+            run('bass < bass.in > bass.out', shell=True)
+        else:
+            run(bin_directory + '/bass < bass.in > bass.out', shell=True)
+        
+        run('cp bass.out ' + 'bass' + str(nTry) + '.out', shell=True)
+            
+        if (nTry >= maxNumTries):
+            print("bass did not converge after", nTry, "attempts")
+            break
+        nTry += 1
+        
+    else:
+        print("bass completed with no errors after", nTry - 1, "attempts")
+        
     return
 
 def run_ao_executables(K_is, C_is):
@@ -1151,13 +1211,17 @@ if __name__ == "__main__":
         run('pwd', shell=True)
         if include_isotope_shifts:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
+            vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
         else:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
-            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, basis['orbitals']['nmax'], basis['orbitals']['lmax'], atom['code_method'], basis['orbitals']['core'], basis['orbitals']['valence'], 0, 0)
+            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
             
         if run_basis_codes:
-            run_ci_executables(on_hpc, bin_directory)
+            order = basis['orbitals']['order']
+            custom = basis['orbitals']['custom']
+            run_ci_executables(on_hpc, bin_directory, order, custom)
                         
         os.chdir('../')
 
