@@ -355,7 +355,7 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
     f.close()
     print(filename + ' has been written')
 
-def write_hfd_inp_ci(filename, system, num_electrons):
+def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_base, QQ_base, KP_base, NC_base, rnuc, K_is, C_is):
     """ Write multiple HFD.INP files for case of pure CI"""
 
     basis = system['basis']
@@ -449,15 +449,12 @@ def write_hfd_inp_ci(filename, system, num_electrons):
             if index == 1:
                 KP.append(0)
                 NC.append(0)
-            else:
-                NL_low = NL[i][0] + NL[i][1].lower()
-                
+            else:                
                 # Set KP = 1 if the current shell is in core or is frozen, else 0
                 if NL[i] in core_shells or NL[i] in frozen_found.keys():
                     KP.append(1)
                 else:
                     KP.append(0)
-                
                 
                 # Set NC = 0 if the current shell is in core or is frozen, else iterate per shell
                 if NL[i] in core_shells or NL[i] in frozen_found.keys() and NC[i-1] == 0:
@@ -474,13 +471,14 @@ def write_hfd_inp_ci(filename, system, num_electrons):
                 frozen_shells.append(shell_fmt)
                 frozen_found[shell_fmt] = False
         
+        # Write the HFD.INP to construct orbitals for this shell
         NS = len(NL)
         NSO = len(core_shells) - 1
-        write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], system['optional']['isotope_shifts']['C_is'])
+        write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         
         index += 1
-            
-    return
+        
+    print("HFD.INP files have been written")
 
 def construct_vvorbs(core, valence, codename, nmax, lmax):
 # Construct list of valence and virtual orbitals
@@ -935,6 +933,7 @@ if __name__ == "__main__":
     system = config['system']
     atom = config['atom']
     basis = config['basis']
+    optional = config['optional']
     
     # Set parameters from config
     name = atom['name']
@@ -950,10 +949,10 @@ if __name__ == "__main__":
     kval = basis['val_energies']['kval']
     val_aov = basis['val_aov']
 
-    include_isotope_shifts = config['optional']['isotope_shifts']['include']
+    include_isotope_shifts = optional['isotope_shifts']['include']
     if include_isotope_shifts:
-        K_is = config['optional']['isotope_shifts']['K_is']
-        C_is = config['optional']['isotope_shifts']['C_is']
+        K_is = optional['isotope_shifts']['K_is']
+        C_is = optional['isotope_shifts']['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
 
@@ -1079,7 +1078,10 @@ if __name__ == "__main__":
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
     elif code_method == 'ci':
-        write_hfd_inp_ci('HFD.INP', config, num_electrons)
+        if include_isotope_shifts:
+            write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
+        else:
+            write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
         print('pure CI regime not supported yet')
     else:
         print('that code method is not supported')
