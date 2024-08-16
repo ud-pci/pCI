@@ -801,13 +801,18 @@ if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
-
+    system = config['system']
+    atom = config['atom']
+    
     # Set parameters from config
-    name = config['system']['name']
-    isotope = config['system']['isotope']
+    name = atom['name']
+    try:
+        isotope = atom['isotope']
+    except KeyError:
+        isotope = ""
     core_orbitals = config['basis']['orbitals']['core']
     valence_orbitals = config['basis']['orbitals']['valence']
-    include_breit = config['system']['include_breit']
+    include_breit = atom['include_breit']
     basis_nmax = config['basis']['orbitals']['nmax']
     basis_lmax = config['basis']['orbitals']['lmax']
     kval = config['basis']['val_energies']['kval']
@@ -820,9 +825,9 @@ if __name__ == "__main__":
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
 
-    code_method = config['optional']['code_method']
-    run_ao_codes = config['optional']['run_ao_codes']
-    pci_version = config['optional']['pci_version']
+    code_method = atom['code_method']
+    run_ao_codes = system['run_ao_codes']
+    pci_version = system['pci_version']
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(name, isotope)
