@@ -8,7 +8,7 @@ The "config.yml" file should have the following blocks:
     * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
 
 From these parameters, this script will create all input files required for the various basis codes.
-After the input files are created, the sequence of basis set codes will be executed if the parameter run_ao_codes is set to "True".
+After the input files are created, the sequence of basis set codes will be executed if the parameter run_basis_codes is set to "True".
 
 This python script has 2 main capabilities for basis set construction:
 1. Construction of basis for isotope shift calculations 
@@ -478,8 +478,6 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
         write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         
         index += 1
-        
-    print("HFD.INP files have been written")
 
 def construct_vvorbs(core, valence, codename, nmax, lmax):
 # Construct list of valence and virtual orbitals
@@ -853,7 +851,34 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_ci_executables():
+def run_ci_executables(on_hpc, bin_directory):
+    
+    # Strip '/' from end of bin_directory
+    if bin_directory[-1] == '/':
+        bin_directory = bin_directory[:-1]
+
+    # Find HFD.INP files
+    file_list = os.listdir(".")
+    hfd_list = []
+    for file in file_list:
+        if file[:3] == 'HFD' and file[-3:] == 'INP':
+            hfd_list.append(file)
+            
+    # Run hfd for HFD.INP files
+    print('Found the following HFD.INP files:', ', '.join(hfd_list))
+    for file in hfd_list:
+        run('cp ' + file + ' HFD.INP', shell=True)
+        if on_hpc:
+            run('hfd > hfd' + file[-5] + '.out', shell=True)
+        else:
+            run(bin_directory + '/hfd > hfd' + file[-5] + '.out', shell=True)
+        run('cp HFD.DAT ' + file[:-3] + 'DAT', shell=True)
+        run('cp HFD.RES ' + file[:-3] + 'RES', shell=True)
+        
+    # Clean up
+    run('rm HFD.INP HFD.RES', shell=True)
+    
+    # Find BASS.INP file
     return
 
 def run_ao_executables(K_is, C_is):
@@ -972,6 +997,7 @@ if __name__ == "__main__":
     basis = config['basis']
     optional = config['optional']
     on_hpc = system['on_hpc']
+    bin_directory = system['bin_directory']
     
     # Set parameters from config
     name = atom['name']
@@ -995,7 +1021,7 @@ if __name__ == "__main__":
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
 
     code_method = atom['code_method']
-    run_ao_codes = system['run_ao_codes']
+    run_basis_codes = system['run_basis_codes']
     pci_version = system['pci_version']
 
     # Get atomic data
@@ -1068,7 +1094,7 @@ if __name__ == "__main__":
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
-        if on_hpc and run_ao_codes:
+        if on_hpc and run_basis_codes:
             print("Running codes...")
             if include_isotope_shifts and K_is > 0:
                 for method in code_method:
@@ -1116,15 +1142,24 @@ if __name__ == "__main__":
                     run('sbatch ' + script_name, shell=True)
                     os.chdir('../')
         else:
-            print('run_ao_codes option is only available with HPC access')
+            print('run_basis_codes option is only available with HPC access')
             
     elif code_method == 'ci':
+        dir_path = os.getcwd()
+        Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+        os.chdir('basis')
+        run('pwd', shell=True)
         if include_isotope_shifts:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         else:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
             write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, basis['orbitals']['nmax'], basis['orbitals']['lmax'], atom['code_method'], basis['orbitals']['core'], basis['orbitals']['valence'], 0, 0)
-        print('pure CI regime not supported yet')
+            
+        if run_basis_codes:
+            run_ci_executables(on_hpc, bin_directory)
+                        
+        os.chdir('../')
+
     else:
-        print('that code method is not supported')
+        print('code method', code_method, ' is not supported')
