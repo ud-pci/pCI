@@ -219,6 +219,8 @@ def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
         run("cp basis/HFD.DAT " + parity, shell=True)
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
         run("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
+    if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
+        run("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP", shell=True )
     if os.path.isfile('basis/SGC.CON'):
         run("cp basis/SGC.CON "  + parity, shell=True)
     if os.path.isfile('basis/SCRC.CON'):
