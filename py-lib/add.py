@@ -281,10 +281,6 @@ if __name__ == "__main__":
     basis_core = config['basis']['orbitals']['core']
     add_core = config['add']['orbitals']['core']
     
-    if basis_core != add_core: 
-        print('ERROR: core orbitals of basis and add do not match in config.yml')
-        sys.exit()
-    
     # Check if user wants to generate directories for CI computations
     gen_dir = run_ci if run_ci else config['system']['generate_directories']
     
