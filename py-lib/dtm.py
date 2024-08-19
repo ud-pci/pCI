@@ -1,13 +1,8 @@
 import yaml
-import collections.abc
 from subprocess import run
 import os
-import sys
-import re
-import math
-import orbitals as orb_lib
-import get_atomic_data as libatomic
 from pathlib import Path
+from utils import run_shell
 from gen_job_script import write_job_script
 
 
@@ -139,32 +134,32 @@ if __name__ == "__main__":
                              '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                              ', '.join(key_list))
 
-            run('mv dtm.in dtm/dtm.in', shell=True)
+            run_shell('mv dtm.in dtm/dtm.in')
             if include_rpa:
                 write_mbpt_inp(basis, key_list)
                 if on_hpc:
                     write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
-                    run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
+                    run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
             else:
                 write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
-                run('mv dtm.qs dtm/dtm.qs', shell=True)
+                run_shell('mv dtm.qs dtm/dtm.qs')
             
             # Find even and odd directories with completed ci runs
             if os.path.isfile('even/CONFFINAL.RES'):
                 if include_rpa: 
-                    run('cp even/HFD.DAT dtm/HFD.DAT', shell=True)
-                    run('cp MBPT.INP dtm/MBPT.INP', shell=True)
-                run('cp even/CONF.INP dtm/CONF.INP', shell=True)
-                run('cp even/CONF.DET dtm/CONF.DET', shell=True)
-                run('cp even/CONF.XIJ dtm/CONF.XIJ', shell=True)
-                run('cp even/CONFSTR.RES dtm/CONFSTR.RES', shell=True)
-                run('cp even/CONF.DAT dtm/CONF.DAT', shell=True)
-                run('cp even/CONF.INT dtm/CONF.INT', shell=True)
+                    run_shell('cp even/HFD.DAT dtm/HFD.DAT')
+                    run_shell('cp MBPT.INP dtm/MBPT.INP')
+                run_shell('cp even/CONF.INP dtm/CONF.INP')
+                run_shell('cp even/CONF.DET dtm/CONF.DET')
+                run_shell('cp even/CONF.XIJ dtm/CONF.XIJ')
+                run_shell('cp even/CONFSTR.RES dtm/CONFSTR.RES')
+                run_shell('cp even/CONF.DAT dtm/CONF.DAT')
+                run_shell('cp even/CONF.INT dtm/CONF.INT')
             if os.path.isfile('odd/CONFFINAL.RES'):
-                run('cp odd/CONF.INP dtm/CONF1.INP', shell=True)
-                run('cp odd/CONF.DET dtm/CONF1.DET', shell=True)
-                run('cp odd/CONF.XIJ dtm/CONF1.XIJ', shell=True)
-                run('cp odd/CONFSTR.RES dtm/CONFSTR1.RES', shell=True)
+                run_shell('cp odd/CONF.INP dtm/CONF1.INP')
+                run_shell('cp odd/CONF.DET dtm/CONF1.DET')
+                run_shell('cp odd/CONF.XIJ dtm/CONF1.XIJ')
+                run_shell('cp odd/CONFSTR.RES dtm/CONFSTR1.RES')
                         
             # cd into new dtm directory and submit job script
             dtm_path = full_path+'/dtm'
@@ -173,16 +168,16 @@ if __name__ == "__main__":
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                     
-                run('mpirun -n 1 ' + bin_directory + 'dtm', shell=True)
+                run_shell('mpirun -n 1 ' + bin_directory + 'dtm')
                 write_dtm_in('TM',
                              '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                              ', '.join(key_list))
                 
                 if on_hpc: 
-                    run('sbatch dtm_rpa.qs', shell=True)
+                    run_shell('sbatch dtm_rpa.qs')
             else:    
                 if on_hpc:
-                    run('sbatch dtm.qs', shell=True)
+                    run_shell('sbatch dtm.qs')
             
     else:
         # Make dtm directory with dtm input and job script
@@ -198,33 +193,33 @@ if __name__ == "__main__":
                          '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                          ', '.join(key_list))
 
-        run('mv dtm.in dtm/dtm.in', shell=True)
+        run_shell('mv dtm.in dtm/dtm.in')
         if include_rpa:
             write_mbpt_inp(basis, key_list)
             if on_hpc:
                 write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
-                run('mv dtm_rpa.qs dtm/dtm_rpa.qs', shell=True)
+                run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
         else:
             if on_hpc:
                 write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
-                run('mv dtm.qs dtm/dtm.qs', shell=True)
+                run_shell('mv dtm.qs dtm/dtm.qs')
         
         # Find even and odd directories with completed ci runs
         if os.path.isfile('even/CONFFINAL.RES'):
             if include_rpa: 
-                run('cp even/HFD.DAT dtm/HFD.DAT', shell=True)
-                run('cp MBPT.INP dtm/MBPT.INP', shell=True)
-            run('cp even/CONF.INP dtm/CONF.INP', shell=True)
-            run('cp even/CONF.DET dtm/CONF.DET', shell=True)
-            run('cp even/CONF.XIJ dtm/CONF.XIJ', shell=True)
-            run('cp even/CONFSTR.RES dtm/CONFSTR.RES', shell=True)
-            run('cp even/CONF.DAT dtm/CONF.DAT', shell=True)
-            run('cp even/CONF.INT dtm/CONF.INT', shell=True)
+                run_shell('cp even/HFD.DAT dtm/HFD.DAT')
+                run_shell('cp MBPT.INP dtm/MBPT.INP')
+            run_shell('cp even/CONF.INP dtm/CONF.INP')
+            run_shell('cp even/CONF.DET dtm/CONF.DET')
+            run_shell('cp even/CONF.XIJ dtm/CONF.XIJ')
+            run_shell('cp even/CONFSTR.RES dtm/CONFSTR.RES')
+            run_shell('cp even/CONF.DAT dtm/CONF.DAT')
+            run_shell('cp even/CONF.INT dtm/CONF.INT')
         if os.path.isfile('odd/CONFFINAL.RES'):
-            run('cp odd/CONF.INP dtm/CONF1.INP', shell=True)
-            run('cp odd/CONF.DET dtm/CONF1.DET', shell=True)
-            run('cp odd/CONF.XIJ dtm/CONF1.XIJ', shell=True)
-            run('cp odd/CONFSTR.RES dtm/CONFSTR1.RES', shell=True)
+            run_shell('cp odd/CONF.INP dtm/CONF1.INP')
+            run_shell('cp odd/CONF.DET dtm/CONF1.DET')
+            run_shell('cp odd/CONF.XIJ dtm/CONF1.XIJ')
+            run_shell('cp odd/CONFSTR.RES dtm/CONFSTR1.RES')
                     
         # cd into new dtm directory and submit job script
         os.chdir(dtm_path)
@@ -232,14 +227,14 @@ if __name__ == "__main__":
             with open('rpa.in', 'w') as f:
                 f.write('2')
                 
-            run('mpirun -n 1 ' + bin_directory + 'dtm', shell=True)
+            run_shell('mpirun -n 1 ' + bin_directory + 'dtm')
             
             write_dtm_in('TM',
                          '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                          ', '.join(key_list))
             
             if on_hpc:
-                run('sbatch dtm_rpa.qs', shell=True)
+                run_shell('sbatch dtm_rpa.qs')
         else:    
             if on_hpc:
-                run('sbatch dtm.qs', shell=True)
+                run_shell('sbatch dtm.qs')
