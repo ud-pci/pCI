@@ -923,7 +923,7 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
     # Run bass
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
-        run_shell(['rm','bass.out'])
+        run_shell('rm bass.out')
         
     maxNumTries = 5
     nTry = 1
@@ -971,10 +971,9 @@ def run_ao_executables(K_is, C_is):
         f.write('\n')
         f.write('\n')
         f.write('1')
-    f.close()
 
     run_shell('bas_wj < bwj.in > bas_wj.out')
-    run_shell(['rm','bwj.in'])
+    run_shell('rm bwj.in')
     print("bas_wj complete")
 
     # Edit BASS.INP
@@ -1024,7 +1023,7 @@ def run_ao_executables(K_is, C_is):
 
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
-        run_shell(['rm','bass.out'])
+        run_shell('rm bass.out')
 
     maxNumTries = 5
     nTry = 1
@@ -1039,8 +1038,8 @@ def run_ao_executables(K_is, C_is):
     else:
         print("bass completed with no errors after", nTry, "attempts")
 
-    run_shell(['rm', 'bass.in'])
-    run_shell(['rm','hfspl.1','hfspl.2'])
+    run_shell('rm bass.in')
+    run_shell('rm hfspl.1 hfspl.2')
 
     # Run qed
     #if system['rotate_basis'] == True or system['include_qed'] == True:
