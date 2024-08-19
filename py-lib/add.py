@@ -20,13 +20,13 @@ This python script has 3 main capabilities for configuration list construction:
 
 """
 import yaml
-from subprocess import run
 import os
 import sys
 import re
 import math
 import orbitals as orb_lib
 import get_atomic_data as libatomic
+from utils import run_shell
 from pathlib import Path
 from gen_job_script import write_job_script
 
@@ -206,27 +206,27 @@ def create_add_inp(config):
         print('no odd reference configurations specified')
 
 def form_conf_inp(parity, bin_dir):
-    run("cp ADD" + parity + ".INP ADD.INP", shell=True)
-    run(bin_dir + "/add < add.in > add" + parity + ".out", shell=True)
+    run_shell("cp ADD" + parity + ".INP ADD.INP")
+    run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
     print("output of add saved to add" + parity + ".out")
-    run("cp CONF.INP CONF" + parity + ".INP", shell=True)
+    run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
 
 def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
     if not os.path.isdir(parity):
-        run("mkdir " + parity, shell=True)
+        run_shell("mkdir " + parity)
     if os.path.isfile('basis/HFD.DAT'):
-        run("cp basis/HFD.DAT " + parity, shell=True)
+        run_shell("cp basis/HFD.DAT " + parity)
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
+        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
     if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
-        run("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP", shell=True )
+        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP", shell=True )
     if os.path.isfile('basis/SGC.CON'):
-        run("cp basis/SGC.CON "  + parity, shell=True)
+        run_shell("cp basis/SGC.CON "  + parity)
     if os.path.isfile('basis/SCRC.CON'):
-        run("cp basis/SCRC.CON "  + parity, shell=True)
+        run_shell("cp basis/SCRC.CON "  + parity)
     if run_ci and os.path.isfile(root_dir + '/ci.qs'):
-        run("cp " + root_dir + "/ci.qs " + parity, shell=True)
+        run_shell("cp " + root_dir + "/ci.qs " + parity)
         
     Kw = '1' if write_hij else '0'
     KLSJ = '1' if include_lsj else '0'
@@ -297,14 +297,14 @@ if __name__ == "__main__":
     if not os.path.isfile('BASS.INP'):
         for root, dirs, files in os.walk('.'):
             if 'BASS.INP' in files:
-                run('cp ' + root + '/BASS.INP .', shell=True)
+                run_shell('cp ' + root + '/BASS.INP .')
                 break
     
     # Run script to generate ADD.INP for even and odd configurations
     create_add_inp(config)
     
     # Cleanup BASS.INP
-    run('rm BASS.INP', shell=True)
+    run_shell('rm BASS.INP')
     
     # Check if ADDeven.INP and ADDodd.INP exist
     even_exists = os.path.isfile('ADDeven.INP')
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         parities.append('odd')
     
     # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
-    run("rm add.in ADD.INP CONF.INP CONF_.INP", shell=True)
+    run_shell("rm add.in ADD.INP CONF.INP CONF_.INP")
     
     # Create a ci.qs job script if it doesn't exist yet
     if on_hpc and not os.path.isfile('ci.qs'):
@@ -347,13 +347,13 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
                         if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run("sbatch " + script_name, shell=True)
+                            run_shell("sbatch " + script_name)
                             os.chdir('../')
                         else:
                             print("run_ci option is only available with HPC access")
@@ -368,26 +368,26 @@ if __name__ == "__main__":
                 for method in code_method:
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method)
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
                         if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run("sbatch " + script_name, shell=True)
+                            run_shell("sbatch " + script_name)
                             os.chdir('../')
                         else:
                             print("run_ci option is only available with HPC access - please run ci codes manually")
                     os.chdir('../')
             else:
                 dir_path = os.getcwd()
-                run('pwd', shell=True)
+                run_shell('pwd')
                 for parity in parities:
                     move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                     # Submit CI job if run_ci == True
                     if on_hpc and run_ci: 
                         os.chdir(parity)
-                        run("sbatch " + script_name, shell=True)
+                        run_shell("sbatch " + script_name)
                         os.chdir('../')
                     else:
                         print("run_ci option is only available with HPC access - please run ci codes manually")

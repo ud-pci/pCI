@@ -22,7 +22,7 @@ import get_atomic_data as libatomic
 import orbitals as liborb
 import os
 from pathlib import Path
-from subprocess import run
+from utils import run_shell
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
@@ -885,17 +885,17 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
     # Run hfd for HFD.INP files
     print('Found the following HFD.INP files:', ', '.join(hfd_list))
     for file in hfd_list:
-        run('cp ' + file + ' HFD.INP', shell=True)
+        run_shell('cp ' + file + ' HFD.INP')
         if on_hpc:
-            run('hfd > hfd' + file[-5] + '.out', shell=True)
+            run_shell('hfd > hfd' + file[-5] + '.out')
         else:
-            run(bin_directory + '/hfd > hfd' + file[-5] + '.out', shell=True)
-        run('cp HFD.DAT ' + file[:-3] + 'DAT', shell=True)
-        run('cp HFD.RES ' + file[:-3] + 'RES', shell=True)
+            run_shell(bin_directory + '/hfd > hfd' + file[-5] + '.out')
+        run_shell('cp HFD.DAT ' + file[:-3] + 'DAT')
+        run_shell('cp HFD.RES ' + file[:-3] + 'RES')
         print('hfd completed with ' + file)
         
     # Clean up
-    run('rm HFD.INP HFD.RES', shell=True)
+    run_shell('rm HFD.INP HFD.RES')
     
     # Find base HFD.DAT to construct basis set
     # Check if key and value is the same in custom_vorbs (from hfd)
@@ -916,14 +916,14 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
             base_hfd_index += 1
     
     # Prepare inputs for bass
-    run('cp HFD' + str(base_hfd_index) + '.DAT HFD.DAT', shell=True)
+    run_shell('cp HFD' + str(base_hfd_index) + '.DAT HFD.DAT')
     with open('bass.in', 'w') as f:
         f.write('HFD' + str(base_hfd_index + 1) + '.DAT')
     
     # Run bass
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
-        run(['rm','bass.out'])
+        run_shell(['rm','bass.out'])
         
     maxNumTries = 5
     nTry = 1
@@ -931,11 +931,11 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
         if on_hpc:
-            run('bass < bass.in > bass.out', shell=True)
+            run_shell('bass < bass.in > bass.out')
         else:
-            run(bin_directory + '/bass < bass.in > bass.out', shell=True)
+            run_shell(bin_directory + '/bass < bass.in > bass.out')
         
-        run('cp bass.out ' + 'bass' + str(nTry) + '.out', shell=True)
+        run_shell('cp bass.out ' + 'bass' + str(nTry) + '.out')
             
         if (nTry >= maxNumTries):
             print("bass did not converge after", nTry, "attempts")
@@ -946,22 +946,22 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
         print("bass completed with no errors after", nTry - 1, "attempts")
         
     return
-
+    
 def run_ao_executables(K_is, C_is):
     # Run hfd
-    run('hfd > hfd.out', shell=True)
+    run_shell('hfd > hfd.out')
     print("hfd complete")
 
     # Produce B-splines
     if kbrt == 0:
-        run('tdhf < bas_wj.in > tdhf.out', shell=True)
+        run_shell('tdhf < bas_wj.in > tdhf.out')
         print("tdhf complete")
-        run('nspl40 < spl.in > nspl40.out', shell=True)
+        run_shell('nspl40 < spl.in > nspl40.out')
         print("nspl40 complete")
     else:
-        run('bdhf < bas_wj.in > bdhf.out', shell=True)
+        run_shell('bdhf < bas_wj.in > bdhf.out')
         print("bdhf complete")
-        run('bspl40 < spl.in > bspl40.out', shell=True)
+        run_shell('bspl40 < spl.in > bspl40.out')
         print("bspl40 complete")
 
     with open('bwj.in','w') as f: 
@@ -973,8 +973,8 @@ def run_ao_executables(K_is, C_is):
         f.write('1')
     f.close()
 
-    run('bas_wj < bwj.in > bas_wj.out', shell=True)
-    run(['rm','bwj.in'])
+    run_shell('bas_wj < bwj.in > bas_wj.out')
+    run_shell(['rm','bwj.in'])
     print("bas_wj complete")
 
     # Edit BASS.INP
@@ -1024,14 +1024,14 @@ def run_ao_executables(K_is, C_is):
 
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
-        run(['rm','bass.out'])
+        run_shell(['rm','bass.out'])
 
     maxNumTries = 5
     nTry = 1
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        run('bass < bass.in > bass.out', shell=True)
+        run_shell('bass < bass.in > bass.out')
         if (nTry >= maxNumTries):
             print("bass did not converge after", nTry, "attempts")
             break
@@ -1039,19 +1039,19 @@ def run_ao_executables(K_is, C_is):
     else:
         print("bass completed with no errors after", nTry, "attempts")
 
-    run(['rm', 'bass.in'])
-    run(['rm','hfspl.1','hfspl.2'])
+    run_shell(['rm', 'bass.in'])
+    run_shell(['rm','hfspl.1','hfspl.2'])
 
     # Run qed
     #if system['rotate_basis'] == True or system['include_qed'] == True:
-    #    run('cp HFD.DAT HFD-noQED.DAT', shell=True)
+    #    run_shell('cp HFD.DAT HFD-noQED.DAT')
     #    generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
-    #    run('chmod +x batch.qed', shell=True)
-    #    run('./batch.qed > qed.out', shell=True)
+    #    run_shell('chmod +x batch.qed')
+    #    run_shell('./batch.qed > qed.out')
     #    print("qed complete")
 
     # Run bas_x
-    run('bas_x > bas_x.out', shell=True)
+    run_shell('bas_x > bas_x.out')
     print("bas_x complete")
 
 if __name__ == "__main__":
@@ -1135,7 +1135,7 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))+'/basis'
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     write_ao_inputs(config,c,get_key_vw(method))
                     os.chdir('../../')
                 if K_is_dict[K_is]:
@@ -1148,14 +1148,14 @@ if __name__ == "__main__":
                 for method in code_method:
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method+'/basis')
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     write_ao_inputs(config, 0, get_key_vw(method))
                     os.chdir('../../')
             else:
                 dir_path = os.getcwd()
                 Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                 os.chdir('basis')
-                run('pwd', shell=True)
+                run_shell('pwd')
                 write_ao_inputs(config, 0, kvw)
                 os.chdir('../')
 
@@ -1181,10 +1181,10 @@ if __name__ == "__main__":
                                 dir_prefix = ''
                             dir_name = dir_prefix+str(abs(c))+'/basis'
                             os.chdir(dir_name)
-                            run('pwd', shell=True)
+                            run_shell('pwd')
                             run_ao_executables(K_is, c)
                             script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
-                            run('sbatch ' + script_name, shell=True)
+                            run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                         if K_is_dict[K_is]:
                             os.chdir('../../')
@@ -1196,26 +1196,26 @@ if __name__ == "__main__":
                             dir_path = os.getcwd()
                             Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                             os.chdir(method+'/basis')
-                            run('pwd', shell=True)
+                            run_shell('pwd')
                             run_ao_executables(0, 0)
                             script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
-                            run('sbatch ' + script_name, shell=True)
+                            run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                     else:
                         dir_path = os.getcwd()
                         Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
-                        run('pwd', shell=True)
+                        run_shell('pwd')
                         run_ao_executables(0, 0)
                         script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
-                        run('sbatch ' + script_name, shell=True)
+                        run_shell('sbatch ' + script_name)
                         os.chdir('../')
             
     elif code_method == 'ci':
         dir_path = os.getcwd()
         Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
         os.chdir('basis')
-        run('pwd', shell=True)
+        run_shell('pwd')
         if include_isotope_shifts:
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
