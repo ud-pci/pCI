@@ -1,6 +1,6 @@
 import yaml
-from subprocess import run
 import os
+import sys
 from pathlib import Path
 from utils import run_shell
 from gen_job_script import write_job_script
@@ -145,7 +145,8 @@ if __name__ == "__main__":
                 run_shell('mv dtm.qs dtm/dtm.qs')
             
             # Find even and odd directories with completed ci runs
-            if os.path.isfile('even/CONFFINAL.RES'):
+            even_exists, odd_exists = False, False
+            if os.path.isfile('even/CONF.RES') or os.path.isfile('even/CONFFINAL.RES'):
                 if include_rpa: 
                     run_shell('cp even/HFD.DAT dtm/HFD.DAT')
                     run_shell('cp MBPT.INP dtm/MBPT.INP')
@@ -155,11 +156,16 @@ if __name__ == "__main__":
                 run_shell('cp even/CONFSTR.RES dtm/CONFSTR.RES')
                 run_shell('cp even/CONF.DAT dtm/CONF.DAT')
                 run_shell('cp even/CONF.INT dtm/CONF.INT')
-            if os.path.isfile('odd/CONFFINAL.RES'):
+            if os.path.isfile('odd/CONF.RES') or os.path.isfile('odd/CONFFINAL.RES'):
+                odd_exists = True
                 run_shell('cp odd/CONF.INP dtm/CONF1.INP')
                 run_shell('cp odd/CONF.DET dtm/CONF1.DET')
                 run_shell('cp odd/CONF.XIJ dtm/CONF1.XIJ')
                 run_shell('cp odd/CONFSTR.RES dtm/CONFSTR1.RES')
+                
+            if not even_exists and not odd_exists:
+                print('ci directories could not be found')
+                sys.exit()
                         
             # cd into new dtm directory and submit job script
             dtm_path = full_path+'/dtm'
@@ -205,7 +211,9 @@ if __name__ == "__main__":
                 run_shell('mv dtm.qs dtm/dtm.qs')
         
         # Find even and odd directories with completed ci runs
-        if os.path.isfile('even/CONFFINAL.RES'):
+        even_exists, odd_exists = False, False
+        if os.path.isfile('even/CONF.RES') or os.path.isfile('even/CONFFINAL.RES'):
+            even_exists = True
             if include_rpa: 
                 run_shell('cp even/HFD.DAT dtm/HFD.DAT')
                 run_shell('cp MBPT.INP dtm/MBPT.INP')
@@ -215,11 +223,16 @@ if __name__ == "__main__":
             run_shell('cp even/CONFSTR.RES dtm/CONFSTR.RES')
             run_shell('cp even/CONF.DAT dtm/CONF.DAT')
             run_shell('cp even/CONF.INT dtm/CONF.INT')
-        if os.path.isfile('odd/CONFFINAL.RES'):
+        if os.path.isfile('odd/CONF.RES') or os.path.isfile('odd/CONFFINAL.RES'):
+            odd_exists = True
             run_shell('cp odd/CONF.INP dtm/CONF1.INP')
             run_shell('cp odd/CONF.DET dtm/CONF1.DET')
             run_shell('cp odd/CONF.XIJ dtm/CONF1.XIJ')
             run_shell('cp odd/CONFSTR.RES dtm/CONFSTR1.RES')
+            
+        if not even_exists and not odd_exists:
+            print('ci directories could not be found')
+            sys.exit()
                     
         # cd into new dtm directory and submit job script
         os.chdir(dtm_path)
