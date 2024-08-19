@@ -599,27 +599,30 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs):
     frorb = frorb_str[0] + " " + frorb_str[1][0]    
 
     # Handle custom orbitals
-    custom = system['basis']['orbitals']['custom']
-    
-    # Keep custom orbital builds in a dictionary
     custom_orbs = {}
     custom_vorbs = {}
-    for orbital in custom:
-        orb = orbital.split(' ')[0]
-        from_orb = orbital.split(' ')[-1]
-        custom_orbs[orb] = from_orb
-        for vorb in liborb.convert_char_to_digital(orb):
-            vorb_fmt = vorb[:-2] + '01'
-            orb_fmt = orb[:-2] + '01'
-            from_orb_fmt = from_orb[:-2] + '01'
-            # If virtual orbital constructed from hfd, set value same as key
-            if from_orb == 'hfd':
-                custom_vorbs[vorb_fmt] = vorb_fmt
-            else:
-                for from_orb_fmt in liborb.convert_char_to_digital(from_orb):
-                    if vorb_fmt[0] == from_orb_fmt[0]:
-                        from_orb_fmt = from_orb_fmt[:-2] + '01'
-                        custom_vorbs[vorb_fmt] = from_orb_fmt    
+    try:
+        custom = system['basis']['orbitals']['custom']
+    except KeyError:
+        custom = ""
+    
+    if custom:
+        for orbital in custom:
+            orb = orbital.split(' ')[0]
+            from_orb = orbital.split(' ')[-1]
+            custom_orbs[orb] = from_orb
+            for vorb in liborb.convert_char_to_digital(orb):
+                vorb_fmt = vorb[:-2] + '01'
+                orb_fmt = orb[:-2] + '01'
+                from_orb_fmt = from_orb[:-2] + '01'
+                # If virtual orbital constructed from hfd, set value same as key
+                if from_orb == 'hfd':
+                    custom_vorbs[vorb_fmt] = vorb_fmt
+                else:
+                    for from_orb_fmt in liborb.convert_char_to_digital(from_orb):
+                        if vorb_fmt[0] == from_orb_fmt[0]:
+                            from_orb_fmt = from_orb_fmt[:-2] + '01'
+                            custom_vorbs[vorb_fmt] = from_orb_fmt    
     
     with open(filename, 'w') as f:
         f.write(' ' + system['atom']['name'] + '\n')
@@ -1157,55 +1160,56 @@ if __name__ == "__main__":
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
-        if on_hpc and run_basis_codes:
-            print("Running codes...")
-            if include_isotope_shifts and K_is > 0:
-                for method in code_method:
-                    dir_path = os.getcwd()
-                    is_dir = method + '/' + K_is_dict[K_is]
-                    Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
-                    os.chdir(dir_path+'/'+is_dir)
-                    for c in c_list:
-                        dir_path = os.getcwd()
-                        if c < 0:
-                            dir_prefix = 'minus' 
-                        elif c > 0:
-                            dir_prefix = 'plus'
-                        else:
-                            dir_prefix = ''
-                        dir_name = dir_prefix+str(abs(c))+'/basis'
-                        os.chdir(dir_name)
-                        run('pwd', shell=True)
-                        run_ao_executables(K_is, c)
-                        script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
-                        run('sbatch ' + script_name, shell=True)
-                        os.chdir('../../')
-                    if K_is_dict[K_is]:
-                        os.chdir('../../')
-                    else:
-                        os.chdir('../')
+        if run_basis_codes:
+            if not on_hpc:
+                print('run_basis_codes option is only available with HPC access')
             else:
-                if isinstance(code_method, list):
+                print("Running codes...")
+                if include_isotope_shifts and K_is > 0:
                     for method in code_method:
                         dir_path = os.getcwd()
-                        Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
-                        os.chdir(method+'/basis')
+                        is_dir = method + '/' + K_is_dict[K_is]
+                        Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
+                        os.chdir(dir_path+'/'+is_dir)
+                        for c in c_list:
+                            dir_path = os.getcwd()
+                            if c < 0:
+                                dir_prefix = 'minus' 
+                            elif c > 0:
+                                dir_prefix = 'plus'
+                            else:
+                                dir_prefix = ''
+                            dir_name = dir_prefix+str(abs(c))+'/basis'
+                            os.chdir(dir_name)
+                            run('pwd', shell=True)
+                            run_ao_executables(K_is, c)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                            run('sbatch ' + script_name, shell=True)
+                            os.chdir('../../')
+                        if K_is_dict[K_is]:
+                            os.chdir('../../')
+                        else:
+                            os.chdir('../')
+                else:
+                    if isinstance(code_method, list):
+                        for method in code_method:
+                            dir_path = os.getcwd()
+                            Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
+                            os.chdir(method+'/basis')
+                            run('pwd', shell=True)
+                            run_ao_executables(0, 0)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                            run('sbatch ' + script_name, shell=True)
+                            os.chdir('../../')
+                    else:
+                        dir_path = os.getcwd()
+                        Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+                        os.chdir('basis')
                         run('pwd', shell=True)
                         run_ao_executables(0, 0)
-                        script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                        script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
                         run('sbatch ' + script_name, shell=True)
-                        os.chdir('../../')
-                else:
-                    dir_path = os.getcwd()
-                    Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
-                    os.chdir('basis')
-                    run('pwd', shell=True)
-                    run_ao_executables(0, 0)
-                    script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
-                    run('sbatch ' + script_name, shell=True)
-                    os.chdir('../')
-        else:
-            print('run_basis_codes option is only available with HPC access')
+                        os.chdir('../')
             
     elif code_method == 'ci':
         dir_path = os.getcwd()
@@ -1223,7 +1227,10 @@ if __name__ == "__main__":
             
         if run_basis_codes:
             order = basis['orbitals']['order']
-            custom = basis['orbitals']['custom']
+            try: 
+                custom = basis['orbitals']['custom']
+            except KeyError:
+                custom = ""
             run_ci_executables(on_hpc, bin_directory, order, custom)
                         
         os.chdir('../')
