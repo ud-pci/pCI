@@ -223,9 +223,9 @@ def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
     if os.path.isfile('basis/HFD.DAT'):
         run_shell("cp basis/HFD.DAT " + parity)
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
+        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP")
     if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP", shell=True )
+        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP")
     if os.path.isfile('basis/SGC.CON'):
         run_shell("cp basis/SGC.CON "  + parity)
     if os.path.isfile('basis/SCRC.CON'):
@@ -328,9 +328,13 @@ if __name__ == "__main__":
     run_shell("rm add.in ADD.INP CONF.INP CONF_.INP")
     
     # Create a ci.qs job script if it doesn't exist yet
-    if on_hpc and not os.path.isfile('ci.qs'):
-        print('generating new ci.qs in ' + os.getcwd() + ' directory')
-        script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+    if on_hpc:
+        if not os.path.isfile('ci.qs'):
+            print('generating new ci.qs in ' + os.getcwd() + ' directory')
+            script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+        else:
+            print('using existing ci.qs')
+            script_name = 'ci.qs'
     
     # Copy ADD.INP and CONF.INP to all directories if gen_dir == True
     if gen_dir:
