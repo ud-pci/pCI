@@ -103,7 +103,7 @@ if __name__ == "__main__":
     include_rpa = config['dtm']['include_rpa']
     pci_version = config['system']['pci_version']
     on_hpc = config['system']['on_hpc']
-    bin_directory = config['system']['bin_directory']
+    bin_dir = config['system']['bin_directory']
     basis = config['basis']
     
     key_list = []
@@ -116,6 +116,10 @@ if __name__ == "__main__":
             for matrix_element in matrix_elements.split(' '):
                 key_list.append(matrix_element.replace('[','').replace(']','').replace(',',''))
 
+    # Specify directory of executables
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+    
     if isinstance(code_method, list):
         dir_path = os.getcwd()
         for method in code_method:
@@ -138,10 +142,10 @@ if __name__ == "__main__":
             if include_rpa:
                 write_mbpt_inp(basis, key_list)
                 if on_hpc:
-                    write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
+                    write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
                     run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
             else:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
+                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
                 run_shell('mv dtm.qs dtm/dtm.qs')
             
             # Find even and odd directories with completed ci runs
@@ -174,7 +178,7 @@ if __name__ == "__main__":
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                     
-                run_shell('mpirun -n 1 ' + bin_directory + 'dtm')
+                run_shell('mpirun -n 1 ' + bin_dir + 'dtm')
                 write_dtm_in('TM',
                              '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                              ', '.join(key_list))
@@ -203,11 +207,11 @@ if __name__ == "__main__":
         if include_rpa:
             write_mbpt_inp(basis, key_list)
             if on_hpc:
-                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version)
+                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
                 run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
         else:
             if on_hpc:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version)
+                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
                 run_shell('mv dtm.qs dtm/dtm.qs')
         
         # Find even and odd directories with completed ci runs
@@ -240,7 +244,7 @@ if __name__ == "__main__":
             with open('rpa.in', 'w') as f:
                 f.write('2')
                 
-            run_shell('mpirun -n 1 ' + bin_directory + 'dtm')
+            run_shell('mpirun -n 1 ' + bin_dir + 'dtm')
             
             write_dtm_in('TM',
                          '1 ' + str(num_levels) + ' 1 ' + str(num_levels),

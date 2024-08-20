@@ -869,11 +869,11 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_ci_executables(on_hpc, bin_directory, order, custom):
+def run_ci_executables(on_hpc, bin_dir, order, custom):
     
-    # Strip '/' from end of bin_directory
-    if bin_directory[-1] == '/':
-        bin_directory = bin_directory[:-1]
+    # Strip '/' from end of bin_dir
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
 
     # Find HFD.INP files
     file_list = os.listdir(".")
@@ -886,10 +886,7 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
     print('Found the following HFD.INP files:', ', '.join(hfd_list))
     for file in hfd_list:
         run_shell('cp ' + file + ' HFD.INP')
-        if on_hpc:
-            run_shell('hfd > hfd' + file[-5] + '.out')
-        else:
-            run_shell(bin_directory + '/hfd > hfd' + file[-5] + '.out')
+        run_shell(bin_dir + 'hfd > hfd' + file[-5] + '.out')
         run_shell('cp HFD.DAT ' + file[:-3] + 'DAT')
         run_shell('cp HFD.RES ' + file[:-3] + 'RES')
         print('hfd completed with ' + file)
@@ -930,10 +927,7 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        if on_hpc:
-            run_shell('bass < bass.in > bass.out')
-        else:
-            run_shell(bin_directory + '/bass < bass.in > bass.out')
+        run_shell(bin_dir + '/bass < bass.in > bass.out')
         
         run_shell('cp bass.out ' + 'bass' + str(nTry) + '.out')
             
@@ -947,21 +941,25 @@ def run_ci_executables(on_hpc, bin_directory, order, custom):
         
     return
     
-def run_ao_executables(K_is, C_is):
+def run_ao_executables(K_is, C_is, bin_dir):
+    # Specify directory of executables
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+    
     # Run hfd
-    run_shell('hfd > hfd.out')
+    run_shell(bin_dir + 'hfd > hfd.out')
     print("hfd complete")
 
     # Produce B-splines
     if kbrt == 0:
-        run_shell('tdhf < bas_wj.in > tdhf.out')
+        run_shell(bin_dir + 'tdhf < bas_wj.in > tdhf.out')
         print("tdhf complete")
-        run_shell('nspl40 < spl.in > nspl40.out')
+        run_shell(bin_dir + 'nspl40 < spl.in > nspl40.out')
         print("nspl40 complete")
     else:
-        run_shell('bdhf < bas_wj.in > bdhf.out')
+        run_shell(bin_dir + 'bdhf < bas_wj.in > bdhf.out')
         print("bdhf complete")
-        run_shell('bspl40 < spl.in > bspl40.out')
+        run_shell(bin_dir + 'bspl40 < spl.in > bspl40.out')
         print("bspl40 complete")
 
     with open('bwj.in','w') as f: 
@@ -972,7 +970,7 @@ def run_ao_executables(K_is, C_is):
         f.write('\n')
         f.write('1')
 
-    run_shell('bas_wj < bwj.in > bas_wj.out')
+    run_shell(bin_dir + 'bas_wj < bwj.in > bas_wj.out')
     run_shell('rm bwj.in')
     print("bas_wj complete")
 
@@ -1030,7 +1028,7 @@ def run_ao_executables(K_is, C_is):
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        run_shell('bass < bass.in > bass.out')
+        run_shell(bin_dir + 'bass < bass.in > bass.out')
         if (nTry >= maxNumTries):
             print("bass did not converge after", nTry, "attempts")
             break
@@ -1050,7 +1048,7 @@ def run_ao_executables(K_is, C_is):
     #    print("qed complete")
 
     # Run bas_x
-    run_shell('bas_x > bas_x.out')
+    run_shell(bin_dir + 'bas_x > bas_x.out')
     print("bas_x complete")
 
 if __name__ == "__main__":
@@ -1062,7 +1060,7 @@ if __name__ == "__main__":
     basis = config['basis']
     optional = config['optional']
     on_hpc = system['on_hpc']
-    bin_directory = system['bin_directory']
+    bin_dir = system['bin_directory']
     
     # Set parameters from config
     name = atom['name']
@@ -1181,8 +1179,8 @@ if __name__ == "__main__":
                             dir_name = dir_prefix+str(abs(c))+'/basis'
                             os.chdir(dir_name)
                             run_shell('pwd')
-                            run_ao_executables(K_is, c)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                            run_ao_executables(K_is, c, bin_dir)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
                             run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                         if K_is_dict[K_is]:
@@ -1196,8 +1194,8 @@ if __name__ == "__main__":
                             Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                             os.chdir(method+'/basis')
                             run_shell('pwd')
-                            run_ao_executables(0, 0)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version)
+                            run_ao_executables(0, 0, bin_dir)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
                             run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                     else:
@@ -1205,7 +1203,7 @@ if __name__ == "__main__":
                         Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
                         run_shell('pwd')
-                        run_ao_executables(0, 0)
+                        run_ao_executables(0, 0, bin_dir)
                         script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
                         run_shell('sbatch ' + script_name)
                         os.chdir('../')
@@ -1230,7 +1228,7 @@ if __name__ == "__main__":
                 custom = basis['orbitals']['custom']
             except KeyError:
                 custom = ""
-            run_ci_executables(on_hpc, bin_directory, order, custom)
+            run_ci_executables(on_hpc, bin_dir, order, custom)
                         
         os.chdir('../')
 

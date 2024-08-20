@@ -331,7 +331,7 @@ if __name__ == "__main__":
     if on_hpc:
         if not os.path.isfile('ci.qs'):
             print('generating new ci.qs in ' + os.getcwd() + ' directory')
-            script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+            script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version, bin_dir)
         else:
             print('using existing ci.qs')
             script_name = 'ci.qs'
