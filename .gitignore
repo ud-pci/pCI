@@ -19,11 +19,14 @@ CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
 
-# Test directory and files
+# Test directory and generated files
 test/
 *.csv
 *.INP
 *.RES
+*.DAT
+*.out
+*.qs
 
 # vscode
 .vscode

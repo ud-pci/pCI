@@ -276,7 +276,7 @@ def count_excitations(excitations):
             count = count + 1
     return count
 
-def expand_orbitals(basis, orbital_list):
+def expand_orbitals(basis, ref_configs, orbital_list):
     """Return a table of orbitals and occupation numbers"""
 
     orb_occ = {}
@@ -331,11 +331,23 @@ def expand_orbitals(basis, orbital_list):
     orb_occ2.update(orb_occ)
     orb_occ = orb_occ2
 
-    # Strip core orbitals from table
+    # Strip core orbitals from table if it is not in the list of reference configurations
+    orbitals_in_ref = []
+    ref_configs_odd = ref_configs['odd']
+    ref_configs_even = ref_configs['even']
+    for parity in ['odd', 'even']:
+        if ref_configs[parity]:
+            for config in ref_configs[parity]:
+                orbs = config.split(' ')
+                for orb in orbs:
+                    nl = orb[:2]
+                    if nl not in orbitals_in_ref:
+                        orbitals_in_ref.append(nl)
+    
     try:
         core_orbs = re.findall('[1-9][spdfghikl]+', orbital_list['core'])
         for orbital in core_orbs:
-            if orbital in orb_occ:
+            if orbital in orb_occ and orbital not in orbitals_in_ref:
                 orb_occ.pop(orbital)
     except KeyError as e:
         print('No orbitals in core')

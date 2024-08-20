@@ -279,7 +279,7 @@ Contains
         Character(Len=*), Intent(In) :: substr
 
         count = 0
-        i = 0
+        i = 1
         Do 
             position = index(str(i:), substr)
             If (position == 0) Return

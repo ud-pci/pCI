@@ -141,6 +141,14 @@ Module conf_init
 
         Open(unit=99, file='ci.in', status='OLD')
 
+        ! Set default values for keys
+        Kl = 0
+        Ksig = 0
+        Kdsig = 0
+        Kw = 0
+        KLSJ = 0
+        K_sms = 0
+        
         ! read parameters (lines with "=")
         equals_in_str = .true.
         Do While (equals_in_str)
