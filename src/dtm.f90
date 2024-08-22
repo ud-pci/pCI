@@ -1939,10 +1939,10 @@ Contains
             !print*, ppl, G, A, AE2, AM3
             Write( 6,55) ppl,G,A,AE2,AM3
             Write(11,55) ppl,G,A,AE2,AM3
-55          format(' Trace =',F8.4,' <b|||M1|||a> =',F9.5,' mu_0',2x, &
+55          format(' Trace =',F8.4,' <b||M1||a> =',F9.5,' mu_0',2x, &
                    ' <b||H_hfs||a> =',E11.4,' MHz'/,16x, &
-                   ' <b|||E2|||a> =',E13.5,' a.u.'/,16x, &
-                   ' <b|||M3|||a> =',E13.5,' mu_0')
+                   ' <b||E2||a> =',E13.5,' a.u.'/,16x, &
+                   ' <b||M3||a> =',E13.5,' mu_0')
             If (dabs(tj1-tj2) < 1.d-6) Then
                 xg = dsqrt(tj1*(tj1+1)*(2*tj1+1)+1.d-77)
                 Write( 6,'(22X,"G_eff =",F10.5,14X,"A_eff =",E11.4," MHz")') G/xg,A/xg
@@ -1966,8 +1966,8 @@ Contains
             /' MQM   = ',E12.5,' = ',E12.5,' Hz/e/cm**2 (Reduced ME)', &
             /' AM    = ',E12.5,' = ',E12.5,' Hz',9X,'(Reduced ME)', &
             /' PNC   = ',E12.5,' = ',E12.5,' Hz',9X,'(Q_w=',F7.2,')' &
-            /' <b|||E3|||a> =',E13.5,' a.u.' &
-            /' <b|||M2|||a> =',E13.5,' mu_0'/)
+            /' <b||E3||a> =',E13.5,' a.u.' &
+            /' <b||M2||a> =',E13.5,' mu_0'/)
         End If
 
         strsp = ''
