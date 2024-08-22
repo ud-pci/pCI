@@ -3017,34 +3017,36 @@ Contains
                 ! Write column names if first iteration
                 If (j == 1) Then
                     num_blanks = max(0, maxlenconfig-3)
-                    Write(99, '(A)') '  n' // '  ' // repeat(' ', num_blanks) // 'conf  term     E_n (a.u.)   DEL (cm^-1)     S     L     J     gf    conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                    Write(99, '(A)') '  n' // '  ' // repeat(' ', num_blanks) // 'conf  term     E_n (a.u.)   DEL (cm^-1)     S     L     J     gf     conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
                 End If
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 num_blanks = max(0, maxlenconfig-len_trim(strcsave(1,j))+1)
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
-                    strfmt = '(I3,2X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,2X,A,3X,f5.1,"%")'
+                    strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,2X,A,3X,f5.1,"%")'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
-                    strfmt = '(I3,2X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f5.1,"%",5X,A)'
+                    strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f5.1,"%",5X,A)'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
-                num_blanks = max(0, maxlenconfig-3)
-                If (j == 1) Write(99, '(A)') '  n ' // '  ' // repeat(' ', num_blanks) // 'conf       J         E_n (a.u.)   DEL (cm^-1)   conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                If (j == 1) Then
+                    num_blanks = max(0, maxlenconfig-3)
+                    Write(99, '(A)') '  n ' // '  ' // repeat(' ', num_blanks) // 'conf       J         E_n (a.u.)   DEL (cm^-1)    conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                End If
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 num_blanks = max(0, maxlenconfig-len_trim(strcsave(1,j))+1)
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
-                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",,5X,A,2X,A,3X,f5.1,"%")'
+                    strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",,5X,A,2X,A,3X,f5.1,"%")'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
-                    strfmt = '(I3,3X,A,4X,f4.2,5x,f14.8,f14.1,3X,f5.1,"%",5X,A)'
+                    strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f5.1,"%",5X,A)'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
             End If 
