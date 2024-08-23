@@ -708,8 +708,8 @@ Contains
 
         strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1)'
         If (kl.NE.2) Write( 6,strfmt) trd
-        YY1(i)=0.d0
-        YY2(i)=0.d0
+        YY1(:)=0.d0
+        YY2(:)=0.d0
         negl=0              !### number of vector components below threshold
         idif= 1
         If (Kli.EQ.5) idif= 2
