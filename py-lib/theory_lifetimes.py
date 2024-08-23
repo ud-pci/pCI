@@ -49,7 +49,7 @@ def parse_dtm_res():
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                          'state_two_configuration', 'state_two_term', 'state_two_J', 'type',
                                          'wavelength (nm)', 'reduced_matrix_element', 
-                                         'branching_ratio', 'transition_rate'])
+                                         'branching_ratio', 'transition_rate', 'state_one_energy', 'state_two_energy'])
     # Parse the RES files
     e1_res = parse_matrix_res('E1.RES')
     e2_res = parse_matrix_res('E2.RES')
@@ -109,6 +109,8 @@ def parse_dtm_res():
             J2 = state2.split(' ')[1][-1]
             matrix_element = rate[3]
             wavelength = rate[4]
+            energy1 = rate[5]
+            energy2 = rate[6]
             tr_rate = rate[2]
             branching_ratio = tr_rate/total_rates
             
@@ -116,7 +118,8 @@ def parse_dtm_res():
             row = {'state_one_configuration': configuration, 'state_one_term': term, 'state_one_J': J,
                    'state_two_configuration': configuration2, 'state_two_term': term2, 'state_two_J': J2, 'type': matrix_element_type,
                    'wavelength (nm)': f"{wavelength:.2f}", 'reduced_matrix_element': matrix_element, 
-                   'branching_ratio': f"{branching_ratio:.3e}", 'transition_rate': f"{tr_rate:.3e}"}
+                   'branching_ratio': f"{branching_ratio:.3e}", 'transition_rate': f"{tr_rate:.3e}",
+                   'state_one_energy': f"{energy1:.6f}", 'state_two_energy': f"{energy2:.6f}"}
             br_ratios_df.loc[len(br_ratios_df.index)] = row
             
             # write to transitions file
@@ -137,7 +140,7 @@ def parse_dtm_res():
     br_ratios_df.to_csv(filename_br_ratios, index=False)
     lifetimes_df.to_csv(filename_lifetimes, index=False)
 
-def add_res_to_dict(matrix_element_type, res, dict):
+def add_res_to_dict(matrix_element_type, res, lifetime_dict):
     
     # [conf1, term1, J1, conf2, term2, J2, matrix_element_value, energy1, energy2, wavelength, index1, index2])
     for line in res:
@@ -169,8 +172,9 @@ def add_res_to_dict(matrix_element_type, res, dict):
         wavelength = wavelength_nm*10 # wavelength in angstroms
         
         # calculate transition rate from formulae (https://www1.udel.edu/atom/about.html)
+        # J value is of the upper level (lower absolute energy)
         J = float(J1) if energy2 > energy1 else float(J2)
-        
+
         line_strength = matrix_element_val**2
 
         if matrix_element_type == 'E1':
@@ -189,18 +193,18 @@ def add_res_to_dict(matrix_element_type, res, dict):
             tr_rate = 0
 
         # add to dictionary
-        if (energy2 < energy1): 
+        if (energy2 > energy1): 
             try:
-                dict[config1].append([matrix_element_type, config2, tr_rate, matrix_element_val, wavelength_nm])
+                lifetime_dict[config1].append([matrix_element_type, config2, tr_rate, matrix_element_val, wavelength_nm, energy1, energy2])
             except KeyError:
-                dict[config1] = []
-                dict[config1].append([matrix_element_type, config2, tr_rate, matrix_element_val, wavelength_nm])
+                lifetime_dict[config1] = []
+                lifetime_dict[config1].append([matrix_element_type, config2, tr_rate, matrix_element_val, wavelength_nm, energy1, energy2])
         else:
             try:
-                dict[config2].append([matrix_element_type, config1, tr_rate, matrix_element_val, wavelength_nm])
+                lifetime_dict[config2].append([matrix_element_type, config1, tr_rate, matrix_element_val, wavelength_nm, energy1, energy2])
             except KeyError:
-                dict[config2] = []
-                dict[config2].append([matrix_element_type, config1, tr_rate, matrix_element_val, wavelength_nm])
+                lifetime_dict[config2] = []
+                lifetime_dict[config2].append([matrix_element_type, config1, tr_rate, matrix_element_val, wavelength_nm, energy1, energy2])
     
     
 
