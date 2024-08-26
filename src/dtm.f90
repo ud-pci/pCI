@@ -270,33 +270,15 @@ Contains
         Stop
     End Subroutine OpenFS
 
-    Function CountSubstr(str, substr) Result(count)
-        ! This function counts the number of occurences of a substring from a string
-        Implicit None
-
-        Integer :: i, position, count
-        Character(Len=*), Intent(In) :: str
-        Character(Len=*), Intent(In) :: substr
-
-        count = 0
-        i = 1
-        Do 
-            position = index(str(i:), substr)
-            If (position == 0) Return
-            count = count + 1
-            i = i + position + len(substr) - 1
-        End Do
-
-    End Function CountSubstr
-
     Subroutine ReadDtmIn
+        Use utils
         ! This subroutine reads job parameters from file c.in
         Implicit None
 
-        integer :: index_equals, index_hashtag, err_stat, keycount, i, num_ops
+        integer :: index_equals, index_hashtag, err_stat, i, num_ops
         character(len=5) :: key
         character(len=80) :: val
-        character(len=80) :: line, lvls, ops
+        character(len=80) :: line
         character(len=4), dimension(:), allocatable :: keyList 
         logical :: equals_in_str
 
