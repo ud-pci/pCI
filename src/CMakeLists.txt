@@ -25,9 +25,12 @@ TARGET_LINK_LIBRARIES(dtm pci_common)
 ADD_EXECUTABLE(ine ine.f90)
 TARGET_LINK_LIBRARIES(ine pci_common)
 
+ADD_EXECUTABLE(pol pol.f90)
+TARGET_LINK_LIBRARIES(pol pci_common)
+
 ADD_EXECUTABLE(conf_pt conf_pt.f90)
 TARGET_LINK_LIBRARIES(conf_pt pci_common)
 
 ADD_EXECUTABLE(add params.f90 add.f90)
 
-INSTALL(TARGETS hfd bass add basc conf conf_lsj dtm ine conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
+INSTALL(TARGETS hfd bass add basc conf conf_lsj dtm ine pol conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
