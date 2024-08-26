@@ -49,7 +49,7 @@ Program pol
     Integer, Parameter :: IPad = 8 ! number of vectors to be used
 
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Integer  :: Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer  :: Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
     Integer  :: IP4, Kt, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
     
@@ -182,11 +182,6 @@ Contains
 
     Subroutine SetParams
         Implicit None
-
-        ! Choose Khe - variant of solution of homogeneous equation
-        ! Khe=0 - old solution of homogeneous eq-n
-        ! Khe=1 - new solution of homogeneous eq-n
-        Khe= 1   
 
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
@@ -933,38 +928,31 @@ Contains
         If (.not. Allocated(X1)) Allocate(X1(Nd))
 
         Call system_clock(start1)
-        If (Khe.EQ.0) Then
-            call Decomp(Z1,Ntr,scales,Mps)          !### decomposition
-            Write(*,*)' decomposition finished'            !### of the matrix
-            call Flsolv(Ntr,Z1,YY1,X1,Mps)          !### solution of the
-            Write(*,*)' flsolv finished'                   !### inhom-s equation
-        Else
-            k = 1
-            Do i=1,Ntr
-                Do j=1,i
-                    If (i.EQ.j) Then
-                        Zc(k)= Az(i,i)
-                    Else
-                        Zc(k)= Az(i,j)
-                    End If
-                    k = k+1
-                End Do
-                XX1(i)= YY1(i)
+        k = 1
+        Do i=1,Ntr
+            Do j=1,i
+                If (i.EQ.j) Then
+                    Zc(k)= Az(i,i)
+                Else
+                    Zc(k)= Az(i,j)
+                End If
+                k = k+1
             End Do
-            Call system_clock(start2)
-            Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
-            !Call Zspsv_F95(Zc,XX1,'U',ipiv,info)
-            Call system_clock(end2)
-            ttime2=Real((end2-start2)/clock_rate)
-            Call FormattedTime(ttime2, timeStr)
-            Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
-            If (info.NE.0) then
-                Write(*,*) 'info =',info
-                Stop
-            End If
-            X1= 0.d0  ! Vector
-            X1(1:Ntr)= Real(XX1(1:Ntr))
+            XX1(i)= YY1(i)
+        End Do
+        Call system_clock(start2)
+        Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
+        !Call Zspsv_F95(Zc,XX1,'U',ipiv,info)
+        Call system_clock(end2)
+        ttime2=Real((end2-start2)/clock_rate)
+        Call FormattedTime(ttime2, timeStr)
+        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+        If (info.NE.0) then
+            Write(*,*) 'info =',info
+            Stop
         End If
+        X1= 0.d0  ! Vector
+        X1(1:Ntr)= Real(XX1(1:Ntr))
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
@@ -1601,13 +1589,13 @@ Contains
         f0=-2.d0
         ss(n)= 0.d0
         strfmt = '(3X,"alpha(J=",F4.1," M=",F4.1,")=",E12.5," (no Prj)")'
-        if (dabs(Q).LT.1.d-5) then        !### summation without
-          do i=1,Nd                       !#### Prj decomposition
-            ss(n)= ss(n)+YY2(i)*X1(i)*f0  !#### requires JM=JM0, Q=0
-          end do                          !### ss = alpha(J0,M0)
-          write(*,*)
-          write( 6,strfmt) Tj0,Jm0,ss(n)
-          write(11,strfmt) Tj0,Jm0,ss(n)
+        if (dabs(Q).LT.1.d-5) then   ! summation without Prj decomposition requires JM=JM0, Q=0
+            do i=1,Nd 
+                ss(n)= ss(n)+YY2(i)*X1(i)*f0 
+            end do                          !### ss = alpha(J0,M0)
+            write(*,*)
+            write( 6,strfmt) Tj0,Jm0,ss(n)
+            write(11,strfmt) Tj0,Jm0,ss(n)
         end if
 
         isk=0                            !### Prj decomposition
@@ -1616,49 +1604,48 @@ Contains
         s2(n)= 0.d0                      !### = alpha2(J0)
         call DefSum(id,kmin,kmax)        !### defines min/max J in sums
         do k=kmin,kmax
-          tj=Tj0+(k-2)                   !### intermediate momentum
-          tj=Anint(tj*100.0)/100.0
-          is=dabs(tj-Jm0)+1.d-5
-          is=1-2*mod(is,2)
-          w3j=is*FJ3(Tj0,1.d0,tj,-Jm0,-Q,Jm)
-          if (w3j.NE.0.d0) then
-            f=f0/w3j/(3.d0*(2*Tj0+1))
-          else
-            if (Tj0+tj.GT.0.99d0) isk=isk+1     !### number of skiped terms
-            f=0.d0
-          end if
-          sk0(k)=0.d0
-          do i=1,Nd
-            sk0(k)=sk0(k)+f*Y2J(i,k)*X1J(i,k)
-          end do
-          is=tj+Tj0+1.1d0
-          is=1-2*mod(is,2)
-!MK          f1=-is*1.5d0*dsqrt(3.d0)*(2*Tj0+1)
-          If (W0.NE.0.d0) Then
-            f1=is*1.5d0*dsqrt(6*Tj0*(2*Tj0+1)/(Tj0+1)) &
-               *FJ6(Tj0,1.d0,tj, 1.d0,Tj0,1.d0)
-          Else
-            f1= 0.d0
-          End If
-          sk1(k)=f1*sk0(k)
+            tj=Tj0+(k-2)                   !### intermediate momentum
+            tj=Anint(tj*100.0)/100.0
+            is=dabs(tj-Jm0)+1.d-5
+            is=1-2*mod(is,2)
+            w3j=is*FJ3(Tj0,1.d0,tj,-Jm0,-Q,Jm)
+            if (w3j.NE.0.d0) then
+                f=f0/w3j/(3.d0*(2*Tj0+1))
+            else
+                if (Tj0+tj.GT.0.99d0) isk=isk+1     !### number of skiped terms
+                f=0.d0
+            end if
+            sk0(k)=0.d0
+            do i=1,Nd
+                sk0(k)=sk0(k)+f*Y2J(i,k)*X1J(i,k)
+            end do
+            is=tj+Tj0+1.1d0
+            is=1-2*mod(is,2)
+            If (W0.NE.0.d0) Then
+                f1=is*1.5d0*dsqrt(6*Tj0*(2*Tj0+1)/(Tj0+1)) &
+                    *FJ6(Tj0,1.d0,tj, 1.d0,Tj0,1.d0)
+            Else
+                f1= 0.d0
+            End If
+            sk1(k)=f1*sk0(k)
 
-          f2=-2*is*dsqrt(15*Tj0*(2*Tj0-1)*(2*Tj0+1) &
-             /(2*(2*Tj0+3)*(Tj0+1)))*FJ6(Tj0,1.d0,tj, 1.d0,Tj0,2.d0)
-          sk2(k)=f2*sk0(k)
+            f2=-2*is*dsqrt(15*Tj0*(2*Tj0-1)*(2*Tj0+1) &
+               /(2*(2*Tj0+3)*(Tj0+1)))*FJ6(Tj0,1.d0,tj, 1.d0,Tj0,2.d0)
+            sk2(k)=f2*sk0(k)
 
-          strfmt2 = '(1X,"J =",F4.1," to alpha_0:",E12.5, &
-                        ", alpha_1:",E12.5,", alpha_2:",E12.5)'
-          write( 6,strfmt2) tj,sk0(k),sk1(k),sk2(k)
-          write(11,strfmt2) tj,sk0(k),sk1(k),sk2(k)
+            strfmt2 = '(1X,"J =",F4.1," to alpha_0:",E12.5, &
+                          ", alpha_1:",E12.5,", alpha_2:",E12.5)'
+            write( 6,strfmt2) tj,sk0(k),sk1(k),sk2(k)
+            write(11,strfmt2) tj,sk0(k),sk1(k),sk2(k)
 
-          s0(n)= s0(n) + sk0(k)
-          s1(n)= s1(n) + sk1(k)
-          s2(n)= s2(n) + sk2(k)
+            s0(n)= s0(n) + sk0(k)
+            s1(n)= s1(n) + sk1(k)
+            s2(n)= s2(n) + sk2(k)
         end do
         if (Tj0.GT.0.51d0) then
-          s(n)= s0(n)+(3*Jm0*Jm0-Tj0*(Tj0+1))/(Tj0*(2*Tj0-1.d0))*s2(n)
+            s(n)= s0(n)+(3*Jm0*Jm0-Tj0*(Tj0+1))/(Tj0*(2*Tj0-1.d0))*s2(n)
         else
-          s(n)= s0(n)
+            s(n)= s0(n)
         end if
         ! - - - - - - - - - - Tensor polarizability - - - - - - - - - - -
         strfmt3 = '(3X,"Polarizability Alpha( J=",F4.1, &
