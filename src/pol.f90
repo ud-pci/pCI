@@ -59,7 +59,7 @@ Program pol
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
-    logical :: ok
+    logical :: ok = .True.
 
     Character(Len=1), Dimension(9)          :: Let
     Character(Len=4), Dimension(13)         :: Alet
