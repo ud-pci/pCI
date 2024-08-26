@@ -2,7 +2,7 @@ SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_bla
 
 ADD_LIBRARY(pci_common params.f90 conf_variables.f90 basc_variables.f90 str_fmt.f90 readfff.f90 
         breit.f90 wigner.f90 sintg.f90 bspl.f90 conf_init.f90 test_ori.f90 pi_pk.f90 integrals.f90 determinants.f90 
-        mpi_utils.f90 solvers.f90 diff.f90)
+        mpi_utils.f90 solvers.f90 diff.f90 utils.f90)
 
 ADD_EXECUTABLE(hfd hfd.f90)
 TARGET_LINK_LIBRARIES(hfd pci_common) 
