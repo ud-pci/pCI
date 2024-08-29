@@ -370,9 +370,9 @@ Contains
         Close(unit=11,status='DELETE')
         Open(unit=11,status='NEW',file='INE.RES')
 
-        Open(unit=99,status='UNKNOWN',file='INEFINAL.RES')
+        Open(unit=99,status='UNKNOWN',file='POL_E1.RES')
         Close(unit=99,status='DELETE')
-        Open(unit=99,status='NEW',file='INEFINAL.RES')
+        Open(unit=99,status='NEW',file='POL_E1.RES')
 
         Call ReadPolIn
 
@@ -1735,10 +1735,10 @@ Contains
             write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
             if (ok) Then
-                strfmt = '(1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
                 strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
             else
-                strfmt = '(1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
                 strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
             end if
             write( 6,strfmt2) abs(xlamb),al0,al2
