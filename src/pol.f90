@@ -48,9 +48,9 @@ Program pol
     
     Integer, Parameter :: IPad = 8 ! number of vectors to be used
 
-    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
+    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, Method, N_it4
     Integer  :: Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
-    Integer  :: IP4, Kt, N0, N2, nrange
+    Integer  :: IP4, Kt, N0, nrange
     Integer(kind=int64) :: NumH, NumJ
     
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, Crit1, W0, Q, Elft, Hmin, dlamb
@@ -106,12 +106,10 @@ Program pol
         dlamb = (xlamb2-xlamb1)/xlambstep
         dlamb = Anint(dlamb*100.0)/100.0
         nlamb = dlamb+1
-        print*, xlamb2, xlamb1, xlambstep, dlamb
-        print*,'nlamb=',nlamb
+
         xlamb=xlamb1
         Do n=1,nlamb
             If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
-            print*, 'xlamb=',xlamb
             Do i=1,icyc
                 Ndir=Nddir
                 If (i.EQ.2) W0= -W0
@@ -123,12 +121,11 @@ Program pol
                     Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
                     Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
                 End If
-                Select Case(kIters)
+                Select Case(Method)
                     Case(0)
-                        print*, 'Ndir=',Ndir
                         Call SolEq1(kl) ! Direct solution
                         If (Ndir.LT.Nd) Then
-                            Call SolEq4(ok)                 !### Iterative solution
+                            Call SolEq4(ok) ! Iterative solution
                             If (Nd.LE.IP1 .AND. .NOT.ok) Then
                               Ndir= Nd
                               Write(*,*)
@@ -169,7 +166,6 @@ Program pol
                 End If
             End Do
             xlamb=abs(xlamb)+xlambstep
-            print*,'xlamb_next=',xlamb
         End Do
     End Do
 
@@ -269,11 +265,102 @@ Contains
         Return
     End Subroutine recunit
 
+    Subroutine ReadPolIn
+        Use utils
+        ! This subroutine reads job parameters from file c.in
+        Implicit None
+
+        integer :: index_equals, index_hashtag, err_stat
+        character(len=10) :: key
+        character(len=80) :: val
+        character(len=80) :: line
+        logical :: equals_in_str
+
+        Open(unit=88, file='pol.in', status='OLD')
+
+        ! read parameters (lines with "=")
+        equals_in_str = .true.
+        Do While (equals_in_str)
+            Read(88, '(A)', iostat=err_stat) line
+            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+                equals_in_str = .false.
+            Else
+                index_equals = index(string=line, substring="=")
+                key = line(1:index_equals-1)
+                val = line(index_equals+1:len(line))
+                
+                index_hashtag = index(string=val, substring="#") ! account for comments
+                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+                Select Case(key)
+                Case('Mode')
+                    ! Kl = 0 - start a new calculation
+                    ! Kl = 1 - use old vectors X1
+                    ! Kl = 2 - use old vectors X1, Y1, Y2
+                    Read(val, *) Kl
+                Case('Method')
+                    Read(val, *) Method
+                Case('Level')
+                    ! Read the energy level numbers
+                    Read(val, *) N0
+                Case('Ranges')
+                    ! Read number of commas to determine number of ranges
+                    nrange = CountSubstr(val, ',') + 1
+                    
+                    ! Set array of wavelength ranges
+                    allocate(xlamb1s(nrange),xlamb2s(nrange),xlambsteps(nrange))
+                    Read(val, *, iostat = err_stat) (xlamb1s(i), xlamb2s(i), xlambsteps(i), i=1,nrange)
+                    If (err_stat /= 0) Then
+                        print*, 'ERROR: list of ranges of wavelengths could not be read.'
+                        Exit
+                    End If
+                Case Default
+                    print*, 'WARNING: The key "', Trim(AdjustL(key)), '" is not supported.'
+                End Select
+            End If
+        End Do
+
+        Select Case(Kl)
+        Case(0)
+            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Starting new calculation..'
+        Case(1)
+            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1..'
+        Case(2)
+            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1, Y1, Y2..'
+        Case Default
+            Write(*, '(A)') 'This value of Kl is not valid. Defaulting to Kl = 0 (starting new calculation).'
+        End Select  
+
+        Select Case(Method)
+        Case(0)
+            Write(*, '(A,I1,A)') 'Method = ', Method, ': Inverting the matrix and iterating if diverged..'
+        Case(1)
+            Write(*, '(A,I1,A)') 'Method = ', Method, ': Inverting the matrix only..'
+        Case(2)
+            Write(*, '(A,I1,A)') 'Method = ', Method, ': 2-step iteration..'
+        Case Default
+            Write(*, '(A)') 'This value of Method is not valid. Defaulting to Method = 0 (inverting and iterating if diverged).'
+        End Select
+
+        If (N0 < 1) Then
+            Write(*, '(A,I2,A)') 'ERROR: Energy level ', N0, ' is not valid'
+            Stop
+        Else
+            Write(*,'(A,I2)') 'Level: #', N0
+        End If
+
+        Write(*,'(I2,A)') nrange, ' wavelength intervals with step size found:'
+        Do i=1,nrange
+            Write(*,'(A,F11.3,A,F11.3,A,F11.4,A)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' nm in steps of ',xlambsteps(i), ' nm'
+        End Do
+
+        Close(88)
+
+    End Subroutine ReadPolIn 
+
     Subroutine Input
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
     
-        Integer :: i
         Character(Len=128) :: strfmt
 
         Call recunit
@@ -287,40 +374,16 @@ Contains
         Close(unit=99,status='DELETE')
         Open(unit=99,status='NEW',file='INEFINAL.RES')
 
-        Write(*,'(A)') ' kIters= (0- invert and iterate if diverged, 1-invert only, 2-2-step iteration)'
-        Read(*,*) kIters
-        Write(*,'(A,I2)') ' kIters=', kIters
+        Call ReadPolIn
 
-        Write(*,'(A)')' kl= (0-new, 1-use X1, 2-use X1,Y1,Y2 ):'
-        Read (*,*) kl
-        Write(*,'(A,I2)')' kl=',kl
-
-        Write(*,'(A)')' X0 is in file CONF0.XIJ, record number:'
-        Read (*,*) N0
-        Write(*,'(A,I2)')' N0=',N0
-        If(N0.LE.0) Stop
-        Write(*,'(A)')' X2 is in file CONF0.XIJ, record number:'
-        Read (*,*) N2
-        Write(*,'(A,I2)')' N2=',N2
-
-        Read (*,*) nrange
-
-        W0= 0.d0
-        allocate(xlamb1s(nrange),xlamb2s(nrange),xlambsteps(nrange))
-        Write(*,'(A)')' Give a list of ranges of wavelengths (nm) followed by step size (eg. 535 537 0.5):'
-        Write(*,'(A)')' (for static polarizability give 0 0 0)'
-        Do i=1,nrange
-            Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
-            Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
-        End Do
-        
         xlamb1 = xlamb1s(1)
         xlamb2 = xlamb2s(1)
         xlambstep = xlambsteps(1)
         If (dabs(xlamb1).GT.1.d-8) Then
-          W0 = 1.d+7/(xlamb1*219474.63d0)
+            W0 = 1.d+7/(xlamb1*219474.63d0)
         Else
-          Write(*,'(A)')' W0 = 0'
+            W0= 0.d0
+            Write(*,'(A)')' W0 = 0'
         End If
 
         strfmt = '(1X,70("-"),/1X,"Program pol v1.0")'
@@ -346,10 +409,10 @@ Contains
         Real(dp), Dimension(IPs)  :: Qq1
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
@@ -361,7 +424,7 @@ Contains
         Read(12,rec=2) q
         Read(12,rec=5) p1
         Read(12,rec=6) q1
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         z1 = pq(1)
         If (abs(Z-z1) > 1.d-6) Then
             Write( 6,'("nuc. charge is changed: Z =",F12.6," ><",F12.6)') Z,z1
@@ -540,7 +603,7 @@ Contains
         Real(dp) :: xj0, xj2, t
         Character(Len=256) :: strfmt, err_msg
 
-        ! Read number of used orbitals in X0/X2 space from file CONF0.DET
+        ! Read number of used orbitals in X0/X2 from file CONF0.DET
         Open(17,file='CONF0.DET',status='OLD',form='UNFORMATTED')
         Read (17) Nd2,nsu2                
         Nsu=max(nsu2,Nsu)                 
@@ -559,25 +622,18 @@ Contains
         Allocate(X0(Nd0),X2(Nd0))
         rewind(16)
         nx=N0
-        If (nx.LT.N2) nx=N2
         Do n=1,nx
             If (n.EQ.N0) Then
                 Read(16) E0,Tj0,Nd0,(X0(i),i=1,Nd0)
                 E0=-E0
-                If (N2.EQ.N0) Then
-                    E2=E0
-                    Tj2=Tj0
-                    Do i=1,Nd0
-                       X2(i)=X0(i)
-                    End Do
-                End If
+                E2=E0
+                Tj2=Tj0
+                Do i=1,Nd0
+                   X2(i)=X0(i)
+                End Do
             Else
-                If (n.EQ.N2) Then
-                    Read(16) E2,Tj2,Nd0,(X2(i),i=1,Nd0)
-                    E2=-E2
-                Else
-                    Read(16)
-                End If
+                Read(16) E2,Tj2,Nd0,(X2(i),i=1,Nd0)
+                E2=-E2
             End If
         End Do
         Close(16)
@@ -829,7 +885,7 @@ Contains
             If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         End If
         
-        elft= E0+W0                          !### equation has the form:
+        elft= E0+W0
         If (kl.GE.1) then
             Open (unit=16,file='INE.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             If (err_stat /= 0) Then
@@ -877,7 +933,6 @@ Contains
                 End If
             End If
         End If
-        print*, 'Nd=',Nd, 'IP1=',Ndir
         If (Nd.GT.Ndir) then
             Ntr=0                          !### Ntr = dimension of the
             Do ic=1,Nc                     !### matrix equation to solve here
@@ -894,14 +949,16 @@ Contains
         If (.not. Allocated(Az)) Allocate(Az(IP1,IP1))
         Z1=0.d0
         Az=0.d0
-        Call system_clock(start1)
         Hmin=0_dp
-        Do i8=1,NumH         !### construction of Z matrix                      
-            i=Hamil%n(i8)    !### (note that it is stored as one-dimensional array)
+
+        Call system_clock(start1)
+        ! construction of Z matrix (stored as a 1D array)
+        Do i8=1,NumH
+            i=Hamil%n(i8)
             j=Hamil%k(i8)
             t=Hamil%t(i8)
             if (t < Hmin) Hmin = t
-            If (i.GT.Ntr) Exit                  
+            If (i.GT.Ntr) Exit
             k1=i+Ntr*(j-1)
             k2=j+Ntr*(i-1)
             If (i.EQ.j) then
@@ -951,7 +1008,7 @@ Contains
             Write(*,*) 'info =',info
             Stop
         End If
-        X1= 0.d0  ! Vector
+        X1= 0.d0
         X1(1:Ntr)= Real(XX1(1:Ntr))
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
@@ -1678,13 +1735,15 @@ Contains
             write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
             if (ok) Then
-              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                strfmt = '(1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
             else
-              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
-            End If
+                strfmt = '(1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
+            end if
             write( 6,strfmt2) abs(xlamb),al0,al2
             write(11,strfmt2) abs(xlamb),al0,al2
-            write(99,strfmt2) abs(xlamb),al0,al2
+            write(99,strfmt) abs(xlamb),al0,al2
         End If
 
         Return
@@ -1729,8 +1788,8 @@ Contains
 
         strfmt = '(/3X,"C_3 coefficient for the state |",I2, &
                ",",F12.6,",",F4.1,",",F4.1,">")'
-        write( 6,strfmt) N2,E2,Tj2,Jm0
-        write(11,strfmt) N2,E2,Tj2,Jm0
+        write( 6,strfmt) N0,E2,Tj2,Jm0
+        write(11,strfmt) N0,E2,Tj2,Jm0
 
         jj=2*Tj2+0.1d0
         c=1.d0/(12*(jj+1))
