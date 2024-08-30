@@ -276,7 +276,7 @@ Contains
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat, i, num_ops
-        character(len=5) :: key
+        character(len=10) :: key
         character(len=80) :: val
         character(len=80) :: line
         character(len=4), dimension(:), allocatable :: keyList 
@@ -309,7 +309,7 @@ Contains
                         print*, 'ERROR: Value "', Trim(AdjustL(val)), '" for key Mode is not supported.'
                         Stop
                     End If
-                Case('Lvls')
+                Case('Levels')
                     If (Kl1 == 1) Then 
                         Read(val, *) nterm1, nterm2
                     Else If (Kl1 == 2) Then
@@ -317,7 +317,7 @@ Contains
                     Else
                         Continue
                     End If
-                Case('Ops')
+                Case('Operators')
                     num_ops = CountSubstr(val, ',') + 1
                     Allocate(keyList(num_ops))
                     Read(val, *, iostat=err_stat) (keyList(i), i=1,num_ops)
