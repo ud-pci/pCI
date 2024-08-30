@@ -6,7 +6,7 @@ Module conf_init
 
     Private
 
-    Public :: ReadConfInp, ReadConfigurations, inpstr
+    Public :: ReadConfInp, ReadConfigurations, inpstr, ReadCiIn
 
   Contains
     
@@ -129,6 +129,82 @@ Module conf_init
         Return
     End Subroutine ReadConfParams
 
+    Subroutine ReadCiIn
+        ! This subroutine reads job parameters from file c.in
+        Implicit None
+
+        integer :: index_equals, index_hashtag, err_stat
+        character(len=5) :: key
+        character(len=10) :: val
+        character(len=80) :: line
+        logical :: equals_in_str
+
+        Open(unit=99, file='ci.in', status='OLD')
+
+        ! Set default values for keys
+        Kl = 0
+        Ksig = 0
+        Kdsig = 0
+        Kw = 0
+        KLSJ = 0
+        K_sms = 0
+        
+        ! read parameters (lines with "=")
+        equals_in_str = .true.
+        Do While (equals_in_str)
+            Read(99, '(A)', iostat=err_stat) line
+            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+                equals_in_str = .false.
+            Else
+                index_equals = index(string=line, substring="=")
+                key = line(1:index_equals-1)
+                val = line(index_equals+1:len(line))
+                
+                index_hashtag = index(string=val, substring="#") ! account for comments
+                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+                Select Case(key)
+                Case('Kl')
+                    ! Kl = 0 - new computation
+                    ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
+                    ! Kl = 2 - new computation with MBPT
+                    ! Kl = 3 - extending computation with new configurations (not implemented yet)
+                    Read(val, *) Kl
+                Case('Ksig')
+                    ! If starting new computation with MBPT
+                    ! Ksig = 0 - no MBPT included (same as Kl = 0)
+                    ! Ksig = 1 - include 1-electron MBPT corrections 
+                    ! Ksig = 2 - include 1-electron and 2-electron MBPT corrections
+                    Read(val, *) Ksig
+                Case('Kdsig')
+                    ! Kdsig = 0 - automatic approximation of the energy dependence of Sigma
+                    ! Kdsig = 1 - manually include energy dependence of Sigma
+                    Read(val, *) Kdsig
+                Case('Kw')
+                    ! Kw determines whether CONF.HIJ will be written or not
+                    ! Kw=0 - CONF.HIJ will not be written
+                    ! Kw=1 - CONF.HIJ will be written
+                    Read(val, *) Kw
+                Case('KLSJ')
+                    ! KLSJ determines whether CONF.HIJ will be written or not
+                    ! KLSJ=0 - LSJ will not be written in FINAL.RES
+                    ! KLSJ=1 - LSJ will be written FINAL.RES
+                    Read(val, *) KLSJ
+                Case('K_sms')
+                    ! SMS to include 1-e (1), 2-e (2), or both (3)
+                    Read(val, *) K_sms
+                    Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+                End Select
+            End If
+        End Do
+
+        Close(99)
+
+        Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+        Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
+        Write( 6,'(/4X,"KLSJ = (0-do not calculate LSJ, 1-calculate LSJ) ",I1)') KLSJ
+
+    End Subroutine ReadCiIn 
+
     Subroutine ReadConfInp
         ! This subroutine reads input parameters from the header of CONF.INP
         Implicit None
@@ -162,7 +238,7 @@ Module conf_init
     End subroutine ReadConfInp
 
     Subroutine GotoConfigurations
-        ! This subroutine reads to the end of the header of CONF.INP
+        ! This subroutine reads to the start of the list of configurations in CONF.INP
         Implicit None
 
         character(len=80) :: line
@@ -179,7 +255,7 @@ Module conf_init
         Do While (equals_in_str)
             Read(10, '(A)') line
             If (index(string=line, substring="=") == 0) Then
-                Backspace(10)
+                If (line /= "") Backspace(10) ! handle blank line before list of core orbitals
                 equals_in_str = .false.
             End If
         End Do
@@ -237,7 +313,7 @@ Module conf_init
         ! This subroutine calculates the total number of orbitals in conf-s
         Implicit None
 
-        Integer :: i, ic, ne0, nx, ny, nz, num_orbitals_per_line, counter
+        Integer :: i, j, ic, ne0, nx, ny, nz, num_orbitals_per_line, counter, num_lines
         Real(dp) :: x
         Real(dp), Dimension(:), Allocatable :: line
 
@@ -245,6 +321,18 @@ Module conf_init
         Allocate(line(num_orbitals_per_line))
 
         counter = 0
+
+        ! Read core orbitals
+        If (Nso /= 0) Then 
+            x = Nso/6
+            num_lines = Ceiling(x)
+            Do j=1,num_lines
+                Read (10,'(6(4X,F7.4))') (line(i), i=1,num_orbitals_per_line) 
+            End Do
+            counter = counter + Nso
+        End If
+
+        ! Read configuration list
         Do ic=1,Nc
             ne0=0
             Do While (ne0 < Ne)

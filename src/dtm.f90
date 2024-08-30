@@ -48,6 +48,7 @@ Program dtm
         End If
     End If
 
+    Call MPI_Bcast(Kl1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
     If (Kl1 < 3) Call InitTDM
 
     Select Case(Kl1)
@@ -76,84 +77,77 @@ Program dtm
 
 Contains
 
-    Subroutine SetKeys(file_unit)
+    Subroutine SetKey(str_key)
         Implicit None
-        Integer, Intent(In) :: file_unit
         Integer :: err_stat
-        Character(Len=64) :: str_key, str_key0
+        Character(Len=4) :: str_key
         
         err_stat = 0
         Select Case(Kl1)
         Case(1)
-            Do While (err_stat == 0)
-                Read(file_unit,*,iostat=err_stat) str_key
-                Select Case(str_key)
-                    Case('A_hf')
-                        Keys%A_hf = 1
-                        Call OpenFS('A_hf.RES',0,106,1)
-                    Case('B_hf')
-                        Keys%B_hf = 1
-                        Call OpenFS('B_hf.RES',0,107,1)
-                    Case('GF')
-                        Keys%GF = 1
-                        Call OpenFS('GF.RES',0,112,1)
-                    Case('gQED')
-                        Keys%gQED = 1
-                        Call OpenFS('gQED.RES',0,113,1)
-                    Case Default
-                        If (str_key /= str_key0) print*, Trim(AdjustL(str_key)), ' is not a valid key for DM'
-                End Select
-                str_key0 = str_key
-            End Do
+            Select Case(str_key)
+                Case('A_hf')
+                    Keys%A_hf = 1
+                    Call OpenFS('A_hf.RES',0,106,1)
+                Case('B_hf')
+                    Keys%B_hf = 1
+                    Call OpenFS('B_hf.RES',0,107,1)
+                Case('GF')
+                    Keys%GF = 1
+                    Call OpenFS('GF.RES',0,112,1)
+                Case('gQED')
+                    Keys%gQED = 1
+                    Call OpenFS('gQED.RES',0,113,1)
+                Case Default
+                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for DM.'
+                    Return
+            End Select
         Case(2)
-            Do While (err_stat == 0)
-                Read(file_unit,*,iostat=err_stat) str_key
-                Select Case(str_key)
-                    Case('E1')
-                        Keys%E1_L = 1
-                        Keys%E1_V = 1
-                        Call OpenFS('E1.RES',0,100,1)
-                    Case('E1_L')
-                        Keys%E1_L = 1
-                        Call OpenFS('E1_L.RES',0,100,1)
-                    Case('E1_V')
-                        Keys%E1_V = 1
-                        Call OpenFS('E1_V.RES',0,100,1)
-                    Case('E2')
-                        Keys%E2 = 1
-                        Call OpenFS('E2.RES',0,101,1)
-                    Case('E3')
-                        Keys%E3 = 1
-                        Call OpenFS('E3.RES',0,102,1)
-                    Case('M1')
-                        Keys%M1 = 1
-                        Call OpenFS('M1.RES',0,103,1)
-                    Case('M2')
-                        Keys%M2 = 1
-                        Call OpenFS('M2.RES',0,104,1)
-                    Case('M3')
-                        Keys%M3 = 1
-                        Call OpenFS('M3.RES',0,105,1)
-                    Case('EDM')
-                        Keys%EDM = 1
-                        Call OpenFS('EDM.RES',0,108,1)
-                    Case('PNC')
-                        Keys%PNC = 1
-                        Call OpenFS('PNC.RES',0,109,1)
-                    Case('AM')
-                        Keys%AM = 1
-                        Call OpenFS('AM.RES',0,110,1)
-                    Case('MQM')
-                        Keys%MQM = 1
-                        Call OpenFS('MQM.RES',0,111,1)
-                    Case Default
-                        If (str_key /= str_key0) print*, Trim(AdjustL(str_key)), ' is not a valid key for TM'
-                End Select
-                str_key0 = str_key
-            End Do
+            Select Case(str_key)
+                Case('E1')
+                    Keys%E1_L = 1
+                    Keys%E1_V = 1
+                    Call OpenFS('E1.RES',0,100,1)
+                Case('E1_L')
+                    Keys%E1_L = 1
+                    Call OpenFS('E1_L.RES',0,100,1)
+                Case('E1_V')
+                    Keys%E1_V = 1
+                    Call OpenFS('E1_V.RES',0,100,1)
+                Case('E2')
+                    Keys%E2 = 1
+                    Call OpenFS('E2.RES',0,101,1)
+                Case('E3')
+                    Keys%E3 = 1
+                    Call OpenFS('E3.RES',0,102,1)
+                Case('M1')
+                    Keys%M1 = 1
+                    Call OpenFS('M1.RES',0,103,1)
+                Case('M2')
+                    Keys%M2 = 1
+                    Call OpenFS('M2.RES',0,104,1)
+                Case('M3')
+                    Keys%M3 = 1
+                    Call OpenFS('M3.RES',0,105,1)
+                Case('EDM')
+                    Keys%EDM = 1
+                    Call OpenFS('EDM.RES',0,108,1)
+                Case('PNC')
+                    Keys%PNC = 1
+                    Call OpenFS('PNC.RES',0,109,1)
+                Case('AM')
+                    Keys%AM = 1
+                    Call OpenFS('AM.RES',0,110,1)
+                Case('MQM')
+                    Keys%MQM = 1
+                    Call OpenFS('MQM.RES',0,111,1)
+                Case Default
+                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for TM.'
+                    Return
+            End Select
         End Select
             
-    End Subroutine SetKeys
+    End Subroutine SetKey
 
     Subroutine CloseKeys
         Implicit None
@@ -276,6 +270,93 @@ Contains
         Stop
     End Subroutine OpenFS
 
+    Function CountSubstr(str, substr) Result(count)
+        ! This function counts the number of occurences of a substring from a string
+        Implicit None
+
+        Integer :: i, position, count
+        Character(Len=*), Intent(In) :: str
+        Character(Len=*), Intent(In) :: substr
+
+        count = 0
+        i = 1
+        Do 
+            position = index(str(i:), substr)
+            If (position == 0) Return
+            count = count + 1
+            i = i + position + len(substr) - 1
+        End Do
+
+    End Function CountSubstr
+
+    Subroutine ReadDtmIn
+        ! This subroutine reads job parameters from file c.in
+        Implicit None
+
+        integer :: index_equals, index_hashtag, err_stat, keycount, i, num_ops
+        character(len=5) :: key
+        character(len=80) :: val
+        character(len=80) :: line, lvls, ops
+        character(len=4), dimension(:), allocatable :: keyList 
+        logical :: equals_in_str
+
+        Open(unit=99, file='dtm.in', status='OLD')
+
+        ! read parameters (lines with "=")
+        equals_in_str = .true.
+        Do While (equals_in_str)
+            Read(99, '(A)', iostat=err_stat) line
+            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+                equals_in_str = .false.
+            Else
+                index_equals = index(string=line, substring="=")
+                key = line(1:index_equals-1)
+                val = line(index_equals+1:len(line))
+                
+                index_hashtag = index(string=val, substring="#") ! account for comments
+                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+                Select Case(key)
+                Case('Mode')
+                    If (Trim(AdjustL(val)) == 'DM') Then
+                        Kl1 = 1
+                    Else If (Trim(AdjustL(val)) == 'TM') Then
+                        Kl1 = 2
+                    Else If (Trim(AdjustL(val)) == 'Init') Then
+                        Kl1 = 3
+                    Else
+                        print*, 'ERROR: Value "', Trim(AdjustL(val)), '" for key Mode is not supported.'
+                        Stop
+                    End If
+                Case('Lvls')
+                    If (Kl1 == 1) Then 
+                        Read(val, *) nterm1, nterm2
+                    Else If (Kl1 == 2) Then
+                        Read(val, *) nterm1, nterm1f, nterm2, nterm2f
+                    Else
+                        Continue
+                    End If
+                Case('Ops')
+                    num_ops = CountSubstr(val, ',') + 1
+                    Allocate(keyList(num_ops))
+                    Read(val, *, iostat=err_stat) (keyList(i), i=1,num_ops)
+                    If (err_stat /= 0) Then
+                        print*, 'ERROR: list of operators could not be read.'
+                        Exit
+                    End If
+                    Do i=1, num_ops
+                        Call SetKey(keyList(i))
+                    End Do
+                    Deallocate(keyList)
+                Case Default
+                    print*, 'WARNING: The key "', Trim(AdjustL(key)), '" is not supported.'
+                End Select
+            End If
+        End Do
+
+        Close(99)
+
+    End Subroutine ReadDtmIn 
+
     Subroutine Input       
         ! This subroutine reads file CONF.INP and dtm.in
         Use conf_init, Only : ReadConfInp, ReadConfigurations
@@ -284,38 +365,34 @@ Contains
         Character(Len=4), Dimension(2) :: yes*3
         Character(Len=512) :: strfmt
 
-        Open(unit=99,file='dtm.in')
-        Read (99,*) Kl1
+        Call ReadDtmIn
+
         Select Case(Kl1)
             Case(1) ! regime of Density matrix & expectation values
-                Read (99,*) nterm1, nterm2
                 strfmt = '(/4X,"Program DM v3.0: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('DM.RES',0,11,1)
-                Call SetKeys(99)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
-                Read (99,*) nterm1, nterm1f, nterm2, nterm2f
                 strfmt = '(/4X,"Program TM v3.4: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
-                Call SetKeys(99)
             Case(3) ! regime to construct DTM.INT
-                strfmt = '(/4X,"Program DTM v1.0: Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program DTM_Init v1.0: Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2) OR FORM DTM.INT (3)? ",I1)'
                 Call OpenFS('DTM.RES',0,11,1)
-                Call SetKeys(99)
+            Case Default
+                print*, 'Kl1=', Kl1, ' is not supported'
+                Stop
         End Select
-        Close(99)
 
         Call Init_Char(Let, Alet, Blet, yes, chm1)
 
         Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
-        If (Kl1 < 0 .or. Kl1 > 3) Stop
 
         Trd=1.d-10
         Kdm=0
@@ -1306,7 +1383,6 @@ Contains
         Integer :: mpierr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kl1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1863,10 +1939,10 @@ Contains
             !print*, ppl, G, A, AE2, AM3
             Write( 6,55) ppl,G,A,AE2,AM3
             Write(11,55) ppl,G,A,AE2,AM3
-55          format(' Trace =',F8.4,' <b|||M1|||a> =',F9.5,' mu_0',2x, &
+55          format(' Trace =',F8.4,' <b||M1||a> =',F9.5,' mu_0',2x, &
                    ' <b||H_hfs||a> =',E11.4,' MHz'/,16x, &
-                   ' <b|||E2|||a> =',E13.5,' a.u.'/,16x, &
-                   ' <b|||M3|||a> =',E13.5,' mu_0')
+                   ' <b||E2||a> =',E13.5,' a.u.'/,16x, &
+                   ' <b||M3||a> =',E13.5,' mu_0')
             If (dabs(tj1-tj2) < 1.d-6) Then
                 xg = dsqrt(tj1*(tj1+1)*(2*tj1+1)+1.d-77)
                 Write( 6,'(22X,"G_eff =",F10.5,14X,"A_eff =",E11.4," MHz")') G/xg,A/xg
@@ -1890,8 +1966,8 @@ Contains
             /' MQM   = ',E12.5,' = ',E12.5,' Hz/e/cm**2 (Reduced ME)', &
             /' AM    = ',E12.5,' = ',E12.5,' Hz',9X,'(Reduced ME)', &
             /' PNC   = ',E12.5,' = ',E12.5,' Hz',9X,'(Q_w=',F7.2,')' &
-            /' <b|||E3|||a> =',E13.5,' a.u.' &
-            /' <b|||M2|||a> =',E13.5,' mu_0'/)
+            /' <b||E3||a> =',E13.5,' a.u.' &
+            /' <b||M2||a> =',E13.5,' mu_0'/)
         End If
 
         strsp = ''

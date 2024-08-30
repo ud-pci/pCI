@@ -20,13 +20,13 @@ This python script has 3 main capabilities for configuration list construction:
 
 """
 import yaml
-from subprocess import run
 import os
 import sys
 import re
 import math
 import orbitals as orb_lib
 import get_atomic_data as libatomic
+from utils import run_shell
 from pathlib import Path
 from gen_job_script import write_job_script
 
@@ -97,22 +97,22 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     else:
         core_formatted = []
         
-    config_sys = config['system']
-    config_conf = config['conf']
+    atom = config['atom']
+    conf = config['conf']
     # Write head of CONF.INP
     f.write('>>>>>>>>>>>>> Head of the file CONF.INP >>>>>>>>>>>>>>>>>>>>>>>>\n')
-    f.write('  ' + config_sys['name'] + ' ' + parity + '\n')
+    f.write('  ' + atom['name'] + ' ' + parity + '\n')
     f.write('  Z = ' + str(Z) + '\n')
     f.write(' Am = ' + "{:.1f}".format(round(AM)) + '\n')
-    f.write('  J = ' + str(config_conf['J']) + '\n')
-    f.write(' Jm = ' + str(config_conf['JM']) + '\n')
+    f.write('  J = ' + str(conf['J']) + '\n')
+    f.write(' Jm = ' + str(conf['JM']) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
-    if config_conf['J_selection']:
+    if conf['J_selection']:
         f.write(' Kv =  3 \n')
     else:
         f.write(' Kv =  4 \n')
-    f.write(' Nlv=  ' + str(config_conf['num_energy_levels']) + '\n')
+    f.write(' Nlv=  ' + str(conf['num_energy_levels']) + '\n')
     f.write(' Ne =  ' + str(num_val) + '\n')
     f.write(' Kl4=  1 \n')
     f.write(' Nc4=999 \n')
@@ -121,8 +121,8 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     f.write('kout= 0 \n')
     f.write('Ncpt= 0 \n')
     f.write('Cut0= 0.0001 \n')
-    f.write('N_it= ' + str(config_conf['num_dvdsn_iterations']) + '\n')
-    if config_sys['include_breit']:
+    f.write('N_it= ' + str(conf['num_dvdsn_iterations']) + '\n')
+    if atom['include_breit']:
         kbrt = 2
     else:
         kbrt = 0
@@ -183,53 +183,73 @@ def format_orb_occ(orb, occ):
 
 def create_add_inp(config):
     # Get atomic data
-    config_sys = config['system']
-    Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(config_sys['name'], config_sys['isotope'])
+    atom = config['atom']
+    
+    try:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], atom['isotope'])
+    except KeyError as e:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], "")
+    
+    add = config['add']
+    num_val = orb_lib.count_valence(add['ref_configs'])
+    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
+    multiplicity = orb_lib.count_excitations(add['excitations'])
 
-    config_add = config['add']
-    num_val = orb_lib.count_valence(config_add['ref_configs'])
-    orb_occ = orb_lib.expand_orbitals(config_add['basis_set'], config_add['orbitals'])
-    multiplicity = orb_lib.count_excitations(config_add['excitations'])
-
-    if config_add['ref_configs']['even']:
+    if add['ref_configs']['even']:
         write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'even')
     else:
         print('no even reference configurations specified')
         
-    if config_add['ref_configs']['odd']:
+    if add['ref_configs']['odd']:
         write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd')
     else:
         print('no odd reference configurations specified')
 
-def form_conf_inp(parity):
-    run("cp ADD" + parity + ".INP ADD.INP", shell=True)
-    run("add < add.in", shell=True)
-    run("cp CONF.INP CONF" + parity + ".INP", shell=True)
+def form_conf_inp(parity, bin_dir):
+    if bin_dir and bin_dir[-1] == '/':
+        bin_dir = bin_dir[:-1]
+    run_shell("cp ADD" + parity + ".INP ADD.INP")
+    if on_hpc:
+        run_shell("add < add.in > add" + parity + ".out")
+    else:
+        run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
+    print("output of add saved to add" + parity + ".out")
+    run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
 
 def move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij):
     if not os.path.isdir(parity):
-        run("mkdir " + parity, shell=True)
+        run_shell("mkdir " + parity)
     if os.path.isfile('basis/HFD.DAT'):
-        run("cp basis/HFD.DAT " + parity, shell=True)
+        run_shell("cp basis/HFD.DAT " + parity)
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP", shell=True )
+        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP")
+    if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
+        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP")
     if os.path.isfile('basis/SGC.CON'):
-        run("cp basis/SGC.CON "  + parity, shell=True)
+        run_shell("cp basis/SGC.CON "  + parity)
     if os.path.isfile('basis/SCRC.CON'):
-        run("cp basis/SCRC.CON "  + parity, shell=True)
+        run_shell("cp basis/SCRC.CON "  + parity)
     if run_ci and os.path.isfile(root_dir + '/ci.qs'):
-        run("cp " + root_dir + "/ci.qs " + parity, shell=True)
+        run_shell("cp " + root_dir + "/ci.qs " + parity)
         
     Kw = '1' if write_hij else '0'
-    kLSJ = '1' if include_lsj else '0'
+    KLSJ = '1' if include_lsj else '0'
 
     if os.path.isfile('basis/SGC.CON') and os.path.isfile('basis/SCRC.CON'):
-        with open(parity + '/c.in', 'w') as f:
-            f.write('2, 2, 0, ' + Kw + ', ' + kLSJ)
+        with open(parity + '/ci.in', 'w') as f:
+            f.write('Kl = 2 \n')
+            f.write('Ksig = 2 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
     else:
-        with open(parity + '/c.in', 'w') as f:
-            f.write('0, 0, 0, ' + Kw + ', ' + kLSJ)
+        with open(parity + '/ci.in', 'w') as f:
+            f.write('Kl = 0 \n')
+            f.write('Ksig = 0 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
 
 def check_conf_inp_exists(dir):
     if not os.path.isfile('HFD.DAT'):
@@ -238,8 +258,8 @@ def check_conf_inp_exists(dir):
     if not os.path.isfile('CONF.INP'):
         print('CONF.INP is missing from ' + dir + ' directory')
         sys.exit()
-    if not os.path.isfile('c.in'):
-        print('c.in is missing from ' + dir + ' directory')
+    if not os.path.isfile('ci.in'):
+        print('ci.in is missing from ' + dir + ' directory')
         sys.exit()
 
 if __name__ == "__main__":
@@ -254,22 +274,20 @@ if __name__ == "__main__":
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
         
-    code_method = config['optional']['code_method']
-    run_ci = config['optional']['run_ci']
+    code_method = config['atom']['code_method']
+    run_ci = config['system']['run_ci']
     include_lsj = config['conf']['include_lsj']
-    pci_version = config['optional']['pci_version']
+    pci_version = config['system']['pci_version']
     write_hij = config['conf']['write_hij']
+    bin_dir = config['system']['bin_directory']
+    on_hpc = config['system']['on_hpc']
     
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
     add_core = config['add']['orbitals']['core']
     
-    if basis_core != add_core: 
-        print('ERROR: core orbitals of basis and add do not match in config.yml')
-        sys.exit()
-    
     # Check if user wants to generate directories for CI computations
-    gen_dir = run_ci if run_ci else config['optional']['generate_directories']
+    gen_dir = run_ci if run_ci else config['system']['generate_directories']
     
     # CONF.INP should only need to be constructed once, then copied to respective directories
     # Read input to add from add.in if it exists, otherwise create it
@@ -284,14 +302,14 @@ if __name__ == "__main__":
     if not os.path.isfile('BASS.INP'):
         for root, dirs, files in os.walk('.'):
             if 'BASS.INP' in files:
-                run('cp ' + root + '/BASS.INP .', shell=True)
+                run_shell('cp ' + root + '/BASS.INP .')
                 break
     
     # Run script to generate ADD.INP for even and odd configurations
     create_add_inp(config)
     
     # Cleanup BASS.INP
-    run('rm BASS.INP', shell=True)
+    run_shell('rm BASS.INP')
     
     # Check if ADDeven.INP and ADDodd.INP exist
     even_exists = os.path.isfile('ADDeven.INP')
@@ -300,19 +318,23 @@ if __name__ == "__main__":
     # Run add and form CONF.INP from respective ADD.INP files
     parities = []
     if even_exists: 
-        form_conf_inp('even')
+        form_conf_inp('even', bin_dir)
         parities.append('even')
     if odd_exists: 
-        form_conf_inp('odd')
+        form_conf_inp('odd', bin_dir)
         parities.append('odd')
     
     # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
-    run("rm add.in ADD.INP CONF.INP CONF_.INP", shell=True)
+    run_shell("rm add.in ADD.INP CONF.INP CONF_.INP")
     
     # Create a ci.qs job script if it doesn't exist yet
-    if not os.path.isfile('ci.qs'):
-        print('generating new ci.qs in ' + os.getcwd() + ' directory')
-        script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version)
+    if on_hpc:
+        if not os.path.isfile('ci.qs'):
+            print('generating new ci.qs in ' + os.getcwd() + ' directory')
+            script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version, bin_dir)
+        else:
+            print('using existing ci.qs')
+            script_name = 'ci.qs'
     
     # Copy ADD.INP and CONF.INP to all directories if gen_dir == True
     if gen_dir:
@@ -334,14 +356,16 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
-                        if run_ci: 
+                        if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run("sbatch " + script_name, shell=True)
+                            run_shell("sbatch " + script_name)
                             os.chdir('../')
+                        else:
+                            print("run_ci option is only available with HPC access")
                     os.chdir('../')
                 if K_is_dict[K_is]:
                     os.chdir('../../')
@@ -353,25 +377,29 @@ if __name__ == "__main__":
                 for method in code_method:
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method)
-                    run('pwd', shell=True)
+                    run_shell('pwd')
                     for parity in parities:
                         move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                         # Submit CI job if run_ci == True
-                        if run_ci: 
+                        if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run("sbatch " + script_name, shell=True)
+                            run_shell("sbatch " + script_name)
                             os.chdir('../')
+                        else:
+                            print("run_ci option is only available with HPC access - please run ci codes manually")
                     os.chdir('../')
             else:
                 dir_path = os.getcwd()
-                run('pwd', shell=True)
+                run_shell('pwd')
                 for parity in parities:
                     move_conf_inp(root_dir, parity, run_ci, include_lsj, write_hij)
                     # Submit CI job if run_ci == True
-                    if run_ci: 
+                    if on_hpc and run_ci: 
                         os.chdir(parity)
-                        run("sbatch " + script_name, shell=True)
+                        run_shell("sbatch " + script_name)
                         os.chdir('../')
+                    else:
+                        print("run_ci option is only available with HPC access - please run ci codes manually")
 
     print('add script completed')
 

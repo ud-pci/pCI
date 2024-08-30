@@ -34,7 +34,7 @@ def find_cluster():
     
     return cluster
 
-def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version):
+def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version, bin_dir):
     
     # Determine cluster information
     cluster = find_cluster()
@@ -47,9 +47,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         print('partition ' + partition + ' was not found on darwin')
         partition = 'standard'
         print('partition has been defaulted to the standard partition')
-
-    # Default node and core parameters depending on cluster
-    cores_per_node = {'caviness': 40, 'darwin': 64}
+    
+    # Specify directory of executables
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir = bin_dir + '/'
     
     # Default filenames
     filenames = {'ci+all-order': 'ao.qs', 
@@ -112,14 +113,14 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         
         # Executables
         if code == 'ci':
-            f.write('${UD_MPIRUN} basc \n')
-            f.write('${UD_MPIRUN} conf \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'basc \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'conf \n')
         elif code == 'dtm':
-            f.write('${UD_MPIRUN} dtm \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'dtm \n')
         elif code == 'dtm_rpa':
-            f.write('rpa < rpa.in \n')
-            f.write('rpa_dtm \n')
-            f.write('${UD_MPIRUN} dtm \n')
+            f.write(bin_dir + 'rpa < rpa.in \n')
+            f.write(bin_dir + 'rpa_dtm \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'dtm \n')
         elif code == 'all-order' or code == 'ci+all-order':
             f.write('time allcore-rle-ci <inf.aov >out.core \n')
             f.write('time valsd-rle-cis <inf.aov >out.val \n')
