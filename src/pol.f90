@@ -60,7 +60,7 @@ Program pol
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok = .True.
-
+SetParams
     Character(Len=1), Dimension(9)          :: Let
     Character(Len=4), Dimension(13)         :: Alet
     Character(Len=4), Dimension(5)          :: Blet
@@ -321,6 +321,11 @@ Contains
                         print*, 'ERROR: list of ranges of wavelengths could not be read.'
                         Exit
                     End If
+                Case('IP1')
+                    ! Read specified dimension of matrix
+                    Read(val, *) IP1
+                    Nddir = IP1
+                    Write(*, '(A,I6)') 'Specified value of IP1:', IP1, ' overrides the default value of 15000'
                 Case Default
                     print*, 'WARNING: The key "', Trim(AdjustL(key)), '" is not supported.'
                 End Select
