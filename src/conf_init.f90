@@ -130,7 +130,7 @@ Module conf_init
     End Subroutine ReadConfParams
 
     Subroutine ReadCiIn
-        ! This subroutine reads job parameters from file c.in
+        ! This subroutine reads job parameters from file ci.in
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat
@@ -163,7 +163,7 @@ Module conf_init
                 index_hashtag = index(string=val, substring="#") ! account for comments
                 If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
                 Select Case(key)
-                Case('Kl')
+                Case('Mode')
                     ! Kl = 0 - new computation
                     ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
                     ! Kl = 2 - new computation with MBPT
