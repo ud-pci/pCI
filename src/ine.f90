@@ -104,7 +104,7 @@ Program ine
     Else
         icyc=2
     End If
-    Allocate(xlamb1s(nrange), xlamb2s(nrange), xlambsteps(nrange))
+    
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -1384,7 +1384,11 @@ Contains
         Character(Len=256) :: strfmt
 !     - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        Allocate(TJ1(Nd),TJ2(Nd),TJ3(Nd),TJ4(Nd),TJ5(Nd))
+        If (.not. Allocated(TJ1)) Allocate(TJ1(Nd))
+        If (.not. Allocated(TJ2)) Allocate(TJ2(Nd))
+        If (.not. Allocated(TJ3)) Allocate(TJ3(Nd))
+        If (.not. Allocated(TJ4)) Allocate(TJ4(Nd))
+        If (.not. Allocated(TJ5)) Allocate(TJ5(Nd))
         If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
         j0= 2*Tj0+0.1d0
 
@@ -1683,7 +1687,7 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Allocate(XXn(Nd))
+        If (.not. allocated(XXn)) Allocate(XXn(Nd))
         j=0
         jtj=0
         Do n=1,Nlv
