@@ -76,16 +76,16 @@ Program pol
 
     Call startTimer(start_time)
 
-    Call SetParams                    ! Set job and array parameters
-    Call Input                        ! Read list of configurations from CONF.INP
-    Call Init                         ! Read basis set information from CONF.DAT
-    Call Rint                         ! Read radial integrals from CONF.INT
-    Call Dinit                        ! Form list of determinants
-    Call Jterm                        ! Print table with numbers of levels with given J
-    Call ReadHIJ                      ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
-    Call ReadJJJ                      ! Read J^2 matrix in X1 space from file CONF.JJJ
-    Call Init0                        !### Evaluation of the RHS of
-    Call Vector(kl)                   !###  the equation and vectors Yi
+    Call SetParams      ! Set job and array parameters
+    Call Input          ! Read list of configurations from CONF.INP
+    Call Init           ! Read basis set information from CONF.DAT
+    Call Rint           ! Read radial integrals from CONF.INT
+    Call Dinit          ! Form list of determinants
+    Call Jterm          ! Print table with numbers of levels with given J
+    Call ReadHIJ        ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
+    Call ReadJJJ        ! Read J^2 matrix in X1 space from file CONF.JJJ
+    Call Init0          ! Read vectors
+    Call Vector(kl)     ! Evaluation of the RHS of the equation and vectors Yi
 
     If (W0 == 0.d0) Then
         icyc=1
@@ -1304,7 +1304,11 @@ Contains
         Character(Len=256) :: strfmt
 !     - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        Allocate(TJ1(Nd),TJ2(Nd),TJ3(Nd),TJ4(Nd),TJ5(Nd))
+        If (.not. Allocated(TJ1)) Allocate(TJ1(Nd))
+        If (.not. Allocated(TJ2)) Allocate(TJ2(Nd))
+        If (.not. Allocated(TJ3)) Allocate(TJ3(Nd))
+        If (.not. Allocated(TJ4)) Allocate(TJ4(Nd))
+        If (.not. Allocated(TJ5)) Allocate(TJ5(Nd))
         If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
         j0= 2*Tj0+0.1d0
 
@@ -1574,7 +1578,7 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Allocate(XXn(Nd))
+        If (.not. allocated(XXn)) Allocate(XXn(Nd))
         j=0
         jtj=0
         Do n=1,Nlv
