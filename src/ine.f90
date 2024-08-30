@@ -104,7 +104,7 @@ Program ine
     Else
         icyc=2
     End If
-
+    Allocate(xlamb1s(nrange), xlamb2s(nrange), xlambsteps(nrange))
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
