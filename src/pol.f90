@@ -278,6 +278,11 @@ Contains
 
         Open(unit=88, file='pol.in', status='OLD')
 
+        ! Set default values for keys
+        Kl = 0
+        Method = 0
+        N0 = 0
+
         ! read parameters (lines with "=")
         equals_in_str = .true.
         Do While (equals_in_str)
@@ -298,6 +303,9 @@ Contains
                     ! Kl = 2 - use old vectors X1, Y1, Y2
                     Read(val, *) Kl
                 Case('Method')
+                    ! Method = 0 - invert the matrix and iterate if diverged
+                    ! Method = 1 - invert the matrix
+                    ! Method = 2 - 2 step iteration
                     Read(val, *) Method
                 Case('Level')
                     ! Read the energy level numbers
@@ -348,11 +356,15 @@ Contains
             Write(*,'(A,I2)') 'Level: #', N0
         End If
 
-        Write(*,'(I2,A)') nrange, ' wavelength intervals with step size found:'
-        Do i=1,nrange
-            Write(*,'(A,F11.3,A,F11.3,A,F11.4,A)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' nm in steps of ',xlambsteps(i), ' nm'
-        End Do
-
+        If (nrange > 0) Then
+            Write(*,'(I2,A)') nrange, ' wavelength intervals with step size found:'
+            Do i=1,nrange
+                Write(*,'(A,F11.3,A,F11.3,A,F11.4,A)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' nm in steps of ',xlambsteps(i), ' nm'
+            End Do
+        Else
+            Write(*,'(A)') 'ERROR: no wavelengths were specified'
+            Stop
+        End If
         Close(88)
 
     End Subroutine ReadPolIn 
