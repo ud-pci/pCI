@@ -61,7 +61,7 @@ Program ine
     Integer, Parameter :: IPad = 8
 
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Integer  :: Kli, Klf, Khe, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
     Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
     
@@ -144,28 +144,28 @@ Program ine
                 Select Case(kIters)
                     Case(0)
                         print*, 'Ndir=',Ndir
-                        Call SolEq1(kl) ! Direct solution
+                        Call SolEq1(kl,i) ! Direct solution
                         If (Ndir.LT.Nd) Then
-                            Call SolEq4(ok)                 !### Iterative solution
+                            Call SolEq4(ok,i)                 !### Iterative solution
                             If (Nd.LE.IP1 .AND. .NOT.ok) Then
                               Ndir= Nd
                               Write(*,*)
-                              Call SolEq1(kl)
+                              Call SolEq1(kl,i)
                               ok=.TRUE.
                             End If
                         End If
                     Case(1)
                         Ndir=Nd
                         IP1=Nd
-                        Call SolEq1(kl) ! Direct solution
+                        Call SolEq1(kl,i) ! Direct solution
                     Case(2)
                         N_it = 2
                         Do l=1,N_it4
                             print*, '   2-step ITERATION #', l
                             If (l > 1) kl = 2
-                            Call SolEq1(kl) ! Direct solution
+                            Call SolEq1(kl,i) ! Direct solution
                             If (Ndir.LT.Nd) Then
-                                Call SolEq4(ok) ! Iterative solution
+                                Call SolEq4(ok,i) ! Iterative solution
                             End If
                             If (ok) Exit
                         End Do
@@ -207,14 +207,9 @@ Contains
     Subroutine SetParams
         Implicit None
 
-        ! Choose Khe - variant of solution of homogeneous equation
-        ! Khe=0 - old solution of homogeneous eq-n
-        ! Khe=1 - new solution of homogeneous eq-n
-        Khe= 1   
-
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
-        IP1=15000
+        IP1=1500
 
         ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
         ! To solve homogeneous equation for the whole matrix, Nddir=IP1
@@ -377,7 +372,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.22",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.23",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -698,7 +693,7 @@ Contains
             Stop
         End If
         Read(17) Nd0
-        
+
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         If (.not. Allocated(idet0)) Allocate(idet0(Ne))
@@ -766,7 +761,7 @@ Contains
                 negl=negl+1
             End If
             If (1000*(n/1000).EQ.n) Then
-                 strfmt='(1X,I6," from ",I6," (",I6," neglected, ",I6," skipped)")'
+                 strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
                  Write(*,strfmt) n,Nd0,negl,nskip
             End If
         End Do
@@ -927,20 +922,21 @@ Contains
         Do i8=1,NumH
             Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
         End Do
+        Close(15)
         Return
-    End Subroutine
+    End Subroutine ReadHIJ
 
-    Subroutine SolEq1(kl)
+    Subroutine SolEq1(kl,sign)
         Use solvers
         Use str_fmt, Only : FormattedTime
         Implicit None
         External ZSPSV
-        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat
+        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat, sign
         Integer(Kind=int64) :: i8, start1, end1, start2, end2, clock_rate
         Real :: ttime, ttime2
         Real(dp) :: t, e0n, e2n, tj0n, tj2n, err
         Real(dp), Allocatable, Dimension(:) :: scales
-        Complex(dp), Allocatable, Dimension(:) ::Zc, XX1
+        Complex(dp), Allocatable, Dimension(:) :: Zc, XX1
         Integer, Allocatable, Dimension(:) :: ipiv, Mps
         Real(dp), Allocatable, Dimension(:,:) :: Az
         Character(Len=256) :: strfmt, err_msg, timeStr
@@ -958,14 +954,22 @@ Contains
         elft= E0+W0                          !### equation has the form:
         If (Kli.EQ.2.AND.Klf.NE.2) elft=E2   !### (elft-H)X1=Y1
         If (kl.GE.1) then
-            Open (unit=16,file='INE.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            print*, 'Reading vectors from INE.XIJ...'
+            If (sign == 1) Then
+                Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            Else
+                Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            End If
             If (err_stat /= 0) Then
+                print*, 'ERROR: INE.XIJ could not be read'
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
+                    print*, 'ERROR: vector from INE.XIJ could not be read'
                     Continue
                 Else
+                    Write(*,*) ' X1 read..'
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
                     If (err.GT.1.d-1) then
                         strfmt = '(1X," Error in file INE.XIJ, vector X1:", &
@@ -979,11 +983,15 @@ Contains
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y1 read..'
                         End If
                         Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y2 read..'
                         End If
                         err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
                         If (err.GT.1.d-1) then
@@ -1014,7 +1022,7 @@ Contains
         Else
             Ntr=Nd
         End If
-        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I6,")")'
+        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I8,")")'
         Write(6,strfmt) Ntr,Ntr,Nd
 
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
@@ -1041,7 +1049,7 @@ Contains
                 Az(j,i)= -t
             End If
         End Do
-        Close(unit=15)
+
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
@@ -1055,39 +1063,34 @@ Contains
         If (.not. Allocated(X1)) Allocate(X1(Nd))
 
         Call system_clock(start1)
-        If (Khe.EQ.0) Then
-            call Decomp(Z1,Ntr,scales,Mps)          !### decomposition
-            Write(*,*)' decomposition finished'            !### of the matrix
-            call Flsolv(Ntr,Z1,YY1,X1,Mps)          !### solution of the
-            Write(*,*)' flsolv finished'                   !### inhom-s equation
-        Else
-            k = 1
-            Do i=1,Ntr
-                Do j=1,i
-                    If (i.EQ.j) Then
-                        Zc(k)= Az(i,i)
-                        If (Kli.EQ.5 .AND. W0.EQ.0.d0) Zc(k)= Az(i,i)+(0,1)*W00
-                    Else
-                        Zc(k)= Az(i,j)
-                    End If
-                    k = k+1
-                End Do
-                XX1(i)= YY1(i)
+
+        k = 1
+        Do i=1,Ntr
+            Do j=1,i
+                If (i.EQ.j) Then
+                    Zc(k)= Az(i,i)
+                    If (Kli.EQ.5 .AND. W0.EQ.0.d0) Zc(k)= Az(i,i)+(0,1)*W00
+                Else
+                    Zc(k)= Az(i,j)
+                End If
+                k = k+1
             End Do
-            Call system_clock(start2)
-            Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
-            !Call Zspsv_F95(Zc,XX1,'U',ipiv,info)
-            Call system_clock(end2)
-            ttime2=Real((end2-start2)/clock_rate)
-            Call FormattedTime(ttime2, timeStr)
-            Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
-            If (info.NE.0) then
-                Write(*,*) 'info =',info
-                Stop
-            End If
-            X1= 0.d0  ! Vector
-            X1(1:Ntr)= Real(XX1(1:Ntr))
+            XX1(i)= YY1(i)
+        End Do
+        Call system_clock(start2)
+        Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
+        If (info.NE.0) then
+            Write(*,*) 'info =',info
+            Stop
         End If
+
+        Call system_clock(end2)
+        ttime2=Real((end2-start2)/clock_rate)
+        Call FormattedTime(ttime2, timeStr)
+        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+
+        X1= 0.d0 
+        X1(1:Ntr)= Real(XX1(1:Ntr), kind=dp)
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
@@ -1095,7 +1098,11 @@ Contains
 
         If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  !# Orthogonalization of X1 to X0 (If J0 /= 0)
         
-        Open(unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        If (sign == 1) Then
+            Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Else
+            Open(unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        End If
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
@@ -1103,10 +1110,10 @@ Contains
         Return
     End Subroutine SolEq1
 
-    Subroutine SolEq4(ok)   !### Iterative solution of the inhomogeneous eqiation
+    Subroutine SolEq4(ok, sign)   !### Iterative solution of the inhomogeneous eqiation
         Use solvers
         Implicit None
-        Integer :: num, i, itr, k, l, n
+        Integer :: num, i, itr, k, l, n, sign
         Real(dp) :: ynorm, crit, dnorm, s2, s3, s12, s13, dx, di, x2, x3, x, y, dx1
         Character(Len=9) :: str
         Logical :: ok
@@ -1127,7 +1134,6 @@ Contains
         If (.not. Allocated(X12)) Allocate(X12(Nd))
         If (.not. Allocated(X13)) Allocate(X13(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
-        If (.not. Allocated(Vr)) Allocate(Vr(IPad))
 
         num=4
         call FormV(num)
@@ -1229,7 +1235,7 @@ Contains
             end do
             call Decomp(Z1,num,scales,Mps)
             call Flsolv(num,Z1,Vr,Vl,Mps)
-            !     New vector X1:
+            ! New vector X1:
             do i=1,Nd
                 X1(i)=Vl(1)*X1(i)
                 do k=2,num
@@ -1240,20 +1246,28 @@ Contains
             write( 6,strfmt) (Vl(k),k=1,num)
             write(11,strfmt) (Vl(k),k=1,num)
     
-            open (unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            If (sign == 1) Then
+                open (unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Else
+                open (unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            End If 
             write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
             write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
             write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
             close(16)
-            If (ok) Then
-                Exit
-            Else
-                str=' DIVERGED'
-                Cycle
-            End If
+            
+            If (ok) Exit
         End Do
-        strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved",/3X,63("="))'
+
+        If (.not. ok) str = ' DIVERGED'
+        If (sign == 1) Then
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
+             I7," are saved to INE_p.XIJ",/3X,63("="))'
+        Else
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
+             I7," are saved to INE_m.XIJ",/3X,63("="))'
+        End If
+            
  200    write( 6,strfmt) str,Nd
         write(11,strfmt) str,Nd
         Return
@@ -2251,7 +2265,6 @@ Contains
            End If
         End Do
         Kdiag=0
-        Close (unit=15)
         Return
     End Subroutine Mxmpy
 
