@@ -209,7 +209,7 @@ Contains
 
         ! Specify IP1 - dimension of the matrix to solve homogeneous equation
         ! Set IP1=IP1conf for same dimensionality as in conf
-        IP1=1500
+        IP1=15000
 
         ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
         ! To solve homogeneous equation for the whole matrix, Nddir=IP1
