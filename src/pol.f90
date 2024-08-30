@@ -60,7 +60,7 @@ Program pol
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok = .True.
-SetParams
+
     Character(Len=1), Dimension(9)          :: Let
     Character(Len=4), Dimension(13)         :: Alet
     Character(Len=4), Dimension(5)          :: Blet
