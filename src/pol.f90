@@ -322,7 +322,7 @@ Contains
                         Exit
                     End If
                 Case('IP1')
-                    ! Read specified dimension of matrix
+                    ! Read specified dimension of matrix initial approximation
                     Read(val, *) IP1
                     Nddir = IP1
                     Write(*, '(A,I6)') 'Specified value of IP1:', IP1, ' overrides the default value of 15000'
