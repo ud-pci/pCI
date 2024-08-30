@@ -1,4 +1,4 @@
-Program dtm 
+Program pdtm 
     Use dtm_variables
     Use mpi_f08
     Use determinants, Only : Dinit, Jterm
@@ -2472,4 +2472,4 @@ Contains
         Return
     End Subroutine DM_out
 
-End Program dtm
+End Program pdtm

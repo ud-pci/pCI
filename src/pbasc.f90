@@ -1,4 +1,4 @@
-Program basc
+Program pbasc
 
     Use mpi_f08
     Use basc_variables
@@ -1409,4 +1409,4 @@ Contains
 
         Return
     End Subroutine Rint_MS
-End Program basc
+End Program pbasc

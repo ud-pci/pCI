@@ -1,4 +1,4 @@
-Program conf 
+Program pconf 
     ! ======== original version by I.I.Tupitsin =======
     ! ======== parallel version by C. Cheung ==========
     ! latest version of parallel code can be found at
@@ -3245,4 +3245,4 @@ Contains
 
     End Function g_factor
 
-End Program conf
+End Program pconf
