@@ -172,7 +172,7 @@ Program ine
                 End Select
                 If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
                 If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
-                Call RdcX1J                                       !### Transforms and saves X1J
+                Call RdcX1J (i)                                      !### Transforms and saves X1J
                 If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
                 If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
                 Call Prin                                  !### Output of the results
@@ -969,7 +969,6 @@ Contains
                     print*, 'ERROR: vector from INE.XIJ could not be read'
                     Continue
                 Else
-                    Write(*,*) ' X1 read..'
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
                     If (err.GT.1.d-1) then
                         strfmt = '(1X," Error in file INE.XIJ, vector X1:", &
@@ -1006,8 +1005,13 @@ Contains
                         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
                     End If
                     Close(16)
-                    Write( *,*)'  SolEq1: solution is taken from INE.XIJ'
-                    Write(11,*)'  SolEq1: solution is taken from INE.XIJ'
+                    If (sign == 1) Then
+                        Write( *,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                    Else
+                        Write( *,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                    End If
                     Return
                 End If
             End If
@@ -1543,15 +1547,21 @@ Contains
         Return
     End Subroutine PrjE2
 
-    Subroutine RdcX1J   !### Transforms X1J to the form which corresponds
+    Subroutine RdcX1J(sign)   !### Transforms X1J to the form which corresponds
         Use wigner      !### to the reduced ME and saves it in INE_J.XIJ.
         Implicit None   
-        Integer :: i, jf, j, is
+        Integer :: i, jf, j, is, sign
         Real(dp) :: Aj, xm, W
 
-        open (unit=16,file='INE_J.XIJ',status='UNKNOWN',form='UNFORMATTED')
-        close(16,status='DELETE')
-        open (unit=16,file='INE_J.XIJ',status='NEW',form='UNFORMATTED')
+        If (sign == 1) Then
+            open (unit=16,file='INE_J_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_p.XIJ',status='NEW',form='UNFORMATTED')
+        Else
+            open (unit=16,file='INE_J_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_m.XIJ',status='NEW',form='UNFORMATTED')
+        End If
 
         jf=3
         if (Kli.EQ.5) jf=5
