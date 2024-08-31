@@ -123,34 +123,34 @@ Program pol
                 End If
                 Select Case(Method)
                     Case(0)
-                        Call SolEq1(kl) ! Direct solution
+                        Call SolEq1(kl,i) ! Direct solution
                         If (Ndir.LT.Nd) Then
-                            Call SolEq4(ok) ! Iterative solution
+                            Call SolEq4(ok,i) ! Iterative solution
                             If (Nd.LE.IP1 .AND. .NOT.ok) Then
                               Ndir= Nd
                               Write(*,*)
-                              Call SolEq1(kl)
+                              Call SolEq1(kl,i)
                               ok=.TRUE.
                             End If
                         End If
                     Case(1)
                         Ndir=Nd
                         IP1=Nd
-                        Call SolEq1(kl) ! Direct solution
+                        Call SolEq1(kl,i) ! Direct solution
                     Case(2)
                         N_it = 2
                         Do l=1,N_it4
                             print*, '   2-step ITERATION #', l
                             If (l > 1) kl = 2
-                            Call SolEq1(kl) ! Direct solution
+                            Call SolEq1(kl,i) ! Direct solution
                             If (Ndir.LT.Nd) Then
-                                Call SolEq4(ok) ! Iterative solution
+                                Call SolEq4(ok,i) ! Iterative solution
                             End If
                             If (ok) Exit
                         End Do
                 End Select
                 Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
-                Call RdcX1J                                       !### Transforms and saves X1J
+                Call RdcX1J(i)                                     !### Transforms and saves X1J
                 Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
                 Call Prin                                  !### Output of the results
                 Call RdcE1(i)                            !### Evaluation of E1 polarizability
@@ -877,12 +877,12 @@ Contains
         Return
     End Subroutine
 
-    Subroutine SolEq1(kl)
+    Subroutine SolEq1(kl,sign)
         Use solvers
         Use str_fmt, Only : FormattedTime
         Implicit None
         External ZSPSV
-        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat
+        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat, sign
         Integer(Kind=int64) :: i8, start1, end1, start2, end2, clock_rate
         Real :: ttime, ttime2
         Real(dp) :: t, e0n, e2n, tj0n, tj2n, err
@@ -904,7 +904,11 @@ Contains
         
         elft= E0+W0
         If (kl.GE.1) then
-            Open (unit=16,file='INE.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            If (sign == 1) Then
+                Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            Else
+                Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            End If
             If (err_stat /= 0) Then
                 Continue
             Else
@@ -944,8 +948,13 @@ Contains
                         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
                     End If
                     Close(16)
-                    Write( *,*)'  SolEq1: solution is taken from INE.XIJ'
-                    Write(11,*)'  SolEq1: solution is taken from INE.XIJ'
+                    If (sign == 1) Then
+                        Write( *,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                    Else
+                        Write( *,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                    End If
                     Return
                 End If
             End If
@@ -1016,15 +1025,16 @@ Contains
         End Do
         Call system_clock(start2)
         Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
-        !Call Zspsv_F95(Zc,XX1,'U',ipiv,info)
-        Call system_clock(end2)
-        ttime2=Real((end2-start2)/clock_rate)
-        Call FormattedTime(ttime2, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
         If (info.NE.0) then
             Write(*,*) 'info =',info
             Stop
         End If
+        
+        Call system_clock(end2)
+        ttime2=Real((end2-start2)/clock_rate)
+        Call FormattedTime(ttime2, timeStr)
+        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+        
         X1= 0.d0
         X1(1:Ntr)= Real(XX1(1:Ntr))
         Call system_clock(end1)
@@ -1032,7 +1042,11 @@ Contains
         Call FormattedTime(ttime, timeStr)
         Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
         
-        Open(unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        If (sign == 1) Then
+            Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Else
+            Open(unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        End If
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
@@ -1040,10 +1054,10 @@ Contains
         Return
     End Subroutine SolEq1
 
-    Subroutine SolEq4(ok)   !### Iterative solution of the inhomogeneous eqiation
+    Subroutine SolEq4(ok,sign)   !### Iterative solution of the inhomogeneous eqiation
         Use solvers
         Implicit None
-        Integer :: num, i, itr, k, l, n
+        Integer :: num, i, itr, k, l, n, sign
         Real(dp) :: ynorm, crit, dnorm, s2, s3, s12, s13, dx, di, x2, x3, x, y, dx1
         Character(Len=9) :: str
         Logical :: ok
@@ -1177,20 +1191,26 @@ Contains
             write( 6,strfmt) (Vl(k),k=1,num)
             write(11,strfmt) (Vl(k),k=1,num)
     
-            open (unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            If (sign == 1) Then
+                open (unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Else
+                open (unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            End If 
             write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
             write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
             write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
             close(16)
-            If (ok) Then
-                Exit
-            Else
-                str=' DIVERGED'
-                Cycle
-            End If
+
+            If (ok) Exit
         End Do
-        strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved",/3X,63("="))'
+
+        If (.not. ok) str = ' DIVERGED'
+        If (sign == 1) Then
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_p.XIJ",/3X,63("="))'
+        Else
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_m.XIJ",/3X,63("="))'
+        End If
+        
  200    write( 6,strfmt) str,Nd
         write(11,strfmt) str,Nd
         Return
@@ -1466,15 +1486,21 @@ Contains
         Return
     End Subroutine PrjE2
 
-    Subroutine RdcX1J   !### Transforms X1J to the form which corresponds
+    Subroutine RdcX1J(sign)   !### Transforms X1J to the form which corresponds
         Use wigner      !### to the reduced ME and saves it in INE_J.XIJ.
         Implicit None   
-        Integer :: i, jf, j, is
+        Integer :: i, jf, j, is, sign
         Real(dp) :: Aj, xm, W
 
-        open (unit=16,file='INE_J.XIJ',status='UNKNOWN',form='UNFORMATTED')
-        close(16,status='DELETE')
-        open (unit=16,file='INE_J.XIJ',status='NEW',form='UNFORMATTED')
+        If (sign == 1) Then
+            open (unit=16,file='INE_J_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_p.XIJ',status='NEW',form='UNFORMATTED')
+        Else
+            open (unit=16,file='INE_J_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_m.XIJ',status='NEW',form='UNFORMATTED')
+        End If
 
         jf=3
 
