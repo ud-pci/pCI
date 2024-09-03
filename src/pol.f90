@@ -708,7 +708,7 @@ Contains
             Stop
         End If
         Read(17) Nd0
-        
+
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         If (.not. Allocated(idet0)) Allocate(idet0(Ne))
@@ -763,7 +763,7 @@ Contains
                 negl=negl+1
             End If
             If (1000*(n/1000).EQ.n) Then
-                 strfmt='(1X,I6," from ",I6," (",I6," neglected, ",I6," skipped)")'
+                 strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
                  Write(*,strfmt) n,Nd0,negl,nskip
             End If
         End Do
@@ -855,7 +855,7 @@ Contains
     Subroutine ReadHIJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: i8
+        Integer(kind=int64) :: i8, cnt
         Character(Len=256) :: err_msg
 
         Open(unit=15,file='CONF.HIJ',status='UNKNOWN',form='unformatted',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -871,11 +871,20 @@ Contains
         If (.not. Allocated(Hamil%n)) Allocate(Hamil%n(NumH))
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
+        cnt=0
         Do i8=1,NumH
             Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            if (Hamil%n(i8) == Nd + 1) then
+                NumH=cnt
+                print*,'For Nd=',Nd,', NumH=', NumH
+                exit
+            end if
+            cnt = cnt + 1
         End Do
+        
+        Close(15)
         Return
-    End Subroutine
+    End Subroutine ReadHIJ
 
     Subroutine SolEq1(kl,sign)
         Use solvers
@@ -902,18 +911,21 @@ Contains
             If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         End If
         
-        elft= E0+W0
+        elft= E0+W0 ! Equation has the form: (Elft-H)X1=Y1
         If (kl.GE.1) then
+            print*, 'Reading vectors from INE.XIJ...'
             If (sign == 1) Then
                 Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             Else
                 Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             End If
             If (err_stat /= 0) Then
+                print*, 'ERROR: INE.XIJ could not be read'
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
+                    print*, 'ERROR: vector from INE.XIJ could not be read'
                     Continue
                 Else
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
@@ -929,11 +941,15 @@ Contains
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y1 read..'
                         End If
                         Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y2 read..'
                         End If
                         err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
                         If (err.GT.1.d-1) then
@@ -968,7 +984,7 @@ Contains
         Else
             Ntr=Nd
         End If
-        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I6,")")'
+        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I8,")")'
         Write(6,strfmt) Ntr,Ntr,Nd
 
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
@@ -997,7 +1013,7 @@ Contains
                 Az(j,i)= -t
             End If
         End Do
-        Close(unit=15)
+
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
@@ -1011,6 +1027,7 @@ Contains
         If (.not. Allocated(X1)) Allocate(X1(Nd))
 
         Call system_clock(start1)
+
         k = 1
         Do i=1,Ntr
             Do j=1,i
@@ -1029,14 +1046,14 @@ Contains
             Write(*,*) 'info =',info
             Stop
         End If
-        
+
         Call system_clock(end2)
         ttime2=Real((end2-start2)/clock_rate)
         Call FormattedTime(ttime2, timeStr)
         Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
-        
+
         X1= 0.d0
-        X1(1:Ntr)= Real(XX1(1:Ntr))
+        X1(1:Ntr)= Real(XX1(1:Ntr), kind=dp)
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
@@ -1054,7 +1071,7 @@ Contains
         Return
     End Subroutine SolEq1
 
-    Subroutine SolEq4(ok,sign)   !### Iterative solution of the inhomogeneous eqiation
+    Subroutine SolEq4(ok, sign)   !### Iterative solution of the inhomogeneous eqiation
         Use solvers
         Implicit None
         Integer :: num, i, itr, k, l, n, sign
@@ -1078,13 +1095,13 @@ Contains
         If (.not. Allocated(X12)) Allocate(X12(Nd))
         If (.not. Allocated(X13)) Allocate(X13(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
-        If (.not. Allocated(Vr)) Allocate(Vr(IPad))
 
         num=4
         call FormV(num)
         num=min(Nlft,IPad)
         strfmt = '(3X,"Number of vectors: ",I2)'
         write(*,strfmt) num
+
         ynorm=0.d0
         do i=1,Nd
             ynorm=ynorm+YY1(i)**2
@@ -1093,10 +1110,12 @@ Contains
         end do
         ynorm=dsqrt(ynorm)
         crit=Crit1*ynorm
+
         strfmt = '(3X,63("="),/4X,"SolEq4: ||Y1|| = ",E10.3," Crit = ",E10.3,/3X,63("="))'
         write( 6,strfmt) ynorm,crit
         write(11,strfmt) ynorm,crit
-        Kdiag=1                        !### flags Mxmpy to fill Diag(i)
+
+        Kdiag=1                        ! flags Mxmpy to fill Diag(i)
         ok=.FALSE.
         Do itr=1,N_it
             call Mxmpy(1,1,X1,X1)
@@ -1153,14 +1172,9 @@ Contains
             X13=X1J(1:Nd,3)
             call Mxmpy(2,2,X12,X13)
             ! Evaluation of the coefficients from minimum of the residue:
-            do i=1,IPad
-                Vr(i)=0.d0
-                do k=1,IPad
-                    Z1(IPad*(i-1)+k)=0.d0
-                end do
-            end do
-            Vl=0.d0
-            Mps=0
+            Vl(1:IPad)=0.d0
+            Vr(1:IPad)=0.d0
+            Z1(1:IPad**2)=0.d0
             do i=1,Nd
                 y=YY1(i)
                 do k=1,num
@@ -1180,7 +1194,7 @@ Contains
             end do
             call Decomp(Z1,num,scales,Mps)
             call Flsolv(num,Z1,Vr,Vl,Mps)
-            !     New vector X1:
+            ! New vector X1:
             do i=1,Nd
                 X1(i)=Vl(1)*X1(i)
                 do k=2,num
@@ -1219,7 +1233,7 @@ Contains
     Subroutine ReadJJJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: j8
+        Integer(kind=int64) :: j8, cnt
         Character(Len=256) :: err_msg
 
         open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -1230,13 +1244,20 @@ Contains
             Write(*,*) ' reading CONF.JJJ...'
         End If
         read(18) NumJ
+        print*, 'NumJ=',NumJ
         If (.not. Allocated(Jsq%n)) Allocate(Jsq%n(NumJ))
         If (.not. Allocated(Jsq%k)) Allocate(Jsq%k(NumJ))
         If (.not. Allocated(Jsq%t)) Allocate(Jsq%t(NumJ))
+        cnt=0
         Do j8=1,NumJ
             read(18) Jsq%k(j8),Jsq%n(j8),Jsq%t(j8)
+            if (Jsq%n(j8) == Nd + 1) then
+                NumJ=cnt
+                print*,'For Nd=',Nd,', NumJ=', NumJ
+                exit
+            end if
+            cnt = cnt + 1
         End Do
-        print*, 'NumJ=',NumJ
         close(18)
     End Subroutine ReadJJJ
 
@@ -1864,7 +1885,8 @@ Contains
 
     Subroutine Mxmpy(num,j,x,y)     !# Y2J(j)  = (Elft-H)*x
         Implicit None               !# Y2J(j+1)= (Elft-H)*y (only for num=2)
-        Integer :: j, j1, i8, num, n, k
+        Integer :: j, j1, num, n, k
+        Integer(kind=int64) :: i8
         Real(dp) :: t
         Real(dp), Allocatable, Dimension(:) :: x, y
         j1=j+1
