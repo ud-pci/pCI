@@ -903,7 +903,7 @@ Contains
     Subroutine ReadHIJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: i8
+        Integer(kind=int64) :: i8, cnt
         Character(Len=256) :: err_msg
 
         Open(unit=15,file='CONF.HIJ',status='UNKNOWN',form='unformatted',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -919,9 +919,17 @@ Contains
         If (.not. Allocated(Hamil%n)) Allocate(Hamil%n(NumH))
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
+        cnt=0
         Do i8=1,NumH
             Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            if (Hamil%n(i8) == Nd + 1) then
+                NumH=cnt
+                print*,'For Nd=',Nd,', NumH=', NumH
+                exit
+            end if
+            cnt = cnt + 1
         End Do
+        
         Close(15)
         Return
     End Subroutine ReadHIJ
@@ -1100,7 +1108,8 @@ Contains
         Call FormattedTime(ttime, timeStr)
         Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
 
-        If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  !# Orthogonalization of X1 to X0 (If J0 /= 0)
+        ! Orthogonalization of X1 to X0 (If J0 /= 0)
+        If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  
         
         If (sign == 1) Then
             Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
@@ -1144,6 +1153,7 @@ Contains
         num=min(Nlft,IPad)
         strfmt = '(3X,"Number of vectors: ",I2)'
         write(*,strfmt) num
+
         ynorm=0.d0
         do i=1,Nd
             ynorm=ynorm+YY1(i)**2
@@ -1152,10 +1162,12 @@ Contains
         end do
         ynorm=dsqrt(ynorm)
         crit=Crit1*ynorm
+
         strfmt = '(3X,63("="),/4X,"SolEq4: ||Y1|| = ",E10.3," Crit = ",E10.3,/3X,63("="))'
         write( 6,strfmt) ynorm,crit
         write(11,strfmt) ynorm,crit
-        Kdiag=1                        !### flags Mxmpy to fill Diag(i)
+
+        Kdiag=1                        ! flags Mxmpy to fill Diag(i)
         ok=.FALSE.
         Do itr=1,N_it
             call Mxmpy(1,1,X1,X1)
@@ -1212,14 +1224,9 @@ Contains
             X13=X1J(1:Nd,3)
             call Mxmpy(2,2,X12,X13)
             ! Evaluation of the coefficients from minimum of the residue:
-            do i=1,IPad
-                Vr(i)=0.d0
-                do k=1,IPad
-                    Z1(IPad*(i-1)+k)=0.d0
-                end do
-            end do
-            Vl=0.d0
-            Mps=0
+            Vl(1:IPad)=0.d0
+            Vr(1:IPad)=0.d0
+            Z1(1:IPad**2)=0.d0
             do i=1,Nd
                 y=YY1(i)
                 do k=1,num
@@ -1280,7 +1287,7 @@ Contains
     Subroutine ReadJJJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: j8
+        Integer(kind=int64) :: j8, cnt
         Character(Len=256) :: err_msg
 
         open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -1291,13 +1298,20 @@ Contains
             Write(*,*) ' reading CONF.JJJ...'
         End If
         read(18) NumJ
+        print*, 'NumJ=',NumJ
         If (.not. Allocated(Jsq%n)) Allocate(Jsq%n(NumJ))
         If (.not. Allocated(Jsq%k)) Allocate(Jsq%k(NumJ))
         If (.not. Allocated(Jsq%t)) Allocate(Jsq%t(NumJ))
+        cnt=0
         Do j8=1,NumJ
             read(18) Jsq%k(j8),Jsq%n(j8),Jsq%t(j8)
+            if (Jsq%n(j8) == Nd + 1) then
+                NumJ=cnt
+                print*,'For Nd=',Nd,', NumJ=', NumJ
+                exit
+            end if
+            cnt = cnt + 1
         End Do
-        print*, 'NumJ=',NumJ
         close(18)
     End Subroutine ReadJJJ
 
@@ -1722,7 +1736,6 @@ Contains
             If (ndd.NE.Nd) then
                write(*,*)' CONF.XIJ: mismatch in the length of record:'
                write(*,*)' ndd =',ndd,' while Nd =',Nd
-               Return
             End If
             j=j+1
             c1=0.d0                           !### c1=(e_x-e_n+W0)<n|X1>
@@ -2250,7 +2263,8 @@ Contains
 
     Subroutine Mxmpy(num,j,x,y)     !# Y2J(j)  = (Elft-H)*x
         Implicit None               !# Y2J(j+1)= (Elft-H)*y (only for num=2)
-        Integer :: j, j1, i8, num, n, k
+        Integer :: j, j1, num, n, k
+        Integer(kind=int64) :: i8
         Real(dp) :: t
         Real(dp), Allocatable, Dimension(:) :: x, y
         j1=j+1
