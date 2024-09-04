@@ -113,10 +113,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         
         # Executables
         if code == 'ci':
-            f.write('${UD_MPIRUN} ' + bin_dir + 'basc \n')
-            f.write('${UD_MPIRUN} ' + bin_dir + 'conf \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'pbasc \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'pconf \n')
         elif code == 'dtm':
-            f.write('${UD_MPIRUN} ' + bin_dir + 'dtm \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'pdtm \n')
         elif code == 'dtm_rpa':
             f.write(bin_dir + 'rpa < rpa.in \n')
             f.write(bin_dir + 'rpa_dtm \n')

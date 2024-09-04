@@ -178,7 +178,7 @@ if __name__ == "__main__":
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                     
-                run_shell('mpirun -n 1 ' + bin_dir + 'dtm')
+                run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
                 write_dtm_in('TM',
                              '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
                              ', '.join(key_list))
@@ -244,7 +244,7 @@ if __name__ == "__main__":
             with open('rpa.in', 'w') as f:
                 f.write('2')
                 
-            run_shell('mpirun -n 1 ' + bin_dir + 'dtm')
+            run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
             
             write_dtm_in('TM',
                          '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
