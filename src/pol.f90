@@ -847,9 +847,6 @@ Contains
         Write(11,strfmt) is,nfin,nini,ind
         Write(*, *) 'Try reconstructing DTM.INT'
         Stop
-        Fint=0.d0
-        Int_err=Int_err+1
-        return
 210     Fint=Rnt(i)*isg
         return
     End Function Fint
