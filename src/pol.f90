@@ -845,6 +845,8 @@ Contains
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
         Write(11,strfmt) is,nfin,nini,ind
+        Write(*, *) 'Try reconstructing DTM.INT'
+        Stop
         Fint=0.d0
         Int_err=Int_err+1
         return
