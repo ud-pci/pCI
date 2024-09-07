@@ -1699,7 +1699,7 @@ Contains
         Use wigner, Only : FJ3, FJ6
         Implicit None
         Integer :: n, i, isk, id, k, kmin, kmax, is
-        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
+        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp, denom
         Real(dp), Dimension(3) :: sk0, sk1, sk2
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
@@ -1783,10 +1783,15 @@ Contains
         end if
 
         If (n.EQ.2 .or. xlamb.EQ.0_dp) Then
-            alp = (ss(1)+ss(2))/2.d0
-            al  = (s(1)+s(2))/2.d0
-            al0 = (s0(1)+s0(2))/2.d0
-            al2 = (s2(1)+s2(2))/2.d0
+            If (xlamb == 0) Then
+                denom = 1.d0
+            Else
+                denom = 2.d0
+            End If
+            alp = (ss(1)+ss(2))/denom
+            al  = (s(1)+s(2))/denom
+            al0 = (s0(1)+s0(2))/denom
+            al2 = (s2(1)+s2(2))/denom
             al1 = (s1(1)-s1(2))
 
             strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
