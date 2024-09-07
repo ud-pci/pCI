@@ -1,0 +1,35 @@
+c #################################################################
+c ######       Parameters which determine dimensions         ######
+c ######     of main arrays in programs conf, basc, etc.     ######
+c #################################################################
+c ###### Note that condition should hold: IPc*IPlv < IP1**2  ######
+c ###### Indexation of orbitals works if         Ns < 168,   ######
+c ###### so there is no need to have IPs>168                 ######
+c ###### Indexation of matrix H_ij works if     IP4 < 64000  ######
+c ###### Approximate expression for memory requirements:     ######
+c ###### Mem = 8*(IP1**2 + (IPlv+3)*IP4) + 12*(IPg+IPgS)     ######
+c #################################################################
+c                Array dimension       Associated variable
+       PARAMETER(IPs   =    600,  !### Ns     - number of orbitals
+     >           IPsp  =9000000,  !### Nsp    - number of shells (>=Ns)
+     >           IPc   =9000000,  !### Nc     - number of config-s
+     >           IPst  =  50000,  !### Nst    = sum_i=1^Ns (2j_i+1)
+     >           IPjd  =     33,  !### Njd    - number of possible J's
+     >           IPx   =    440)  !### Nx     - used for indexation of int-ls
+       PARAMETER(IP1   =   2000,  !### Nd1    - number of determinants for
+                                  !####         direct diagonalization
+     >           IP4   =8990000,  !### Nd4    - number of determinants for
+                                  !####         Davidson diagonalization
+     >           IPh   = 350000,  !### Nhint  - number of one-el. int-ls
+     >           IPg   =130000000,!### Ngint  - number of two-el. int-ls
+     >           IPgS  =6000000,  !### NgintS - number of screened int-ls
+     >           IPlv  =     36)  !### Nlv    - number of levels to show
+                                  !####         (for Davidson variant
+                                  !#####         max(Nlv)= IPlv/3)
+       PARAMETER(IPgnt =   2891,  !### Ngaunt - number of tabulated Gaunts
+     >           IPlx  =      5,  !### max l for tabulation of Gaunts
+     >           IPir  =   1999,  !### Irec   - length of block in CONF.HIJ
+     >           IPad  =      8,  !### number of vectors to be used by ine
+     >           IPPT  = 600000,  !### Nd for 0-order vectors in conf_pt
+     >           IPbr  =      2)  !###  1 - no valence Breit,
+                                  !#### 2 - valence Breit/Gaunt
