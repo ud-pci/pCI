@@ -45,8 +45,9 @@ Program pol
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
-    
-    Integer, Parameter :: IPad = 8 ! number of vectors to be used
+
+    ! Number of probe vectors to be used
+    Integer, Parameter :: IPad = 8
 
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, Method, N_it4
     Integer  :: Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1

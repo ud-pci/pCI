@@ -58,6 +58,8 @@ Program ine
     Implicit None
     
     Integer, Parameter :: IP2 = 50000
+
+    ! Number of probe vectors to be used
     Integer, Parameter :: IPad = 8
 
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
