@@ -11,7 +11,7 @@ Program pol
     !   CONF.JJJ    J**2 in the CI space of vector X1
     !   CONF.XIJ    is used to calculate <n|X1>
     !   DTM.INT     Radial integrals
-    !   INE.XIJ     solution and R.H.S of the inhom. eq.
+    !   POL.XIJ     solution and R.H.S of the inhom. eq.
     !   INE_J.XIJ   decomposition of the solution of the inhom. eq.
     !   CONF0.XIJ   eigenvectors X0 (initial) and X2 (final)
     !   CONF0.DET   determinants in X0/X2 space
@@ -169,10 +169,10 @@ Program pol
         End Do
     End Do
 
-    Close(unit=11) ! Close INE.RES
-    Close(unit=99) ! Close INEFINAL.RES
+    Close(unit=11) ! Close POL.RES
+    Close(unit=99) ! Close POL_E1.RES
     Call stopTimer(start_time, timeStr)
-    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of pol was '// trim(timeStr)
     
 Contains
 
@@ -383,9 +383,9 @@ Contains
         Call recunit
         Call Init_Char(Let,Alet,Blet)
         
-        Open(unit=11,status='UNKNOWN',file='INE.RES')
+        Open(unit=11,status='UNKNOWN',file='POL.RES')
         Close(unit=11,status='DELETE')
-        Open(unit=11,status='NEW',file='INE.RES')
+        Open(unit=11,status='NEW',file='POL.RES')
 
         Open(unit=99,status='UNKNOWN',file='POL_E1.RES')
         Close(unit=99,status='DELETE')
@@ -912,24 +912,24 @@ Contains
         
         elft= E0+W0 ! Equation has the form: (Elft-H)X1=Y1
         If (kl.GE.1) then
-            print*, 'Reading vectors from INE.XIJ...'
+            print*, 'Reading vectors from POL.XIJ...'
             If (sign == 1) Then
                 Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             Else
                 Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             End If
             If (err_stat /= 0) Then
-                print*, 'ERROR: INE.XIJ could not be read'
+                print*, 'ERROR: POL.XIJ could not be read'
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
-                    print*, 'ERROR: vector from INE.XIJ could not be read'
+                    print*, 'ERROR: vector from POL.XIJ could not be read'
                     Continue
                 Else
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
                     If (err.GT.1.d-1) then
-                        strfmt = '(1X," Error in file INE.XIJ, vector X1:", &
+                        strfmt = '(1X," Error in file POL.XIJ, vector X1:", &
                                 /" E0=",2F10.6,"; J0=",2F10.6)'
                         Write( *,strfmt) -e0n,E0,tj0n,Tj0
                         Write(11,strfmt) -e0n,E0,tj0n,Tj0
@@ -938,21 +938,21 @@ Contains
                     If (kl.EQ.2) then
                         Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Nd1,(YY1(i),i=1,Nd1)
                         If (err_stat /= 0) Then
-                            Write(*,*) ' Error in INE.XIJ'
+                            Write(*,*) ' Error in POL.XIJ'
                             Stop
                         Else
                             Write(*,*) ' Y1 read..'
                         End If
                         Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
                         If (err_stat /= 0) Then
-                            Write(*,*) ' Error in INE.XIJ'
+                            Write(*,*) ' Error in POL.XIJ'
                             Stop
                         Else
                             Write(*,*) ' Y2 read..'
                         End If
                         err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
                         If (err.GT.1.d-1) then
-                            strfmt = '(1X," Error in file INE.XIJ, vectors Y1,Y2:", &
+                            strfmt = '(1X," Error in file POL.XIJ, vectors Y1,Y2:", &
                                     /" E0=",2F10.6,"; J0=",2F10.6,/" E2=",2F10.6,"; J2=",2F10.6)'
                             Write( *,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
                             Write(11,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
