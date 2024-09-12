@@ -59,11 +59,8 @@ Program ine
     
     Integer, Parameter :: IP2 = 50000
 
-    ! Number of probe vectors to be used
-    Integer, Parameter :: IPad = 8
-
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1, IPad
     Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
     
@@ -140,8 +137,8 @@ Program ine
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
                 End If
                 Select Case(kIters)
                     Case(0)
@@ -371,6 +368,7 @@ Contains
 
         Call ReadConfInp
         Crit1=crt4
+        IPad=3+Nlv ! set number of probe vectors to be 3 + number of levels in CONF.XIJ
         Call ReadConfigurations
         Return
     End Subroutine Input
