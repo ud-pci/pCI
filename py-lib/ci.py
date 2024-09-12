@@ -1,4 +1,4 @@
-""" Add
+""" CI
 
 This script allows the user to automate the configuration list construction from inputted parameters in a "config.yml" file. 
 The "config.yml" file should have the following blocks:
