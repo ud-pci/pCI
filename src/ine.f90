@@ -101,12 +101,6 @@ Program ine
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
-    If (W0 == 0.d0 .or. Kli == 5) Then
-        icyc=1
-    Else
-        icyc=2
-    End If
-    
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -124,7 +118,13 @@ Program ine
         print*,'nlamb=',nlamb
         xlamb=xlamb1
         Do n=1,nlamb
-            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            If (dabs(xlamb) > 1.d-8) Then
+                W0 = 1.d+7/(xlamb*219474.63d0)
+                icyc = 2
+            Else
+                W0 = 0.d0
+                icyc = 1
+            End If
             print*, 'xlamb=',xlamb
             Do i=1,icyc
                 Ndir=Nddir
@@ -140,8 +140,8 @@ Program ine
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
                 End If
                 Select Case(kIters)
                     Case(0)
@@ -355,15 +355,6 @@ Contains
                 Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
                 Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
             End Do
-            
-            xlamb1 = xlamb1s(1)
-            xlamb2 = xlamb2s(1)
-            xlambstep = xlambsteps(1)
-            If (dabs(xlamb1).GT.1.d-8) Then
-              W0 = 1.d+7/(xlamb1*219474.63d0)
-            Else
-              Write(*,'(A)')' W0 = 0'
-            End If
         End If
 
         If (Kli.EQ.5 .AND. W0.EQ.0.d0) Then

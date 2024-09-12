@@ -88,12 +88,6 @@ Program pol
     Call Init0          ! Read vectors
     Call Vector(kl)     ! Evaluation of the RHS of the equation and vectors Yi
 
-    If (W0 == 0.d0) Then
-        icyc=1
-    Else
-        icyc=2
-    End If
-
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -110,7 +104,13 @@ Program pol
 
         xlamb=xlamb1
         Do n=1,nlamb
-            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            If (dabs(xlamb) > 1.d-8) Then
+                W0 = 1.d+7/(xlamb*219474.63d0)
+                icyc = 2
+            Else
+                W0 = 0.d0
+                icyc = 1
+            End If
             Do i=1,icyc
                 Ndir=Nddir
                 If (i.EQ.2) W0= -W0
@@ -119,8 +119,8 @@ Program pol
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,22("-")/)')
                 End If
                 Select Case(Method)
                     Case(0)
@@ -393,16 +393,6 @@ Contains
         Open(unit=99,status='NEW',file='POL_E1.RES')
 
         Call ReadPolIn
-
-        xlamb1 = xlamb1s(1)
-        xlamb2 = xlamb2s(1)
-        xlambstep = xlambsteps(1)
-        If (dabs(xlamb1).GT.1.d-8) Then
-            W0 = 1.d+7/(xlamb1*219474.63d0)
-        Else
-            W0= 0.d0
-            Write(*,'(A)')' W0 = 0'
-        End If
 
         strfmt = '(1X,70("-"),/1X,"Program pol v1.0")'
         Write( 6,strfmt) 
