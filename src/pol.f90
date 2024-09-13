@@ -139,7 +139,7 @@ Program pol
                         N_it = 2
                         Do l=1,N_it4
                             print*, '   2-step ITERATION #', l
-                            If (l > 1) kl = 2
+                            If (l > 1) kl = 1
                             Call SolEq1(kl,i) ! Direct solution
                             If (Ndir.LT.Nd) Then
                                 Call SolEq4(ok,i) ! Iterative solution
@@ -297,8 +297,7 @@ Contains
                 Select Case(key)
                 Case('Mode')
                     ! Kl = 0 - start a new calculation
-                    ! Kl = 1 - use old vectors X1
-                    ! Kl = 2 - use old vectors X1, Y1, Y2
+                    ! Kl = 1 - continue an old calculation
                     Read(val, *) Kl
                 Case('Method')
                     ! Method = 0 - invert the matrix and iterate if diverged
@@ -334,9 +333,7 @@ Contains
         Case(0)
             Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Starting new calculation..'
         Case(1)
-            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1..'
-        Case(2)
-            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1, Y1, Y2..'
+            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Continuing an old calculation'
         Case Default
             Write(*, '(A)') 'This value of Kl is not valid. Defaulting to Kl = 0 (starting new calculation).'
         End Select  
@@ -706,7 +703,7 @@ Contains
         If (.not. Allocated(iconf2)) Allocate(iconf2(Ne))
 
         strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1)'
-        If (kl.NE.2) Write( 6,strfmt) trd
+        If (kl == 0) Write( 6,strfmt) trd
         YY1(:)=0.d0
         YY2(:)=0.d0
         negl=0              !### number of vector components below threshold
@@ -720,7 +717,7 @@ Contains
                 Call DefJz2(idet0)
                 Q=Jm-Jm0
                 mdel=dabs(Q)+1.d-5
-                If (kl.EQ.2) return
+                If (Kl == 1) Return
             End If
             If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
                 nskip=0             !### dets in skipped confs
@@ -893,71 +890,66 @@ Contains
         If (.not. Allocated(scales)) Allocate(scales(IP1))
         If (.not. Allocated(Mps)) Allocate(Mps(IP1))
         If (.not. Allocated(ipiv)) Allocate(ipiv(IP1))
-        If (kl > 0) Then
-            If (.not. Allocated(X1)) Allocate(X1(Nd))
-            If (.not. Allocated(YY1)) Allocate(YY1(Nd))
-            If (.not. Allocated(YY2)) Allocate(YY2(Nd))
-        End If
+        If (.not. Allocated(X1)) Allocate(X1(Nd))
+        If (.not. Allocated(YY1)) Allocate(YY1(Nd))
+        If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         
         elft= E0+W0 ! Equation has the form: (Elft-H)X1=Y1
-        If (kl.GE.1) then
-            print*, 'Reading vectors from POL.XIJ...'
+        If (kl == 1) then
             If (sign == 1) Then
-                Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+                Write(*,*) 'Reading vectors from POL_p.XIJ...'
+                Open (unit=16,file='POL_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             Else
-                Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+                Write(*,*) 'Reading vectors from POL_m.XIJ...'
+                Open (unit=16,file='POL_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             End If
             If (err_stat /= 0) Then
-                print*, 'ERROR: POL.XIJ could not be read'
+                If (sign == 1) Then
+                    Write(*,*) 'ERROR: POL_p.XIJ could not be read'
+                Else
+                    Write(*,*) 'ERROR: POL_m.XIJ could not be read'
+                End If
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
-                    print*, 'ERROR: vector from POL.XIJ could not be read'
+                    If (sign == 1) Then
+                        Write(*,*) 'ERROR: vectors from POL_p.XIJ could not be read'
+                    Else
+                        Write(*,*) 'ERROR: vectors from POL_m.XIJ could not be read'
+                    End If
                     Continue
                 Else
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
                     If (err.GT.1.d-1) then
-                        strfmt = '(1X," Error in file POL.XIJ, vector X1:", &
-                                /" E0=",2F10.6,"; J0=",2F10.6)'
+                        If (sign == 1) Then
+                            strfmt = '(1X," Error in file POL_p.XIJ, vector X1:",/" E0=",2F10.6,"; J0=",2F10.6)'
+                        Else
+                            strfmt = '(1X," Error in file POL_m.XIJ, vector X1:",/" E0=",2F10.6,"; J0=",2F10.6)'
+                        End If
                         Write( *,strfmt) -e0n,E0,tj0n,Tj0
                         Write(11,strfmt) -e0n,E0,tj0n,Tj0
                         Stop
                     End If
-                    If (kl.EQ.2) then
-                        Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Nd1,(YY1(i),i=1,Nd1)
-                        If (err_stat /= 0) Then
-                            Write(*,*) ' Error in POL.XIJ'
-                            Stop
+                    Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Nd1,(YY1(i),i=1,Nd1)
+                    If (err_stat /= 0) Then
+                        If (sign == 1) Then
+                            Write(*,*) ' Error in POL_p.XIJ'
                         Else
-                            Write(*,*) ' Y1 read..'
+                            Write(*,*) ' Error in POL_m.XIJ'
                         End If
-                        Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
-                        If (err_stat /= 0) Then
-                            Write(*,*) ' Error in POL.XIJ'
-                            Stop
-                        Else
-                            Write(*,*) ' Y2 read..'
-                        End If
-                        err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
-                        If (err.GT.1.d-1) then
-                            strfmt = '(1X," Error in file POL.XIJ, vectors Y1,Y2:", &
-                                    /" E0=",2F10.6,"; J0=",2F10.6,/" E2=",2F10.6,"; J2=",2F10.6)'
-                            Write( *,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
-                            Write(11,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
-                            Stop
-                        End If
+                        Stop
                     Else
-                        Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
-                        Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
+                        Write(*,*) ' Y1 read..'
                     End If
+                    YY2 = YY1
                     Close(16)
                     If (sign == 1) Then
-                        Write( *,*)'  SolEq1: solution is taken from INE_p.XIJ'
-                        Write(11,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                        Write( *,*)'  SolEq1: solution is taken from POL_p.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from POL_p.XIJ'
                     Else
-                        Write( *,*)'  SolEq1: solution is taken from INE_m.XIJ'
-                        Write(11,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                        Write( *,*)'  SolEq1: solution is taken from POL_m.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from POL_m.XIJ'
                     End If
                     Return
                 End If
@@ -1048,9 +1040,9 @@ Contains
         Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
         
         If (sign == 1) Then
-            Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Open(unit=16,file='POL_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
         Else
-            Open(unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Open(unit=16,file='POL_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
         End If
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
@@ -1194,9 +1186,9 @@ Contains
             write(11,strfmt) (Vl(k),k=1,num)
     
             If (sign == 1) Then
-                open (unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+                open (unit=16,file='POL_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
             Else
-                open (unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+                open (unit=16,file='POL_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
             End If 
             write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
             write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
@@ -1208,9 +1200,9 @@ Contains
 
         If (.not. ok) str = ' DIVERGED'
         If (sign == 1) Then
-            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_p.XIJ",/3X,63("="))'
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to POL_p.XIJ",/3X,63("="))'
         Else
-            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_m.XIJ",/3X,63("="))'
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to POL_m.XIJ",/3X,63("="))'
         End If
         
  200    write( 6,strfmt) str,Nd
