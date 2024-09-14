@@ -1,5 +1,5 @@
 # Specify install directory
-PREFIX=../bin
+PREFIX=../../bin
 
 # Specify include directory
 INCLUDE=../include
