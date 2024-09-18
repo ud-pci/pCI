@@ -954,13 +954,13 @@ def run_ao_executables(K_is, C_is, bin_dir):
     if kbrt == 0:
         run_shell(bin_dir + 'tdhf < bas_wj.in > tdhf.out')
         print("tdhf complete")
-        run_shell(bin_dir + 'nspl40 < spl.in > nspl40.out')
-        print("nspl40 complete")
+        run_shell(bin_dir + 'nspl < spl.in > nspl.out')
+        print("nspl complete")
     else:
         run_shell(bin_dir + 'bdhf < bas_wj.in > bdhf.out')
         print("bdhf complete")
-        run_shell(bin_dir + 'bspl40 < spl.in > bspl40.out')
-        print("bspl40 complete")
+        run_shell(bin_dir + 'bspl < spl.in > bspl.out')
+        print("bspl complete")
 
     with open('bwj.in','w') as f: 
         f.write(str(basis_lmax) + '\n')
@@ -1180,7 +1180,7 @@ if __name__ == "__main__":
                             os.chdir(dir_name)
                             run_shell('pwd')
                             run_ao_executables(K_is, c, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'large-mem', pci_version, bin_dir)
                             run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                         if K_is_dict[K_is]:
@@ -1195,7 +1195,7 @@ if __name__ == "__main__":
                             os.chdir(method+'/basis')
                             run_shell('pwd')
                             run_ao_executables(0, 0, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
+                            script_name = write_job_script('.', method, 1, 1, True, 0, 'large-mem', pci_version, bin_dir)
                             run_shell('sbatch ' + script_name)
                             os.chdir('../../')
                     else:
@@ -1204,7 +1204,7 @@ if __name__ == "__main__":
                         os.chdir('basis')
                         run_shell('pwd')
                         run_ao_executables(0, 0, bin_dir)
-                        script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
+                        script_name = write_job_script('.', code_method, 1, 1, True, 0, 'large-mem', pci_version)
                         run_shell('sbatch ' + script_name)
                         os.chdir('../')
             
