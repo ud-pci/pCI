@@ -120,7 +120,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         elif code == 'dtm_rpa':
             f.write(bin_dir + 'rpa < rpa.in \n')
             f.write(bin_dir + 'rpa_dtm \n')
-            f.write('${UD_MPIRUN} ' + bin_dir + 'dtm \n')
+            f.write('${UD_MPIRUN} ' + bin_dir + 'pdtm \n')
         elif code == 'all-order' or code == 'ci+all-order':
             f.write('time allcore-rle-ci <inf.aov >out.core \n')
             f.write('time valsd-rle-cis <inf.aov >out.val \n')
