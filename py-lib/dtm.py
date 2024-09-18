@@ -90,8 +90,8 @@ def write_dtm_in(mode, levels, operators):
     """ Write dtm.in """
     with open('dtm.in','w') as f:
         f.write('Mode = ' + mode + '\n')
-        f.write('Lvls = ' + levels + '\n')
-        f.write('Ops = ' + operators)
+        f.write('Levels = ' + levels + '\n')
+        f.write('Operators = ' + operators)
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                              ', '.join(key_list))
             else:
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                              ', '.join(key_list))
 
             run_shell('mv dtm.in dtm/dtm.in')
@@ -180,7 +180,7 @@ if __name__ == "__main__":
                     
                 run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                              ', '.join(key_list))
                 
                 if on_hpc: 
@@ -200,7 +200,7 @@ if __name__ == "__main__":
                          ', '.join(key_list))
         else:
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                          ', '.join(key_list))
 
         run_shell('mv dtm.in dtm/dtm.in')
@@ -247,7 +247,7 @@ if __name__ == "__main__":
             run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
             
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                          ', '.join(key_list))
             
             if on_hpc:
