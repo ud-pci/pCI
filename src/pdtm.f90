@@ -617,6 +617,13 @@ Contains
             Write(*,*)' Parameter IPx is too small for Nsu=',Nsu
             Stop
         End If
+
+        ! Delete old DTM.INT if Mode = Init
+        If (Kl1 == 3) Then
+            Open(13,file='DTM.INT',status='UNKNOWN',form='UNFORMATTED')
+            Close(13,status='DELETE')
+        End If
+
         Open (13,file='DTM.INT',status='OLD',form='UNFORMATTED',err=200)
         Read (13,End=200,err=200) ns1,nso1,z1,rn1,km1
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1)+dabs(z1-Z)+dabs(rn1-Rnuc)
