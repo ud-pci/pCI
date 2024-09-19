@@ -9,6 +9,7 @@
       PARAMETER (NXX1=30,NK1=15,IPX=400,NSIG=423000000)
 *     parameters for the all-order merge
       PARAMETER (NZ=100,NVWH=140000)
+      PARAMETER (IPmr=1)
 ***********************************************************************
 *     LINE 1                                                          *
 *                                                                     *
