@@ -53,7 +53,7 @@
       implicit real*8 (a-h,o-z)
       character*2 lab1,lab2,lab3,lab4
       character*3 key_inv
-      include "second-cis.par"
+      include "second.par"
       DIMENSION t(nkx)
       COMMON /radial/ r(nhf),rp(nhf),rpor(nhf),h,max
       COMMON /ldata/ nmax,lmax,nmax1,lmax1
@@ -292,7 +292,7 @@ c      write(6,1093) dT
 
       subroutine merge_sigma1(max_orb)
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxx/nmaxx(nx)
 ******** ALL_ORDER **********************************
       COMMON /val_all/ nv_all(nz),kv_all(nz),nval_all
@@ -351,7 +351,7 @@ c      write (*,*)
 
       subroutine read_allorder(key_en)
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxx/nmaxx(nx)
       COMMON /s2_all/ ipvw(nz,nz,nk,nk,0:kk),xvw(nxx,nxx,0:NVWH),ich_all
       COMMON /val_all/ nv_all(nz),kv_all(nz),nval_all
@@ -420,7 +420,7 @@ c      write (*,*)
 
       subroutine orb(max_orb,lvmax1)
       implicit real*8 (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /bassinp/ nor(nsorb),kor(nsorb),norb
       common /nmaxxv/ nmaxxv(nx),lvmax
       lvmax=lvmax1
@@ -460,7 +460,7 @@ c      stop
 
       subroutine bass_inp
       implicit real*8 (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       character*1 nsign
       character*2 line
       character*7 a
@@ -516,7 +516,7 @@ C     =================================================
       subroutine init_hfd
       implicit real*8 (a-h,o-z)
       include "hfd.par"  !### check directory for hfd.par!
-      include "second-cis.par"
+      include "second.par"
        common /bassinp/ nor(nsorb),kor(nsorb),norb
        dimension P(IP6),Q(IP6),P1(IP6),Q1(IP6),PQ(4*IP6)
        logical longbasis
@@ -588,7 +588,7 @@ c<<<mgk
 
       subroutine write_out(max_orb,lvmax,key_en,nav1)
       implicit real*8 (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /sigma1st/ sigma1(nxx1,nxx1,nk1),sigmad(nxx1,nxx1,nk1)
       common /bassinp/ nor(nsorb),kor(nsorb),norb
       COMMON /core/ go(nhf,ns),fo(nhf,ns),eo(ns),no(ns),ko(ns),ncore
@@ -675,7 +675,7 @@ c<<<mgk
 *****************************************************************************************
       subroutine xmnab
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxxv/ nmaxxv(nx),lvmax
       COMMON /radmxab/ ip1(nk,nk,nn,nn,0:kk),x1(nxx,nxx,0:nch1),ichan1
       DIMENSION gb(nhf),fb(nhf),ga(nhf),fa(nhf),gc(nhf),fc(nhf)
@@ -794,7 +794,7 @@ c   write (*,'(4e12.2)') ga(100),gg(100,m,indm),rp(100),uy(100,nx5)
 *****************************************************************************************
       subroutine xmnra
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxxv/ nmaxxv(nx),lvmax
       COMMON /radmnxa/ ip2(nk,nk,nk,nn,0:kk),
      * x2(nxx,nxx,nxx,0:nch2),ichan2
@@ -921,7 +921,7 @@ c   write (*,'(4e12.2)') ga(100),gg(100,m,indm),rp(100),uy(100,nx5)
 *****************************************************************************************
       subroutine count_xmnab
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxxv/ nmaxxv(nx),lvmax
       common /spl/ gg(nhf,nx,kx1),ff(nhf,nx,kx1),ee(nx,kx1)
       COMMON /ldata/ nmax,lmax,nmax1,lmax1
@@ -1001,7 +1001,7 @@ c   write (*,'(4e12.2)') ga(100),gg(100,m,indm),rp(100),uy(100,nx5)
 *****************************************************************************************
       subroutine count_xmnra
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxxv/ nmaxxv(nx),lvmax
       common /spl/ gg(nhf,nx,kx1),ff(nhf,nx,kx1),ee(nx,kx1)
       COMMON /ldata/ nmax,lmax,nmax1,lmax1
@@ -1077,7 +1077,7 @@ c   write (*,'(4e12.2)') ga(100),gg(100,m,indm),rp(100),uy(100,nx5)
 *****************************************************************************************
       subroutine term1_s1(key_en)
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /sigma1st/ sigma1(nxx1,nxx1,nk1),sigmad(nxx1,nxx1,nk1)
       common /nmaxxv/ nmaxxv(nx),lvmax
       COMMON /radmxab/ ip1(nk,nk,nn,nn,0:kk),x1(nxx,nxx,0:nch1),ichan1
@@ -1224,7 +1224,7 @@ c            write (*,'(4e12.3)') c,del,x1(m,ny,index1),x1(m,nx5,index2)
 *****************************************************************************************
       subroutine term2_s1(key_en,key_k)
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       COMMON /radmnxa/ ip2(nk,nk,nk,nn,0:kk),
      * x2(nxx,nxx,nxx,0:nch2),ichan2
       common /sigma1st/ sigma1(nxx1,nxx1,nk1),sigmad(nxx1,nxx1,nk1)
@@ -1393,7 +1393,7 @@ c      integer*2 inv,inm,inw,inn,ink
 ************** NOTE : CHANGE LATER ***********************
       real*4 sigma2,der,energy
 ***********************************************************
-      include "second-cis.par"
+      include "second.par"
 c      dimension inv(NSIG),inm(NSIG),inw(NSIG),inn(NSIG),ink(NSIG)
       dimension sigma2(NSIG),der(NSIG),energy(NSIG)
       DIMENSION iint2(NSIG),iint3(NSIG)
@@ -2254,7 +2254,7 @@ c      write (20) (inv(i),inw(i),inm(i),inn(i),ink(i),i=1,igint)
 
       subroutine count_sigma2code(max_orb,key4,nav,kvmax)
       implicit double precision (a-h,o-z)
-      include "second-cis.par"
+      include "second.par"
       common /nmaxx/nmaxx(nx)
       COMMON /ldata/ nmax,lmax,nmax1,lmax1
       common /nmaxxv/ nmaxxv(nx),lvmax
