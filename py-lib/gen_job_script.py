@@ -122,12 +122,12 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write(bin_dir + 'rpa_dtm \n')
             f.write('${UD_MPIRUN} ' + bin_dir + 'pdtm \n')
         elif code == 'all-order' or code == 'ci+all-order':
-            f.write('time allcore-rle-ci <inf.aov >out.core \n')
-            f.write('time valsd-rle-cis <inf.aov >out.val \n')
-            f.write('time sdvw-rle-cis <inf.aov >out.vw \n')
-            f.write('time second-cis <inf.vw >out.second.vw \n')
+            f.write(bin_dir + 'allcore-ci <inf.aov >out.core \n')
+            f.write(bin_dir + 'valsd-ci <inf.aov >out.val \n')
+            f.write(bin_dir + 'sdvw-ci <inf.aov >out.vw \n')
+            f.write(bin_dir + 'second-ci <inf.vw >out.second.vw \n')
         elif code == 'second-order' or code == 'ci+second-order':
-            f.write('time second-cis <inf.vw >out.second.vw \n')
+            f.write(bin_dir + 'second-ci <inf.vw >out.second.vw \n')
         else:
             print(code + ' is not supported')
             sys.exit()
