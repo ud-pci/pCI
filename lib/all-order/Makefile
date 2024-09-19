@@ -14,7 +14,7 @@ FC=ifort
 FFLAGS=-O -r8
 
 # Specify executables
-TARGET=nspl bspl tdhf bdhf bas_wj bas_x allcore-cis sdvw-cis valsd-cis second-cis
+TARGET=nspl bspl tdhf bdhf bas_wj bas_x allcore-ci sdvw-ci valsd-ci second-ci
  
 all: $(TARGET)
 
@@ -36,17 +36,17 @@ bas_wj: ./bas_wj.for
 bas_x: ./bas_x.for
 		$(FC) $(FFLAGS) $(INCLUDE) $(INCLUDE_CI) -o bas_x ./bas_x.for
 
-allcore-cis: ./allcore-cis.f
-		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o allcore-cis ./allcore-cis.f
+allcore-ci: ./allcore-ci.f
+		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o allcore-ci ./allcore-ci.f
 
-sdvw-cis: ./sdvw-cis.f
-		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o sdvw-cis ./sdvw-cis.f
+sdvw-ci: ./sdvw-ci.f
+		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o sdvw-ci ./sdvw-ci.f
 
-valsd-cis: ./valsd-cis.f
-		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o valsd-cis ./valsd-cis.f
+valsd-ci: ./valsd-ci.f
+		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o valsd-ci ./valsd-ci.f
 
-second-cis: ./second-cis.f
-		$(FC) $(FFLAGS) $(INCLUDE) $(INCLUDE_CI) -mcmodel=large -o second-cis ./second-cis.f
+second-ci: ./second-ci.f
+		$(FC) $(FFLAGS) $(INCLUDE) $(INCLUDE_CI) -mcmodel=large -o second-ci ./second-ci.f
 
 install: all
 	install -d $(PREFIX)
