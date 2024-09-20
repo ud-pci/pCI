@@ -875,12 +875,16 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
 
-    # Find HFD.INP files
+    # Remove old HFD.INP
+    if os.path.isfile('HFD.INP'):
+        run_shell('rm HFD.INP')
     file_list = os.listdir(".")
     hfd_list = []
     for file in file_list:
         if file[:3] == 'HFD' and file[-3:] == 'INP':
             hfd_list.append(file)
+    
+    hfd_list.sort()
             
     # Run hfd for HFD.INP files
     print('Found the following HFD.INP files:', ', '.join(hfd_list))
