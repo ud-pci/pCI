@@ -730,22 +730,23 @@ Contains
             print*, 'vector YY2 read from INE.YY2'
         End If
 
+        ! Define projection of Jz for Iarr2(:,1) corresponding to CONF0.DET
+        idet0(1:Ne)=Iarr2(1:Ne,1)
+        Call DefJz2(idet0)
+        Q=Jm-Jm0
+        mdel=dabs(Q)+1.d-5
+        If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
+            Write(*,*) 'Vector: |M-M0| is not zero!'
+            Write(*,*)' M=',Jm,'  M0=',Jm0
+            Stop
+        End If
+        If (kl.EQ.2) return
+
         if ((.not. yy1_read) .and. (.not. yy2_read)) then
             Do n=1,Nd0
                 xn0=X0(n)
                 xn2=X2(n)
                 idet0(1:Ne)=Iarr2(1:Ne,n)
-                If (n.EQ.1) Then
-                    Call DefJz2(idet0)
-                    Q=Jm-Jm0
-                    mdel=dabs(Q)+1.d-5
-                    If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
-                        Write(*,*) 'Vector: |M-M0| is not zero!'
-                        Write(*,*)' M=',Jm,'  M0=',Jm0
-                        Stop
-                    End If
-                    If (kl.EQ.2) return
-                End If
                 If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
                     nskip=0             !### dets in skipped confs
                     k=0
