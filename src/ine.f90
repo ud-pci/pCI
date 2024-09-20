@@ -66,8 +66,8 @@ Program ine
     
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin, dlamb
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
-    Integer, Allocatable, Dimension(:) :: Int
-    Integer, Allocatable, Dimension(:,:) :: Iarr2
+    Integer, Allocatable, Dimension(:) :: Inte
+    Integer, Allocatable, Dimension(:,:) :: Iarr0
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
@@ -556,14 +556,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x.LT.1.d-6) Then
             Read(13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint),Int(Nint))
+            Allocate(Rnt(Nint),Inte(Nint))
             is=0
             Do i=1,Nsu
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is.EQ.0) Then
                 Read(13) (ki(i),i=1,13)
-                Read(13) (Rnt(i),Int(i),i=1,Nint)
+                Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
@@ -686,9 +686,9 @@ Contains
             Stop
         End If
         Read(17) Nd0, nsu1
-        If (.not. allocated(Iarr2)) Allocate(Iarr2(Ne,Nd0))
+        If (.not. allocated(Iarr0)) Allocate(Iarr0(Ne,Nd0))
         Do i=1,Nd0
-           Read(17) Iarr2(1:Ne,i)
+           Read(17) Iarr0(1:Ne,i)
         End Do
         Close(17)
 
@@ -730,8 +730,8 @@ Contains
             print*, 'vector YY2 read from INE.YY2'
         End If
 
-        ! Define projection of Jz for Iarr2(:,1) corresponding to CONF0.DET
-        idet0(1:Ne)=Iarr2(1:Ne,1)
+        ! Define projection of Jz for Iarr0(:,1) corresponding to CONF0.DET
+        idet0(1:Ne)=Iarr0(1:Ne,1)
         Call DefJz2(idet0)
         Q=Jm-Jm0
         mdel=dabs(Q)+1.d-5
@@ -746,7 +746,7 @@ Contains
             Do n=1,Nd0
                 xn0=X0(n)
                 xn2=X2(n)
-                idet0(1:Ne)=Iarr2(1:Ne,n)
+                idet0(1:Ne)=Iarr0(1:Ne,n)
                 If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
                     nskip=0             !### dets in skipped confs
                     k=0
@@ -790,6 +790,9 @@ Contains
                 End If
             End Do
         end if
+        print*,'Nd0=',Nd0,'Nd=',Nd
+        print*, 'a',YY1(1:10), YY2(1:10)
+        print*, 'c',YY1(Nd-10:Nd), YY2(Nd-10:Nd)
 
         If (Kli.EQ.5 .AND. Nd0.EQ.Nd) Then
             s1= 0.d0
@@ -912,7 +915,7 @@ Contains
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
         Do i=1,Nint
-            If (ind.EQ.Int(i)) goto 210
+            If (ind.EQ.Inte(i)) goto 210
         End Do
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
@@ -1090,7 +1093,7 @@ Contains
         Call FormattedTime(ttime, timeStr)
         Write(*,'(2X,A)'), 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
         
-        strfmt = '(3X," NumH =",I10,";  Hmin =",F12.6/)'
+        strfmt = '(3X," NumH =",I12,";  Hmin =",F12.6/)'
         Write(*,strfmt) NumH,Hmin
 
         If (.not. Allocated(Zc)) Allocate(Zc(Ntr*Ntr))

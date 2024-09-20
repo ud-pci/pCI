@@ -53,7 +53,8 @@ Program pol
     
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, Crit1, W0, Q, Elft, Hmin, dlamb
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps
-    Integer, Allocatable, Dimension(:) :: Int
+    Integer, Allocatable, Dimension(:) :: Inte
+    Integer, Allocatable, Dimension(:,:) :: Iarr0
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
@@ -572,14 +573,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x.LT.1.d-6) Then
             Read(13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint),Int(Nint))
+            Allocate(Rnt(Nint),Inte(Nint))
             is=0
             Do i=1,Nsu
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is.EQ.0) Then
                 Read(13) (ki(i),i=1,13)
-                Read(13) (Rnt(i),Int(i),i=1,Nint)
+                Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
@@ -679,7 +680,7 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         Use determinants, Only : Gdet, Rspq, CompC
         Implicit None
-        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat
+        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat, nsu1
         Integer :: mdel, nskip, k1, nf
         Integer, Allocatable, Dimension(:) :: idet0, idet1
         Real(dp) :: trd, xn0, xn2
@@ -693,7 +694,12 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Read(17) Nd0
+        Read(17) Nd0, nsu1
+        If (.not. allocated(Iarr0)) Allocate(Iarr0(Ne,Nd0))
+        Do i=1,Nd0
+           Read(17) Iarr0(1:Ne,i)
+        End Do
+        Close(17)
 
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
@@ -712,7 +718,7 @@ Contains
         Do n=1,Nd0
             xn0=X0(n)
             xn2=X2(n)
-            Read(17) (idet0(i),i=1,Ne)
+            idet0(1:Ne)=Iarr0(1:Ne,n)
             If (n.EQ.1) Then
                 Call DefJz2(idet0)
                 Q=Jm-Jm0
@@ -726,7 +732,7 @@ Contains
                     kx=Ndc(ic)
                     Call Gdet(k+1,idet1)
                     Call CompC(idet0,idet1,icomp)
-                    If (icomp.GT.1 .OR. Jdel.GT.idIf) Then
+                    If (icomp.GT.1 .OR. Jdel.GT.idif) Then
                         k=k+kx
                         nskip=nskip+kx
                     Else
@@ -826,7 +832,7 @@ Contains
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
         Do i=1,Nint
-            If (ind.EQ.Int(i)) goto 210
+            If (ind.EQ.Inte(i)) goto 210
         End Do
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
