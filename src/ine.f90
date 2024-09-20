@@ -790,9 +790,6 @@ Contains
                 End If
             End Do
         end if
-        print*,'Nd0=',Nd0,'Nd=',Nd
-        print*, 'a',YY1(1:10), YY2(1:10)
-        print*, 'c',YY1(Nd-10:Nd), YY2(Nd-10:Nd)
 
         If (Kli.EQ.5 .AND. Nd0.EQ.Nd) Then
             s1= 0.d0
