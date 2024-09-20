@@ -67,6 +67,7 @@ Program ine
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin, dlamb
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
     Integer, Allocatable, Dimension(:) :: Int
+    Integer, Allocatable, Dimension(:,:) :: Iarr2
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
@@ -667,13 +668,14 @@ Contains
     Subroutine Vector(kl)   
         ! Read RHS vector |Y1>=A|X0> and LHS vector <Y2|=<X2|B,
         Use conf_variables, Only : iconf1, iconf2
-        Use determinants, Only : Gdet, Rspq, CompC
+        Use determinants, Only : Gdet, Rspq, CompCD, Rdet
         Implicit None
-        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat
+        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat, nsu1
         Integer :: mdel, nskip, k1, nf, iq
         Integer, Allocatable, Dimension(:) :: idet0, idet1
         Real(dp) :: trd, xn0, xn2, s1, s2
         Character(Len=256) :: strfmt, err_msg
+        logical :: yy1_read, yy2_read
 
         trd=1.d-10                  !### used to drop small contributions
         Open (unit=17,file='CONF0.DET',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
@@ -683,7 +685,12 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Read(17) Nd0
+        Read(17) Nd0, nsu1
+        If (.not. allocated(Iarr2)) Allocate(Iarr2(Ne,Nd0))
+        Do i=1,Nd0
+           Read(17) Iarr2(1:Ne,i)
+        End Do
+        Close(17)
 
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
@@ -699,63 +706,89 @@ Contains
         negl=0              !### number of vector components below threshold
         idif= 1
         If (Kli.EQ.5) idif= 2
-        Do n=1,Nd0
-            xn0=X0(n)
-            xn2=X2(n)
-            Read(17) (idet0(i),i=1,Ne)
-            If (n.EQ.1) Then
-                Call DefJz2(idet0)
-                Q=Jm-Jm0
-                mdel=dabs(Q)+1.d-5
-                If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
-                    Write(*,*) 'Vector: |M-M0| is not zero!'
-                    Write(*,*)' M=',Jm,'  M0=',Jm0
-                    Stop
-                End If
-                If (kl.EQ.2) return
-            End If
-            If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
-                nskip=0             !### dets in skipped confs
-                k=0
-                Do ic=1,Nc
-                    kx=Ndc(ic)
-                    Call Gdet(k+1,idet1)
-                    Call CompC(idet0,idet1,icomp)
-                    If (icomp.GT.1 .OR. Jdel.GT.idIf) Then
-                        k=k+kx
-                        nskip=nskip+kx
-                    Else
-                        Do k1=1,kx
-                            k=k+1
-                            Call Gdet(k,idet1)
-                            Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
-                            If (nf.EQ.1) Then
-                                If (dabs(xn0).GT.trd) Then
-                                    YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
-                                End If
-                                If (dabs(xn2).GT.trd) Then
-                                    YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
-                                End If
-                            End If
-                
-                            If (Kli.EQ.5 .AND. nf.EQ.0) Then
-                                Do iq=1,Ne
-                                    i1=idet1(iq)
-                                    If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
-                                    If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
-                                End Do
-                            End If
-                        End Do
+
+        ! Read vectors from files INE.YY1 and INE.YY2 if they exist
+        yy1_read = .false.
+        Open(33,file='INE.YY1',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY1(1:Nd)
+            Close(33)
+            yy1_read = .true.
+            print*, 'vector YY1 read from INE.YY1'
+        End If
+
+        yy2_read = .false.
+        Open(33,file='INE.YY2',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY2(1:Nd)
+            Close(33)
+            yy2_read = .true.
+            print*, 'vector YY2 read from INE.YY2'
+        End If
+
+        if ((.not. yy1_read) .and. (.not. yy2_read)) then
+            Do n=1,Nd0
+                xn0=X0(n)
+                xn2=X2(n)
+                idet0(1:Ne)=Iarr2(1:Ne,n)
+                If (n.EQ.1) Then
+                    Call DefJz2(idet0)
+                    Q=Jm-Jm0
+                    mdel=dabs(Q)+1.d-5
+                    If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
+                        Write(*,*) 'Vector: |M-M0| is not zero!'
+                        Write(*,*)' M=',Jm,'  M0=',Jm0
+                        Stop
                     End If
-                End Do
-            Else
-                negl=negl+1
-            End If
-            If (1000*(n/1000).EQ.n) Then
-                 strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
-                 Write(*,strfmt) n,Nd0,negl,nskip
-            End If
-        End Do
+                    If (kl.EQ.2) return
+                End If
+                If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
+                    nskip=0             !### dets in skipped confs
+                    k=0
+                    Do ic=1,Nc
+                        kx=Ndc(ic)
+                        Call Gdet(k+1,idet1)
+                        Call CompCD(idet0,idet1,icomp)
+                        If (icomp.GT.1 .OR. Jdel.GT.idif) Then
+                            k=k+kx
+                            nskip=nskip+kx
+                        Else
+                            Do k1=1,kx
+                                k=k+1
+                                Call Gdet(k,idet1)
+                                Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
+                                If (nf.EQ.1) Then
+                                    If (dabs(xn0).GT.trd) Then
+                                        YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
+                                    End If
+                                    If (dabs(xn2).GT.trd) Then
+                                        YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
+                                    End If
+                                End If
+                            
+                                If (Kli.EQ.5 .AND. nf.EQ.0) Then
+                                    Do iq=1,Ne
+                                        i1=idet1(iq)
+                                        If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
+                                        If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
+                                    End Do
+                                End If
+                            End Do
+                        End If
+                    End Do
+                Else
+                    negl=negl+1
+                End If
+                If (1000*(n/1000).EQ.n) Then
+                     strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
+                     Write(*,strfmt) n,Nd0,negl,nskip
+                End If
+            End Do
+        end if
 
         If (Kli.EQ.5 .AND. Nd0.EQ.Nd) Then
             s1= 0.d0
@@ -767,7 +800,6 @@ Contains
             strfmt='(/4x,"<X2|Q_0|X0>=",F10.5,/4x"<X0|Q_0|X2>=",F10.5)'
             Write (*,strfmt) s1,s2
         End If
-        Close(17)
 
         Return
     End Subroutine Vector
