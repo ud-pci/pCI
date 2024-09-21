@@ -1,0 +1,101 @@
+system:
+    bin_directory: ""
+    generate_directories: False
+    run_basis_codes: True
+    run_ci: True
+    on_hpc: True
+    pci_version: default
+
+atom:
+    name: Fe16+
+    isotope: 52
+    include_breit: True
+    code_method: ci
+
+# Parameters used by basis programs
+basis:
+    cavity_radius: 5
+    diagonalized: False
+    orbitals:
+        core: 1s 2s 2p
+        valence: 3s 3p 3d 4s 4p 4d 4f 5g
+        order: 2p 3d / 3s 3p / 4s 4p 4d 4f 5g
+        custom: [
+            4s from hfd,
+            4p from hfd,
+            4d from hfd,
+            4f from hfd,
+            5g from 3p
+        ]
+        nmax: 24
+        lmax: 4
+    b_splines:
+        nmax: 40
+        lmax: 6
+        k: 7
+    val_aov:
+        s: 4
+        p: 4
+        d: 4
+        f: 3
+    val_energies:
+        kval: 1
+        energies: 
+            s: -0.28000
+            p: [-0.22000, -0.22000]
+            d: [-0.31000, -0.31000]
+            f: [-0.13000, -0.13000]
+
+# Parameters used by add program
+add:
+    # Lists of even and odd parity reference configurations
+    ref_configs:
+        odd: [2s2 2p5 3s1]
+        even: [2s2 2p6,
+               2s2 2p5 3p1]
+    basis_set: 12spdfg
+    orbitals:
+        core: 1s
+        active: [
+            1s: 2 2,
+            2s: 0 2,
+            2-7p:  0  6,
+            3-7d:  0  6,
+            4-7f:  0  6,
+            5-7g:  0  6,
+            ]    
+    excitations:
+        single: True
+        double: True
+        triple: False
+
+# Parameters used by conf program
+conf:
+    J: 0.0
+    JM: 0.0
+    J_selection: False
+    num_energy_levels: 24
+    num_dvdsn_iterations: 100
+    include_lsj: True
+    write_hij: False
+
+# Parameters used by dtm program
+dtm:
+    matrix_elements: E1
+    include_rpa: False
+
+# Parameters used by portal script
+portal:
+    ignore_g: True
+    min_uncertainty: 1.5
+    
+# Optional parameters
+optional:
+    qed:
+        include: False
+        rotate_basis: False
+
+    isotope_shifts: 
+        include: False
+        K_is: 0
+        C_is: 0
