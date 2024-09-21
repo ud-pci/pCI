@@ -35,4 +35,7 @@ ADD_EXECUTABLE(sort str_fmt.f90 sort.f90)
 
 ADD_EXECUTABLE(add params.f90 add.f90)
 
-INSTALL(TARGETS hfd bass add pbasc pconf conf_lsj pdtm ine pol conf_pt sort DESTINATION ${CMAKE_INSTALL_BINDIR})
+ADD_EXECUTABLE(formy formy.f90)
+TARGET_LINK_LIBRARIES(formy pci_common)
+
+INSTALL(TARGETS hfd bass add pbasc pconf conf_lsj pdtm ine pol conf_pt sort formy DESTINATION ${CMAKE_INSTALL_BINDIR})
