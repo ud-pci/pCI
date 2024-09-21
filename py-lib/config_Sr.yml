@@ -3,7 +3,7 @@ system:
     bin_directory: ""
     generate_directories: False
     run_basis_codes: True
-    run_ci: False
+    run_ci: True
     on_hpc: True
     pci_version: default
 
