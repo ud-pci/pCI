@@ -50,6 +50,14 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
         print(parity.capitalize(), 'parity configurations were not specified')
         return
 
+    # Set number of energy levels
+    if parity == 'odd':
+        num_energy_levels = config['conf']['num_energy_levels']['odd']
+    elif parity == 'even':
+        num_energy_levels = config['conf']['num_energy_levels']['even']
+    else:
+        num_energy_levels = 0
+
     # Define name of file to export
     filename = filename[0:-4] + parity + filename[-4:]
     f = open(filename,'w')
@@ -112,7 +120,7 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
         f.write(' Kv =  3 \n')
     else:
         f.write(' Kv =  4 \n')
-    f.write(' Nlv=  ' + str(conf['num_energy_levels']) + '\n')
+    f.write(' Nlv=  ' + str(num_energy_levels) + '\n')
     f.write(' Ne =  ' + str(num_val) + '\n')
     f.write(' Kl4=  1 \n')
     f.write(' Nc4=999 \n')
