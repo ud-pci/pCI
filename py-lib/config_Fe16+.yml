@@ -6,6 +6,11 @@ system:
     on_hpc: True
     pci_version: default
 
+hpc:
+    partition: large-mem
+    nodes: 1
+    tasks_per_node: 64
+
 atom:
     name: Fe16+
     isotope: 52
@@ -92,7 +97,7 @@ portal:
 # Optional parameters
 optional:
     qed:
-        include: False
+        include: True
         rotate_basis: False
 
     isotope_shifts: 
