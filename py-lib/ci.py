@@ -291,7 +291,7 @@ if __name__ == "__main__":
     on_hpc = config['system']['on_hpc']
     
     # hpc parameters
-    if on_hpc and run_ci:
+    if on_hpc:
         hpc = get_dict_value(config, 'hpc')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
@@ -317,18 +317,29 @@ if __name__ == "__main__":
         f.write("0 \n 0")
         f.close()
     
-    # BASS.INP will dictate order of orbitals in ADD.INP, so find a BASS.INP file from any basis directory
+    # BASS.INP will dictate order of orbitals in ADD.INP, so find a BASS.INP file from the basis directory
+    bass_inp_paths = []
     if not os.path.isfile('BASS.INP'):
         for root, dirs, files in os.walk('.'):
             if 'BASS.INP' in files:
-                run_shell('cp ' + root + '/BASS.INP .')
-                break
-    
+                bass_inp_paths.append(root)
+    if code_method == 'ci':
+        run_shell('cp ./basis/BASS.INP .')
+        print('BASS.INP taken from basis/')
+    else:
+        if os.path.isdir('ci+all-order'):
+            run_shell('cp ./ci+all-order/basis/BASS.INP .')
+            print('BASS.INP taken from ci+all-order/basis/')
+        elif os.path.isdir('ci+second-order'):
+            run_shell('cp ./ci+second-order/basis/BASS.INP .')
+            print('BASS.INP taken from ci+all-order/basis/')
+
     # Run script to generate ADD.INP for even and odd configurations
     create_add_inp(config)
     
     # Cleanup BASS.INP
-    run_shell('rm BASS.INP')
+    if os.path.isfile('BASS.INP'):
+        run_shell('rm BASS.INP')
     
     # Check if ADDeven.INP and ADDodd.INP exist
     even_exists = os.path.isfile('ADDeven.INP')
