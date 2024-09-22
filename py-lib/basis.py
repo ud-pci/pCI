@@ -944,6 +944,15 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
         print("bass completed with no errors after", nTry - 1, "attempts")
         
     return
+
+def run_qed_executables():
+    # Run qed
+    if system['rotate_basis'] == True or system['include_qed'] == True:
+        run_shell('cp HFD.DAT HFD-noQED.DAT')
+        generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
+        run_shell('chmod +x batch.qed')
+        run_shell('./batch.qed > qed.out')
+        print("qed complete")
     
 def run_ao_executables(K_is, C_is, bin_dir):
     # Specify directory of executables
@@ -1043,14 +1052,6 @@ def run_ao_executables(K_is, C_is, bin_dir):
     run_shell('rm bass.in')
     run_shell('rm hfspl.1 hfspl.2')
 
-    # Run qed
-    #if system['rotate_basis'] == True or system['include_qed'] == True:
-    #    run_shell('cp HFD.DAT HFD-noQED.DAT')
-    #    generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
-    #    run_shell('chmod +x batch.qed')
-    #    run_shell('./batch.qed > qed.out')
-    #    print("qed complete")
-
     # Run bas_x
     run_shell(bin_dir + 'bas_x > bas_x.out')
     print("bas_x complete")
@@ -1086,6 +1087,9 @@ if __name__ == "__main__":
         C_is = optional['isotope_shifts']['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
+        
+    include_qed = optional['qed']['include']
+    rotate_basis = optional['qed']['rotate_basis']
 
     code_method = atom['code_method']
     run_basis_codes = system['run_basis_codes']
