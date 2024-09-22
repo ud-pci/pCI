@@ -931,7 +931,7 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        run_shell(bin_dir + '/bass < bass.in > bass.out')
+        run_shell(bin_dir + 'bass < bass.in > bass.out')
         
         run_shell('cp bass.out ' + 'bass' + str(nTry) + '.out')
             
@@ -1080,6 +1080,7 @@ if __name__ == "__main__":
     basis_lmax = basis['orbitals']['lmax']
     kval = basis['val_energies']['kval']
     val_aov = basis['val_aov']
+
 
     include_isotope_shifts = optional['isotope_shifts']['include']
     if include_isotope_shifts:
