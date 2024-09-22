@@ -99,6 +99,9 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write('#SBATCH --ntasks=1 \n')
         else:
             f.write('#SBATCH --nodes=' + str(num_nodes) + ' \n')
+            if num_procs_per_node == 1:
+                print('tasks-per-node is set to minimum of 2 for parallel programs')
+                num_procs_per_node = 2
             f.write('#SBATCH --tasks-per-node=' + str(num_procs_per_node) + ' \n')
         if exclusive: 
             f.write('#SBATCH --exclusive=user \n')
