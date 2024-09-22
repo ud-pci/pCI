@@ -22,7 +22,7 @@ import get_atomic_data as libatomic
 import orbitals as liborb
 import os
 from pathlib import Path
-from utils import run_shell
+from utils import run_shell, get_dict_value
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
@@ -1064,37 +1064,53 @@ if __name__ == "__main__":
     atom = config['atom']
     basis = config['basis']
     optional = config['optional']
-    on_hpc = system['on_hpc']
-    bin_dir = system['bin_directory']
     
-    # Set parameters from config
+    # system parameters
+    bin_dir = system['bin_directory']
+    on_hpc = system['on_hpc']
+    run_basis_codes = system['run_basis_codes']
+    pci_version = system['pci_version']
+    
+    # hpc parameters
+    if on_hpc and run_basis_codes:
+        hpc = get_dict_value(config, 'hpc')
+        if hpc:
+            partition = get_dict_value(hpc, 'partition')
+            nodes = get_dict_value(hpc, 'nodes')
+            tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+        else:
+            print('hpc block was not found in', yml_file)
+            partition, nodes, tasks_per_node = None, 1, 1
+
+    # atom parameters
     name = atom['name']
     try:
         isotope = atom['isotope']
     except KeyError:
         isotope = ""
+    include_breit = atom['include_breit']
+    code_method = atom['code_method']
+    
+    # basis parameters
     core_orbitals = basis['orbitals']['core']
     valence_orbitals = basis['orbitals']['valence']
-    include_breit = atom['include_breit']
     basis_nmax = basis['orbitals']['nmax']
     basis_lmax = basis['orbitals']['lmax']
     kval = basis['val_energies']['kval']
     val_aov = basis['val_aov']
 
-
-    include_isotope_shifts = optional['isotope_shifts']['include']
+    # isotope shift parameters
+    isotope_shifts = optional['isotope_shifts']
+    include_isotope_shifts = isotope_shifts['include']
     if include_isotope_shifts:
         K_is = optional['isotope_shifts']['K_is']
         C_is = optional['isotope_shifts']['C_is']
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
-        
+    
+    # qed parameters
     include_qed = optional['qed']['include']
     rotate_basis = optional['qed']['rotate_basis']
-
-    code_method = atom['code_method']
-    run_basis_codes = system['run_basis_codes']
-    pci_version = system['pci_version']
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
@@ -1189,8 +1205,11 @@ if __name__ == "__main__":
                             os.chdir(dir_name)
                             run_shell('pwd')
                             run_ao_executables(K_is, c, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'large-mem', pci_version, bin_dir)
-                            run_shell('sbatch ' + script_name)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            if script_name:
+                                run_shell('sbatch ' + script_name)
+                            else:
+                                print('job script was not submitted. check job script and submit manually.')
                             os.chdir('../../')
                         if K_is_dict[K_is]:
                             os.chdir('../../')
@@ -1204,8 +1223,11 @@ if __name__ == "__main__":
                             os.chdir(method+'/basis')
                             run_shell('pwd')
                             run_ao_executables(0, 0, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'large-mem', pci_version, bin_dir)
-                            run_shell('sbatch ' + script_name)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            if script_name:
+                                run_shell('sbatch ' + script_name)
+                            else:
+                                print('job script was not submitted - check job script and submit manually.')
                             os.chdir('../../')
                     else:
                         dir_path = os.getcwd()
@@ -1213,8 +1235,11 @@ if __name__ == "__main__":
                         os.chdir('basis')
                         run_shell('pwd')
                         run_ao_executables(0, 0, bin_dir)
-                        script_name = write_job_script('.', code_method, 1, 1, True, 0, 'large-mem', pci_version)
-                        run_shell('sbatch ' + script_name)
+                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                        if script_name:
+                            run_shell('sbatch ' + script_name)
+                        else:
+                            print('job script was not submitted - check job script and submit manually.')
                         os.chdir('../')
             
     elif code_method == 'ci':

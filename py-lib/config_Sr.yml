@@ -7,6 +7,12 @@ system:
     on_hpc: True
     pci_version: default
 
+# HPC parameters
+hpc:
+    partition: large-mem
+    nodes: 1
+    tasks_per_node: 64
+
 # Atomic information
 atom:
     name: Sr

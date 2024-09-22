@@ -2,7 +2,7 @@ import yaml
 import os
 import sys
 from pathlib import Path
-from utils import run_shell
+from utils import run_shell, get_dict_value
 from gen_job_script import write_job_script
 
 
@@ -106,6 +106,17 @@ if __name__ == "__main__":
     bin_dir = config['system']['bin_directory']
     basis = config['basis']
     
+    # hpc parameters
+    if on_hpc:
+        hpc = get_dict_value(config, 'hpc')
+        if hpc:
+            partition = get_dict_value(hpc, 'partition')
+            nodes = get_dict_value(hpc, 'nodes')
+            tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+        else:
+            print('hpc block was not found in', yml_file)
+            partition, nodes, tasks_per_node = None, 1, 1
+    
     key_list = []
     if isinstance(matrix_elements, list):
         key_list = matrix_elements
@@ -142,11 +153,17 @@ if __name__ == "__main__":
             if include_rpa:
                 write_mbpt_inp(basis, key_list)
                 if on_hpc:
-                    write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                    run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                    script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                    if script_name:
+                        run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                    else:
+                        print('job script was not submitted. check job script and submit manually.')
             else:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm.qs dtm/dtm.qs')
+                script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm.qs dtm/dtm.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
             
             # Find even and odd directories with completed ci runs
             even_exists, odd_exists = False, False
@@ -207,12 +224,18 @@ if __name__ == "__main__":
         if include_rpa:
             write_mbpt_inp(basis, key_list)
             if on_hpc:
-                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
         else:
             if on_hpc:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm.qs dtm/dtm.qs')
+                script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm.qs dtm/dtm.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
         
         # Find even and odd directories with completed ci runs
         even_exists, odd_exists = False, False

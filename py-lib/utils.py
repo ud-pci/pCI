@@ -8,3 +8,9 @@ def run_shell(command):
     except CalledProcessError as e:
         print(e)
         sys.exit()
+        
+def get_dict_value(param_dict, key):
+    try:
+        return param_dict[key]
+    except KeyError:
+        return None

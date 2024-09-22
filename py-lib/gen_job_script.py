@@ -39,6 +39,20 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     # Determine cluster information
     cluster = find_cluster()
     
+    # Set default job parameters
+    if not num_nodes:
+        num_nodes = 1
+    if not num_procs_per_node:
+        num_procs_per_node = 1
+    if not partition:
+        if cluster == 'caviness':
+            partition = 'standard'
+        elif cluster == 'darwin':
+            partition = 'idle'
+        else:
+            print('partition name was not specified')
+            return None
+    
     # Ensure partition is in cluster
     darwin_partitions = ['standard', 'large-mem', 'xlarge-mem', 'idle']
     if partition in darwin_partitions and cluster == 'darwin':

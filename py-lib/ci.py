@@ -26,7 +26,7 @@ import re
 import math
 import orbitals as orb_lib
 import get_atomic_data as libatomic
-from utils import run_shell
+from utils import run_shell, get_dict_value
 from pathlib import Path
 from gen_job_script import write_job_script
 
@@ -282,6 +282,17 @@ if __name__ == "__main__":
     bin_dir = config['system']['bin_directory']
     on_hpc = config['system']['on_hpc']
     
+    # hpc parameters
+    if on_hpc and run_ci:
+        hpc = get_dict_value(config, 'hpc')
+        if hpc:
+            partition = get_dict_value(hpc, 'partition')
+            nodes = get_dict_value(hpc, 'nodes')
+            tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+        else:
+            print('hpc block was not found in', yml_file)
+            partition, nodes, tasks_per_node = None, 1, 1
+    
     # Ensure basis and add core orbitals match
     basis_core = config['basis']['orbitals']['core']
     add_core = config['add']['orbitals']['core']
@@ -329,12 +340,8 @@ if __name__ == "__main__":
     
     # Create a ci.qs job script if it doesn't exist yet
     if on_hpc:
-        if not os.path.isfile('ci.qs'):
-            print('generating new ci.qs in ' + os.getcwd() + ' directory')
-            script_name = write_job_script('.','ci', 2, 64, True, 0, 'standard', pci_version, bin_dir)
-        else:
-            print('using existing ci.qs')
-            script_name = 'ci.qs'
+        print('generating new ci.qs in ' + os.getcwd() + ' directory')
+        script_name = write_job_script('.','ci', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
     
     # Copy ADD.INP and CONF.INP to all directories if gen_dir == True
     if gen_dir:
@@ -362,7 +369,10 @@ if __name__ == "__main__":
                         # Submit CI job if run_ci == True
                         if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run_shell("sbatch " + script_name)
+                            if script_name:
+                                run_shell("sbatch " + script_name)
+                            else:
+                                print('job script was not submitted. check job script and submit manually.')
                             os.chdir('../')
                         else:
                             print("run_ci option is only available with HPC access")
@@ -383,7 +393,10 @@ if __name__ == "__main__":
                         # Submit CI job if run_ci == True
                         if on_hpc and run_ci: 
                             os.chdir(parity)
-                            run_shell("sbatch " + script_name)
+                            if script_name:
+                                run_shell("sbatch " + script_name)
+                            else:
+                                print('job script was not submitted. check job script and submit manually.')
                             os.chdir('../')
                         else:
                             print("run_ci option is only available with HPC access - please run ci codes manually")
@@ -396,7 +409,10 @@ if __name__ == "__main__":
                     # Submit CI job if run_ci == True
                     if on_hpc and run_ci: 
                         os.chdir(parity)
-                        run_shell("sbatch " + script_name)
+                        if script_name:
+                            run_shell("sbatch " + script_name)
+                        else:
+                            print('job script was not submitted. check job script and submit manually.')
                         os.chdir('../')
                     else:
                         print("run_ci option is only available with HPC access - please run ci codes manually")
