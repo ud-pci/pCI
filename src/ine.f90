@@ -1296,10 +1296,10 @@ Contains
         If (.not. ok) str = ' DIVERGED'
         If (sign == 1) Then
             strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved to INE_p.XIJ",/3X,63("="))'
+             I8," are saved to INE_p.XIJ",/3X,63("="))'
         Else
             strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved to INE_m.XIJ",/3X,63("="))'
+             I8," are saved to INE_m.XIJ",/3X,63("="))'
         End If
             
  200    write( 6,strfmt) str,Nd
