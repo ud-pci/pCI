@@ -101,7 +101,7 @@ portal:
 # Optional parameters
 optional:
     qed:
-        include: True
+        include: False
         rotate_basis: False
 
     isotope_shifts: 
