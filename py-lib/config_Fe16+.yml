@@ -1,5 +1,5 @@
 system:
-    bin_directory: ""
+    bin_directory: "/lustre/safrono/users/1813/pCI-dev/bin"
     generate_directories: False
     run_basis_codes: True
     run_ci: True
@@ -90,6 +90,9 @@ conf:
 dtm:
     matrix_elements: E1
     include_rpa: False
+    level_range:
+        odd: 12 16
+        even: 1 1
 
 # Parameters used by portal script
 portal:

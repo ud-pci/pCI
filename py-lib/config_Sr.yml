@@ -82,6 +82,9 @@ conf:
 dtm:
     matrix_elements: E1
     include_rpa: False
+    level_range:
+        odd: 1 24
+        even: 1 24
 
 # Parameters used by portal script
 portal:

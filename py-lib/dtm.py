@@ -127,6 +127,15 @@ if __name__ == "__main__":
             for matrix_element in matrix_elements.split(' '):
                 key_list.append(matrix_element.replace('[','').replace(']','').replace(',',''))
 
+    # set level ranges for dtm
+    level_range = config['dtm']['level_range']
+    odd_level_range = level_range['odd']
+    odd_level_from = odd_level_range.split(' ')[0]
+    odd_level_to = odd_level_range.split(' ')[1]
+    even_level_range = level_range['even']
+    even_level_from = even_level_range.split(' ')[0]
+    even_level_to = even_level_range.split(' ')[1]
+    
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
@@ -213,11 +222,11 @@ if __name__ == "__main__":
         Path(dir_path+'/dtm').mkdir(parents=True, exist_ok=True)
         if include_rpa:
             write_dtm_in('Init',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
         else:
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
 
         run_shell('mv dtm.in dtm/dtm.in')
