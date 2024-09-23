@@ -799,8 +799,13 @@ def write_ao_inputs(system, C_is, kvw):
     # Write inf.vw
     write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
-def generate_batch_qed(kqed, krot, kbrt):
+def generate_batch_qed(bin_dir, kqed, kbrt):
     """ Writes batch.qed """
+    
+    # Specify directory of executables
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+    
     with open('q.in','w') as f:
         f.write("1 \n")
         if kqed == True:
@@ -836,9 +841,8 @@ def generate_batch_qed(kqed, krot, kbrt):
         f.write("n=1 \n")
         f.write("while [ $n -lt $iter ]; do \n")
         f.write("echo 'Iteration '$n \n")
-        f.write("qedpot_conf <q.in >qp.res \n")
-        if krot == True:
-            f.write("qed_rot <q.in >qr.res \n")
+        f.write(bin_dir + "qedpot_conf <q.in >qp.res \n")
+        f.write(bin_dir + "qed_rot <q.in >qr.res \n")
         f.write("grep 'changed' \"QED_ROT.RES\" \n")
         f.write("  if grep -q reached \"QED_ROT.RES\"; then \n")
         f.write("  echo 'Converged in '$n' iterations' \n")
@@ -848,6 +852,7 @@ def generate_batch_qed(kqed, krot, kbrt):
         f.write("done \n")
         f.write("##################################### \n")
     print('batch.qed has been written')
+    run_shell('chmod +x batch.qed')
     
 def check_errors(filename):
     # This function checks output files for errors and returns the number of errors
@@ -869,12 +874,7 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_ci_executables(on_hpc, bin_dir, order, custom):
-    
-    # Strip '/' from end of bin_dir
-    if bin_dir and bin_dir[-1] != '/':
-        bin_dir += '/'
-
+def run_ci_executables(bin_dir, order, custom):
     # Remove old HFD.INP
     if os.path.isfile('HFD.INP'):
         run_shell('rm HFD.INP')
@@ -942,8 +942,6 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
         
     else:
         print("bass completed with no errors after", nTry - 1, "attempts")
-        
-    return
 
 def run_qed_executables():
     # Run qed
@@ -1067,6 +1065,9 @@ if __name__ == "__main__":
     
     # system parameters
     bin_dir = system['bin_directory']
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+        
     on_hpc = system['on_hpc']
     run_codes = system['run_codes']
     pci_version = system['pci_version']
@@ -1262,8 +1263,13 @@ if __name__ == "__main__":
                 custom = basis['orbitals']['custom']
             except KeyError:
                 custom = ""
-            run_ci_executables(on_hpc, bin_dir, order, custom)
+            run_ci_executables(bin_dir, order, custom)
                         
+        if include_qed:
+            run_shell(bin_dir+'sgc0')
+            generate_batch_qed(bin_dir, include_qed, kbrt)
+            run_shell('./batch.qed')
+        
         os.chdir('../')
 
     else:
