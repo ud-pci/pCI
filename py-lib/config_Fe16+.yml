@@ -1,8 +1,7 @@
 system:
-    bin_directory: "/lustre/safrono/users/1813/pCI-dev/bin"
+    bin_directory: ""
     generate_directories: False
-    run_basis_codes: True
-    run_ci: True
+    run_codes: True
     on_hpc: True
     pci_version: default
 

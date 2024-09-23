@@ -104,6 +104,7 @@ if __name__ == "__main__":
     pci_version = config['system']['pci_version']
     on_hpc = config['system']['on_hpc']
     bin_dir = config['system']['bin_directory']
+    run_codes = config['system']['run_codes']
     basis = config['basis']
     
     # hpc parameters
@@ -209,10 +210,10 @@ if __name__ == "__main__":
                              '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                              ', '.join(key_list))
                 
-                if on_hpc: 
+                if on_hpc and run_codes: 
                     run_shell('sbatch dtm_rpa.qs')
             else:    
-                if on_hpc:
+                if on_hpc and run_codes:
                     run_shell('sbatch dtm.qs')
             
     else:
@@ -232,14 +233,14 @@ if __name__ == "__main__":
         run_shell('mv dtm.in dtm/dtm.in')
         if include_rpa:
             write_mbpt_inp(basis, key_list)
-            if on_hpc:
+            if on_hpc and run_codes:
                 script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                 if script_name:
                     run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
                 else:
                     print('job script was not submitted. check job script and submit manually.')
         else:
-            if on_hpc:
+            if on_hpc and run_codes:
                 script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                 if script_name:
                     run_shell('mv dtm.qs dtm/dtm.qs')
@@ -282,8 +283,8 @@ if __name__ == "__main__":
                          '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
                          ', '.join(key_list))
             
-            if on_hpc:
+            if on_hpc and run_codes:
                 run_shell('sbatch dtm_rpa.qs')
         else:    
-            if on_hpc:
+            if on_hpc and run_codes:
                 run_shell('sbatch dtm.qs')

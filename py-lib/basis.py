@@ -8,7 +8,7 @@ The "config.yml" file should have the following blocks:
     * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
 
 From these parameters, this script will create all input files required for the various basis codes.
-After the input files are created, the sequence of basis set codes will be executed if the parameter run_basis_codes is set to "True".
+After the input files are created, the sequence of basis set codes will be executed if the parameter run_codes is set to "True".
 
 This python script has 2 main capabilities for basis set construction:
 1. Construction of basis for isotope shift calculations 
@@ -1068,11 +1068,11 @@ if __name__ == "__main__":
     # system parameters
     bin_dir = system['bin_directory']
     on_hpc = system['on_hpc']
-    run_basis_codes = system['run_basis_codes']
+    run_codes = system['run_codes']
     pci_version = system['pci_version']
     
     # hpc parameters
-    if on_hpc and run_basis_codes:
+    if on_hpc and run_codes:
         hpc = get_dict_value(config, 'hpc')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
@@ -1182,9 +1182,9 @@ if __name__ == "__main__":
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
-        if run_basis_codes:
+        if run_codes:
             if not on_hpc:
-                print('run_basis_codes option is only available with HPC access')
+                print('run_codes option is only available with HPC access')
             else:
                 print("Running codes...")
                 if include_isotope_shifts and K_is > 0:
@@ -1256,7 +1256,7 @@ if __name__ == "__main__":
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
             write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
             
-        if run_basis_codes:
+        if run_codes:
             order = basis['orbitals']['order']
             try: 
                 custom = basis['orbitals']['custom']
