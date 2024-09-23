@@ -125,6 +125,7 @@ Program ine
             End If
             print*, 'xlamb=',xlamb
             Do i=1,icyc
+                If (kIters == 2) Kl = 0
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
