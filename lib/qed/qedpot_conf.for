@@ -708,7 +708,7 @@ c        write(*,*) ma,mb,sgq
      &    ' got ',2I3)
           Stop
         else
-        if (sg.NE.0.d0) sg=sg+sgq     ! no QED corrections for zero MEs
+        if (sgq.NE.0.d0) sg=sg+sgq     ! no QED corrections for zero MEs
           write(15,65) irpt,ka,kb,sg,dsg,esg
 c          write(*, 65) irpt,ka,kb,sg,dsg,esg
  65       format(1X,I4,1X,I3,1X,I3,1X,F12.8,2(1X,E12.5))
@@ -1201,7 +1201,7 @@ C       =======================================================
 C       =======================================================
 C       Purpose: Integrate Bessel functions I0(t) and K0(t)
 C                with respect to t from 0 to x
-C       Input :  x  --- Upper limit of the integral ( x Ô 0 )
+C       Input :  x  --- Upper limit of the integral ( x ï¿½ 0 )
 C       Output:  TI --- Integration of I0(t) from 0 to x
 C                TK --- Integration of K0(t) from x to infty
 C       =======================================================
@@ -1252,7 +1252,7 @@ C       =========================================================
 C       =========================================================
 C       Purpose: Compute modified Bessel functions I0(x), I1(1),
 C                K0(x) and K1(x), and their derivatives
-C       Input :  x   --- Argument ( x Ô 0 )
+C       Input :  x   --- Argument ( x ï¿½ 0 )
 C       Output:  BI1 --- I1(x)
 C                BK1 --- K1(x)-1/x
 C       =========================================================
@@ -1295,7 +1295,7 @@ c       =================================================
 C       =========================================================
 C       Purpose: Compute modified Bessel functions I0(x), I1(1),
 C                K0(x) and K1(x), and their derivatives
-C       Input :  x   --- Argument ( x Ô 0 )
+C       Input :  x   --- Argument ( x ï¿½ 0 )
 C       Output:  BI0 --- I0(x)
 C                DI0 --- I0'(x)
 C                BI1 --- I1(x)
