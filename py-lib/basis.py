@@ -1266,9 +1266,10 @@ if __name__ == "__main__":
             run_ci_executables(bin_dir, order, custom)
                         
         if include_qed:
-            run_shell(bin_dir+'sgc0')
             generate_batch_qed(bin_dir, include_qed, kbrt)
-            run_shell('./batch.qed')
+            if run_codes: 
+                run_shell(bin_dir+'sgc0')
+                run_shell('./batch.qed > qed.out')
         
         os.chdir('../')
 
