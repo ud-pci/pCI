@@ -152,11 +152,11 @@ if __name__ == "__main__":
             Path(full_path+'/dtm').mkdir(parents=True, exist_ok=True)
             if include_rpa:
                 write_dtm_in('Init',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
             else:
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
 
             run_shell('mv dtm.in dtm/dtm.in')
@@ -207,7 +207,7 @@ if __name__ == "__main__":
                     
                 run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
                 
                 if on_hpc and run_codes: 
@@ -280,7 +280,7 @@ if __name__ == "__main__":
             run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
             
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ', 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
             
             if on_hpc and run_codes:
