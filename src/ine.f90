@@ -59,7 +59,7 @@ Program ine
     
     Integer, Parameter :: IP2 = 50000
 
-    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
+    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4, kl0
     Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1, IPad
     Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
@@ -99,6 +99,7 @@ Program ine
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
+    kl0 = kl ! user-inputted Kl
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -125,7 +126,7 @@ Program ine
             End If
             print*, 'xlamb=',xlamb
             Do i=1,icyc
-                If (kIters == 2) Kl = 0
+                If (kIters == 2 .and. kl0 == 0) Kl = 0
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
