@@ -817,7 +817,6 @@ def generate_batch_qed(bin_dir, kqed, kbrt):
 
     with open('batch.qed','w') as f: 
         f.write("#! /bin/bash -fe \n")
-        f.write("vpkg_require pci \n")
         f.write("kvar=1  # variant of QED potential \n")
         f.write("iter=25 # max number of iterations \n")
         f.write("##################################### \n")
