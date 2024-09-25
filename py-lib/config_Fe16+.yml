@@ -75,13 +75,18 @@ add:
 
 # Parameters used by conf program
 conf:
-    J: 0.0
-    JM: 0.0
-    J_selection: False
-    num_energy_levels: 
-        odd: 24
-        even: 5
-    num_dvdsn_iterations: 100
+    odd:
+        J: 1
+        JM: 1
+        J_selection: True
+        num_energy_levels: 11
+        num_dvdsn_iterations: 100
+    even:
+        J: 0.0
+        JM: 0.0
+        J_selection: False
+        num_energy_levels: 5
+        num_dvdsn_iterations: 100
     include_lsj: True
     write_hij: False
 
@@ -90,7 +95,7 @@ dtm:
     matrix_elements: E1
     include_rpa: False
     level_range:
-        odd: 12 16
+        odd: 4 5
         even: 1 1
 
 # Parameters used by portal script

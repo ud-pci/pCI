@@ -99,7 +99,6 @@ if __name__ == "__main__":
     config = read_yaml(yml_file)
     code_method = config['atom']['code_method']
     matrix_elements = config['dtm']['matrix_elements']
-    num_levels = config['conf']['num_energy_levels']
     include_rpa = config['dtm']['include_rpa']
     pci_version = config['system']['pci_version']
     on_hpc = config['system']['on_hpc']

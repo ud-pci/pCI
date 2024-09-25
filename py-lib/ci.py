@@ -50,13 +50,20 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
         print(parity.capitalize(), 'parity configurations were not specified')
         return
 
-    # Set number of energy levels
     if parity == 'odd':
-        num_energy_levels = config['conf']['num_energy_levels']['odd']
+        parity_config = config['conf']['odd']
     elif parity == 'even':
-        num_energy_levels = config['conf']['num_energy_levels']['even']
+        parity_config = config['conf']['even']
     else:
-        num_energy_levels = 0
+        print('parity ' + parity + ' is not valid')
+        return
+    
+    # Set number of energy levels
+    J = parity_config['J']
+    JM = parity_config['JM']
+    J_selection = parity_config['J_selection']
+    num_energy_levels = parity_config['num_energy_levels']
+    num_dvdsn_iterations = parity_config['num_dvdsn_iterations']
 
     # Define name of file to export
     filename = filename[0:-4] + parity + filename[-4:]
@@ -112,11 +119,11 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     f.write('  ' + atom['name'] + ' ' + parity + '\n')
     f.write('  Z = ' + str(Z) + '\n')
     f.write(' Am = ' + "{:.1f}".format(round(AM)) + '\n')
-    f.write('  J = ' + str(conf['J']) + '\n')
-    f.write(' Jm = ' + str(conf['JM']) + '\n')
+    f.write('  J = ' + str(J) + '\n')
+    f.write(' Jm = ' + str(JM) + '\n')
     f.write(' Nso=  ' + str(num_core_orb) + '\n')
     f.write(' Nc =   10 \n')
-    if conf['J_selection']:
+    if J_selection:
         f.write(' Kv =  3 \n')
     else:
         f.write(' Kv =  4 \n')
@@ -129,7 +136,7 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     f.write('kout= 0 \n')
     f.write('Ncpt= 0 \n')
     f.write('Cut0= 0.0001 \n')
-    f.write('N_it= ' + str(conf['num_dvdsn_iterations']) + '\n')
+    f.write('N_it= ' + str(num_dvdsn_iterations) + '\n')
     if atom['include_breit']:
         kbrt = 2
     else:
