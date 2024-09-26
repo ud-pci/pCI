@@ -90,6 +90,14 @@ dtm:
         odd: 1 24
         even: 1 24
 
+# Parameters used by pol program
+pol:
+    parity: odd
+    level: 1
+    method: 1
+    wavelength_range: 0 500
+    step_size: 250
+
 # Parameters used by portal script
 portal:
     ignore_g: True

@@ -75,7 +75,9 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'basc': 'basc.qs',
                  'ci': 'ci.qs',
                  'dtm': 'dtm.qs',
-                 'dtm_rpa': 'dtm_rpa.qs'}
+                 'dtm_rpa': 'dtm_rpa.qs',
+                 'ine': 'ine.qs',
+                 'pol': 'pol.qs'}
     
     # Serial codes
     is_serial = {'ci+all-order': True, 
@@ -86,7 +88,14 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'basc': False,
                  'ci': False,
                  'dtm': False,
-                 'dtm_rpa': False,}
+                 'dtm_rpa': False,
+                 'ine': True,
+                 'pol': True}
+    
+    # OpenMP codes
+    use_omp = False
+    if code == 'ine' or code == 'pol':
+        use_omp = True
     
     os.chdir(path)
     
@@ -105,7 +114,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write('#SBATCH --tasks-per-node=' + str(num_procs_per_node) + ' \n')
         if exclusive: 
             f.write('#SBATCH --exclusive=user \n')
-        f.write('#SBATCH --cpus-per-task=1 \n')
+        if use_omp:
+            f.write('#SBATCH --cpus-per-task=64 \n')
+        else:
+            f.write('#SBATCH --cpus-per-task=1 \n')
         f.write('#SBATCH --mem=' + str(mem) + ' \n')
         f.write('#SBATCH --job-name=' + code + ' \n')
         f.write('#SBATCH --partition=' + partition + ' \n')
@@ -138,6 +150,12 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write(bin_dir + 'rpa < rpa.in \n')
             f.write(bin_dir + 'rpa_dtm \n')
             f.write('${UD_MPIRUN} ' + bin_dir + 'pdtm \n')
+        elif code == 'ine':
+            f.write(bin_dir + 'sort \n')
+            f.write(bin_dir + 'ine < ine.in \n')
+        elif code == 'pol':
+            f.write(bin_dir + 'sort \n')
+            f.write(bin_dir + 'pol < pol.in \n')
         elif code == 'all-order' or code == 'ci+all-order':
             f.write(bin_dir + 'allcore-ci <inf.aov >out.core \n')
             f.write(bin_dir + 'valsd-ci <inf.aov >out.val \n')
