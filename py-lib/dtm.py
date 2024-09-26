@@ -177,6 +177,7 @@ if __name__ == "__main__":
             # Find even and odd directories with completed ci runs
             even_exists, odd_exists = False, False
             if os.path.isfile('even/CONF.RES') or os.path.isfile('even/CONFFINAL.RES'):
+                even_exists = True
                 if include_rpa: 
                     run_shell('cp even/HFD.DAT dtm/HFD.DAT')
                     run_shell('cp MBPT.INP dtm/MBPT.INP')
