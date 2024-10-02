@@ -1,3 +1,22 @@
+""" dtm
+
+This script allows the user to automate the transition matrix element calculations from inputted parameters in a "config.yml" file. 
+The "config.yml" file should have the following blocks:
+
+    * system - system parameter (bin_directory, run_codes, on_hpc)
+    * atom.code_method - list of methods (CI, CI+all-order, CI+MBPT)
+    * dtm - parameters used by dtm program (parity, level, emthod, wavelength_range, step_size)
+
+From these parameters, this script will create all input files required for execution of the add program.
+After the input files are created, the add program will be executed to create the list of configurations CONF.INP.
+If optional.generate_directories is set to "True", the script will generate respective directories for CI calculations (e.g. /even and /odd)
+If optional.run_codes is set to "True", the script will then submit the slurm job in the generated directories. 
+
+This python script has 2 main capabilities for polarizability calculations:
+1. Set up file directory for matrix elements calculations.
+2. Submit job script for matrix elements calculations.
+
+"""
 import yaml
 import os
 import sys

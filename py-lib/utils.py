@@ -10,6 +10,7 @@ def run_shell(command):
         sys.exit()
         
 def get_dict_value(param_dict, key):
+    """ This function obtains returns the value from a dictionary given a key and returns None if the key doesn't exist """
     try:
         return param_dict[key]
     except KeyError:

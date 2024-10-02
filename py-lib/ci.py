@@ -1,17 +1,17 @@
-""" CI
+""" ci
 
 This script allows the user to automate the configuration list construction from inputted parameters in a "config.yml" file. 
 The "config.yml" file should have the following blocks:
 
-    * system - general parameters (name of atomic system, isotope number, inclusion of breit)
+    * system - system parameter (bin_directory, run_codes, on_hpc)
     * basis.orbitals.core - core orbitals are read to ensure consistent basis set
-    * add - parameters used by add program (reference configurations, basis set, orbitals, excitations)
+    * ci - parameters used by ci programs (reference configurations, basis set, orbitals, excitations)
     * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
 
 From these parameters, this script will create all input files required for execution of the add program.
 After the input files are created, the add program will be executed to create the list of configurations CONF.INP.
 If optional.generate_directories is set to "True", the script will generate respective directories for CI calculations (e.g. /even and /odd)
-If optional.run_codes is set to "True", the script will then submit the slurm job in the generated directories. 
+If optional.run_codes is set to "True", the script will then submit the job script in the respective directories. 
 
 This python script has 3 main capabilities for configuration list construction:
 1. General construction of configuration lists in root directory

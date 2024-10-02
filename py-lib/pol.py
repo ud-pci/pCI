@@ -1,3 +1,21 @@
+""" pol
+
+This script allows the user to automate polarizability calculation from inputted parameters in a "config.yml" file. 
+The "config.yml" file should have the following blocks:
+
+    * system - system parameter (bin_directory, run_codes, on_hpc)
+    * atom.code_method - list of methods (CI, CI+all-order, CI+MBPT)
+    * pol - parameters used by pol program (parity, level, method, wavelength_range, step_size)
+
+From these parameters, this script will create move the required input files for execution of the pol program.
+After the input files are moved, a job script will be generated to run the job if working on HPC. 
+If optional.run_codes is set to "True", the script will then submit the slurm job in the generated directory. 
+
+This python script has 2 main capabilities for polarizability calculations:
+1. Set up file directory for polarizability calculation.
+2. Submit job script for polarizability calculation.
+
+"""
 import yaml
 import os
 import sys
