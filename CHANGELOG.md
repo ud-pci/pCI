@@ -6,6 +6,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.54] - 2024-10-02
+- updated versions for parallel programs
+- dtm v3.4 -> pdtm v4.0
+- conf v5.16 -> pconf v6.0
+- basc v2.7 -> pbasc v3.0
+
+## [0.11.54] - 2024-09-20
+- initial commit of formy program, which pre-constructs YY* vectors for ine program
+- ine.f90 - read INE.YY* if they exist
+- ine.f90 - move DefJz2 outside of main loop in subroutine Vector
+- ine.f90, pol.f90 - renamed Iarr2 -> Iarr0 to make it more obvious determinants come from CONF0.DET
+
+## [0.11.53] - 2024-09-18
+- pdtm.f90 - always reconstruct DTM.INT when Mode = Init
+- pdtm.f90 - updated keys in dtm.in
+
+## [0.11.52] - 2024-09-13
+- sort.f90 - initial commit of new sorting program based on quicksort
+- initial commit of rpa programs rpa, rpa_dtm, and their dependencies
+
+## [0.11.51] - 2024-09-12
+- ine.f90, pol.f90 - fixed issue where dc and ac polarizabilities could not be calculated in the same run
+- ine.f90, pol.f90 - dynamically set IPad (number of probe vectors) to be 3 + number of levels in CONF.XIJ
+
+## [0.11.50] - 2024-09-10
+- str_fmt.f90 - removed dependency on params.f90
+
+## [0.11.49] - 2024-09-09
+- pol.f90 - renamed INE.RES -> POL.RES
+
+## [0.11.48] - 2024-09-07
+- ine.f90, pol.f90 - do not divide alphas by 2 in the case of static polarizabilities
+
+## [0.11.47] - 2024-09-06
+- initial commit of QED programs sgc, qedpot_conf, qed_rot, and their dependencies
+
+## [0.11.46] - 2024-09-04
+- conf.f90 - added default values for keys in ci.in
+- conf.f90 - renamed c.in -> ci.in
+- pol v1.0 - initial commit of new pol program for E1 polarizabilities
+- pol.f90 - revamped ine.f90, removing all features outside of E1 polarizabilities
+- pol.f90 - initialize convergence criteria
+- pol.f90 - removed Khe parameter, which defines variant of solution of homogeneous equation
+- pol.f90 - read new pol.in input file, using key-value assignments
+- pol.f90 - renamed INEFINAL.RES -> POL_E1.RES
+- pol.f90 - set default values for keys and throw error if no wavelengths are given
+- pol.f90 - allow user-inputted dimension of matrix
+- ine.f90 - write INE.XIJ and INE_J.XIJ to separate +/- files labeled with p/m
+- ine.f90, pol.f90 - increased int -> int64 for NumH, minor refactoring
+- ine.f90, pol.f90 - throw Fint error and terminate program if error occurs
+- utils.f90 - utility module for various pci programs
+- dtm.f90 - use CountStr from utils module
+- conf.f90 - renamed Kl -> Mode in ci.in
+- renamed parallel programs basc -> pbasc, conf -> pconf, dtm -> pdtm
+
+## [0.11.45] - 2024-08-29
+- ine.f90 - fixed unallocated bug
+
+## [0.11.44] - 2024-08-22
+- dtm.f90 - removed extra '|' when writing reduced matrix elements
+- conf.f90 - fixed bug in final tables when dealing with very short configurations (e.g. 2s^2, where len(conf) < 4)
+- conf.f90 - realigned FINAL.RES table
+
+## [0.11.43] - 2024-08-20
+- dtm.f90 - fixed bug in reading dtm.in
+
+## [0.11.42] - 2024-08-12
+- dtm.f90 - revamp of dtm.in input file, using key-value assignments (e.g. Mode = TM)
+- dtm.f90 - added warning and error messages when reading dtm.in
+- dtm.f90 - fixed bug in Mode = Init regime when running with multiple cores
+
+## [0.11.41] - 2024-08-09
+- conf_init.f90 - handle blank line before list of core orbitals and add number of core orbitals to Nsp
+- conf.f90 - revamp reading of c.in input file, using key-value assignments (e.g. Kl = 0)
+- conf.f90 - added Kw=1 condition to writing CONFp.JJJ file
+
+## [0.11.40] - 2024-08-08
+- conf.f90 - renamed CONFLEVELS.RES -> LEVELS.RES, CONFFINAL.RES -> FINAL.RES
+
+## [0.11.39] - 2024-07-26
+- dtm.f90 - added estimation for QED correction to g factor
+
+## [0.11.38] - 2024-07-23
+- conf_init.f90 - fixed bug in reading core orbitals
+
+## [0.11.37] - 2024-07-09
+- basc.f90 - use AddReduceR and AllReduceI to call MPI_AllReduce after calculations of radial integrals
+- conf_pt.f90, conf_lsj.f90, conf.f90 - removed unused imports of old inpstr subroutine
+
+## [0.11.36] - 2024-07-03
+- conf_init.f90 - refactored ReadConfInp to use ReadConfParams instead of old inpstr subroutine
+- mpi_utils.f90 - added AllReduceI and AllReduceR subroutines
+
+## [0.11.35] - 2024-07-02
+- conf.f90 - refactored reading of CONF.INP, allowing Qnl to be dynamically allocated via Nsp
+
+## [0.11.34] - 2024-06-21
+- conf.f90, conf_init.f90, determinants.f90 - changed weight formatting in CONF.RES to scientific notation
+
 ## [0.11.33] - 2024-06-20
 - dtm v3.4 - corrected transition rate formulas for correct J in denominator depending on lower/upper level
 

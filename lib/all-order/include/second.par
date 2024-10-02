@@ -1,0 +1,92 @@
+***********************************************************************
+*     Parameter file for second-cis.f                                 *
+*********************************************************************** 
+      include "global.par"
+      PARAMETER (KX1=17)
+      PARAMETER (NL=2*NX,NKX=NX+KX,NREC=8*NL*(NHF+1))
+      PARAMETER (NSORB=600)
+      PARAMETER (NXX=35,NK=15,NN=24,KK=15,NCH1=36000,NCH2=27000)
+      PARAMETER (NXX1=30,NK1=15,IPX=400,NSIG=423000000)
+*     parameters for the all-order merge
+      PARAMETER (NZ=100,NVWH=140000)
+      PARAMETER (IPmr=1)
+***********************************************************************
+*     LINE 1                                                          *
+*                                                                     *
+*     PARAMETER (NHF=500,NX=40,KX=15,KX1=17,NS=30)                    *
+*                                                                     *
+*     NHF  = MAX number of grid points                                * 
+*                                                                     *
+*     NX   = MAX size of spline array coming from nfspl,              *
+*            needs to be consistent with spline/basis set code        * 
+*                                                                     *
+*     KX1  = MAX number of parial waves (2l+1) in basis set           *
+*                                                                     *
+*     Example:  common /spl/ gg(nhf,nx,kx1),ff(nhf,nx,kx1),ee(nx,kx1) * 
+*                                                                     *
+*     KX   = MAX order of splines, needed to read hfspl files         *
+*            needs to be consistent with spline/basis set code        *
+*                                                                     *
+*     NS   = MAX number of core orbitals (originally comes from tdhf) *
+***********************************************************************
+*     LINE 2                                                          *
+*                                                                     * 
+*     PARAMETER (NL=2*NX,NK=NX+KX,NREC=8*NL*(NFH+1))                  *
+*                                                                     *
+*     This line is needed for correct hfspl readin                    *    
+********************************************************************* *
+*     LINE 3                                                          *
+*                                                                     *
+*	  PARAMETER (NSORB=500)                                           *
+*                                                                     *
+*     NSORB = MAX number of orbitals in BASS.INP                      *
+*                                                                     * 
+*     Example: COMMON /bassinp/ nor(nsorb),kor(nsorb),norb            *
+***********************************************************************
+*     LINE 4                                                          *
+*                                                                     * 
+*     PARAMETER (NXX=25,NK=13,NN=24,KK=13,NCH1=5000,NCH2=5000)        * 
+*                                                                     *
+*     These parameters are used for storage of needed radial integrals*
+*                                                                     *
+*     NXX  = MAX number of orbital principal quantum number for       *
+*            which correlation diagrams are summed over (limits nmax) *
+*                                                                     *
+*     NK   = MAX number of parial waves (2l+1) for which              *
+*            correlation diagrams are summed over (limits lmax)       *
+*                                                                     *
+*     NN   = MAX number of core shells                                *
+*                                                                     *
+*     KK   = MAX number of partial waves in correlation diagrams [l]  * 
+*            X_KK (ijkl)                                              *  
+*                                                                     *
+*     NCH1 = MAX number of X_k(mnab) integrals                        * 
+*                                                                     *
+*     NCH2 = MAX number of X_k(mnra) integrals                        *
+*                                                                     *
+*     EXAMPLE:                                                        *
+*     COMMON /radmxab/ ip1(NK,NK,NN,NN,0:KK),x1(NXX,NXX,0:NCH1),ichan1*
+***********************************************************************
+*     LINE 5                                                          *
+*                                                                     *
+*     PARAMETER (NXX1=25,NK1=11,IPX=180,NNN=20000000)                 *
+*                                                                     *
+*     These parameters are used for storage and calculation of        *   
+*     SIGMA 1 and SIGMA 2                                             * 
+*                                                                     *
+*     NXX1 = MAX number of orbital principal quantum number for       * 
+*            which sigmas are calculated (limits max_orb)             *
+*                                                                     * 
+*     NK1  = MAX number of parial waves (2l+1) for which SIGMA 1      *
+*            is calculated                                            * 
+*                                                                     *
+*     EXAMPLE: sigma1(nxx1,nxx1,nk1)                                  *
+*                                                                     * 
+*     NSIG  = MAX number of SIGMA 2 (total count)                     *
+*                                                                     *
+*     IPX is needed to produce arrays fot SCRC.CON files              *
+*                                                                     *
+***********************************************************************
+*     Program will produce warnings and stop when the following       *
+*     parameters are exceeded: NCH1, NCH2, and NNN                    *  
+***********************************************************************

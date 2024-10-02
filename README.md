@@ -2,4 +2,8 @@
 
 # pCI
 
-The parallel CI/CI+MBPT/CI+all-order code package (to be named) is a high-precision relativistic atomic structure software package based on the configuration interaction (CI) method and the combination of CI with many-body perturbation theory (MBPT) or the linearized coupled-cluster (all-order) method. The [serial codes](https://www.sciencedirect.com/science/article/abs/pii/S001046551500185X) were published by Kozlov *et al*. and parallel codes have been developed and are currently maintained by Prof. [Marianna Safronova](http://www.physics.udel.edu/~msafrono/)'s group at the University of Delaware in Newark, DE, USA. 
+pCI is a high-precision relativistic atomic structure software package written in Fortran and designed for use on modern HPC systems. The calculations are based on the configuration interaction method and extendable to utilize many-body perturbation theory (MBPT) or the all-order method to attain even higher accuracy. 
+
+pCI is developed and maintained at the University of Delaware. All of its development is done in the GitHub repository under the development branch.
+
+We welcome all contributions to the pCI software package, including bug fixes, feature enhancements, and documentation improvements. In order to contribute, open an issue or a pull request on GitHub.

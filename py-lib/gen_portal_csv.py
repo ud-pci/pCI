@@ -495,7 +495,7 @@ if __name__ == "__main__":
     atom = ''
     if config_exists:
         config = read_yaml('config.yml')
-        config_name = config['system']['name']
+        config_name = config['atom']['name']
         if len(config_name.split()) == 1:
             atom = config_name + ' I'
         elif len(config_name.split()) == 2:
@@ -534,9 +534,9 @@ if __name__ == "__main__":
         use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(all_order_path + ' directory was found - use data from this directory? ')))))
         if use_path:
             if os.path.isdir(all_order_path + '/even'):
-                run('cp ci+all-order/even/CONFFINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
+                run('cp ci+all-order/even/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
             if os.path.isdir(all_order_path + '/odd'):   
-                run('cp ci+all-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
+                run('cp ci+all-order/odd/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
             if os.path.isdir(all_order_path + '/dtm'):   
                 run('cp ci+all-order/dtm/E1.RES DATA_RAW/E1.RES', shell=True)
             print('data from ' + all_order_path + ' moved to DATA_RAW directory')
@@ -546,9 +546,9 @@ if __name__ == "__main__":
         use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(second_order_path + ' directory was found - use data from this directory? ')))))
         if use_path:
             if os.path.isdir(second_order_path + '/even'):
-                run('cp ci+second-order/even/CONFFINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
+                run('cp ci+second-order/even/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
             if os.path.isdir(second_order_path + '/odd'):   
-                run('cp ci+second-order/odd/CONFFINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
+                run('cp ci+second-order/odd/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
             if os.path.isdir(second_order_path + '/dtm'):   
                 run('cp ci+second-order/dtm/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
             print('data from ' + second_order_path + ' moved to DATA_RAW directory')

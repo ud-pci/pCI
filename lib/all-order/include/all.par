@@ -1,0 +1,47 @@
+      include "global.par"
+      PARAMETER (KX1=17)
+      PARAMETER (NL=2*NX,NKX=NX+KX,NREC=8*NL*(NHF+1))
+      PARAMETER (NXX=35,NK=15,NN=24,KK=15,NCH=36000,NXK=18000)
+      PARAMETER (NXV=5000,NVH=10000)
+      PARAMETER (NNH=NN*NN)
+      PARAMETER (nit=10,nyy=1)
+***********************************************************************
+*     Parameter file for allcore-ci.f, valsd-ci.f, and sdvw-ci.f      *
+*********************************************************************** 
+*     LINES 1, 2 same as allways, see second-ci2.par for explanation  *                                                         
+********************************************************************* *
+*     LINES 3, 4                                                      *
+*                                                                     *                                                                     
+*     These parameters are used for storage of needed radial integrals*
+*     and rhos                                                        *
+*                                                                     *
+*     NXX  = MAX number of orbital principal quantum number for       *
+*            which correlation diagrams are summed over (limits nmax) *
+*                                                                     *
+*     NK   = MAX number of parial waves (2l+1) for which              *
+*            correlation diagrams are summed over (limits lmax)       *
+*                                                                     *
+*     NN   = MAX number of core shells                                *
+*                                                                     *
+*     KK   = MAX number of partial waves in correlation diagrams [l]  * 
+*            X_KK (ijkl)                                              *  
+*                                                                     *
+*     NCH  = MAX number of channels for rho_k(mnab)                   * 
+*                                                                     *
+*     NXK  = MAX number of channels for X_k(mnab) and X_k(manb) int.  *
+*                                                                     *
+*     NVH  = MAX number of channels for rho_k(mnvb)                   * 
+*                                                                     *
+*     NXV  = MAX number of channels for X_k(mnvb) and X_k(mvnb) int.  * 
+*                                                                     *                                                                   
+*     EXAMPLE:                                                        *
+*     COMMON /irhoc/ ipxc(nn,nn,nk,nk,0:kk),icchan                    *
+*     COMMON /rhocin/ xci(nxx,nxx,nch),rmi(nx,nn)                     *
+*                                                                     *
+*     NNH is internal parameter for term 21 in allcore-ci.f           *
+*                                                                     *
+*********************************************************************** 
+*   Programs will produce warnings and stop when the following        *
+*   parameters are exceeded: allcore-ci: NN, NK, NXX, KK, NCH and NXK,*  
+*                              valsd-ci: NN, NK, NXX, KK, NVH and NXV *  
+***********************************************************************

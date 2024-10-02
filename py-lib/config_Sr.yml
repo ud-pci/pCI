@@ -2,10 +2,15 @@
 system:
     bin_directory: ""
     generate_directories: False
-    run_basis_codes: True
-    run_ci: False
+    run_codes: True
     on_hpc: True
     pci_version: default
+
+# HPC parameters
+hpc:
+    partition: large-mem
+    nodes: 1
+    tasks_per_node: 64
 
 # Atomic information
 atom:
@@ -62,11 +67,18 @@ add:
 
 # Parameters used by conf program
 conf:
-    J: 0.0
-    JM: 0.0
-    J_selection: False
-    num_energy_levels: 5
-    num_dvdsn_iterations: 50
+    odd:
+        J: 0.0
+        JM: 0.0
+        J_selection: False
+        num_energy_levels: 24
+        num_dvdsn_iterations: 50
+    even:
+        J: 0.0
+        JM: 0.0
+        J_selection: False
+        num_energy_levels: 24
+        num_dvdsn_iterations: 50
     include_lsj: True
     write_hij: False
 
@@ -74,6 +86,17 @@ conf:
 dtm:
     matrix_elements: E1
     include_rpa: False
+    level_range:
+        odd: 1 24
+        even: 1 24
+
+# Parameters used by pol program
+pol:
+    parity: odd
+    level: 1
+    method: 1
+    wavelength_range: 0 500
+    step_size: 250
 
 # Parameters used by portal script
 portal:

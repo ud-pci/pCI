@@ -11,7 +11,7 @@ Program pol
     !   CONF.JJJ    J**2 in the CI space of vector X1
     !   CONF.XIJ    is used to calculate <n|X1>
     !   DTM.INT     Radial integrals
-    !   INE.XIJ     solution and R.H.S of the inhom. eq.
+    !   POL.XIJ     solution and R.H.S of the inhom. eq.
     !   INE_J.XIJ   decomposition of the solution of the inhom. eq.
     !   CONF0.XIJ   eigenvectors X0 (initial) and X2 (final)
     !   CONF0.DET   determinants in X0/X2 space
@@ -45,17 +45,16 @@ Program pol
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
-    
-    Integer, Parameter :: IPad = 8 ! number of vectors to be used
 
     Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, Method, N_it4
-    Integer  :: Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer  :: Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1, IPad
     Integer  :: IP4, Kt, N0, nrange
     Integer(kind=int64) :: NumH, NumJ
     
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, Crit1, W0, Q, Elft, Hmin, dlamb
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps
-    Integer, Allocatable, Dimension(:) :: Int
+    Integer, Allocatable, Dimension(:) :: Inte
+    Integer, Allocatable, Dimension(:,:) :: Iarr0
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
@@ -87,12 +86,6 @@ Program pol
     Call Init0          ! Read vectors
     Call Vector(kl)     ! Evaluation of the RHS of the equation and vectors Yi
 
-    If (W0 == 0.d0) Then
-        icyc=1
-    Else
-        icyc=2
-    End If
-
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -109,7 +102,13 @@ Program pol
 
         xlamb=xlamb1
         Do n=1,nlamb
-            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            If (dabs(xlamb) > 1.d-8) Then
+                W0 = 1.d+7/(xlamb*219474.63d0)
+                icyc = 2
+            Else
+                W0 = 0.d0
+                icyc = 1
+            End If
             Do i=1,icyc
                 Ndir=Nddir
                 If (i.EQ.2) W0= -W0
@@ -118,8 +117,8 @@ Program pol
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
                 End If
                 Select Case(Method)
                     Case(0)
@@ -141,7 +140,7 @@ Program pol
                         N_it = 2
                         Do l=1,N_it4
                             print*, '   2-step ITERATION #', l
-                            If (l > 1) kl = 2
+                            If (l > 1) kl = 1
                             Call SolEq1(kl,i) ! Direct solution
                             If (Ndir.LT.Nd) Then
                                 Call SolEq4(ok,i) ! Iterative solution
@@ -169,10 +168,10 @@ Program pol
         End Do
     End Do
 
-    Close(unit=11) ! Close INE.RES
-    Close(unit=99) ! Close INEFINAL.RES
+    Close(unit=11) ! Close POL.RES
+    Close(unit=99) ! Close POL_E1.RES
     Call stopTimer(start_time, timeStr)
-    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of pol was '// trim(timeStr)
     
 Contains
 
@@ -299,8 +298,7 @@ Contains
                 Select Case(key)
                 Case('Mode')
                     ! Kl = 0 - start a new calculation
-                    ! Kl = 1 - use old vectors X1
-                    ! Kl = 2 - use old vectors X1, Y1, Y2
+                    ! Kl = 1 - continue an old calculation
                     Read(val, *) Kl
                 Case('Method')
                     ! Method = 0 - invert the matrix and iterate if diverged
@@ -336,9 +334,7 @@ Contains
         Case(0)
             Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Starting new calculation..'
         Case(1)
-            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1..'
-        Case(2)
-            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Using old X1, Y1, Y2..'
+            Write(*, '(A,I1,A)') 'Mode = ', Kl, ': Continuing an old calculation'
         Case Default
             Write(*, '(A)') 'This value of Kl is not valid. Defaulting to Kl = 0 (starting new calculation).'
         End Select  
@@ -383,9 +379,9 @@ Contains
         Call recunit
         Call Init_Char(Let,Alet,Blet)
         
-        Open(unit=11,status='UNKNOWN',file='INE.RES')
+        Open(unit=11,status='UNKNOWN',file='POL.RES')
         Close(unit=11,status='DELETE')
-        Open(unit=11,status='NEW',file='INE.RES')
+        Open(unit=11,status='NEW',file='POL.RES')
 
         Open(unit=99,status='UNKNOWN',file='POL_E1.RES')
         Close(unit=99,status='DELETE')
@@ -393,22 +389,13 @@ Contains
 
         Call ReadPolIn
 
-        xlamb1 = xlamb1s(1)
-        xlamb2 = xlamb2s(1)
-        xlambstep = xlambsteps(1)
-        If (dabs(xlamb1).GT.1.d-8) Then
-            W0 = 1.d+7/(xlamb1*219474.63d0)
-        Else
-            W0= 0.d0
-            Write(*,'(A)')' W0 = 0'
-        End If
-
         strfmt = '(1X,70("-"),/1X,"Program pol v1.0")'
         Write( 6,strfmt) 
         Write(11,strfmt) 
 
         Call ReadConfInp
         Crit1=crt4
+        IPad=3+Nlv ! set number of probe vectors to be 3 + number of levels in CONF.XIJ
         Call ReadConfigurations
         Return
     End Subroutine Input
@@ -586,14 +573,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x.LT.1.d-6) Then
             Read(13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint),Int(Nint))
+            Allocate(Rnt(Nint),Inte(Nint))
             is=0
             Do i=1,Nsu
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is.EQ.0) Then
                 Read(13) (ki(i),i=1,13)
-                Read(13) (Rnt(i),Int(i),i=1,Nint)
+                Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
@@ -693,7 +680,7 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         Use determinants, Only : Gdet, Rspq, CompC
         Implicit None
-        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat
+        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat, nsu1
         Integer :: mdel, nskip, k1, nf
         Integer, Allocatable, Dimension(:) :: idet0, idet1
         Real(dp) :: trd, xn0, xn2
@@ -707,7 +694,12 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Read(17) Nd0
+        Read(17) Nd0, nsu1
+        If (.not. allocated(Iarr0)) Allocate(Iarr0(Ne,Nd0))
+        Do i=1,Nd0
+           Read(17) Iarr0(1:Ne,i)
+        End Do
+        Close(17)
 
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
@@ -717,7 +709,7 @@ Contains
         If (.not. Allocated(iconf2)) Allocate(iconf2(Ne))
 
         strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1)'
-        If (kl.NE.2) Write( 6,strfmt) trd
+        If (kl == 0) Write( 6,strfmt) trd
         YY1(:)=0.d0
         YY2(:)=0.d0
         negl=0              !### number of vector components below threshold
@@ -726,12 +718,12 @@ Contains
         Do n=1,Nd0
             xn0=X0(n)
             xn2=X2(n)
-            Read(17) (idet0(i),i=1,Ne)
+            idet0(1:Ne)=Iarr0(1:Ne,n)
             If (n.EQ.1) Then
                 Call DefJz2(idet0)
                 Q=Jm-Jm0
                 mdel=dabs(Q)+1.d-5
-                If (kl.EQ.2) return
+                If (Kl == 1) Return
             End If
             If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
                 nskip=0             !### dets in skipped confs
@@ -740,7 +732,7 @@ Contains
                     kx=Ndc(ic)
                     Call Gdet(k+1,idet1)
                     Call CompC(idet0,idet1,icomp)
-                    If (icomp.GT.1 .OR. Jdel.GT.idIf) Then
+                    If (icomp.GT.1 .OR. Jdel.GT.idif) Then
                         k=k+kx
                         nskip=nskip+kx
                     Else
@@ -840,7 +832,7 @@ Contains
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
         Do i=1,Nint
-            If (ind.EQ.Int(i)) goto 210
+            If (ind.EQ.Inte(i)) goto 210
         End Do
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
@@ -904,71 +896,66 @@ Contains
         If (.not. Allocated(scales)) Allocate(scales(IP1))
         If (.not. Allocated(Mps)) Allocate(Mps(IP1))
         If (.not. Allocated(ipiv)) Allocate(ipiv(IP1))
-        If (kl > 0) Then
-            If (.not. Allocated(X1)) Allocate(X1(Nd))
-            If (.not. Allocated(YY1)) Allocate(YY1(Nd))
-            If (.not. Allocated(YY2)) Allocate(YY2(Nd))
-        End If
+        If (.not. Allocated(X1)) Allocate(X1(Nd))
+        If (.not. Allocated(YY1)) Allocate(YY1(Nd))
+        If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         
         elft= E0+W0 ! Equation has the form: (Elft-H)X1=Y1
-        If (kl.GE.1) then
-            print*, 'Reading vectors from INE.XIJ...'
+        If (kl == 1) then
             If (sign == 1) Then
-                Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+                Write(*,*) 'Reading vectors from POL_p.XIJ...'
+                Open (unit=16,file='POL_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             Else
-                Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+                Write(*,*) 'Reading vectors from POL_m.XIJ...'
+                Open (unit=16,file='POL_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
             End If
             If (err_stat /= 0) Then
-                print*, 'ERROR: INE.XIJ could not be read'
+                If (sign == 1) Then
+                    Write(*,*) 'ERROR: POL_p.XIJ could not be read'
+                Else
+                    Write(*,*) 'ERROR: POL_m.XIJ could not be read'
+                End If
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
-                    print*, 'ERROR: vector from INE.XIJ could not be read'
+                    If (sign == 1) Then
+                        Write(*,*) 'ERROR: vectors from POL_p.XIJ could not be read'
+                    Else
+                        Write(*,*) 'ERROR: vectors from POL_m.XIJ could not be read'
+                    End If
                     Continue
                 Else
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
                     If (err.GT.1.d-1) then
-                        strfmt = '(1X," Error in file INE.XIJ, vector X1:", &
-                                /" E0=",2F10.6,"; J0=",2F10.6)'
+                        If (sign == 1) Then
+                            strfmt = '(1X," Error in file POL_p.XIJ, vector X1:",/" E0=",2F10.6,"; J0=",2F10.6)'
+                        Else
+                            strfmt = '(1X," Error in file POL_m.XIJ, vector X1:",/" E0=",2F10.6,"; J0=",2F10.6)'
+                        End If
                         Write( *,strfmt) -e0n,E0,tj0n,Tj0
                         Write(11,strfmt) -e0n,E0,tj0n,Tj0
                         Stop
                     End If
-                    If (kl.EQ.2) then
-                        Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Nd1,(YY1(i),i=1,Nd1)
-                        If (err_stat /= 0) Then
-                            Write(*,*) ' Error in INE.XIJ'
-                            Stop
+                    Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Nd1,(YY1(i),i=1,Nd1)
+                    If (err_stat /= 0) Then
+                        If (sign == 1) Then
+                            Write(*,*) ' Error in POL_p.XIJ'
                         Else
-                            Write(*,*) ' Y1 read..'
+                            Write(*,*) ' Error in POL_m.XIJ'
                         End If
-                        Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
-                        If (err_stat /= 0) Then
-                            Write(*,*) ' Error in INE.XIJ'
-                            Stop
-                        Else
-                            Write(*,*) ' Y2 read..'
-                        End If
-                        err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
-                        If (err.GT.1.d-1) then
-                            strfmt = '(1X," Error in file INE.XIJ, vectors Y1,Y2:", &
-                                    /" E0=",2F10.6,"; J0=",2F10.6,/" E2=",2F10.6,"; J2=",2F10.6)'
-                            Write( *,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
-                            Write(11,strfmt) -e0n,E0,tj0n,Tj0,-e2n,E2,tj2n,Tj2
-                            Stop
-                        End If
+                        Stop
                     Else
-                        Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
-                        Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
+                        Write(*,*) ' Y1 read..'
                     End If
+                    YY2 = YY1
                     Close(16)
                     If (sign == 1) Then
-                        Write( *,*)'  SolEq1: solution is taken from INE_p.XIJ'
-                        Write(11,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                        Write( *,*)'  SolEq1: solution is taken from POL_p.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from POL_p.XIJ'
                     Else
-                        Write( *,*)'  SolEq1: solution is taken from INE_m.XIJ'
-                        Write(11,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                        Write( *,*)'  SolEq1: solution is taken from POL_m.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from POL_m.XIJ'
                     End If
                     Return
                 End If
@@ -1059,9 +1046,9 @@ Contains
         Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
         
         If (sign == 1) Then
-            Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Open(unit=16,file='POL_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
         Else
-            Open(unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Open(unit=16,file='POL_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
         End If
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
@@ -1205,9 +1192,9 @@ Contains
             write(11,strfmt) (Vl(k),k=1,num)
     
             If (sign == 1) Then
-                open (unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+                open (unit=16,file='POL_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
             Else
-                open (unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+                open (unit=16,file='POL_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
             End If 
             write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
             write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
@@ -1219,9 +1206,9 @@ Contains
 
         If (.not. ok) str = ' DIVERGED'
         If (sign == 1) Then
-            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_p.XIJ",/3X,63("="))'
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to POL_p.XIJ",/3X,63("="))'
         Else
-            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to INE_m.XIJ",/3X,63("="))'
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ",I7," are saved to POL_m.XIJ",/3X,63("="))'
         End If
         
  200    write( 6,strfmt) str,Nd
@@ -1699,7 +1686,7 @@ Contains
         Use wigner, Only : FJ3, FJ6
         Implicit None
         Integer :: n, i, isk, id, k, kmin, kmax, is
-        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
+        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp, denom
         Real(dp), Dimension(3) :: sk0, sk1, sk2
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
@@ -1783,10 +1770,15 @@ Contains
         end if
 
         If (n.EQ.2 .or. xlamb.EQ.0_dp) Then
-            alp = (ss(1)+ss(2))/2.d0
-            al  = (s(1)+s(2))/2.d0
-            al0 = (s0(1)+s0(2))/2.d0
-            al2 = (s2(1)+s2(2))/2.d0
+            If (xlamb == 0) Then
+                denom = 1.d0
+            Else
+                denom = 2.d0
+            End If
+            alp = (ss(1)+ss(2))/denom
+            al  = (s(1)+s(2))/denom
+            al0 = (s0(1)+s0(2))/denom
+            al2 = (s2(1)+s2(2))/denom
             al1 = (s1(1)-s1(2))
 
             strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'

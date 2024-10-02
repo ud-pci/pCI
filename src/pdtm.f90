@@ -351,18 +351,18 @@ Contains
 
         Select Case(Kl1)
             Case(1) ! regime of Density matrix & expectation values
-                strfmt = '(/4X,"Program DM v3.0: Density matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.0: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('DM.RES',0,11,1)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
-                strfmt = '(/4X,"Program TM v3.4: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.0: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
             Case(3) ! regime to construct DTM.INT
-                strfmt = '(/4X,"Program DTM_Init v1.0: Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.0: Init - Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2) OR FORM DTM.INT (3)? ",I1)'
                 Call OpenFS('DTM.RES',0,11,1)
@@ -617,6 +617,13 @@ Contains
             Write(*,*)' Parameter IPx is too small for Nsu=',Nsu
             Stop
         End If
+
+        ! Delete old DTM.INT if Mode = Init
+        If (Kl1 == 3) Then
+            Open(13,file='DTM.INT',status='UNKNOWN',form='UNFORMATTED')
+            Close(13,status='DELETE')
+        End If
+
         Open (13,file='DTM.INT',status='OLD',form='UNFORMATTED',err=200)
         Read (13,End=200,err=200) ns1,nso1,z1,rn1,km1
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1)+dabs(z1-Z)+dabs(rn1-Rnuc)

@@ -1,8 +1,27 @@
+""" dtm
+
+This script allows the user to automate the transition matrix element calculations from inputted parameters in a "config.yml" file. 
+The "config.yml" file should have the following blocks:
+
+    * system - system parameter (bin_directory, run_codes, on_hpc)
+    * atom.code_method - list of methods (CI, CI+all-order, CI+MBPT)
+    * dtm - parameters used by dtm program (parity, level, emthod, wavelength_range, step_size)
+
+From these parameters, this script will create all input files required for execution of the add program.
+After the input files are created, the add program will be executed to create the list of configurations CONF.INP.
+If optional.generate_directories is set to "True", the script will generate respective directories for CI calculations (e.g. /even and /odd)
+If optional.run_codes is set to "True", the script will then submit the slurm job in the generated directories. 
+
+This python script has 2 main capabilities for polarizability calculations:
+1. Set up file directory for matrix elements calculations.
+2. Submit job script for matrix elements calculations.
+
+"""
 import yaml
 import os
 import sys
 from pathlib import Path
-from utils import run_shell
+from utils import run_shell, get_dict_value
 from gen_job_script import write_job_script
 
 
@@ -90,8 +109,8 @@ def write_dtm_in(mode, levels, operators):
     """ Write dtm.in """
     with open('dtm.in','w') as f:
         f.write('Mode = ' + mode + '\n')
-        f.write('Lvls = ' + levels + '\n')
-        f.write('Ops = ' + operators)
+        f.write('Levels = ' + levels + '\n')
+        f.write('Operators = ' + operators)
 
 if __name__ == "__main__":
     # Read yaml file for system configurations
@@ -99,12 +118,23 @@ if __name__ == "__main__":
     config = read_yaml(yml_file)
     code_method = config['atom']['code_method']
     matrix_elements = config['dtm']['matrix_elements']
-    num_levels = config['conf']['num_energy_levels']
     include_rpa = config['dtm']['include_rpa']
     pci_version = config['system']['pci_version']
     on_hpc = config['system']['on_hpc']
     bin_dir = config['system']['bin_directory']
+    run_codes = config['system']['run_codes']
     basis = config['basis']
+    
+    # hpc parameters
+    if on_hpc:
+        hpc = get_dict_value(config, 'hpc')
+        if hpc:
+            partition = get_dict_value(hpc, 'partition')
+            nodes = get_dict_value(hpc, 'nodes')
+            tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+        else:
+            print('hpc block was not found in', yml_file)
+            partition, nodes, tasks_per_node = None, 1, 1
     
     key_list = []
     if isinstance(matrix_elements, list):
@@ -116,6 +146,15 @@ if __name__ == "__main__":
             for matrix_element in matrix_elements.split(' '):
                 key_list.append(matrix_element.replace('[','').replace(']','').replace(',',''))
 
+    # set level ranges for dtm
+    level_range = config['dtm']['level_range']
+    odd_level_range = level_range['odd']
+    odd_level_from = odd_level_range.split(' ')[0]
+    odd_level_to = odd_level_range.split(' ')[1]
+    even_level_range = level_range['even']
+    even_level_from = even_level_range.split(' ')[0]
+    even_level_to = even_level_range.split(' ')[1]
+    
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
@@ -131,26 +170,33 @@ if __name__ == "__main__":
             Path(full_path+'/dtm').mkdir(parents=True, exist_ok=True)
             if include_rpa:
                 write_dtm_in('Init',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
             else:
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
 
             run_shell('mv dtm.in dtm/dtm.in')
             if include_rpa:
                 write_mbpt_inp(basis, key_list)
                 if on_hpc:
-                    write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                    run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                    script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                    if script_name:
+                        run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                    else:
+                        print('job script was not submitted. check job script and submit manually.')
             else:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm.qs dtm/dtm.qs')
+                script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm.qs dtm/dtm.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
             
             # Find even and odd directories with completed ci runs
             even_exists, odd_exists = False, False
             if os.path.isfile('even/CONF.RES') or os.path.isfile('even/CONFFINAL.RES'):
+                even_exists = True
                 if include_rpa: 
                     run_shell('cp even/HFD.DAT dtm/HFD.DAT')
                     run_shell('cp MBPT.INP dtm/MBPT.INP')
@@ -180,13 +226,13 @@ if __name__ == "__main__":
                     
                 run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
                 write_dtm_in('TM',
-                             '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                             even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                              ', '.join(key_list))
                 
-                if on_hpc: 
+                if on_hpc and run_codes: 
                     run_shell('sbatch dtm_rpa.qs')
             else:    
-                if on_hpc:
+                if on_hpc and run_codes:
                     run_shell('sbatch dtm.qs')
             
     else:
@@ -196,23 +242,29 @@ if __name__ == "__main__":
         Path(dir_path+'/dtm').mkdir(parents=True, exist_ok=True)
         if include_rpa:
             write_dtm_in('Init',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
         else:
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
 
         run_shell('mv dtm.in dtm/dtm.in')
         if include_rpa:
             write_mbpt_inp(basis, key_list)
-            if on_hpc:
-                write_job_script('.','dtm_rpa', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+            if on_hpc and run_codes:
+                script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm_rpa.qs dtm/dtm_rpa.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
         else:
-            if on_hpc:
-                write_job_script('.','dtm', 2, 64, True, 0, 'large-mem', pci_version, bin_dir)
-                run_shell('mv dtm.qs dtm/dtm.qs')
+            if on_hpc and run_codes:
+                script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                if script_name:
+                    run_shell('mv dtm.qs dtm/dtm.qs')
+                else:
+                    print('job script was not submitted. check job script and submit manually.')
         
         # Find even and odd directories with completed ci runs
         even_exists, odd_exists = False, False
@@ -247,11 +299,11 @@ if __name__ == "__main__":
             run_shell('mpirun -n 1 ' + bin_dir + 'pdtm')
             
             write_dtm_in('TM',
-                         '1 ' + str(num_levels) + ' 1 ' + str(num_levels),
+                         even_level_from + ' ' + even_level_to + ', ' + odd_level_from + ' ' + odd_level_to,
                          ', '.join(key_list))
             
-            if on_hpc:
+            if on_hpc and run_codes:
                 run_shell('sbatch dtm_rpa.qs')
         else:    
-            if on_hpc:
+            if on_hpc and run_codes:
                 run_shell('sbatch dtm.qs')

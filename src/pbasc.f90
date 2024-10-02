@@ -103,9 +103,9 @@ Contains
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(4X,"PROGRAM BasC v2.7")'
+            strfmt = '(4X,"PROGRAM pbasc v3.0")'
         Case(dp)            
-            strfmt = '(4X,"PROGRAM BasC v2.7 with double precision for 2e integrals")'
+            strfmt = '(4X,"PROGRAM pbasc v3.0 with double precision for 2e integrals")'
         End Select
         Write( *,strfmt)
         Write(11,strfmt)

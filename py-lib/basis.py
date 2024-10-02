@@ -8,7 +8,7 @@ The "config.yml" file should have the following blocks:
     * optional - optional parameters (isotope shifts, code methods, running all-order codes, pci versions)
 
 From these parameters, this script will create all input files required for the various basis codes.
-After the input files are created, the sequence of basis set codes will be executed if the parameter run_basis_codes is set to "True".
+After the input files are created, the sequence of basis set codes will be executed if the parameter run_codes is set to "True".
 
 This python script has 2 main capabilities for basis set construction:
 1. Construction of basis for isotope shift calculations 
@@ -22,7 +22,7 @@ import get_atomic_data as libatomic
 import orbitals as liborb
 import os
 from pathlib import Path
-from utils import run_shell
+from utils import run_shell, get_dict_value
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
@@ -799,8 +799,13 @@ def write_ao_inputs(system, C_is, kvw):
     # Write inf.vw
     write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
-def generate_batch_qed(kqed, krot, kbrt):
+def generate_batch_qed(bin_dir, kqed, kbrt):
     """ Writes batch.qed """
+    
+    # Specify directory of executables
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+    
     with open('q.in','w') as f:
         f.write("1 \n")
         if kqed == True:
@@ -812,7 +817,6 @@ def generate_batch_qed(kqed, krot, kbrt):
 
     with open('batch.qed','w') as f: 
         f.write("#! /bin/bash -fe \n")
-        f.write("vpkg_require pci \n")
         f.write("kvar=1  # variant of QED potential \n")
         f.write("iter=25 # max number of iterations \n")
         f.write("##################################### \n")
@@ -836,9 +840,8 @@ def generate_batch_qed(kqed, krot, kbrt):
         f.write("n=1 \n")
         f.write("while [ $n -lt $iter ]; do \n")
         f.write("echo 'Iteration '$n \n")
-        f.write("qedpot_conf <q.in >qp.res \n")
-        if krot == True:
-            f.write("qed_rot <q.in >qr.res \n")
+        f.write(bin_dir + "qedpot_conf <q.in >qp.res \n")
+        f.write(bin_dir + "qed_rot <q.in >qr.res \n")
         f.write("grep 'changed' \"QED_ROT.RES\" \n")
         f.write("  if grep -q reached \"QED_ROT.RES\"; then \n")
         f.write("  echo 'Converged in '$n' iterations' \n")
@@ -848,6 +851,7 @@ def generate_batch_qed(kqed, krot, kbrt):
         f.write("done \n")
         f.write("##################################### \n")
     print('batch.qed has been written')
+    run_shell('chmod +x batch.qed')
     
 def check_errors(filename):
     # This function checks output files for errors and returns the number of errors
@@ -869,18 +873,17 @@ def check_errors(filename):
     else:
         print(filename + "not currently supported")
 
-def run_ci_executables(on_hpc, bin_dir, order, custom):
-    
-    # Strip '/' from end of bin_dir
-    if bin_dir and bin_dir[-1] != '/':
-        bin_dir += '/'
-
-    # Find HFD.INP files
+def run_ci_executables(bin_dir, order, custom):
+    # Remove old HFD.INP
+    if os.path.isfile('HFD.INP'):
+        run_shell('rm HFD.INP')
     file_list = os.listdir(".")
     hfd_list = []
     for file in file_list:
         if file[:3] == 'HFD' and file[-3:] == 'INP':
             hfd_list.append(file)
+    
+    hfd_list.sort()
             
     # Run hfd for HFD.INP files
     print('Found the following HFD.INP files:', ', '.join(hfd_list))
@@ -927,7 +930,7 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        run_shell(bin_dir + '/bass < bass.in > bass.out')
+        run_shell(bin_dir + 'bass < bass.in > bass.out')
         
         run_shell('cp bass.out ' + 'bass' + str(nTry) + '.out')
             
@@ -938,8 +941,15 @@ def run_ci_executables(on_hpc, bin_dir, order, custom):
         
     else:
         print("bass completed with no errors after", nTry - 1, "attempts")
-        
-    return
+
+def run_qed_executables():
+    # Run qed
+    if system['rotate_basis'] == True or system['include_qed'] == True:
+        run_shell('cp HFD.DAT HFD-noQED.DAT')
+        generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
+        run_shell('chmod +x batch.qed')
+        run_shell('./batch.qed > qed.out')
+        print("qed complete")
     
 def run_ao_executables(K_is, C_is, bin_dir):
     # Specify directory of executables
@@ -954,13 +964,13 @@ def run_ao_executables(K_is, C_is, bin_dir):
     if kbrt == 0:
         run_shell(bin_dir + 'tdhf < bas_wj.in > tdhf.out')
         print("tdhf complete")
-        run_shell(bin_dir + 'nspl40 < spl.in > nspl40.out')
-        print("nspl40 complete")
+        run_shell(bin_dir + 'nspl < spl.in > nspl.out')
+        print("nspl complete")
     else:
         run_shell(bin_dir + 'bdhf < bas_wj.in > bdhf.out')
         print("bdhf complete")
-        run_shell(bin_dir + 'bspl40 < spl.in > bspl40.out')
-        print("bspl40 complete")
+        run_shell(bin_dir + 'bspl < spl.in > bspl.out')
+        print("bspl complete")
 
     with open('bwj.in','w') as f: 
         f.write(str(basis_lmax) + '\n')
@@ -1039,14 +1049,6 @@ def run_ao_executables(K_is, C_is, bin_dir):
     run_shell('rm bass.in')
     run_shell('rm hfspl.1 hfspl.2')
 
-    # Run qed
-    #if system['rotate_basis'] == True or system['include_qed'] == True:
-    #    run_shell('cp HFD.DAT HFD-noQED.DAT')
-    #    generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
-    #    run_shell('chmod +x batch.qed')
-    #    run_shell('./batch.qed > qed.out')
-    #    print("qed complete")
-
     # Run bas_x
     run_shell(bin_dir + 'bas_x > bas_x.out')
     print("bas_x complete")
@@ -1055,37 +1057,63 @@ if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
-    system = config['system']
-    atom = config['atom']
-    basis = config['basis']
-    optional = config['optional']
-    on_hpc = system['on_hpc']
-    bin_dir = system['bin_directory']
+    system = get_dict_value(config, 'system')
+    atom = get_dict_value(config, 'atom')
+    basis = get_dict_value(config, 'basis')
+    optional = get_dict_value(config, 'optional')
     
-    # Set parameters from config
+    # system parameters
+    bin_dir = get_dict_value(system, 'bin_directory')
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+        
+    on_hpc = get_dict_value(system, 'on_hpc')
+    run_codes = get_dict_value(system, 'run_codes')
+    pci_version = get_dict_value(system, 'pci_version')
+    
+    # hpc parameters
+    if on_hpc and run_codes:
+        hpc = get_dict_value(config, 'hpc')
+        if hpc:
+            partition = get_dict_value(hpc, 'partition')
+            nodes = get_dict_value(hpc, 'nodes')
+            tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+        else:
+            print('hpc block was not found in', yml_file)
+            partition, nodes, tasks_per_node = None, 1, 1
+
+    # atom parameters
     name = atom['name']
     try:
         isotope = atom['isotope']
     except KeyError:
         isotope = ""
-    core_orbitals = basis['orbitals']['core']
-    valence_orbitals = basis['orbitals']['valence']
     include_breit = atom['include_breit']
-    basis_nmax = basis['orbitals']['nmax']
-    basis_lmax = basis['orbitals']['lmax']
-    kval = basis['val_energies']['kval']
-    val_aov = basis['val_aov']
+    code_method = atom['code_method']
+    
+    # basis parameters
+    orbitals = get_dict_value(basis, 'orbitals')
+    core_orbitals = get_dict_value(orbitals, 'core')
+    valence_orbitals = get_dict_value(orbitals, 'valence')
+    basis_nmax = get_dict_value(orbitals, 'nmax')
+    basis_lmax = get_dict_value(orbitals, 'lmax')
+    val_energies = get_dict_value(basis, 'val_energies')
+    if val_energies: kval = get_dict_value(val_energies, 'kval')
+    val_aov = get_dict_value(orbitals, 'val_aov')
 
-    include_isotope_shifts = optional['isotope_shifts']['include']
+    # isotope shift parameters
+    isotope_shifts = get_dict_value(optional, 'isotope_shifts')
+    include_isotope_shifts = get_dict_value(isotope_shifts, 'include')
     if include_isotope_shifts:
-        K_is = optional['isotope_shifts']['K_is']
-        C_is = optional['isotope_shifts']['C_is']
+        K_is = get_dict_value(isotope_shifts, 'K_is')
+        C_is = get_dict_value(isotope_shifts, 'C_is')
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
-
-    code_method = atom['code_method']
-    run_basis_codes = system['run_basis_codes']
-    pci_version = system['pci_version']
+    
+    # qed parameters
+    qed = get_dict_value(optional, 'qed')
+    include_qed = get_dict_value(qed, 'include')
+    rotate_basis = get_dict_value(qed, 'rotate_basis')
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
@@ -1157,9 +1185,9 @@ if __name__ == "__main__":
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
-        if run_basis_codes:
+        if run_codes:
             if not on_hpc:
-                print('run_basis_codes option is only available with HPC access')
+                print('run_codes option is only available with HPC access')
             else:
                 print("Running codes...")
                 if include_isotope_shifts and K_is > 0:
@@ -1180,8 +1208,11 @@ if __name__ == "__main__":
                             os.chdir(dir_name)
                             run_shell('pwd')
                             run_ao_executables(K_is, c, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
-                            run_shell('sbatch ' + script_name)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            if script_name:
+                                run_shell('sbatch ' + script_name)
+                            else:
+                                print('job script was not submitted. check job script and submit manually.')
                             os.chdir('../../')
                         if K_is_dict[K_is]:
                             os.chdir('../../')
@@ -1195,8 +1226,11 @@ if __name__ == "__main__":
                             os.chdir(method+'/basis')
                             run_shell('pwd')
                             run_ao_executables(0, 0, bin_dir)
-                            script_name = write_job_script('.', method, 1, 1, True, 0, 'standard', pci_version, bin_dir)
-                            run_shell('sbatch ' + script_name)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            if script_name:
+                                run_shell('sbatch ' + script_name)
+                            else:
+                                print('job script was not submitted - check job script and submit manually.')
                             os.chdir('../../')
                     else:
                         dir_path = os.getcwd()
@@ -1204,8 +1238,11 @@ if __name__ == "__main__":
                         os.chdir('basis')
                         run_shell('pwd')
                         run_ao_executables(0, 0, bin_dir)
-                        script_name = write_job_script('.', code_method, 1, 1, True, 0, 'standard', pci_version)
-                        run_shell('sbatch ' + script_name)
+                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                        if script_name:
+                            run_shell('sbatch ' + script_name)
+                        else:
+                            print('job script was not submitted - check job script and submit manually.')
                         os.chdir('../')
             
     elif code_method == 'ci':
@@ -1222,14 +1259,20 @@ if __name__ == "__main__":
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
             write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
             
-        if run_basis_codes:
+        if run_codes:
             order = basis['orbitals']['order']
             try: 
                 custom = basis['orbitals']['custom']
             except KeyError:
                 custom = ""
-            run_ci_executables(on_hpc, bin_dir, order, custom)
+            run_ci_executables(bin_dir, order, custom)
                         
+        if include_qed:
+            generate_batch_qed(bin_dir, include_qed, kbrt)
+            if run_codes: 
+                run_shell(bin_dir+'sgc0')
+                run_shell('./batch.qed > qed.out')
+        
         os.chdir('../')
 
     else:

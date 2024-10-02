@@ -58,16 +58,16 @@ Program ine
     Implicit None
     
     Integer, Parameter :: IP2 = 50000
-    Integer, Parameter :: IPad = 8
 
-    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1
+    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4, kl0
+    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1, IPad
     Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
     Integer(kind=int64) :: NumH, NumJ
     
     Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin, dlamb
     Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
-    Integer, Allocatable, Dimension(:) :: Int
+    Integer, Allocatable, Dimension(:) :: Inte
+    Integer, Allocatable, Dimension(:,:) :: Iarr0
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
@@ -99,12 +99,7 @@ Program ine
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
-    If (W0 == 0.d0 .or. Kli == 5) Then
-        icyc=1
-    Else
-        icyc=2
-    End If
-    
+    kl0 = kl ! user-inputted Kl
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
@@ -122,9 +117,16 @@ Program ine
         print*,'nlamb=',nlamb
         xlamb=xlamb1
         Do n=1,nlamb
-            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            If (dabs(xlamb) > 1.d-8) Then
+                W0 = 1.d+7/(xlamb*219474.63d0)
+                icyc = 2
+            Else
+                W0 = 0.d0
+                icyc = 1
+            End If
             print*, 'xlamb=',xlamb
             Do i=1,icyc
+                If (kIters == 2 .and. kl0 == 0) Kl = 0
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
@@ -138,8 +140,8 @@ Program ine
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
+                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
                 End If
                 Select Case(kIters)
                     Case(0)
@@ -353,15 +355,6 @@ Contains
                 Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
                 Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
             End Do
-            
-            xlamb1 = xlamb1s(1)
-            xlamb2 = xlamb2s(1)
-            xlambstep = xlambsteps(1)
-            If (dabs(xlamb1).GT.1.d-8) Then
-              W0 = 1.d+7/(xlamb1*219474.63d0)
-            Else
-              Write(*,'(A)')' W0 = 0'
-            End If
         End If
 
         If (Kli.EQ.5 .AND. W0.EQ.0.d0) Then
@@ -378,6 +371,7 @@ Contains
 
         Call ReadConfInp
         Crit1=crt4
+        IPad=3+Nlv ! set number of probe vectors to be 3 + number of levels in CONF.XIJ
         Call ReadConfigurations
         Return
     End Subroutine Input
@@ -564,14 +558,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x.LT.1.d-6) Then
             Read(13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint),Int(Nint))
+            Allocate(Rnt(Nint),Inte(Nint))
             is=0
             Do i=1,Nsu
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is.EQ.0) Then
                 Read(13) (ki(i),i=1,13)
-                Read(13) (Rnt(i),Int(i),i=1,Nint)
+                Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
@@ -676,13 +670,14 @@ Contains
     Subroutine Vector(kl)   
         ! Read RHS vector |Y1>=A|X0> and LHS vector <Y2|=<X2|B,
         Use conf_variables, Only : iconf1, iconf2
-        Use determinants, Only : Gdet, Rspq, CompC
+        Use determinants, Only : Gdet, Rspq, CompCD, Rdet
         Implicit None
-        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat
+        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat, nsu1
         Integer :: mdel, nskip, k1, nf, iq
         Integer, Allocatable, Dimension(:) :: idet0, idet1
         Real(dp) :: trd, xn0, xn2, s1, s2
         Character(Len=256) :: strfmt, err_msg
+        logical :: yy1_read, yy2_read
 
         trd=1.d-10                  !### used to drop small contributions
         Open (unit=17,file='CONF0.DET',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
@@ -692,7 +687,12 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Read(17) Nd0
+        Read(17) Nd0, nsu1
+        If (.not. allocated(Iarr0)) Allocate(Iarr0(Ne,Nd0))
+        Do i=1,Nd0
+           Read(17) Iarr0(1:Ne,i)
+        End Do
+        Close(17)
 
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
@@ -708,63 +708,90 @@ Contains
         negl=0              !### number of vector components below threshold
         idif= 1
         If (Kli.EQ.5) idif= 2
-        Do n=1,Nd0
-            xn0=X0(n)
-            xn2=X2(n)
-            Read(17) (idet0(i),i=1,Ne)
-            If (n.EQ.1) Then
-                Call DefJz2(idet0)
-                Q=Jm-Jm0
-                mdel=dabs(Q)+1.d-5
-                If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
-                    Write(*,*) 'Vector: |M-M0| is not zero!'
-                    Write(*,*)' M=',Jm,'  M0=',Jm0
-                    Stop
+
+        ! Read vectors from files INE.YY1 and INE.YY2 if they exist
+        yy1_read = .false.
+        Open(33,file='INE.YY1',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY1(1:Nd)
+            Close(33)
+            yy1_read = .true.
+            print*, 'vector YY1 read from INE.YY1'
+        End If
+
+        yy2_read = .false.
+        Open(33,file='INE.YY2',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY2(1:Nd)
+            Close(33)
+            yy2_read = .true.
+            print*, 'vector YY2 read from INE.YY2'
+        End If
+
+        ! Define projection of Jz for Iarr0(:,1) corresponding to CONF0.DET
+        idet0(1:Ne)=Iarr0(1:Ne,1)
+        Call DefJz2(idet0)
+        Q=Jm-Jm0
+        mdel=dabs(Q)+1.d-5
+        If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
+            Write(*,*) 'Vector: |M-M0| is not zero!'
+            Write(*,*)' M=',Jm,'  M0=',Jm0
+            Stop
+        End If
+        If (kl.EQ.2) return
+
+        if ((.not. yy1_read) .and. (.not. yy2_read)) then
+            Do n=1,Nd0
+                xn0=X0(n)
+                xn2=X2(n)
+                idet0(1:Ne)=Iarr0(1:Ne,n)
+                If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
+                    nskip=0             !### dets in skipped confs
+                    k=0
+                    Do ic=1,Nc
+                        kx=Ndc(ic)
+                        Call Gdet(k+1,idet1)
+                        Call CompCD(idet0,idet1,icomp)
+                        If (icomp.GT.1 .OR. Jdel.GT.idif) Then
+                            k=k+kx
+                            nskip=nskip+kx
+                        Else
+                            Do k1=1,kx
+                                k=k+1
+                                Call Gdet(k,idet1)
+                                Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
+                                If (nf.EQ.1) Then
+                                    If (dabs(xn0).GT.trd) Then
+                                        YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
+                                    End If
+                                    If (dabs(xn2).GT.trd) Then
+                                        YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
+                                    End If
+                                End If
+                            
+                                If (Kli.EQ.5 .AND. nf.EQ.0) Then
+                                    Do iq=1,Ne
+                                        i1=idet1(iq)
+                                        If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
+                                        If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
+                                    End Do
+                                End If
+                            End Do
+                        End If
+                    End Do
+                Else
+                    negl=negl+1
                 End If
-                If (kl.EQ.2) return
-            End If
-            If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
-                nskip=0             !### dets in skipped confs
-                k=0
-                Do ic=1,Nc
-                    kx=Ndc(ic)
-                    Call Gdet(k+1,idet1)
-                    Call CompC(idet0,idet1,icomp)
-                    If (icomp.GT.1 .OR. Jdel.GT.idIf) Then
-                        k=k+kx
-                        nskip=nskip+kx
-                    Else
-                        Do k1=1,kx
-                            k=k+1
-                            Call Gdet(k,idet1)
-                            Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
-                            If (nf.EQ.1) Then
-                                If (dabs(xn0).GT.trd) Then
-                                    YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
-                                End If
-                                If (dabs(xn2).GT.trd) Then
-                                    YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
-                                End If
-                            End If
-                
-                            If (Kli.EQ.5 .AND. nf.EQ.0) Then
-                                Do iq=1,Ne
-                                    i1=idet1(iq)
-                                    If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
-                                    If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
-                                End Do
-                            End If
-                        End Do
-                    End If
-                End Do
-            Else
-                negl=negl+1
-            End If
-            If (1000*(n/1000).EQ.n) Then
-                 strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
-                 Write(*,strfmt) n,Nd0,negl,nskip
-            End If
-        End Do
+                If (1000*(n/1000).EQ.n) Then
+                     strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
+                     Write(*,strfmt) n,Nd0,negl,nskip
+                End If
+            End Do
+        end if
 
         If (Kli.EQ.5 .AND. Nd0.EQ.Nd) Then
             s1= 0.d0
@@ -776,7 +803,6 @@ Contains
             strfmt='(/4x,"<X2|Q_0|X0>=",F10.5,/4x"<X0|Q_0|X2>=",F10.5)'
             Write (*,strfmt) s1,s2
         End If
-        Close(17)
 
         Return
     End Subroutine Vector
@@ -888,7 +914,7 @@ Contains
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
         Do i=1,Nint
-            If (ind.EQ.Int(i)) goto 210
+            If (ind.EQ.Inte(i)) goto 210
         End Do
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
@@ -1066,7 +1092,7 @@ Contains
         Call FormattedTime(ttime, timeStr)
         Write(*,'(2X,A)'), 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
         
-        strfmt = '(3X," NumH =",I10,";  Hmin =",F12.6/)'
+        strfmt = '(3X," NumH =",I12,";  Hmin =",F12.6/)'
         Write(*,strfmt) NumH,Hmin
 
         If (.not. Allocated(Zc)) Allocate(Zc(Ntr*Ntr))
@@ -1272,10 +1298,10 @@ Contains
         If (.not. ok) str = ' DIVERGED'
         If (sign == 1) Then
             strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved to INE_p.XIJ",/3X,63("="))'
+             I8," are saved to INE_p.XIJ",/3X,63("="))'
         Else
             strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved to INE_m.XIJ",/3X,63("="))'
+             I8," are saved to INE_m.XIJ",/3X,63("="))'
         End If
             
  200    write( 6,strfmt) str,Nd
@@ -1826,7 +1852,7 @@ Contains
         Use wigner, Only : FJ3, FJ6
         Implicit None
         Integer :: n, i, isk, id, k, kmin, kmax, is
-        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
+        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp, denom
         Real(dp), Dimension(3) :: sk0, sk1, sk2
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
@@ -1911,10 +1937,15 @@ Contains
         end if
 
         If (n.EQ.2 .or. xlamb.EQ.0_dp) Then
-            alp = (ss(1)+ss(2))/2.d0
-            al  = (s(1)+s(2))/2.d0
-            al0 = (s0(1)+s0(2))/2.d0
-            al2 = (s2(1)+s2(2))/2.d0
+            If (xlamb == 0) Then
+                denom = 1.d0
+            Else
+                denom = 2.d0
+            End If
+            alp = (ss(1)+ss(2))/denom
+            al  = (s(1)+s(2))/denom
+            al0 = (s0(1)+s0(2))/denom
+            al2 = (s2(1)+s2(2))/denom
             al1 = (s1(1)-s1(2))
 
             strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
