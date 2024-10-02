@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.54] - 2024-10-02
+- updated versions for parallel programs
+- dtm v3.4 -> pdtm v4.0
+- conf v5.16 -> pconf v6.0
+- basc v2.7 -> pbasc v3.0
+
 ## [0.11.54] - 2024-09-20
 - initial commit of formy program, which pre-constructs YY* vectors for ine program
 - ine.f90 - read INE.YY* if they exist
