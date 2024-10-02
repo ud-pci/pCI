@@ -179,13 +179,13 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program conf v5.16 with single precision")'
+            strfmt = '(4X,"Program pconf v6.0 with single precision")'
         Case(dp)            
             Select Case(type2_real)
             Case(sp)
-                strfmt = '(4X,"Program conf v5.16")'
+                strfmt = '(4X,"Program pconf v6.0")'
             Case(dp)
-                strfmt = '(4X,"Program conf v5.16 with double precision for 2e integrals")'
+                strfmt = '(4X,"Program pconf v6.0 with double precision for 2e integrals")'
             End Select
         End Select
         
