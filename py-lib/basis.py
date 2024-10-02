@@ -1057,19 +1057,19 @@ if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
-    system = config['system']
-    atom = config['atom']
-    basis = config['basis']
-    optional = config['optional']
+    system = get_dict_value(config, 'system')
+    atom = get_dict_value(config, 'atom')
+    basis = get_dict_value(config, 'basis')
+    optional = get_dict_value(config, 'optional')
     
     # system parameters
-    bin_dir = system['bin_directory']
+    bin_dir = get_dict_value(system, 'bin_directory')
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
         
-    on_hpc = system['on_hpc']
-    run_codes = system['run_codes']
-    pci_version = system['pci_version']
+    on_hpc = get_dict_value(system, 'on_hpc')
+    run_codes = get_dict_value(system, 'run_codes')
+    pci_version = get_dict_value(system, 'pci_version')
     
     # hpc parameters
     if on_hpc and run_codes:
@@ -1092,25 +1092,28 @@ if __name__ == "__main__":
     code_method = atom['code_method']
     
     # basis parameters
-    core_orbitals = basis['orbitals']['core']
-    valence_orbitals = basis['orbitals']['valence']
-    basis_nmax = basis['orbitals']['nmax']
-    basis_lmax = basis['orbitals']['lmax']
-    kval = basis['val_energies']['kval']
-    val_aov = basis['val_aov']
+    orbitals = get_dict_value(basis, 'orbitals')
+    core_orbitals = get_dict_value(orbitals, 'core')
+    valence_orbitals = get_dict_value(orbitals, 'valence')
+    basis_nmax = get_dict_value(orbitals, 'nmax')
+    basis_lmax = get_dict_value(orbitals, 'lmax')
+    val_energies = get_dict_value(basis, 'val_energies')
+    if val_energies: kval = get_dict_value(val_energies, 'kval')
+    val_aov = get_dict_value(orbitals, 'val_aov')
 
     # isotope shift parameters
-    isotope_shifts = optional['isotope_shifts']
-    include_isotope_shifts = isotope_shifts['include']
+    isotope_shifts = get_dict_value(optional, 'isotope_shifts')
+    include_isotope_shifts = get_dict_value(isotope_shifts, 'include')
     if include_isotope_shifts:
-        K_is = optional['isotope_shifts']['K_is']
-        C_is = optional['isotope_shifts']['C_is']
+        K_is = get_dict_value(isotope_shifts, 'K_is')
+        C_is = get_dict_value(isotope_shifts, 'C_is')
         c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
     
     # qed parameters
-    include_qed = optional['qed']['include']
-    rotate_basis = optional['qed']['rotate_basis']
+    qed = get_dict_value(optional, 'qed')
+    include_qed = get_dict_value(qed, 'include')
+    rotate_basis = get_dict_value(qed, 'rotate_basis')
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)

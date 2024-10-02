@@ -1,5 +1,5 @@
 system:
-    bin_directory: ""
+    bin_directory: "/lustre/safrono/users/1813/pCI-dev/bin"
     generate_directories: False
     run_codes: True
     on_hpc: True
@@ -33,22 +33,6 @@ basis:
         ]
         nmax: 24
         lmax: 4
-    b_splines:
-        nmax: 40
-        lmax: 6
-        k: 7
-    val_aov:
-        s: 4
-        p: 4
-        d: 4
-        f: 3
-    val_energies:
-        kval: 1
-        energies: 
-            s: -0.28000
-            p: [-0.22000, -0.22000]
-            d: [-0.31000, -0.31000]
-            f: [-0.13000, -0.13000]
 
 # Parameters used by add program
 add:
