@@ -1099,7 +1099,7 @@ if __name__ == "__main__":
     basis_lmax = get_dict_value(orbitals, 'lmax')
     val_energies = get_dict_value(basis, 'val_energies')
     if val_energies: kval = get_dict_value(val_energies, 'kval')
-    val_aov = get_dict_value(orbitals, 'val_aov')
+    val_aov = get_dict_value(basis, 'val_aov')
 
     # isotope shift parameters
     isotope_shifts = get_dict_value(optional, 'isotope_shifts')
