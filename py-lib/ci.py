@@ -254,7 +254,10 @@ def move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij):
     if os.path.isfile('basis/SGC.CON'):
         with open(parity + '/ci.in', 'w') as f:
             f.write('Kl = 2 \n')
-            f.write('Ksig = 2 \n')
+            if os.path.isfile('basis/SCRC.CON'):
+                f.write('Ksig = 2 \n')
+            else:
+                f.write('Ksig = 2 \n')
             f.write('Kdsig = 0 \n')
             f.write('Kw = ' + Kw + '\n')
             f.write('KLSJ = ' + KLSJ)
