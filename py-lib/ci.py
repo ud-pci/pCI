@@ -232,27 +232,27 @@ def form_conf_inp(parity, bin_dir):
     run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij):
-    if not os.path.isdir(parity):
-        run_shell("mkdir " + parity)
+def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij):
+    if not os.path.isdir(conf_dir):
+        run_shell("mkdir " + conf_dir)
     if os.path.isfile('basis/HFD.DAT'):
-        run_shell("cp basis/HFD.DAT " + parity)
+        run_shell("cp basis/HFD.DAT " + conf_dir)
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + parity + "/CONF.INP")
+        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + conf_dir + "/CONF.INP")
     if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + parity + "/ADD.INP")
+        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + conf_dir + "/ADD.INP")
     if os.path.isfile('basis/SGC.CON'):
-        run_shell("cp basis/SGC.CON "  + parity)
+        run_shell("cp basis/SGC.CON "  + conf_dir)
     if os.path.isfile('basis/SCRC.CON'):
-        run_shell("cp basis/SCRC.CON "  + parity)
+        run_shell("cp basis/SCRC.CON "  + conf_dir)
     if run_codes and os.path.isfile(root_dir + '/ci.qs'):
-        run_shell("cp " + root_dir + "/ci.qs " + parity)
+        run_shell("cp " + root_dir + "/ci.qs " + conf_dir)
         
     Kw = '1' if write_hij else '0'
     KLSJ = '1' if include_lsj else '0'
 
     if os.path.isfile('basis/SGC.CON'):
-        with open(parity + '/ci.in', 'w') as f:
+        with open(conf_dir + '/ci.in', 'w') as f:
             f.write('Kl = 2 \n')
             if os.path.isfile('basis/SCRC.CON'):
                 f.write('Ksig = 2 \n')
@@ -262,7 +262,7 @@ def move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij):
             f.write('Kw = ' + Kw + '\n')
             f.write('KLSJ = ' + KLSJ)
     else:
-        with open(parity + '/ci.in', 'w') as f:
+        with open(conf_dir + '/ci.in', 'w') as f:
             f.write('Kl = 0 \n')
             f.write('Ksig = 0 \n')
             f.write('Kdsig = 0 \n')
@@ -285,20 +285,12 @@ if __name__ == "__main__":
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
     
-    include_isotope_shifts = config['optional']['isotope_shifts']['include']
-    if include_isotope_shifts:
-        K_is = config['optional']['isotope_shifts']['K_is']
-        C_is = config['optional']['isotope_shifts']['C_is']
-        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
-        K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
-        
-    code_method = config['atom']['code_method']
-    run_codes = config['system']['run_codes']
-    include_lsj = config['conf']['include_lsj']
-    pci_version = config['system']['pci_version']
-    write_hij = config['conf']['write_hij']
-    bin_dir = config['system']['bin_directory']
-    on_hpc = config['system']['on_hpc']
+    system = get_dict_value(config, 'system')
+    gen_dir = get_dict_value(system, 'generate_directories')
+    run_codes = get_dict_value(system, 'run_codes')
+    pci_version = get_dict_value(system, 'pci_version')
+    bin_dir = get_dict_value(system, 'bin_directory')
+    on_hpc = get_dict_value(system, 'on_hpc')
     
     # hpc parameters
     if on_hpc:
@@ -311,12 +303,24 @@ if __name__ == "__main__":
             print('hpc block was not found in', yml_file)
             partition, nodes, tasks_per_node = None, 1, 1
     
-    # Ensure basis and add core orbitals match
-    basis_core = config['basis']['orbitals']['core']
-    add_core = config['add']['orbitals']['core']
+    optional = get_dict_value(config, 'optional')
+    isotope_shifts = get_dict_value(optional, 'isotope_shifts')
+    include_isotope_shifts = get_dict_value(isotope_shifts, 'include')
+    if include_isotope_shifts:
+        K_is = get_dict_value(isotope_shifts, 'K_is')
+        C_is = get_dict_value(isotope_shifts, 'C_is')
+        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+        K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
+    
+    atom = get_dict_value(config, 'atom')
+    code_method = get_dict_value(atom, 'code_method')
+    conf = get_dict_value(config, 'conf')
+    
+    include_lsj = get_dict_value(conf, 'include_lsj')
+    write_hij = get_dict_value(conf, 'write_hij')
     
     # Check if user wants to generate directories for CI computations
-    gen_dir = run_codes if run_codes else config['system']['generate_directories']
+    gen_dir = run_codes if run_codes else gen_dir
     
     # CONF.INP should only need to be constructed once, then copied to respective directories
     # Read input to add from add.in if it exists, otherwise create it
@@ -394,10 +398,12 @@ if __name__ == "__main__":
                     os.chdir(dir_name)
                     run_shell('pwd')
                     for parity in parities:
-                        move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij)
+                        J = get_dict_value(conf[parity], 'J')
+                        conf_path = parity + str(J)[0]
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
-                            os.chdir(parity)
+                            os.chdir(conf_path)
                             if script_name:
                                 run_shell("sbatch " + script_name)
                             else:
@@ -418,10 +424,12 @@ if __name__ == "__main__":
                     os.chdir(method)
                     run_shell('pwd')
                     for parity in parities:
-                        move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij)
+                        J = get_dict_value(conf[parity], 'J')
+                        conf_path = parity + str(J)[0]
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
-                            os.chdir(parity)
+                            os.chdir(conf_path)
                             if script_name:
                                 run_shell("sbatch " + script_name)
                             else:
@@ -434,10 +442,12 @@ if __name__ == "__main__":
                 dir_path = os.getcwd()
                 run_shell('pwd')
                 for parity in parities:
-                    move_conf_inp(root_dir, parity, run_codes, include_lsj, write_hij)
+                    J = get_dict_value(conf[parity], 'J')
+                    conf_path = parity + str(J)[0]
+                    move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
                     # Submit CI job if run_codes == True
                     if on_hpc and run_codes: 
-                        os.chdir(parity)
+                        os.chdir(conf_path)
                         if script_name:
                             run_shell("sbatch " + script_name)
                         else:
