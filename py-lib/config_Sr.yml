@@ -21,21 +21,21 @@ atom:
 
 # Parameters used by basis programs
 basis:
-    cavity_radius: 60
+    cavity_radius: 70
     diagonalized: True
     orbitals:
         core: 1s 2s 2p 3s 3p 3d 4s 4p 
-        valence: 5s 5p 4d 6s 6p 5d 4f
+        valence: 5s 5p 4d 6s 6p 5d 7s 7p 6d
         nmax: 35
-        lmax: 6
+        lmax: 5
     b_splines:
         nmax: 40
         lmax: 6
         k: 7
     val_aov:
-        s: 4
-        p: 4
-        d: 4
+        s: 5
+        p: 5
+        d: 5
         f: 3
     val_energies:
         kval: 1
@@ -51,7 +51,7 @@ add:
     ref_configs:
         odd: [5s1   5p1]
         even: [5s2]
-    basis_set: 22spdfg
+    basis_set: 17spdfg
     orbitals:
         core: 1s 2s 2p 3s 3p 3d 4s 4p 
         active: [
@@ -68,10 +68,10 @@ add:
 # Parameters used by conf program
 conf:
     odd:
-        J: 0.0
-        JM: 0.0
+        J: 1.0
+        JM: 1.0
         J_selection: False
-        num_energy_levels: 24
+        num_energy_levels: 12
         num_dvdsn_iterations: 50
     even:
         J: 0.0
@@ -80,28 +80,33 @@ conf:
         num_energy_levels: 24
         num_dvdsn_iterations: 50
     include_lsj: True
-    write_hij: False
+    write_hij: True
 
 # Parameters used by dtm program
 dtm:
-    matrix_elements: E1
-    include_rpa: False
-    level_range:
-        odd: 1 24
-        even: 1 24
+    include_rpa: True
+    DM: 
+        matrix_elements: 
+        level_range: 
+            odd: 
+            even: 
+    TM:
+        matrix_elements: E1
+        from:
+            parity: odd
+            level_range: 1 3
+        to:
+            parity: even 
+            level_range: 1 1
 
 # Parameters used by pol program
 pol:
-    parity: odd
+    parity: even
     level: 1
     method: 1
-    wavelength_range: 0 500
-    step_size: 250
-
-# Parameters used by portal script
-portal:
-    ignore_g: True
-    min_uncertainty: 1.5
+    field_type: static, dynamic
+    wavelength_range: 1000 1000
+    step_size: 0
     
 # Optional parameters
 optional:
