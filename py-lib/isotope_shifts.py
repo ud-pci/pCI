@@ -103,7 +103,6 @@ if __name__ == "__main__":
                 energies.append(energies_ev)
                 os.chdir('../')
 
-            print(energies)
             # calculate 2-point and 4-point derivatives and isotope coefficients (K_fs, K_sms, K_nms, K_ms)
             points = [1, -8, 0, 8, -1] 
             radius = get_radius()
