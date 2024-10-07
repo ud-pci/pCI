@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.55] - 2024-10-07
+-ine.f90, pol.f90 - fixed text for omega=0
+
 ## [0.11.54] - 2024-10-02
 - updated versions for parallel programs
 - dtm v3.4 -> pdtm v4.0
