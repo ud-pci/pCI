@@ -140,8 +140,8 @@ Program ine
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
+                    Write( *,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
+                    Write(11,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
                 End If
                 Select Case(kIters)
                     Case(0)
@@ -1960,14 +1960,26 @@ Contains
             write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
             write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
-            if (ok) Then
-              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+            if (ok) then
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
             else
-              strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
-            End If
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
+            end if
             write( 6,strfmt2) abs(xlamb),al0,al2
             write(11,strfmt2) abs(xlamb),al0,al2
-            write(99,strfmt2) abs(xlamb),al0,al2
+            write(99,strfmt) abs(xlamb),al0,al2
         End If
 
         Return

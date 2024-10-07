@@ -12,7 +12,7 @@ Program pol
     !   CONF.XIJ    is used to calculate <n|X1>
     !   DTM.INT     Radial integrals
     !   POL.XIJ     solution and R.H.S of the inhom. eq.
-    !   INE_J.XIJ   decomposition of the solution of the inhom. eq.
+    !   POL_J.XIJ   decomposition of the solution of the inhom. eq.
     !   CONF0.XIJ   eigenvectors X0 (initial) and X2 (final)
     !   CONF0.DET   determinants in X0/X2 space
     !   CONF0.JJJ   J**2 in X0/X2 space
@@ -117,8 +117,8 @@ Program pol
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for lambda = 0",/3X,26("-")/)')
+                    Write( *,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
+                    Write(11,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
                 End If
                 Select Case(Method)
                     Case(0)
@@ -1494,19 +1494,19 @@ Contains
     End Subroutine PrjE2
 
     Subroutine RdcX1J(sign)   !### Transforms X1J to the form which corresponds
-        Use wigner      !### to the reduced ME and saves it in INE_J.XIJ.
+        Use wigner      !### to the reduced ME and saves it in POL_J.XIJ.
         Implicit None   
         Integer :: i, jf, j, is, sign
         Real(dp) :: Aj, xm, W
 
         If (sign == 1) Then
-            open (unit=16,file='INE_J_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            open (unit=16,file='POL_J_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
             close(16,status='DELETE')
-            open (unit=16,file='INE_J_p.XIJ',status='NEW',form='UNFORMATTED')
+            open (unit=16,file='POL_J_p.XIJ',status='NEW',form='UNFORMATTED')
         Else
-            open (unit=16,file='INE_J_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            open (unit=16,file='POL_J_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
             close(16,status='DELETE')
-            open (unit=16,file='INE_J_m.XIJ',status='NEW',form='UNFORMATTED')
+            open (unit=16,file='POL_J_m.XIJ',status='NEW',form='UNFORMATTED')
         End If
 
         jf=3
@@ -1793,12 +1793,22 @@ Contains
             write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
             write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
 
-            if (ok) Then
-                strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
-                strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+            if (ok) then
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
             else
-                strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
-                strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  DIVERGED")'
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
             end if
             write( 6,strfmt2) abs(xlamb),al0,al2
             write(11,strfmt2) abs(xlamb),al0,al2
