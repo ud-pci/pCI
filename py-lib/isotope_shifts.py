@@ -109,7 +109,7 @@ if __name__ == "__main__":
             au_to_si_conversion_factor_fs = 2.3497*10**-3  # 1 a.u. = 2.3497 x 10^-3 GHz/fm^2
             au_to_si_conversion_factor_ms = 3609.48        # 1 a.u. = 3609.48 GHz*amu
             derivatives = [] 
-            K_is = [] 
+            K_ishift = [] 
             for num_energy in range(len(energies[0])): # runs over the total number of energy levels
                 derivative  = 0
                 for num_energy2 in range(len(energies)): # runs over the 5 c_is values
@@ -121,7 +121,7 @@ if __name__ == "__main__":
                 else:    
                     coefficient = au_to_si_conversion_factor_ms * derivative
                 
-                K_is.append(coefficient)
+                K_ishift.append(coefficient)
 
             # calculate uncertainties
             zero_plus1 = [0]*len(energies[0])
@@ -136,7 +136,7 @@ if __name__ == "__main__":
                 uncertainty1[num_energy] = plus1_minus1[num_energy] - zero_plus1[num_energy]
                 uncertainty2[num_energy] = zero_minus1[num_energy] - plus1_minus1[num_energy]
 
-            filename = 'is' + C_is + '.out'
+            filename = 'is' + str(C_is) + '.out'
             with open(filename,'w') as f:
                 conf_len = len(reduce(lambda x, y: x if len(x) > len(y) else y, main_confs))
                 f.write('conf.'.rjust(conf_len, ' ') + ' ' + 'term' + '  ')
@@ -163,7 +163,7 @@ if __name__ == "__main__":
                     for num_energy2 in range(len(energies)): # runs over the 5 c_is values
                         f.write(str(energies[num_energy2][num_energy]) + '  ')
                     f.write('{: .8f}'.format(derivatives[num_energy]) + '  ')
-                    f.write('{: .8f}'.format(K_is[num_energy]) + '  ')
+                    f.write('{: .8f}'.format(K_ishift[num_energy]) + '  ')
                     f.write('{: .8f}'.format(zero_plus1[num_energy]) + '  ')
                     f.write('{: .8f}'.format(zero_minus1[num_energy]) + '  ')
                     f.write('{: .8f}'.format(plus1_minus1[num_energy]) + '  ')
@@ -290,10 +290,10 @@ if __name__ == "__main__":
                 run("cp -r 0 " + dir_name, shell=True)
                 os.chdir(dir_name)
                 if abs(c) > 0.0:
-                    run("find . -type f -name \"*.INP\" -exec sed -i 's/K_is= 0/K_is= " + '{:.5f}'.format(K_is) + "/g' \{\} \;", shell=True)
-                    run("find . -type f -name \"*.INP\" -exec sed -i 's/C_is= 0/C_is= " + '{:.5f}'.format(c) + "/g' \{\} \;", shell=True)
+                    run("find . -type f \\( -name '*.INP' -o -name '*.sh' \\) -exec sed -i 's/K_is= 0/K_is= " + '{}'.format(K_is) + "/gI' \{\} \;", shell=True)
+                    run("find . -type f \\( -name '*.INP' -o -name '*.sh' \\) -exec sed -i 's/C_is= 0/C_is= " + '{:.5f}'.format(c) + "/gI' \{\} \;", shell=True)
                     if K_is > 1:
-                        run("find . -type f -name \"*.INP\" -exec sed -i 's/Klow= 0/Klow= 2" + "/g' \{\} \;", shell=True)
+                        run("find . -type f \\( -name '*.INP' -o -name '*.sh' \\) -exec sed -i 's/Klow= 0/Klow= 2/gI' \{\} \;", shell=True)
                 run('./basis.sh', shell=True)
                 os.chdir('../')  
               
