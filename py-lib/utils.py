@@ -15,3 +15,18 @@ def get_dict_value(param_dict, key):
         return param_dict[key]
     except KeyError:
         return None
+    except TypeError:
+        return None
+    
+def convert_params_to_list(param):
+    """ Converts a string parameter into a list if it's not already a list"""
+    
+    if ',' in str(param): param = str(param).split(',')
+    
+    if not isinstance(param, list): 
+        param = [str(param)]
+    else:
+        for istr in range(len(param)):
+            param[istr] = param[istr].strip()
+
+    return param

@@ -155,7 +155,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write(bin_dir + 'ine < ine.in \n')
         elif code == 'pol':
             f.write(bin_dir + 'sort \n')
-            f.write(bin_dir + 'pol < pol.in \n')
+            f.write(bin_dir + 'pol \n')
         elif code == 'all-order' or code == 'ci+all-order':
             f.write(bin_dir + 'allcore-ci <inf.aov >out.core \n')
             f.write(bin_dir + 'valsd-ci <inf.aov >out.val \n')

@@ -38,7 +38,7 @@ basis:
 add:
     # Lists of even and odd parity reference configurations
     ref_configs:
-        odd: [2s2 2p5 3s1]
+        odd: [2s2 2p5 3s1, 2s2 2p5 3d1, 2s1 2p6 3p1]
         even: [2s2 2p6,
                2s2 2p5 3p1]
     basis_set: 12spdfg
@@ -63,7 +63,7 @@ conf:
         J: 1
         JM: 1
         J_selection: True
-        num_energy_levels: 11
+        num_energy_levels: 5
         num_dvdsn_iterations: 100
     even:
         J: 0.0
@@ -78,14 +78,14 @@ conf:
 dtm:
     matrix_elements: E1
     include_rpa: False
-    level_range:
-        odd: 4 5
-        even: 1 1
-
-# Parameters used by portal script
-portal:
-    ignore_g: True
-    min_uncertainty: 1.5
+    TM:
+        matrix_elements: E1
+        from:
+            parity: odd
+            level_range: 4 5
+        to:
+            parity: even 
+            level_range: 1 1
     
 # Optional parameters
 optional:
