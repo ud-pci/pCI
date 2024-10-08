@@ -131,7 +131,6 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     f.write(' Ne =  ' + str(num_val) + '\n')
     f.write(' Kl4=  1 \n')
     f.write(' Nc4=999 \n')
-    f.write(' Gj = 0.0000 \n')
     f.write('Crt4= 0.0001 \n')
     f.write('kout= 0 \n')
     f.write('Ncpt= 0 \n')
