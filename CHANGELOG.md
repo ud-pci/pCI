@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2024-10-08
+- pCI version update for public release
+
 ## [0.11.55] - 2024-10-07
 -ine.f90, pol.f90 - fixed text for omega=0
 
