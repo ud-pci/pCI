@@ -3,11 +3,11 @@ Fe XVII and Ni XIX
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 
-In this section, we describe a method used to construct basis sets for the cases of Fe XVII and Ni XIX. In this example, we utilize multiple ``HFD.INP`` to construct the orbitals. The following is a list of the input files used in this example.
+In this section, we describe a method used to construct basis sets for the cases of Fe XVII and Ni XIX. In this example, we run the ``hfd`` program in 3 sequential stages to construct the DF orbitals, then run the ``bass`` program to form virtual orbitals to account for correlations. The following is a list of the input files used in this example.
 
-1. ``h_m_1.inp`` - Here we construct the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals with the :math:`2s^2 2p^5 3d` configuration. QQ is 0 for 3s and 3p, but the orbital is still formed. DF is solved with 0 occ. num., but they won't be very good orbitals. You can think of :math:`3s0` and :math:`3p0` as placeholders to keep the order of orbitals, and add them in the next step.
+1. ``h_m_1.inp`` - In the first stage, we construct the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals with the :math:`1s^2 2s^2 2p^5 3d` configuration. ``QQ`` is ``0`` for :math:`3s`` and :math:`3p`, but the orbital is still formed. DF is solved with 0 occupation number for these orbitals, but they won't be very good orbitals. We can think of :math:`3s0` and :math:`3p0` as placeholders to keep the order of orbitals, and re-construct them in the next step.
 
-2. ``h_m_2.inp`` - Here we freeze the :math:`1s, 2s, 2p, 3d` orbitals and re-construct the :math:`3s, 3p` orbitals from the :math:`2s^2 2p^5 3s` and :math:`2s^2 2p^5 3p` configurations. 
+2. ``h_m_2.inp`` - In the second stage, we freeze the :math:`1s, 2s, 2p, 3d` orbitals and re-construct the :math:`3s, 3p` orbitals from the :math:`1s^2 2s^2 2p^5 3s` and :math:`1s^2 2s^2 2p^5 3p` configurations. Note that ``NS`` is unchanged here, since we do not add any additional orbitals.
 
     The following code block shows ``h_m_1.inp`` on the left and ``h_m_2.inp`` on the right of the partition. The head of both input files are identical. 
 
@@ -19,7 +19,7 @@ In this section, we describe a method used to construct basis sets for the cases
         NSO=   2                # number of closed orbitals (in this case only 1s2, 2s2)
         Z  =  26.0              # atomic number
         AM =  56.000            # atomic mass
-        JM =  -2.0              # 
+        JM =  -2.0              # default parameter (do not change)
         R2 =  20.0              # radius of cavity
         kbr= 2                  # key for Breit (0 - Coulomb, 1 - Gaunt, 2 - Full Breit)
         
@@ -36,7 +36,7 @@ In this section, we describe a method used to construct basis sets for the cases
          9     3D (5/2)   0.0000    0    0          |          9     3D (5/2)   0.0000    1    3
         
         
-3. ``h_m_3.inp`` - Here we freeze the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals, then construct the :math:`4s, 4p, 4d, 4f, 5g` orbitals from the :math:`2s^2 2p^5 4s, 2s^2 2p^5 4p, \dots, 2s^2 2p^5 5g` configurations. Note that the number of orbitals ``Ns`` has changed from 9 to 18. 
+3. ``h_m_3.inp`` - At the third stage, we freeze the :math:`1s, 2s, 2p, 3s, 3p, 3d` orbitals, then construct the :math:`4s, 4p, 4d, 4f, 5g` orbitals from the :math:`1s^2 2s^2 2p^5 4s, 1s^2 2s^2 2p^5 4p, \dots, 1s^2 2s^2 2p^5 5g` configurations. Note that the number of orbitals ``Ns`` has changed from 9 to 18, since we are adding 9 additional orbitals. 
 
     .. code-block:: 
 
@@ -72,7 +72,7 @@ In this section, we describe a method used to construct basis sets for the cases
         18     5G (9/2)   0.0000    0    5
 
 
-4. ``b_m_2.inp`` - Here we update ``HFD.DAT`` by including virtual orbitals to account for correlations.
+4. ``b_m_2.inp`` - Finally, we run the ``bass`` program to add virtual orbitals to ``HFD.DAT`` to account for correlations. Here, we are constructing the :math:`24spdfg` basis set, where the designation :math:`24spdfg` means that all orbitals up to :math:`n=24` are included for the :math:`spdfg` partial waves. Therefore, the list of orbitals included here extends to :math:`24g`, designated by ``-2.4401`` and ``2.4401``. The digital format here is represented as ``sn.nlqq``, where ``nn`` represents the principal quantum number, ``l`` is the orbital angular momentum quantum number, ``l`` is the orbital angular momentum quantum number, and ``qq`` is the occupation number of the orbital. The sign ``s`` corresponds to the total angular momentum, represeented by ``-`` for :math:`j=l-1/2`, or an empty space for :math:`j=l+1/2`. For brevity, not all orbitals are displayed. 
 
     .. code-block:: 
 
@@ -80,7 +80,7 @@ In this section, we describe a method used to construct basis sets for the cases
           Z = 26.0
          Am = 52.0
          Nso=    4         # number of core orbitals (defines DF operator)
-         Nv =   84         # number of valence & virtual orbitals
+         Nv =  194         # number of valence & virtual orbitals
          Ksg=    1         # defines Hamiltonian: 1-DF, 3-DF+Breit
          Kdg=    0         # diagonalization of Hamiltonian (0=no,1,2=yes)
          orb= 4s 1         # first orbital for diagonalization
@@ -121,9 +121,10 @@ In this section, we describe a method used to construct basis sets for the cases
          :
          :
          :
-         84  1.2401
+        193 -2.4401
+        194  2.4401
 
-The following bash script utilizes the above input files and forms the basis set for Fe XVII and Ni XIX.
+The following bash script utilizes the above input files and forms the final :math:`24spdfg` basis set for Fe XVII and Ni XIX.
 
 .. code-block:: 
 
