@@ -294,6 +294,7 @@ if __name__ == "__main__":
     # hpc parameters
     if on_hpc:
         hpc = get_dict_value(config, 'hpc')
+        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
@@ -403,7 +404,7 @@ if __name__ == "__main__":
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
-                            if script_name:
+                            if script_name and submit_job:
                                 run_shell("sbatch " + script_name)
                             else:
                                 print('job script was not submitted. check job script and submit manually.')
@@ -429,7 +430,7 @@ if __name__ == "__main__":
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
-                            if script_name:
+                            if script_name and submit_job:
                                 run_shell("sbatch " + script_name)
                             else:
                                 print('job script was not submitted. check job script and submit manually.')
@@ -447,7 +448,7 @@ if __name__ == "__main__":
                     # Submit CI job if run_codes == True
                     if on_hpc and run_codes: 
                         os.chdir(conf_path)
-                        if script_name:
+                        if script_name and submit_job:
                             run_shell("sbatch " + script_name)
                         else:
                             print('job script was not submitted. check job script and submit manually.')

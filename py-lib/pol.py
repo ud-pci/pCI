@@ -69,6 +69,7 @@ if __name__ == "__main__":
     # hpc parameters
     if on_hpc:
         hpc = get_dict_value(config, 'hpc')
+        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
@@ -162,5 +163,5 @@ if __name__ == "__main__":
 
         # cd into new pol directory and submit job script
         os.chdir(pol_path)
-        if on_hpc and run_codes:
+        if submit_job:
             run_shell('sbatch pol.qs')
