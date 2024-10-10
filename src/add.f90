@@ -2,10 +2,6 @@ Program add
     Use params, nlvl => Nlv
     Implicit None
 
-    ! add.par parameters
-    Integer, Parameter :: IPad1 = 2000000 ! # max number of configurations
-    Integer, Parameter :: IPad2 = 18      ! # max number of shells in configuration
-
     Integer :: Ncor, Nsv, NsvNR, Mult, l, keyPT
     Character(Len=32) :: strfmt
     Real(dp), Dimension(IPad1, IPad2) :: Ac
