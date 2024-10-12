@@ -13,7 +13,7 @@ hpc:
 
 atom:
     name: Fe16+
-    isotope: 52
+    isotope: 56
     include_breit: True
     code_method: ci
 

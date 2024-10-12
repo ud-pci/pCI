@@ -38,4 +38,4 @@ pCI Development Team
 ----
 
 | **Andrey Bondarev**  
-| Peter the Great St. Petersburg Polytechnic University, Russia
+| Helmholtz Institute Jena, Germany
