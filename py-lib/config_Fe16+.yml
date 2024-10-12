@@ -92,7 +92,6 @@ dtm:
 optional:
     qed:
         include: False
-        rotate_basis: False
 
     isotope_shifts: 
         include: False
