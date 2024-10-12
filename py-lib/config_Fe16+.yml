@@ -9,6 +9,7 @@ hpc:
     partition: large-mem
     nodes: 1
     tasks_per_node: 64
+    submit_job: False
 
 atom:
     name: Fe16+
@@ -91,7 +92,6 @@ dtm:
 optional:
     qed:
         include: False
-        rotate_basis: False
 
     isotope_shifts: 
         include: False

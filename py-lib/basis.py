@@ -941,15 +941,6 @@ def run_ci_executables(bin_dir, order, custom):
         
     else:
         print("bass completed with no errors after", nTry - 1, "attempts")
-
-def run_qed_executables():
-    # Run qed
-    if system['rotate_basis'] == True or system['include_qed'] == True:
-        run_shell('cp HFD.DAT HFD-noQED.DAT')
-        generate_batch_qed(system['include_qed'],system['rotate_basis'],kbrt)
-        run_shell('chmod +x batch.qed')
-        run_shell('./batch.qed > qed.out')
-        print("qed complete")
     
 def run_ao_executables(K_is, C_is, bin_dir):
     # Specify directory of executables
@@ -1074,6 +1065,7 @@ if __name__ == "__main__":
     # hpc parameters
     if on_hpc and run_codes:
         hpc = get_dict_value(config, 'hpc')
+        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
@@ -1113,7 +1105,6 @@ if __name__ == "__main__":
     # qed parameters
     qed = get_dict_value(optional, 'qed')
     include_qed = get_dict_value(qed, 'include')
-    rotate_basis = get_dict_value(qed, 'rotate_basis')
 
     # Get atomic data
     Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
@@ -1209,7 +1200,7 @@ if __name__ == "__main__":
                             run_shell('pwd')
                             run_ao_executables(K_is, c, bin_dir)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
-                            if script_name:
+                            if script_name and submit_job:
                                 run_shell('sbatch ' + script_name)
                             else:
                                 print('job script was not submitted. check job script and submit manually.')
@@ -1227,7 +1218,7 @@ if __name__ == "__main__":
                             run_shell('pwd')
                             run_ao_executables(0, 0, bin_dir)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
-                            if script_name:
+                            if script_name and submit_job:
                                 run_shell('sbatch ' + script_name)
                             else:
                                 print('job script was not submitted - check job script and submit manually.')
@@ -1239,7 +1230,7 @@ if __name__ == "__main__":
                         run_shell('pwd')
                         run_ao_executables(0, 0, bin_dir)
                         script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
-                        if script_name:
+                        if script_name and submit_job:
                             run_shell('sbatch ' + script_name)
                         else:
                             print('job script was not submitted - check job script and submit manually.')

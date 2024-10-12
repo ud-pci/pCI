@@ -146,6 +146,7 @@ if __name__ == "__main__":
     # hpc parameters
     if on_hpc:
         hpc = get_dict_value(config, 'hpc')
+        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
@@ -316,9 +317,10 @@ if __name__ == "__main__":
                             write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
                         elif dtm_dir =='dm_odd':
                             write_dtm_in('DM', from_level_odd + ' ' + from_level_odd, ', '.join(dm_key_list))
-                        run_shell('sbatch dtm_rpa.qs')
+                        if submit_job:
+                            run_shell('sbatch dtm_rpa.qs')
                 else:    
-                    if on_hpc:
+                    if submit_job:
                         run_shell('sbatch dtm.qs')
                 os.chdir('..')
             os.chdir('..')
