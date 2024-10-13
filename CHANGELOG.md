@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2024-10-13
+- updated CMakeLists.txt files to require Intel Fortran compiler and OpenMPI library
+- add v2.1 - dynamically allocate part of add program
+
 ## [1.0.0] - 2024-10-08
 - pCI version update for public release
 
