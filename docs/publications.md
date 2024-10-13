@@ -3,8 +3,8 @@
 Here is a non-exhaustive list of publications that employ the pCI software package.
 
 ## 2024
-- **pCI: a parallel configuration interaction software package for high-precision atomic structure calculations**, Charles Cheung, Mikhail G. Kozlov, Sergey G. Porsev, Marianna S. Safronova, Ilya I. Tupitsyn, Andrey I. Bondarev, *[arXiv:2410.06680](https://arxiv.org/abs/2410.06680)*.
-- **A neural network approach to running high-precision atomic computations**, Pavlo Bilous, Charles Cheung, and Marianna S. Safronova, *[arXiv:2408.00477](https://arxiv.org/abs/2408.00477)*.
+- **pCI: a parallel configuration interaction software package for high-precision atomic structure calculations**, Charles Cheung, Mikhail G. Kozlov, Sergey G. Porsev, Marianna S. Safronova, Ilya I. Tupitsyn, Andrey I. Bondarev, *[arXiv:2410.06680 (2024)](https://arxiv.org/abs/2410.06680)*.
+- **A neural network approach to running high-precision atomic computations**, Pavlo Bilous, Charles Cheung, and Marianna S. Safronova, *[arXiv:2408.00477 (2024)](https://arxiv.org/abs/2408.00477)*.
 - **Pr<sup>10+</sup> as a candidate for a high-accuracy optical clock for tests of fundamental physics**, S.G. Porsev, C. Cheung, M.S. Safronova, H. Bekker, N.-H. Rehbehn, J. R. Crespo Lopez-Urrutia, S. M. Brewer, *[arXiv:2407.17610 (2024)](https://arxiv.org/abs/2407.17610)*.
 - **Prospects of a thousand-ion Sn2+ Coulomb-crystal clock with sub-10-19 inaccuracy**, David R. Leibrandt, Sergey G. Porsev, Charles Cheung, and Marianna S. Safronova, *[Nature Communications 15, 5663 (2024)](https://www.nature.com/articles/s41467-024-49241-w)*. 
 - **High-Precision Transition Energy Measurements of Neon-like Fe XVII Ions**, Chintan Shah, Moto Togawa, Marc Botz, Jonas Danisch, Joschka J. Goes, Sonja Bernitt, Marleen Maxton, Kai Köbnick, Jen Buck, Jörn Seltmann, Moritz Hoesch, Ming Feng Gu, F. Scott Porter, Thomas Pfeifer, Maurice A. Leutenegger, Charles Cheung, Marianna S. Safronova, José R. Crespo López-Urrutia, *[ApJ 969 52 (2024)](https://iopscience.iop.org/article/10.3847/1538-4357/ad454b)*. 
