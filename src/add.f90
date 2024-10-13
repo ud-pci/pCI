@@ -1,19 +1,21 @@
 Program add
-    Use params, nlvl => Nlv
+    Use params, nlvl => Nlv, nnparam => Nn
     Implicit None
 
-    Integer :: Ncor, Nsv, NsvNR, Mult, l, keyPT
+    Integer :: Ncor, NsvNR, Mult, l, keyPT, vaGrowBy
     Character(Len=32) :: strfmt
     Real(dp), Dimension(IPad1, IPad2) :: Ac
-    Integer, Dimension(IPad1) :: NOz, Knr
-    Integer, Dimension(IPs) :: NLv
+    Integer, Dimension(:), Allocatable :: NOz, Knr
     Real(dp), Dimension(39) :: Q
-    Real(dp), Dimension(IPs) :: V
-    Real(dp), Dimension(1000) :: Nqmin, Nqmax
+    Real(dp), Dimension(:), Allocatable :: V, Nqmin, Nqmax
+    Integer, Dimension(:), Allocatable :: Nq1, Nq2, Nq3, Nn
+    Character(Len=1), Dimension(:), Allocatable :: let
 
-    strfmt = '(/4X,"Program Add (NR) v2.0"/)'
+    strfmt = '(/4X,"Program Add (NR) v2.1"/)'
     Write(6, strfmt)
     Open(unit=10, file='ADD.INP')
+
+    vaGrowBy = 1000
 
     ! Read inputs from ADD.INP
     Call Input 
@@ -49,6 +51,9 @@ Program add
 
     Call PrintConfINP(Ncpt,keyPT)     ! Forms CONF.INP
 
+    ! Dellocate Arrays
+    Deallocate(NOz, Knr)
+
     ! Close ADD.INP and CONF.INP
     Close(12)
     Close(11)
@@ -60,12 +65,11 @@ Contains
     Subroutine Input
         Implicit None
         Integer :: nsmc, ic, ne0, i, i1, i2, iz, j, nx, ny, nz, ncheck, ndum, nlvi, nl1, &
-                    iskip, ics, ji, k, jk, idif
+                    iskip, ics, ji, k, jk, idif, qqmax
         Real(dp) :: x
-        Integer, Dimension(IPs) :: Nq1, Nq2, Nq3
         Integer, Dimension(20) :: nyi, myi, nyk, myk
         Real(dp), Dimension(40) :: Qnl
-        Character(Len=1), Dimension(IPs) :: let, chr
+        Character(Len=1), Dimension(:), Allocatable :: let, chr
         Character(Len=1), Dimension(4) :: txt
         Character(Len=128) :: string, strfmt
         Logical :: new
@@ -90,7 +94,10 @@ Contains
         iskip=0     ! - skipped rel. configurations
         ics=0       ! - basic non-rel. configurations 
 
-        ! Run through each configuration
+        Allocate(Nn(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
+        Allocate(NOz(IPad1))
+
+        ! Run through each core configuration
         Do ic=1,Ncor
             ne0=0
             i1=1
@@ -98,7 +105,7 @@ Contains
 
 200         i2=i1+5
 
-            ! Read configuration
+            ! Read core configuration
             strfmt = '(4A1,A)'
             Read(10, strfmt) (txt(i),i=1,4), string
 
@@ -116,6 +123,7 @@ Contains
                 Read(string, strfmt) (Qnl(i),i=i1,i2)
             End If
 
+            ! Loop through each shell in configuration
             Do i=i1,i2
                 x=abs(Qnl(i))+1.d-7
                 If (x.LT.1.d-6) Exit
@@ -196,7 +204,6 @@ Contains
         Write(*, strfmt) (Nn(i),let(i),Nq1(i),Nq2(i), i=1,NsvNR)
 
         ! Read list of active non-relativistic shells
-        Nsv = 0
         Do i=1,NsvNR
             Call ConvertChar(let(i),Ll(i),-1)
 
@@ -205,17 +212,20 @@ Contains
                 Read(*,*)
                 Stop
             End If
+        End Do
 
+        qqmax = 10*Nn(NsvNR)+Ll(NsvNR)
+        allocate(Nqmin(qqmax), Nqmax(qqmax), V(IPs))
+
+        Do i=1,NsvNR
             nlvi=10*Nn(i)+Ll(i)
-            Nlv(i)=nlvi
             Nqmin(nlvi)=Nq1(i)
             Nqmax(nlvi)=Nq2(i)
 
-            Nsv = Nsv + 1
-            V(Nsv) = (10000*Nn(i) + 1000*Ll(i))/100000. + 5.0E-8
+            V(i) = (10000*Nn(i) + 1000*Ll(i))/100000. + 5.0E-8
         End Do
 
-        Do j=1,Nsv
+        Do j=1,NsvNR
             nl1=100*(abs(V(j))+0.001)
             Nn(j)=nl1/10
             Ll(j)=nl1-10*Nn(j)
@@ -260,6 +270,7 @@ Contains
         kc=0
         ji=0
 
+        If (.not. Allocated(Knr)) Allocate(Knr(IPad1))
         Write(*,*) ' Expanding ',Nc,' configurations'
 
         Do
@@ -380,6 +391,8 @@ Contains
 
 
     Subroutine Squeeze(ic, k, nyi, myi)
+        ! This subroutine reads config ic from Ac and returns arrays nl and occ. num. for each shell
+        !
         ! ic - current config in Ac
         ! k - number of non-rel shells in config
         ! nyi - array of QN n & l
@@ -424,7 +437,7 @@ Contains
         n=Nc
         Do i=1,n
             Do k=1,NOz(i)
-                Do jj=1,Nsv
+                Do jj=1,NsvNR
                     If (k.EQ.1) Then
                       Continue
                     Else
@@ -510,7 +523,7 @@ Contains
         Character(Len=128) :: strfmt
 
         strfmt = '(2x,"Ac1(",I4,")=",F10.4," is not in V:",/(6F10.4))'
-        n1=Nsv
+        n1=NsvNR
         Do j=1,nozi-1
             m=j
             k1=0
@@ -547,14 +560,9 @@ Contains
         Integer :: noz1, j, i1, nnj, llj, jlj, nq, j1, i2, nnj2, llj2, jlj2, nq2, ierr, nlj
         Integer :: nozi, i, nq1
         Real(dp) :: d, d2, del
-        Integer, Dimension(1000) :: NLnew
         Real(dp), Dimension(IPad2) :: Ac1
 
         New=.FALSE.
-
-        Do j=1,1000
-            NLnew(j)=0              !### occupation numbers for NL shell
-        End Do                      !#### in this configuration
   
         Do j=1,noz1                  !### check of the Pauli principle:
             i1=sign(1.01,Ac1(j))     !#### nq.LE.(4*l+2)
@@ -583,18 +591,10 @@ Contains
             if (i1.LT.0) return
 
             nlj=10*nnj+llj
-            NLnew(nlj)=nq
-            If (nq.LT.Nqmin(nlj).OR.nq.GT.Nqmax(nlj)) Return ! check that occ. num. are within allowed limits
-
+            ! check that occupation numbers are within allowed limits
+            If (nq.LT.Nqmin(nlj).OR.nq.GT.Nqmax(nlj)) Return 
         End Do
 
-        ! Check that occupation numbers are within allowed limits
-        !Do j=1,Nsv                   
-        !    nlj=10*Nn(j)+Ll(j)      
-        !    nq1=NLnew(nlj)
-        !    If(nq1.LT.Nqmin(nlj).OR.nq1.GT.Nqmax(nlj)) return
-        !End Do
-  
         ! Check and see if configurations are new
         Outer: Do i=1,Nc            
             nozi=NOz(i)
