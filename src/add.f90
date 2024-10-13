@@ -101,50 +101,52 @@ Contains
         Do ic=1,Ncor
             ne0=0
             i1=1
-            iz=0
+            iz=0 ! number of shells
+            
+            Do While (ne0 < Ne)
+                i2=i1+5
 
-200         i2=i1+5
+                ! Read core configuration
+                strfmt = '(4A1,A)'
+                Read(10, strfmt) (txt(i),i=1,4), string
 
-            ! Read core configuration
-            strfmt = '(4A1,A)'
-            Read(10, strfmt) (txt(i),i=1,4), string
+                ! If configuration is written in readable form
+                If (txt(1) == 'L') Then 
+                    strfmt = '(6(I2,A1,I2,1X))'
+                    Read(string, strfmt) (Nq1(i),chr(i),Nq2(i),i=i1,i2)
+                    Do i=i1,i2
+                        Call ConvertChar(chr(i),Nq3(i),0)
+                        Qnl(i)=(1000*Nq1(i)+100*Nq3(i)+Nq2(i))/10000.d0
+                    End Do
+                ! If configuration is written in digital form
+                Else
+                    strfmt = '(F7.4,5(4X,F7.4))'
+                    Read(string, strfmt) (Qnl(i),i=i1,i2)
+                End If
 
-            ! If configuration is written in readable form
-            If (txt(1) == 'L') Then 
-                strfmt = '(6(I2,A1,I2,1X))'
-                Read(string, strfmt) (Nq1(i),chr(i),Nq2(i),i=i1,i2)
+                ! Loop through each shell in configuration
                 Do i=i1,i2
-                    Call ConvertChar(chr(i),Nq3(i),0)
-                    Qnl(i)=(1000*Nq1(i)+100*Nq3(i)+Nq2(i))/10000.d0
+                    x=abs(Qnl(i))+1.d-7
+                    If (x.LT.1.d-6) Exit
+                    nx=10000*x
+                    ny=100*x
+                    nz=(nx-100*ny)
+                    If (nz.EQ.0) Then
+                        strfmt = '(" no electrons in ",I2," shell"," of configuration ",I5)'
+                        Write(6,strfmt) iz,ic
+                        Stop
+                    End If
+                    ne0=ne0+nz
+                    iz=iz+1
                 End Do
-            ! If configuration is written in digital form
-            Else
-                strfmt = '(F7.4,5(4X,F7.4))'
-                Read(string, strfmt) (Qnl(i),i=i1,i2)
-            End If
 
-            ! Loop through each shell in configuration
-            Do i=i1,i2
-                x=abs(Qnl(i))+1.d-7
-                If (x.LT.1.d-6) Exit
-                nx=10000*x
-                ny=100*x
-                nz=(nx-100*ny)
-                If (nz.EQ.0) Then
-                    strfmt = '(" no electrons in ",I2," shell"," of configuration ",I5)'
-                    Write(6,strfmt) iz,ic
+                If (ne0 > Ne) Then
+                    Write(*,*) ' Too many electrons for ic =', ic
                     Stop
                 End If
-                ne0=ne0+nz
-                iz=iz+1
-            End Do
 
-            i1=iz+1
-            If (ne0 < Ne) goto 200
-            If (ne0 > Ne) Then
-                Write(*,*) ' Too many electrons for ic =', ic
-                Stop
-            End If
+                i1=iz+1
+            End Do
 
             Noz(ic)=iz          !### number of shells in config-n
             do j=1,iz
