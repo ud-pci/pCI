@@ -2,9 +2,9 @@ Program add
     Use params, nlvl => Nlv, nnparam => Nn
     Implicit None
 
-    Integer :: Ncor, NsvNR, Mult, l, keyPT, vaGrowBy
+    Integer :: Ncor, NsvNR, Mult, l, keyPT, vaGrowBy, max_num_shells
     Character(Len=32) :: strfmt
-    Real(dp), Dimension(IPad1, IPad2) :: Ac
+    Real(dp), Dimension(:, :), Allocatable :: Ac
     Integer, Dimension(:), Allocatable :: NOz, Knr
     Real(dp), Dimension(39) :: Q
     Real(dp), Dimension(:), Allocatable :: V, Nqmin, Nqmax
@@ -69,6 +69,7 @@ Contains
         Real(dp) :: x
         Integer, Dimension(20) :: nyi, myi, nyk, myk
         Real(dp), Dimension(40) :: Qnl
+        Real(dp), Dimension(:,:), Allocatable :: Ac0
         Character(Len=1), Dimension(:), Allocatable :: let, chr
         Character(Len=1), Dimension(4) :: txt
         Character(Len=128) :: string, strfmt
@@ -148,15 +149,18 @@ Contains
                 i1=iz+1
             End Do
 
+            If (.not. Allocated(Ac0)) Allocate(Ac0(Ncor, iz+Mult))
             Noz(ic)=iz          !### number of shells in config-n
             do j=1,iz
-                Ac(ic,j)=Qnl(j)
+                Ac0(ic,j)=Qnl(j)
             end do
-        
-            call Squeeze(ic, ji, nyi, myi) 
+        End Do
+
+        Do ic=1,Ncor
+            call Squeeze(ic, Ac0, ji, nyi, myi) 
             new=.TRUE.
             outer: do k=1,ics
-                call Squeeze(k,jk,nyk,myk)
+                call Squeeze(k,Ac0,jk,nyk,myk)
                 if (ji.EQ.jk) then   ! compare two non.rel. config-s
                     inner: do j=1,ji
                         idif = iabs(nyi(j)-nyk(j)) + iabs(myi(j)-myk(j))
@@ -169,29 +173,30 @@ Contains
         
             if (new) then
                 ics=ics+1
-                Noz(ics)=ji       
+                Noz(ics)=ji
                 nsmc=max(nsmc,ji) !### max number of shells in config-n
                 do j=1,ji
-                    Ac(ics,j)=(100.d0*nyi(j)+myi(j))/10000.d0
+                    Ac0(ics,j)=(100.d0*nyi(j)+myi(j))/10000.d0
                 end do
                 strfmt = '(I3,1X,F7.4,5(4X,F7.4),/6(4X,F7.4))'
-                write(*,strfmt) ics,(Ac(ics,j),j=1,ji)
+                write(*,strfmt) ics,(Ac0(ics,j),j=1,ji)
             else
                 iskip=iskip+1
             end if         
         End Do
 
+        max_num_shells = nsmc+2*Mult
+        Allocate(Ac(IPad1, max_num_shells))
+        Do ic=1,Ncor
+            Do j=1,nsmc
+                Ac(ic,j) = Ac0(ic,j)
+            End Do
+        End Do
+        Deallocate(Ac0)
+
         If (iskip.GT.0) Then
             write(*,*) iskip,' config-s skipped from ',Ncor
             Ncor=Ncor-iskip
-        End If
-
-        ! Check that number of shells do not exceed maximum set by IPad2
-        ncheck=nsmc+mult
-        If (ncheck > IPad2) Then
-            strfmt = '(2X,"Error: max number of shells in conf =",I3," > IPad2 =",I3)'
-            Write(*, strfmt) ncheck, IPad2
-            Stop
         End If
 
         ! Read any empty lines before list of active non-relativistic shells
@@ -264,8 +269,8 @@ Contains
         Integer, Dimension(20)      :: nyi, myi, nyk, myk, ivc, ni, li, iv
         Integer, Dimension(20, 9)   :: mx1, mx2
         Integer, Dimension(500, 20) :: ivv
-        Integer, Dimension(IPad1)   :: NozN
-        Real(dp), Dimension(IPad1, IPad2) :: AcN
+        Integer, Dimension(:), Allocatable   :: NozN
+        Real(dp), Dimension(:, :), Allocatable :: AcN
 
         ic=0
         icnr=0
@@ -273,6 +278,8 @@ Contains
         ji=0
 
         If (.not. Allocated(Knr)) Allocate(Knr(IPad1))
+        If (.not. Allocated(NozN)) Allocate(NozN(IPad1))
+        If (.not. Allocated(AcN)) Allocate(AcN(IPad1, max_num_shells))
         Write(*,*) ' Expanding ',Nc,' configurations'
 
         Do
@@ -294,9 +301,10 @@ Contains
                 Return
             End If
 
-            Call Squeeze(ic,jk,nyk,myk)
+            Call Squeeze(ic,Ac,jk,nyk,myk)
 
-            If (ji.EQ.jk) Then   ! compare two non.rel. config-s
+            ! compare two non-relativistic configuration configurations
+            If (ji.EQ.jk) Then   
                 Do j=1,ji
                   idif = iabs(nyi(j)-nyk(j)) + iabs(myi(j)-myk(j))
                   If (idif.GT.0) goto 110
@@ -311,8 +319,6 @@ Contains
 
             ! new non-relativistic configuration
 110         icnr=icnr+1
-            strfmt = '(I4)'
-            !Write(*, strfmt) icnr
             Knr(icnr)=kc+1
 
             ir=1 ! number of relativistic cofiguration in non-relativistic configuration
@@ -392,7 +398,7 @@ Contains
     End Subroutine Expand
 
 
-    Subroutine Squeeze(ic, k, nyi, myi)
+    Subroutine Squeeze(ic, Ac, k, nyi, myi)
         ! This subroutine reads config ic from Ac and returns arrays nl and occ. num. for each shell
         !
         ! ic - current config in Ac
@@ -402,6 +408,7 @@ Contains
         Implicit None
         Integer :: k, j, j1, ic
         Integer, Dimension(20) :: nyi, myi, nzi, mzi
+        Real(dp), Dimension(:,:), Allocatable :: Ac
 
         Do j=1,NOz(ic)
             j1=j
@@ -433,8 +440,10 @@ Contains
         Implicit None
         Integer :: n, i, k, j, jj, ii, mlast
         Real(dp) :: B
-        Real(dp), Dimension(IPad2) :: Ac1
+        Real(dp), Dimension(:), Allocatable :: Ac1
         Character(Len=128) :: strfmt
+
+        If (.not. Allocated(Ac1)) Allocate(Ac1(max_num_shells))
 
         n=Nc
         Do i=1,n
@@ -481,7 +490,7 @@ Contains
         Implicit None
         Integer :: j, nozi, k, nx, ny, iz, nac, nxy
         Real(dp) :: B, R
-        Real(dp), Dimension(IPad2) :: Ac1
+        Real(dp), Dimension(:), Allocatable :: Ac1
 
 
         Do j=1,nozi-1
@@ -521,7 +530,7 @@ Contains
         Implicit None
         Integer :: n1, j, m, k, k1, k2, nozi
         Real(dp) :: P1, P2, A
-        Real(dp), Dimension(IPad2) :: Ac1
+        Real(dp), Dimension(:), Allocatable :: Ac1
         Character(Len=128) :: strfmt
 
         strfmt = '(2x,"Ac1(",I4,")=",F10.4," is not in V:",/(6F10.4))'
@@ -562,7 +571,7 @@ Contains
         Integer :: noz1, j, i1, nnj, llj, jlj, nq, j1, i2, nnj2, llj2, jlj2, nq2, ierr, nlj
         Integer :: nozi, i, nq1
         Real(dp) :: d, d2, del
-        Real(dp), Dimension(IPad2) :: Ac1
+        Real(dp), Dimension(:), Allocatable :: Ac1
 
         New=.FALSE.
   
