@@ -215,7 +215,7 @@ Contains
         End Do
 
         qqmax = 10*Nn(NsvNR)+Ll(NsvNR)
-        allocate(Nqmin(qqmax), Nqmax(qqmax), V(IPs))
+        allocate(Nqmin(qqmax), Nqmax(qqmax), V(NsvNR))
 
         Do i=1,NsvNR
             nlvi=10*Nn(i)+Ll(i)
