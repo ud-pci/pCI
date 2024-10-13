@@ -1,6 +1,6 @@
 Module vaccumulator
 
-    Use conf_variables
+    Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, int64
     
     Implicit None
     
@@ -17,7 +17,7 @@ Module vaccumulator
     End Type IVAccumulator
     
     Type RVAccumulator
-        Real(kind=type_real), Allocatable, Dimension(:) :: vAccum
+        Real(kind=dp), Allocatable, Dimension(:) :: vAccum
         Integer(kind=int64)                 :: vLen, vSize, vGrowBy
     End Type RVAccumulator
 
@@ -133,8 +133,8 @@ Module vaccumulator
         Implicit None
         
         Type(RVAccumulator), Intent(InOut)  :: this
-        Real(kind=type_real), Intent(In)                :: rVal
-        Real(kind=type_real), Dimension(:), Allocatable :: vTmp
+        Real(kind=dp), Intent(In)                :: rVal
+        Real(kind=dp), Dimension(:), Allocatable :: vTmp
         
         If (.not. Allocated(this%vAccum)) then
             ! Initial allocation of vAccum:
@@ -157,7 +157,7 @@ Module vaccumulator
         Implicit None
         
         Type(RVAccumulator), Intent(InOut)                  :: this
-        Real(kind=type_real), Dimension(:), Allocatable, Intent(Out)    :: outV
+        Real(kind=dp), Dimension(:), Allocatable, Intent(Out)    :: outV
         Integer(kind=int64), Intent(Out)                                :: outVLen
         
         outVLen = this%vLen
