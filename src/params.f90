@@ -41,8 +41,7 @@ Module params
     Integer, Parameter :: IPns  =     62         ! maximum number of shells
 
     ! defining parameters which determine dimensions of main arrays in add
-    Integer, Parameter :: IPad1 = 25000          ! # max number of configurations
-    Integer, Parameter :: IPad2 = 18             ! # max number of shells in configuration
+    Integer, Parameter :: IPad1 = 1000000        ! max number of configurations
 
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
     Integer, Parameter :: type_real=dp

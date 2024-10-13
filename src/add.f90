@@ -483,6 +483,8 @@ Contains
             End Do
         End Do
 
+        Deallocate(Ac1)
+
         Return
     End Subroutine Constr
 
