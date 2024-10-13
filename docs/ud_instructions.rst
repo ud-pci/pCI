@@ -16,15 +16,27 @@ The University of Delaware currently houses and maintains the Caviness community
 
 Here's more information about the `UD clusters <https://docs.hpc.udel.edu/>`_.
 
-Compiling at UD
----------------
+Installing via VALET
+--------------------
+VALET is a tool developed by Dr. Jeffrey Frey that is available on the UD clusters. VALET provides the ability to modify your environment without modifying your startup files like ``.bashrc`` and ``.bash_profile`` as it prevents jobs from failing by keeping a clean login environment. 
 
-The computers at UD utilize the VALET system for installing software. We load the cmake and openmpi modules into your environment using the command ``vpkg_require``. 
+If working on a UD cluster, a pre-built copy of the latest pCI package is available via VALET:
+
+.. code-block:: 
+
+   vpkg_require pci
+
+This command automatically configures your environment to include all necessary libraries to run pCI: OpenMPI with an Intel Fortran compiler, as well as latest version of Python to run auxiliary scripts. If using the pre-built pCI distribution, you do not have to compile anything and can simply run the pCI programs.
+
+We can load the ``cmake`` and ``openmpi`` modules into the environment using the ``vpkg_require`` command. 
 
 .. code-block::
 
-   $ vpkg_require intel
-   Adding package `intel/2018u4` to your environment
+   $ vpkg_require cmake openmpi/4.1.4:intel-2020
+   Adding package `cmake/3.21.4` to your environment
+   Adding dependency `intel/2020u4` to your environment
+   Adding dependency `ucx/1.13.1` to your environment
+   Adding package `openmpi/4.1.4:intel-2020` to your environment
 
 
 To see what packages have been added to your environment, you can use the ``vpkg_history`` command.
@@ -33,7 +45,10 @@ To see what packages have been added to your environment, you can use the ``vpkg
 
    $ vpkg_history
    [standard]
-     intel/2018u4
+     cmake/3.21.4
+     intel/2020u4
+     ucx/1.13.1
+     openmpi/4.1.4:intel-2020
 
 To remove the changes produced by ``vpkg_require``, you can use the ``vpkg_rollback`` command.
 
@@ -41,20 +56,29 @@ To remove the changes produced by ``vpkg_require``, you can use the ``vpkg_rollb
 
    $ vpkg_rollback
 
+The pCI programs are built using the ``CMakeLists.txt`` files. 
 
-The parallel codes are built using the ``CMakeLists.txt`` file. 
+A general build can be done:
+
+.. code-block:: 
+
+   $ cd pCI
+   $ mkdir build
+   $ cd build
+   $ FC=ifort cmake -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+      :
+   $ make
+   $ make install
+
 
 A Debug build can be done:
 
-.. code-block::
+.. code-block:: 
 
-   $ ls
-   pCI
    $ cd pCI
    $ mkdir build-debug
    $ cd build-debug
-   $ vpkg_require cmake openmpi/4.1.0:intel-2020
-   $ FC=mpifort cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(pwd)/../20200402-debug ..
+   $ FC=ifort cmake -DCMAKE_BUILD_TYPE=Debug -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../debug ..
       :
    $ make
    $ make install
@@ -63,14 +87,13 @@ An optimized build demands a little more:
 
 .. code-block:: 
 
-   $ cd ..
+   $ cd pCI
    $ mkdir build-opt
    $ cd build-opt
-   $ FC=mpifort cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(pwd)/../20200317-opt  -DCMAKE_Fortran_FLAGS_RELEASE="-g -O3 -mcmodel=large -xHost -m64" ..
+   $ FC=ifort cmake -DCMAKE_BUILD_TYPE=Release -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../opt -DCMAKE_Fortran_FLAGS_RELEASE="-g -O3 -mcmodel=large -xHost -m64" ..
       :
    $ make
    $ make install
-
 
 .. note::
     
@@ -78,7 +101,6 @@ An optimized build demands a little more:
 
 Running Jobs at UD
 ------------------
-
 The UD clusters utilize the Slurm workload manager (job scheduling system) to manage and control the resources available to computational tasks. Users can either run their jobs interactively or submit in batch. For an interacive job, the user must type the commands they wish to execute in real time. For a batch job, those sequence of commands are saved to a file, known as a job script, which is submitted to Slurm. Using batch job scripts have several advantages such as reusability and increased job throughput. 
 
 Here's more information about `running jobs <http://docs.hpc.udel.edu/abstract/darwin/runjobs/runjobs>`_.  
