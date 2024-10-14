@@ -14,68 +14,61 @@ The following code executions read the files ``hfspl.1`` and ``hfspl.2`` and gen
 	./sdvw-rle-cis <inf.aov >out.sdvw        # computes Sigma_mnvw (Sigma_2, the two-body correction to the Hamiltonian) -> writes pair.vw and sigma1 files
 
 
-.. raw:: html
+.. collapse:: Click here to see a description of inf.aov
 
-	<details>
-	<summary>Click here to see a description of inf.aov</summary>
+	.. code-block:: 
 
-.. code-block:: 
+		12             	 # ncore - number of core shells 
+		1 -1           	 # n and kappa of the core shells
+		2 -1
+		2  1
+		2 -2
+		3 -1
+		3  1
+		3 -2
+		3  2
+		3 -3
+		4 -1
+		4  1
+		4 -2
+		35  5    	     # nmax and lmax in correlation diagram summations   
+		0   0    	     # internal parameters, do not change
+		30       	     # max number of iterations for core
+		2 7 1  	         # Stabilizer code parameters, see below 
+		0.d0    	     # damping factor, not active not zero
+		1      	         # kval (key_en) - key for energies,  see explanation below                          
+		24    	         # nval - number of valence orbitals in list to follow   
+		 5  -1 30        # n and kappa of the valence orbitals, max number of iteration 
+		 6  -1 30
+		 7  -1 30
+		 8  -1 30
+		 5   1 30
+		 6   1 30
+		 7   1 30
+		 8   1 30
+		 5  -2 30
+		 6  -2 30
+		 7  -2 30
+		 8  -2 30
+		 4   2 30
+		 5   2 30
+		 6   2 30
+		 7   2 30
+		 4  -3 30
+		 5  -3 30
+		 6  -3 30
+		 7  -3 30
+		 4   3 30
+		 5   3 30
+		 4  -4 30
+		 5  -4 30 
 
-	12             	 # ncore - number of core shells 
-	1 -1           	 # n and kappa of the core shells
-	2 -1
-	2  1
-	2 -2
-	3 -1
-	3  1
-	3 -2
-	3  2
-	3 -3
-	4 -1
-	4  1
-	4 -2
-	35  5    	     # nmax and lmax in correlation diagram summations   
-	0   0    	     # internal parameters, do not change
-	30       	     # max number of iterations for core
-	2 7 1  	         # Stabilizer code parameters, see below 
-	0.d0    	     # damping factor, not active not zero
-	1      	         # kval (key_en) - key for energies,  see explanation below                          
-	24    	         # nval - number of valence orbitals in list to follow   
-	 5  -1 30        # n and kappa of the valence orbitals, max number of iteration 
-	 6  -1 30
-	 7  -1 30
-	 8  -1 30
-	 5   1 30
-	 6   1 30
-	 7   1 30
-	 8   1 30
-	 5  -2 30
-	 6  -2 30
-	 7  -2 30
-	 8  -2 30
-	 4   2 30
-	 5   2 30
-	 6   2 30
-	 7   2 30
-	 4  -3 30
-	 5  -3 30
-	 6  -3 30
-	 7  -3 30
-	 4   3 30
-	 5   3 30
-	 4  -4 30
-	 5  -4 30 
-
-	==============================================================
-	Additional explanations:
-	2 7 1  # Stabilizer code parameters 
-	2 - DIIS method (change to 1 for RLE method)
-	7 - number in iterations before stabilizer code runs
-	1 - do not change (controls the type of linear algebra code)
-
-.. raw:: html
-
-	</details>
+		==============================================================
+		Additional explanations:
+		2 7 1  # Stabilizer code parameters 
+		2 - DIIS method (change to 1 for RLE method)
+		7 - number in iterations before stabilizer code runs
+		1 - do not change (controls the type of linear algebra code)
 
 |
 

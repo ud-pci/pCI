@@ -8,68 +8,47 @@ bdhfA - Dirac-Hartree-Fock code
 
 ``bdhfA`` can be used in place of ``bdhf`` to make a B-spline basis set. This program reads in an input file ``xx.dat`` with a much simpler input than for ``bdhf``, and will write ``bdhf.in``, which can be renamed to ``bas_wj.in`` for subsequent use in all-order codes. 
 
-.. raw:: html
-
-    <details>
-    <summary>
-        Click here to see a description of a <a href="../src/cs_min.dat" download>minimum input file for Cs</a>.
-    </summary>
+.. collapse:: Click here to see a description of a minimum input file for Cs.
     
-.. code-block:: 
+    .. code-block:: 
 
-    1
-    1
-    Cs 
-    1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 
-    ==========
-    7 70 9 220.0
+        1
+        1
+        Cs 
+        1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 
+        ==========
+        7 70 9 220.0
 
-.. raw:: html
+.. collapse:: Click here to see a description of a complete input file for Cs.
 
-    </details>  
-    <details>
-    <summary>
-        Click here to see a description of a <a href="../src/cs_min.dat" download>complete input file for Cs</a>.
-    </summary>
+    .. code-block:: 
 
+        1
+        1
+        Cs 137 0.0001
+        1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 
+        6 9 s1/2
+        6 9 p1/2
+        5d3/2
+        5d5/2
+        ==========
+        7 70 9 220.0
 
-.. code-block:: 
+.. collapse:: Click here to see a description of a complete input file for Yb.
 
-    1
-    1
-    Cs 137 0.0001
-    1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 
-    6 9 s1/2
-    6 9 p1/2
-    5d3/2
-    5d5/2
-    ==========
-    7 70 9 220.0
+    .. code-block:: 
 
-.. raw:: html
+        1
+        1
+        Yb 176 0.0001
+        1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 4f
+        6s1/2
+        5d3/2
+        5d5/2
+        ==========
+        7 50 9 60.0
 
-    </details>  
-    <details>
-    <summary>
-        Click here to see a description of a <a href="../src/cs_min.dat" download>complete input file for Yb</a>.
-    </summary>
-
-.. code-block:: 
-
-    1
-    1
-    Yb 176 0.0001
-    1s 2s 2p 3s 3p 3d 4s 4p 4d 5s 5p 4f
-    6s1/2
-    5d3/2
-    5d5/2
-    ==========
-    7 50 9 60.0
-
-.. raw:: html
-
-    </details>
-    <br>
+|
 
 The input files have the following format:
 
