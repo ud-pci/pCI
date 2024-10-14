@@ -38,6 +38,7 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    :maxdepth: 1
    :caption: Examples
 
+   examples/portal-sr.rst
    examples/pci-py-sr.rst
    examples/neutral.rst
    examples/hci.rst
