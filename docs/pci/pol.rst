@@ -1,7 +1,7 @@
-ine - polarizabilities
+pol - polarizabilities
 ----------------------
 
-The ``ine`` program calculates static and dynamic polarizabilities of specified atomic levels. ``ine`` only gives the valence polarizability. Core polarizability needs to be computed separately with a different code. The code will give both scalar and tensor polarizabilities if the tensor polarizability is not zero, but not the vector polarizability. There are several version of the code, but for now we will use ``ine_dyn_E28``. This program requires several input files from previously ran ``conf`` and ``dtm`` programs, including ``CONF.DET`` and ``CONF.XIJ`` of the parity of the level of interest (renamed to ``CONF0.DET`` and ``CONF0.XIJ``), ``CONF.INP``, ``CONF.XIJ``, ``CONF.HIJ``, and ``CONF.JJJ`` of the opposite parity, and the file ``DTM.INT`` from ``dtm``. 
+The ``pol`` program calculates static and dynamic polarizabilities of specified atomic levels. ``pol`` only gives the valence polarizability. Core polarizability needs to be computed separately with a different code. The code will give both scalar and tensor polarizabilities if the tensor polarizability is not zero, but not the vector polarizability. There are several version of the code, but for now we will use ``ine_dyn_E28``. This program requires several input files from previously ran ``conf`` and ``dtm`` programs, including ``CONF.DET`` and ``CONF.XIJ`` of the parity of the level of interest (renamed to ``CONF0.DET`` and ``CONF0.XIJ``), ``CONF.INP``, ``CONF.XIJ``, ``CONF.HIJ``, and ``CONF.JJJ`` of the opposite parity, and the file ``DTM.INT`` from ``dtm``. 
 
 For example, if we want to calculate polarizabilities for an even state:
 
@@ -18,7 +18,7 @@ For example, if we want to calculate polarizabilities for an even state:
 Running ine
 ~~~~~~~~~~~
 
-Before parallel ``ine`` can be run, the parallel matrix files ``CONFp.HIJ`` and ``CONFp.JJJ`` have to be sorted. This can be done using the python script ``/pCI/src/auxiliary/sort.py``. 
+Before parallel ``pol`` can be run, the parallel matrix files ``CONFp.HIJ`` and ``CONFp.JJJ`` have to be sorted. This can be done using the python script ``/pCI/src/auxiliary/sort.py``. 
 
 1. First load the python3
    
@@ -63,7 +63,7 @@ Before parallel ``ine`` can be run, the parallel matrix files ``CONFp.HIJ`` and 
         813.02 813.025 0.001       | range 2
         813.025 813.03 0.01        | range 3
 
-6. Finally, ``ine`` can be run:
+6. Finally, ``pol`` can be run:
 
     .. code-block::
 

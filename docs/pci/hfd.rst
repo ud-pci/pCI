@@ -8,3 +8,8 @@ The ``hfd`` program solves restricted Hartree-Fock-Dirac (HFD) equations self-co
     \phi_{nlj}\equiv r\left(\begin{array}{c}f_{nlj}\\-g_{nlj}\end{array}\right),
 
 as well as the radial derivatives of the orbitals :math:`\partial_r\phi_{nlj}`, to the file ``HFD.DAT``. 
+A more detailed description of this program is given in the 2015 CI-MBPT paper\ :footcite:p:`KozPorSaf15`. 
+
+**References**
+
+.. footbibliography:: 
