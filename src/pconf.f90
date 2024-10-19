@@ -946,14 +946,14 @@ Contains
         Implicit None
 
         Integer :: npes, mype, mpierr
-        Integer :: k1, kx, n, ic, j, k, diff, icomp, ih4
+        Integer :: k1, kx, n, ic, j, k, diff, icomp, ih4, ihmax
         Integer :: nn, kk, msg, sender, num_done, an_id, endnd
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
-        Integer(Kind=int64) :: statmem, mem, maxmem, ihmax, counter1, counter2, counter3
+        Integer(Kind=int64) :: statmem, mem, maxmem, counter1, counter2, counter3
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
@@ -992,7 +992,7 @@ Contains
 
             ! Add maximum memory per core from storing H to total memory count
             Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            memEstimate = memEstimate + ihmax*(8+type_real)
+            memEstimate = memEstimate + ihmax*(8_int64+type_real)
 
         ! If Hamiltonian has not been fully constructed
         Else 
