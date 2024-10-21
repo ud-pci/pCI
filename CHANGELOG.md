@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2024-10-20
+- pconf v6.1 - fixed bugs related to Kl=1 option
+
 ## [1.0.1] - 2024-10-13
 - updated CMakeLists.txt files to require Intel Fortran compiler and OpenMPI library
 - add v2.1 - dynamically allocate part of add program
