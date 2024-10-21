@@ -125,10 +125,11 @@ Module formj2
         If (Kl == 1) Then 
             ! Read the matrix J^2 from file CONFp.JJJ
             Call ReadMatrix(Jsq%ind1,Jsq%ind2,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+            ij8=ij4
 
             ! Add maximum memory per core from storing J^2 to total memory count
             Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            memEstimate = memEstimate + ijmax*16
+            memEstimate = memEstimate + ijmax*16_int64
 
         ! If continuing calculation and Hamiltonian is to be extended with more configurations
         !Else If (Kl == 3) Then
@@ -324,15 +325,14 @@ Module formj2
             Call stopTimer(s1, timeStr)
             !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
+            ij8 = counter1
+            ij4 = ij8
+            Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+            ! Write J^2 matrix to file CONFp.JJJ
+            If (Kw == 1) Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
         End If
-
-        ij8 = counter1
-        ij4 = ij8
-
-        Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-
-        ! Write J^2 matrix to file CONFp.JJJ
-        If (Kl /= 1 .and. Kw == 1) Call WriteMatrix(Jsq,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr)
 
         If (mype == 0) Then
             Write(counterStr,fmt='(I16)') NumJ
