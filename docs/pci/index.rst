@@ -1,7 +1,7 @@
-Overview of the pCI code package
-================================
+Overview of the pCI software package
+====================================
 
-.. image:: ../img/codes-NSF.png
+.. image:: ../img/pci.png
     :width: 900
     :alt: pCI code scheme
 
@@ -11,7 +11,7 @@ Overview of the pCI code package
     hfd
     bass
     add
-    basc
-    conf
-    dtm
-    ine
+    pbasc
+    pconf
+    pdtm
+    pol

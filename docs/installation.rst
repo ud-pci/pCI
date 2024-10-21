@@ -12,18 +12,10 @@ In order to compile pCI the following software libraries and tools are required:
 
 *Older versions of each library may be usable, but the listed versions have been tested.*
 
-VALET on UD clusters
---------------------
 
-If working on a UD cluster, a pre-built copy of the latest pCI package is available via VALET:
-
-.. code-block:: 
-
-   vpkg_require pci
-
-This command automatically configures your environment to include all necessary libraries to run pCI: OpenMPI with an Intel Fortran compiler, as well as latest version of Python to run auxiliary scripts. If using the pre-built pCI distribution, you do not have to compile anything and can ignore the rest of this page.
-
-If working on another HPC cluster, a similar method of setting up your environment may already be available using ``module load <package>``. Please check your cluster's documentations for more information. 
+On HPC clusters
+---------------
+If working on an HPC cluster, environment modules may be available using ``module load <package>`` for each required library. Please check your cluster's documentations for more information. 
 
 Obtaining the source code
 -------------------------
@@ -48,16 +40,14 @@ Compiling with CMake
 
 The codes are built using CMake and the ``CMakeLists.txt`` files in the root and ``/src`` directories. The following are some example builds on the DARWIN computing cluster.
 
-A standard build can be done:
+A general build can be done:
 
 .. code-block:: 
 
-   $ vpkg_require cmake openmpi/4.1.0:intel-2020
-   $ git clone https://github.com/ud-pci/pCI.git pci
-   $ cd pci
+   $ cd pCI
    $ mkdir build
    $ cd build
-   $ FC=mpifort cmake ..
+   $ FC=ifort cmake -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
       :
    $ make
    $ make install
@@ -67,12 +57,10 @@ A Debug build can be done:
 
 .. code-block:: 
 
-   $ vpkg_require cmake openmpi/4.1.0:intel-2020
-   $ git clone https://github.com/ud-pci/pCI.git pci
-   $ cd pci
+   $ cd pCI
    $ mkdir build-debug
    $ cd build-debug
-   $ FC=mpifort cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(pwd)/../20200402-debug ..
+   $ FC=ifort cmake -DCMAKE_BUILD_TYPE=Debug -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../debug ..
       :
    $ make
    $ make install
@@ -81,12 +69,10 @@ An optimized build demands a little more:
 
 .. code-block:: 
 
-   $ vpkg_require cmake openmpi/4.1.0:intel-2020
-   $ git clone https://github.com/ud-pci/pCI.git pci
-   $ cd pci
+   $ cd pCI
    $ mkdir build-opt
    $ cd build-opt
-   $ FC=mpifort cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(pwd)/../20200317-opt -DCMAKE_Fortran_FLAGS_RELEASE="-g -O3 -mcmodel=large   -xHost -m64" ..
+   $ FC=ifort cmake -DCMAKE_BUILD_TYPE=Release -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../opt -DCMAKE_Fortran_FLAGS_RELEASE="-g -O3 -mcmodel=large -xHost -m64" ..
       :
    $ make
    $ make install

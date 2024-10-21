@@ -16,7 +16,8 @@ author = 'Charles Cheung'
 extensions = [
     'myst_parser',
     'sphinx.ext.mathjax',
-    'sphinxcontrib.bibtex'
+    'sphinxcontrib.bibtex',
+    'sphinx_toolbox.collapse'
 ]
 
 source_suffix = {
