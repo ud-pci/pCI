@@ -296,40 +296,48 @@ Module integrals
     Real(dp) Function Find_VS(na,nb)
         Implicit None
         Integer :: n, na, nb, iab, nmin, nmax, kab
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (na <= nb) Then
             iab=IPx*(na-Nso-1)+nb-Nso
         Else
             iab=IPx*(nb-Nso-1)+na-Nso
         End If
+
         nmin=1
         nmax=num_is
-        If(I_is(nmax) == iab) Then
+
+        If (I_is(nmax) == iab) Then
             n=nmax
             Find_VS=R_is(n)
             Return
         End If
-    1   If (nmin == nmax) Then
-            Write(*,*) ' Find_VS error: na=',na,' nb=',nb
-            Write(*,*) ' num_is=',num_is,' iab=',iab
-            Read(*,*)
-            Stop
-        End If
-        n=(nmax+nmin)/2
-        kab=I_is(n)
-        If (iab-kab) 100,300,200
-  100   nmax=n
-        Goto 1
-  200   nmin=n
-        Goto 1
-  300   Find_VS=R_is(n)
-        Return
+
+        ! Binary search for VS integral
+        Do While (nmin < nmax)
+            n=(nmax+nmin)/2
+            kab=I_is(n)
+
+            If (iab < kab) Then
+                nmax = n
+            Else If (iab > kab) Then
+                nmin = n
+            Else
+                Find_VS = R_is(n)
+                Return
+            End If
+        End Do
+
+        ! Case when nmin == nmax 
+        Write(*,*) ' Find_VS error: na=',na,' nb=',nb
+        Write(*,*) ' num_is=',num_is,' iab=',iab
+        Read(*,*)
+        Stop
     End Function Find_VS
 
     Real(dp) Function Find_SMS(na,nb)
         Implicit None
         Integer  :: is, iab, nmin, nmax, n, kab, na, nb
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (na <= nb) Then
             is=1
             iab=IPx*(na-Nso-1)+nb-Nso
@@ -337,28 +345,36 @@ Module integrals
             is=-1
             iab=IPx*(nb-Nso-1)+na-Nso
         End If
+
         nmin=1
         nmax=num_is
-        If(I_is(nmax) == iab) Then
+
+        ! Binary search for SMS integral
+        If (I_is(nmax) == iab) Then
             n=nmax
             Find_SMS=is*R_is(n)
             Return
         End If
-    1   If (nmin == nmax) Then
-            Write(*,*) ' Find_SMS error: na=',na,' nb=',nb
-            Write(*,*) ' num_is=',num_is,' iab=',iab
-            Read(*,*)
-            Stop
-        End If
-        n=(nmax+nmin)/2
-        kab=I_is(n)
-        If (iab-kab) 100,300,200
-  100   nmax=n
-        Goto 1
-  200   nmin=n
-        Goto 1
-  300   Find_SMS=is*R_is(n)
-        Return
+
+        Do While (nmin < nmax)
+            n=(nmax+nmin)/2
+            kab=I_is(n)
+
+            If (iab < kab) Then
+                nmax = n
+            Else If (iab > kab) Then
+                nmin = n
+            Else
+                Find_SMS = is * R_is(n)
+                Return
+            End If
+        End Do
+        
+        ! Case when nmin == nmax 
+        Write(*,*) ' Find_SMS error: na=',na,' nb=',nb
+        Write(*,*) ' num_is=',num_is,' iab=',iab
+        Read(*,*)
+        Stop
     End Function Find_SMS
 
     Real(dp) Function HintS(na,nb,n0)
