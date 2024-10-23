@@ -13,7 +13,7 @@ Module integrals
     subroutine Rint
         Implicit None
         Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
-                       k, mlow, m_is
+                       k, mlow, m_is, err_stat
         Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
         Data str /'Coulomb','Gaunt  ','Breit  '/
@@ -29,8 +29,12 @@ Module integrals
         Else
             nx = IPx
         End If
-        Open(unit=13,file='CONF.INT',status='OLD',form='UNFORMATTED',err=700)
-
+        Open(unit=13,file='CONF.INT',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Write( 6,'(2X," Can not find file CONF.INT...")')
+            Write(11,'(2X," Can not find file CONF.INT...")')
+            Stop
+        End If
         Write(*,*)' Reading file CONF.INT...'
         Read (13) ns1,nso1,nsp1,Nsu1,Ecore
         If (ns1 /=  Ns) Then
@@ -66,7 +70,11 @@ Module integrals
         Read (13) (Iint3(i8), i8=1,Ngint)
         Read (13) (IntOrd(i), i=1,nrd)
         If (K_is >= 1) Then
-            Read(13,End=800) m_is,mlow,num_is
+            Read(13,iostat=err_stat) m_is,mlow,num_is
+            If (err_stat /= 0) Then
+                Write( *,*) 'No SMS integrals in CONF.INT!'
+                Stop
+            End If
             Allocate(R_is(num_is),I_is(num_is))
             If (m_is /=  K_is) Then
                 Write(*,*) 'IS Integrals are for K_is=',m_is
@@ -77,8 +85,12 @@ Module integrals
                 Write(*,*) 'SMS Integrals are for Klow=',mlow
                 Read(*,*)
             End If
-            Read(13,End=800) (R_is(i),i=1,num_is)
-            Read(13,End=800) (I_is(i),i=1,num_is)
+            Read(13,iostat=err_stat) (R_is(i),i=1,num_is)
+            Read(13,iostat=err_stat) (I_is(i),i=1,num_is)
+            If (err_stat /= 0) Then
+                Write( *,*) 'No SMS integrals in CONF.INT!'
+                Stop
+            End If
         End If
         Close(unit=13)
         Write( *,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
@@ -93,12 +105,6 @@ Module integrals
             Write (11,*) ' Nsp changed since integrals were calculated'
             End If
         Return
-
-  700   Write( 6,'(2X," Can not find file CONF.INT...")')
-        Write(11,'(2X," Can not find file CONF.INT...")')
-        Stop
-  800   Write( *,*) 'No SMS integrals in CONF.INT!'
-        Stop
     End subroutine Rint
 
     Real(dp) Function Hint(ia,ib)
