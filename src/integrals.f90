@@ -379,56 +379,61 @@ Module integrals
 
     Real(dp) Function HintS(na,nb,n0)
         Implicit None
-        Real(dp)    :: e, d, dr, dd, de, d1
+        Real(dp)  :: e, d, dr, dd, de, d1
         Integer   :: nx, ind, nab, i, na, nb, n0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         e=0.d0
         HintS=e
         nx = IPx
-        If (Ll(na) > LmaxS)   Return
-        If (nb > NmaxS)       Return
+
+        ! Check that quantum numbers are within range
+        If (Ll(na) > LmaxS .or. nb > NmaxS) Return
         ind=nx*(na-Nso-1)+(nb-Nso)
+
+        ! Loop through one-electron effective radial integrals to find a match
         Do i=1,NhintS
             nab=Iint1S(i)
             If (nab == ind) Then
                 e=Rsig(i)
                 d=Dsig(i)
+
                 If (Kdsig*d /= 0.d0) Then
                     de=(E_k+Eps(n0)-Esig(i))
                     d1=d/e
                     dd=d1*de
+
                     If (dd > 0.5d0) Then
                         Kherr=Kherr+1
                         dd=0.5d0
                     End If
-                    ! NORMAL VARIANT
+
                     If (d1 > 0.d0) Then
+                        ! NORMAL VARIANT
                         e=e/(1.d0-dd)
-                    ! ANOMALOUS VARIANT
                     Else
+                        ! ANOMALOUS VARIANT
                         Select Case(Kexn)
-                            ! two-side extrapolation
-                            Case(1) 
+                            Case(1) ! two-side extrapolation
                                 e=e*(1.d0+dd)
-                            ! one-side extrapolation
-                            Case(2) 
+                            Case(2) ! one-side extrapolation
                                 e=e*(1.d0+dmin1(0.d0,dd))
-                            ! nonlinear extrapolation
-                            Case(3) 
+                            Case(3) ! nonlinear extrapolation
                                 dr=1.d0+dd-0.1*de*de
                                 e=e*dmax1(dr,0.d0)
                         End Select
                     End If
                 End If
+
                 HintS=e
                 Return
             End If
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
+        ! Handle case when integral is absent
         Write( 6,'(/4X,"HintS: integral is absent:"/4X,"na=",I2,2X,"nb=",I2/)') na,nb
         Write(11,'(/4X,"HintS: integral is absent:"/4X,"na=",I2,2X,"nb=",I2/)') na,nb
         Stop
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         HintS=e
         Return
     End Function HintS
@@ -439,8 +444,8 @@ Module integrals
                      na0, nb0, la, lb, lc, ld, i, ja, jb, jc, jd, k, iab, &
                      iac0, ibd0, kmn, kmx, minint, k1, mi, nx, i1, i2, i3, i4, &
                      ii, iac, ibd, kac, kbd
-        Real(dp)    :: e, rabcd, dabcd, de, dd, dmin1, dr, dmax1, d1, eabcd
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        Real(dp)  :: e, rabcd, dabcd, de, dd, dmin1, dr, dmax1, d1, eabcd
+
         e=0.d0
         GintS=e
         nx = IPx
@@ -449,6 +454,7 @@ Module integrals
         ib=i2
         ic=i3
         id=i4
+
         Do ii=1,2
             ma=Jz(ia)
             mb=Jz(ib)
@@ -464,75 +470,40 @@ Module integrals
             lb=Ll(nb)
             lc=Ll(nc)
             ld=Ll(nd)
-            If (max(la,lb,lc,ld) > LmaxS) Return
-            If (max(na,nb,nc,nd) > NmaxS) Return
-            If ((na+nb+nc+nd) > Nsum)     Return
+
+            If (max(la,lb,lc,ld) > LmaxS .or. max(na,nb,nc,nd) > NmaxS .or. (na+nb+nc+nd) > Nsum) Return
             i=la+lb+lc+ld
-            If (i /= 2*(i/2))             Return
+            If (i /= 2*(i/2)) Return
+
             ja=Jj(na)
             jb=Jj(nb)
             jc=Jj(nc)
             jd=Jj(nd)
-            If (na > nc  .and.  nb >= nc  .and.  nd >= nc) Then ! na>nc
-                k =na                                     ! nb>=nc
-                na=nc                                     ! nd>=nc
-                nc=k
-                k =nb
-                nb=nd
-                nd=k
-                Goto 200
+
+            If (na > nc .and. nb >= nc .and. nd >= nc) Then
+                Call SwapValues(na, nc)
+                Call SwapValues(nb, nd)
+            Else If (na > nb .and. nc > nb .and. nd >= nb) Then
+                Call SwapValues(na, nb)
+                Call SwapValues(nc, nd)
+            Else If (na > nd  .and.  nb > nd  .and.  nc > nd) Then
+                Call SwapValues(na, nd)
+                Call SwapValues(nb, nc)
             End If
-            If (na > nb  .and.  nc > nb  .and.  nd >= nb) Then ! na>nb
-                k =na                                     ! nc>nb
-                na=nb                                     ! nd>=nb
-                nb=k
-                k =nc
-                nc=nd
-                nd=k
-                Goto 200
-            End If
-            If (na > nd  .and.  nb > nd  .and.  nc > nd) Then ! na>nd
-                k =na                                     ! nb>nd
-                na=nd                                     ! nc>nd
-                nd=k
-                k =nb
-                nb=nc
-                nc=k
-                Goto 210
-            End If
-  200       If (na == nb  .and.  nc > nd)Then
-               k =nc
-               nc=nd
-               nd=k
-            End If
+
+            If (na == nb .and. nc > nd) Call SwapValues(nc, nd)
             If (na == nd  .and.  nb > nc)Then
                 If (na /= nc) Then
-                    k =nc
-                    nc=nb
-                    nb=k
-                Else      ! Case: na=nc=nd<nb
-                    k =nd
-                    nd=nb
-                    nb=k
+                    Call SwapValues(nc, nb)
+                Else
+                    Call SwapValues(nd, nb)
                 End If
             End If
-            If (na == nc  .and.  nb > nd)Then
-                k =nb
-                nb=nd
-                nd=k
-            End If
+            If (na == nc .and. nb > nd) Call SwapValues(nb, nd)
     
-  210       If (Ksym == 0) Then      ! approx. symmetry
-                If (nb > nd) Then     ! which is assumed
-                    k =nb               ! when Ksym=0             
-                    nb=nd                         
-                    nd=k
-                End If
-                If (na == nb  .and.  nc > nd) Then
-                    k =nc
-                    nc=nd
-                    nd=k
-                End If
+            If (Ksym == 0) Then      ! approximate symmetry which is assumed when Ksym=0
+                If (nb > nd) Call SwapValues(nb, nd)
+                If (na == nb .and. nc > nd) Call SwapValues(nc, nd)
             End If
     
             iac0=nx*(na-Nso-1)+(nc-Nso)
@@ -541,6 +512,7 @@ Module integrals
             kmx=min((ja+jc)/2+1,(jb+jd)/2+1,Kmax+1)
             iab = nx*(na-Nso-1)+(nb-Nso)
             minint = IntOrdS(iab)
+
             Do k1=kmn,kmx
                 k=k1-1
                 iac=nx*nx*k+iac0
@@ -551,58 +523,72 @@ Module integrals
                     kbd=Iint3S(i)
                     If (kac == iac  .and.  kbd == ibd) Then
                         mi=i
-                        Goto 230
+                        Exit
                     End If
                 End Do
-  220           continue ! this is to control missing integrals
-                Write(*,*) ' GintS: missing integral'
-                Write(*,'(4I5,I3)') na,nb,nc,nd,k
-                Read(*,*)
-                Goto 240
-  230           rabcd=Rint2S(i)
-                If (rabcd == 0.d0) Then
-                    minint = mi + 1
-                    Cycle
+
+                ! Handle case when integral is absent
+                If (i > NgintS) Then
+                    Write(*,*) ' GintS: missing integral'
+                    Write(*,'(4I5,I3)') na,nb,nc,nd,k
+                    Stop
                 End If
-                dabcd=Dint2S(i)
-                If (Kdsig*dabcd /= 0.d0) Then
-                    eabcd=Eint2S(i)
-                    de=E_k+Eps(na0)+Eps(nb0)-eabcd
-                    d1=dabcd/rabcd
-                    dd=d1*de
-                    If (dd > 0.5d0) Then
-                        Kgerr=Kgerr+1
-                        dd=0.5d0
+                
+                rabcd=Rint2S(i)
+                If (rabcd /= 0.d0) Then
+                    dabcd=Dint2S(i)
+                    If (Kdsig*dabcd /= 0.d0) Then
+                        eabcd=Eint2S(i)
+                        de=E_k+Eps(na0)+Eps(nb0)-eabcd
+                        d1=dabcd/rabcd
+                        dd=d1*de
+
+                        If (dd > 0.5d0) Then
+                            Kgerr=Kgerr+1
+                            dd=0.5d0
+                        End If
+
+                        If (d1 > 0.d0) Then           
+                            ! NORMAL VARIANT
+                            rabcd=rabcd/(1.d0-dd)
+                        Else                          
+                            ! ANOMALOUS VARIANT
+                            Select Case(Kexn)
+                                Case(1) ! two-side extrapolation
+                                    rabcd=rabcd*(1.d0+dd)
+                                Case(2) ! one-side extrapolation
+                                    rabcd=rabcd*(1.d0+dmin1(0.d0,dd))
+                                Case(3) ! nonlinear extrapolation
+                                    dr=1.d0+dd-0.1*de*de
+                                    rabcd=rabcd*dmax1(dr,0.d0)
+                            End Select
+                        End If
                     End If
-                    If (d1 > 0.d0) Then           ! <= NORMAL VARIANT
-                        rabcd=rabcd/(1.d0-dd)
-                    Else                           ! <= ANOMALOUS VARIANT
-                        If (Kexn == 1) Then          ! <= two side extr-n
-                            rabcd=rabcd*(1.d0+dd)
-                        End If
-                        If (Kexn == 2) Then          ! <= one side extr-n
-                            rabcd=rabcd*(1.d0+dmin1(0.d0,dd))
-                        End If
-                        If (Kexn == 3) Then          ! <= nonlinear extr-n
-                            dr=1.d0+dd-0.1*de*de
-                            rabcd=rabcd*dmax1(dr,0.d0)
-                        End If
-                    End If
+
+                    e=e+is*Gaunt(k,ja*0.5d0,ma*0.5d0,jc*0.5d0,mc*0.5d0) &
+                        *Gaunt(k,jd*0.5d0,md*0.5d0,jb*0.5d0,mb*0.5d0) &
+                        *rabcd
                 End If
-                e=e+is &
-                    *Gaunt(k,ja*0.5d0,ma*0.5d0,jc*0.5d0,mc*0.5d0) &
-                    *Gaunt(k,jd*0.5d0,md*0.5d0,jb*0.5d0,mb*0.5d0) &
-                    *rabcd
-  240           minint = mi + 1
+                minint = mi + 1
             End Do
-            k=ic
-            ic=id
-            id=k
+
+            Call SwapValues(ic, id)
             is=-is
         End Do
+
         GintS=e
         Return
     End Function GintS
+
+    Subroutine SwapValues(a, b)
+        Implicit None
+        Integer, Intent(InOut) :: a, b
+        Integer :: temp
+
+        temp = a
+        a = b
+        b = temp
+    End Subroutine SwapValues
 
     Real(dp) Function Gaunt(k,xj1,xm1,xj2,xm2)
         Implicit None
