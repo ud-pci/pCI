@@ -1,6 +1,6 @@
 Module determinants
     !
-    ! This module implements Subroutines related to determinants.
+    ! This module implements subroutines related to determinants.
     !
     Use conf_variables
 
@@ -96,32 +96,47 @@ Module determinants
     Subroutine Jterm
         Implicit None
 
-        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1
+        Integer         :: i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1, jmax
         Real(dp)        :: d
-        Integer, allocatable, dimension(:) :: idet
-        Integer, dimension(60) :: nmj
-        logical :: fin
+        Integer, allocatable, dimension(:) :: idet, nmj
+        logical :: fin, swapped
 
         allocate(idet(Ne),Ndc(Nc),Jtc(Nc))
+
         Njd=0
         Nd=0
-        ! Calculate Nd
+        jmax=0
+
+        ! Calculate total number of determinants Nd
         Do iconf1=1,Nc
             ndi=0
             iconf=iconf1
             fin=.true.
             Call Ndet(iconf,fin,idet)
             Do While (.not. fin)
-                If (M == Mj) ndi = ndi + 1
+                im = (M-Mj)/2+1
+                If (im > jmax) jmax = im
+                If (M == Mj) Then
+                    ndi = ndi + 1
+                End If
                 Call Ndet(iconf,fin,idet)
             End Do
             Nd=Nd+Ndi
         End Do
 
+        ! Allocate global arrays:
+        ! Iarr - 2d array of determinants, dimension(Ne, Nd)
+        ! Jt - array of J term
+        ! Njt - array of number of determinants with J term
         if (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
+        if (.not. allocated(Jt)) allocate(Jt(jmax))
+        if (.not. allocated(Njt)) allocate(Njt(jmax))
+        if (.not. allocated(nmj)) allocate(nmj(jmax))
 
         Njd=0
         Nd=0
+
+        ! Loop over configurations
         Do iconf1=1,Nc
             ndi=0
             ndi1=0
@@ -129,34 +144,33 @@ Module determinants
             imax=1
             fin=.true.
             Call Ndet(iconf,fin,idet)
+
+            ! Construct next determinant in configuration iconf
             Do While (.not. fin)
                 If (M >= Mj) Then
                     If (M == Mj) ndi=ndi+1
                     If (M == Mj+2) ndi1=ndi1+1
+
                     nd1=nd+ndi
-                    If (M == Mj) Then
-                      Call Pdet (nd1,idet)
-                    End If
+
+                    If (M == Mj) Call Pdet(nd1,idet) ! Save determinant to Iarr(1:Ne,nd1)
+
                     im=(M-Mj)/2+1
                     If (im > imax) imax=im
                 End If
                 Call Ndet(iconf,fin,idet)
             End Do
+
             Ndc(iconf)=ndi
             Jtc(iconf)=ndi
             If (kv == 1) Jtc(iconf)=ndi-ndi1
             Nd=Nd+Ndi
+
             If (ndi /= 0) Then
-                If (imax > 60) Then
-                    write(*,*) ' Jterm: array nmj is too small'
-                    write(*,*) ' Dimension is 60, required:',imax
-                    Read(*,*)
-                End If
-                Do im=1,imax
-                    nmj(im)=0
-                End Do
+                nmj(1:imax)=0
                 fin= .true.
                 Call Ndet(iconf,fin,idet)
+
                 Do While (.NOT.fin) 
                     If (M >= Mj) Then
                         im=(M-Mj)/2+1
@@ -164,62 +178,70 @@ Module determinants
                     End If
                     Call Ndet(iconf,fin,idet)
                 End Do
+
                 ! list of terms
-                im=imax+1
-    230         im=im-1
-                If (im >= 1) Then
+                Do im=imax, 1, -1
                     n=nmj(im)
                     If (n /= 0) Then
                         mt=(im-1)*2+Mj
                         Do j=1,im
                             nmj(j)=nmj(j)-n
                         End Do
-                        If (njd /= 0) Then
-                            Do j=1,njd
-                                If (Jt(j) == mt) Then
-                                    njt(j)=njt(j)+n
-                                    goto 230
-                                End If
-                            End Do
+
+                        ! Check if J term is already in Jt array
+                        Do j=1,njd
+                            If (Jt(j) == mt) Then
+                                njt(j)=njt(j)+n
+                                Exit
+                            End If
+                        End Do
+                        
+                        ! Add a new J term if not already present
+                        If (j > Njd) Then
+                            Njd=Njd+1
+                            Jt(njd)=mt
+                            Njt(njd)=n
                         End If
-                        njd=njd+1
-                        If (njd > IPjd) Then
-                            write(*,*) ' Jterm: number of Js'
-                            write(*,*) ' exceed IPjd=',IPjd
-                            Read(*,*)
-                        End If
-                        Jt(njd)=mt
-                        Njt(njd)=n
                     End If
-                    goto 230
-                End If
+                End Do
             End If
         End Do
 
+        ! Handle case when no determinants were constructed for J terms
         If (Nd == 0) Then
             write( 6,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
             write(11,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
             stop
         End If
 
-        ! Writing table of J
+        ! Write table of number of determinants with respective J terms
         write( 6,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
         write(11,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
-        i = 1
-        Do While (i == 1)
-            i=0
+
+        ! Sort Jt and Njt
+        Do
+            swapped = .false.
             Do j=2,njd
                 If (Jt(j) < Jt(j-1)) Then
+                    ! swap Jt values
                     n=Jt(j)
                     Jt(j)=Jt(j-1)
                     Jt(j-1)=n
+
+                    ! swap Njt values
                     n=Njt(j)
                     Njt(j)=Njt(j-1)
                     Njt(j-1)=n
-                    i=1
+                    
+                    swapped = .true.
                 End If
             End Do
+
+            ! Exit loop if no elements were swapped
+            If (.not. swapped) Exit
         End Do
+
+        ! Print number of determinants for each J term
         Do j=1,njd
             d=Jt(j)*0.5d0
             n=j
@@ -228,15 +250,8 @@ Module determinants
         End Do
         write( 6,'(3X,23("="))')
         write(11,'(3X,23("="))')
-     
-        i=0
-        Do j=1,njd
-            d=Jt(j)*0.5d0
-            n=j
-            ndj=Njt(n)
-        End Do
 
-        Deallocate(idet, Jtc, Nq0)
+        Deallocate(idet, Jtc, Nq0, nmj)
 
         Return
     End Subroutine Jterm

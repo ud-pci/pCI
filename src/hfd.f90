@@ -9,11 +9,11 @@ Program hfd
     Real(dp), Dimension(10) :: Vnuc
     Real(dp), Dimension(IP6) :: P, Q, A, B, C, CC, R, V, Y, CP, CQ, RO, ROO, W, ROIJ, RS, FS
     Real(dp), Dimension(IP6) :: Pa, Pc, Qa, Qc, P1a, P1c, Q1a, Q1c, Py, Qy
-    Real(dp), Dimension(IPns) :: eadd
+    Real(dp), Allocatable,  Dimension(:) :: eadd
     Integer, Dimension(64) :: IGAM
     Real(dp), Dimension(64) :: GAM
-    Integer, Dimension(IPns) :: Nc, Kp, Nf, Nq, Nn, Ll, Kk, Jj
-    Real(dp), Dimension(IPns) :: Qq, Qw, Zat
+    Integer, Allocatable, Dimension(:) :: Nc, Kp, Nf, Nq, Nn, Ll, Kk, Jj
+    Real(dp), Allocatable, Dimension(:) :: Qq, Qw, Zat
     Character(Len=1) :: let(5), str(4)*8, str1(2)*5, name(16)
     Character(Len=256) :: strfmt
     
@@ -58,20 +58,8 @@ Program hfd
     Q1c=0_dp
     Py=0_dp
     Qy=0_dp
-    eadd=0_dp
     igam=0
     gam=0_dp
-    Nc=0
-    Kp=0
-    Nf=0
-    Nq=0
-    Nn=0
-    Ll=0
-    Kk=0
-    Jj=0
-    Qq=0_dp
-    Qw=0_dp
-    Zat=0_dp
     M1=0
     M2=0
     M3=0
@@ -80,6 +68,7 @@ Program hfd
     Call recunit  ! determines word length
     Mrec=ipmr
     Call INPUT
+
     eps0=1.d-7         !### eps0 defines covergence criterion
     eps1=1.d-3 
     If (kl.EQ.2) eps0=0.1d0*eps0
@@ -484,8 +473,8 @@ Contains
         
         Integer :: istr, li, ji, Ns0, nmin, kpa, nca, na, la, ja, k, nj, ni, nii, i, iconf
         Real(dp) :: qa
-        Integer, Dimension(IPns) :: Nn1, Ll1, Kk1, Jj1, KP1, Nc1
-        Real(dp), Dimension(IPns) :: Qq1, Dqa
+        Integer, Allocatable, Dimension(:)  :: Nn1, Ll1, Kk1, Jj1, KP1, Nc1
+        Real(dp), Allocatable, Dimension(:) :: Qq1, Dqa
         Character*1 :: txt(36), lt
         Character(Len=256) :: strfmt
 
@@ -495,14 +484,13 @@ Contains
         strfmt = '(1X,16A1)'
         Read(10,strfmt) NAME
 
-        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.1",4X,16A1)'
+        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.2",4X,16A1)'
         Write( *,strfmt) NAME
         Write(11,strfmt) NAME
 
 
         ! Default values:
         Kl=0
-        Ns=IPns
         Nso=0
         Jm=-2_dp
         R2=50.d0
@@ -529,6 +517,23 @@ Contains
         READ (10,strfmt) TXT
         WRITE( *,strfmt) TXT
         WRITE(11,strfmt) TXT
+
+        Allocate(Nn1(Ns), Ll1(Ns), Kk1(Ns), Jj1(Ns), KP1(Ns), Nc1(Ns))
+        Allocate(Qq1(Ns), Dqa(Ns))
+
+        Allocate(eadd(Ns), Nc(Ns), Kp(Ns), Nf(Ns), Nq(Ns), Nn(Ns), Ll(Ns), Kk(Ns), Jj(Ns), Qq(Ns), Qw(Ns), Zat(Ns))
+        eadd=0_dp
+        Nc=0
+        Kp=0
+        Nf=0
+        Nq=0
+        Nn=0
+        Ll=0
+        Kk=0
+        Jj=0
+        Qq=0_dp
+        Qw=0_dp
+        Zat=0_dp
 
         MAXNC=0
         Do NII=1,NS
@@ -641,6 +646,9 @@ Contains
             IF (ICONF.GT.0) ZAT(I)=ZAT(I)-DQA(1)
         End Do
         CALL CLOSEF(10)
+
+        Deallocate(Nn1, Ll1, Kk1, Jj1, KP1, Nc1, Qq1, Dqa)
+
         RETURN
 
     End Subroutine Input
@@ -2954,8 +2962,8 @@ Contains
 
         Integer :: itest, ns1, ng, nso1, if, ni, nj, njj, nsm, nj1, li, n1, k1, n12
         Real(dp) :: c1, z1, r21, am1, c2, q1
-        Integer, Dimension(IPns) :: Nn1, Kk1, Kp1, Nc1
-        Real(dp), Dimension(IPns) :: Qq1
+        Integer, Allocatable, Dimension(:)  :: Nn1, Kk1, Kp1, Nc1
+        Real(dp), Allocatable, Dimension(:) :: Qq1
         Real(dp) :: Jm1
         Character(Len=256) :: strfmt
 
@@ -2965,6 +2973,8 @@ Contains
         Kp1=0
         Nc1=0
         Qq1=0_dp
+
+        Allocate(Nn1(Ns), Kk1(Ns), Kp1(Ns), Nc1(Ns), Qq1(Ns))
 
         ITEST=0
         CALL READF (12,1,P,P,1)
@@ -3156,6 +3166,8 @@ Contains
         End If
 
         IF (ITEST.NE.0.AND.KL.EQ.1) STOP
+
+        Deallocate(Nn1, Kk1, Kp1, Nc1, Qq1)
 
         RETURN
     End Subroutine Test
@@ -3530,10 +3542,10 @@ Contains
 
         Integer, Dimension(70) :: ig
         Real(dp), Dimension(70) :: gg
-        Integer, Dimension(IPns) :: nq
+        Integer, Allocatable, Dimension(:) :: nq
 
-
-        Do ni = 1, IPns
+        Allocate(nq(Ns))
+        Do ni = 1, Ns
             nq(ni) = qq(ni)+0.01d0
         End Do
 
@@ -3762,6 +3774,9 @@ Contains
 
 1000    if (dabs(g).lt.1.d-7) g=0.d0
         coeft=g
+
+        Deallocate(nq)
+        
         Return
     End Function coeft
 

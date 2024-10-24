@@ -102,7 +102,7 @@ Program pconf
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
-    If (.not. GetEnvIsPresent("CONF_MAX_BYTES_PER_CPU")) Then
+    If (mype == 0 .and. .not. GetEnvIsPresent("CONF_MAX_BYTES_PER_CPU")) Then
         print*, "WARNING: CONF_MAX_BYTES_PER_CPU not set in environment"
     End If
     memTotalPerCPU = GetEnvInteger64("CONF_MAX_BYTES_PER_CPU", 0_int64)
@@ -1896,6 +1896,8 @@ Contains
         If (allocated(B2)) Deallocate(B2)
         If (allocated(Z1)) Deallocate(Z1)
         If (allocated(E1)) Deallocate(E1)
+        If (allocated(Jt)) Deallocate(Jt)
+        If (allocated(Njt)) Deallocate(Njt)
 
         Return
     End Subroutine Diag4
