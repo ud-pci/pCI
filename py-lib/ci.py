@@ -26,7 +26,7 @@ import re
 import math
 import orbitals as orb_lib
 import get_atomic_data as libatomic
-from utils import run_shell, get_dict_value
+from utils import run_shell, get_dict_value, check_slurm_installed
 from pathlib import Path
 from gen_job_script import write_job_script
 
@@ -224,7 +224,7 @@ def form_conf_inp(parity, bin_dir):
         bin_dir = bin_dir[:-1]
     run_shell("cp ADD" + parity + ".INP ADD.INP")
     if on_hpc:
-        run_shell("add < add.in > add" + parity + ".out")
+        run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
     else:
         run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
     print("output of add saved to add" + parity + ".out")
@@ -292,7 +292,8 @@ if __name__ == "__main__":
     on_hpc = get_dict_value(system, 'on_hpc')
     
     # hpc parameters
-    if on_hpc:
+    on_slurm = check_slurm_installed()
+    if on_hpc and on_slurm:
         hpc = get_dict_value(config, 'hpc')
         submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
@@ -302,6 +303,8 @@ if __name__ == "__main__":
         else:
             print('hpc block was not found in', yml_file)
             partition, nodes, tasks_per_node = None, 1, 1
+    else:
+        on_hpc = False
     
     optional = get_dict_value(config, 'optional')
     isotope_shifts = get_dict_value(optional, 'isotope_shifts')
