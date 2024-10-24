@@ -1076,6 +1076,7 @@ if __name__ == "__main__":
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
+        submit_job = False
         
     # atom parameters
     name = atom['name']

@@ -157,6 +157,7 @@ if __name__ == "__main__":
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
+        submit_job = False
     
     basis = get_dict_value(config, 'basis')
     conf = get_dict_value(config, 'conf')

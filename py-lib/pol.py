@@ -80,6 +80,7 @@ if __name__ == "__main__":
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
+        submit_job = False
     
     conf = get_dict_value(config, 'conf')
     odd_J = get_dict_value(conf['odd'], 'J')

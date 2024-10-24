@@ -305,6 +305,7 @@ if __name__ == "__main__":
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
+        submit_job = False
     
     optional = get_dict_value(config, 'optional')
     isotope_shifts = get_dict_value(optional, 'isotope_shifts')
