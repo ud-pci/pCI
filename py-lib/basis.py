@@ -22,7 +22,7 @@ import get_atomic_data as libatomic
 import orbitals as liborb
 import os
 from pathlib import Path
-from utils import run_shell, get_dict_value
+from utils import run_shell, get_dict_value, check_slurm_installed
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
@@ -1063,7 +1063,8 @@ if __name__ == "__main__":
     pci_version = get_dict_value(system, 'pci_version')
     
     # hpc parameters
-    if on_hpc and run_codes:
+    on_slurm = check_slurm_installed()
+    if on_hpc and on_slurm:
         hpc = get_dict_value(config, 'hpc')
         submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
@@ -1073,7 +1074,9 @@ if __name__ == "__main__":
         else:
             print('hpc block was not found in', yml_file)
             partition, nodes, tasks_per_node = None, 1, 1
-
+    else:
+        on_hpc = False
+        
     # atom parameters
     name = atom['name']
     try:

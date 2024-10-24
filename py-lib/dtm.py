@@ -22,7 +22,7 @@ import yaml
 import os
 import sys
 from pathlib import Path
-from utils import run_shell, get_dict_value
+from utils import run_shell, get_dict_value, check_slurm_installed
 from gen_job_script import write_job_script
 
 
@@ -144,7 +144,8 @@ if __name__ == "__main__":
     run_codes = get_dict_value(system, 'run_codes')
     
     # hpc parameters
-    if on_hpc:
+    on_slurm = check_slurm_installed()
+    if on_hpc and on_slurm:
         hpc = get_dict_value(config, 'hpc')
         submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
@@ -154,6 +155,8 @@ if __name__ == "__main__":
         else:
             print('hpc block was not found in', yml_file)
             partition, nodes, tasks_per_node = None, 1, 1
+    else:
+        on_hpc = False
     
     basis = get_dict_value(config, 'basis')
     conf = get_dict_value(config, 'conf')
