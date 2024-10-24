@@ -867,6 +867,7 @@ Contains
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1425,6 +1426,9 @@ Contains
         If (.not. Allocated(B2)) Allocate(B2(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
+        If (.not. Allocated(Jt)) Allocate(Jt(Njd))
+        
+        Call MPI_Bcast(Jt, Njd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         If (KLSJ == 1) Then
             If (.not. Allocated(xj)) Allocate(xj(Nlv))
@@ -1635,7 +1639,7 @@ Contains
         Real(dp) :: cnx
         Character(Len=16) :: timeStr, iStr
         Integer,  Allocatable, Dimension(:) :: Jn, Jk
-        Real(kind=type_real), Allocatable, Dimension(:) :: Jt
+        Real(kind=type_real), Allocatable, Dimension(:) :: Jv
 
         ! Initialize parameters and arrays
         Iconverge = 0
@@ -1679,10 +1683,10 @@ Contains
         ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
         If (mype == 0) Then
             js = size(Jsq%ind1)
-            Allocate(Jn(js),Jk(js),Jt(js))
+            Allocate(Jn(js),Jk(js),Jv(js))
             Jn=Jsq%ind1
             Jk=Jsq%ind2
-            Jt=Jsq%val
+            Jv=Jsq%val
         End If
 
         ! Davidson loop:
@@ -1747,7 +1751,7 @@ Contains
                     If (mype == 0) Then
                         Jsq%ind1=Jn
                         Jsq%ind2=Jk
-                        Jsq%val=Jt
+                        Jsq%val=Jv
                     End If
                     Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
                     If (mype == 0) Then
@@ -1831,7 +1835,7 @@ Contains
                                 If (mype == 0) Then
                                     Jsq%ind1=Jn
                                     Jsq%ind2=Jk
-                                    Jsq%val=Jt
+                                    Jsq%val=Jv
                                 End If
                                 Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
                             End Do
@@ -1869,10 +1873,10 @@ Contains
         If (mype == 0) Then
             Jsq%ind1=Jn
             Jsq%ind2=Jk
-            Jsq%val=Jt
+            Jsq%val=Jv
             If (allocated(Jn)) Deallocate(Jn)
             If (allocated(Jk)) Deallocate(Jk)
-            If (allocated(Jt)) Deallocate(Jt)
+            If (allocated(Jv)) Deallocate(Jv)
         End If
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
