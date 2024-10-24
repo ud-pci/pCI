@@ -1896,6 +1896,8 @@ Contains
         If (allocated(B2)) Deallocate(B2)
         If (allocated(Z1)) Deallocate(Z1)
         If (allocated(E1)) Deallocate(E1)
+        If (allocated(Jt)) Deallocate(Jt)
+        If (allocated(Njt)) Deallocate(Njt)
 
         Return
     End Subroutine Diag4

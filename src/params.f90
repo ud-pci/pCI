@@ -28,8 +28,7 @@ Module params
     ! defining Parameters which determine dimensions of main arrays
     !                     Array dimension          Associated variable
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
-    Integer, Parameter :: IPjd  =     33         ! Njd - number of possible J's   
-    Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
+    Integer, Parameter :: IPx   =    400         ! Nx - used for indexation of integrals   
     Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for direct diagonalization   
     Integer, Parameter :: IPbr  =      2         ! 1 - no valence Breit, 2 - valence Breit/Gaunt  
 
@@ -60,7 +59,7 @@ Module params
     Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm, Crt4
 
     ! Global arrays
-    Integer, Dimension(IPjd)              :: Jt, Njt
+    Integer, Allocatable, Dimension(:)    :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
     Real(dp), Allocatable, Dimension(:)   :: D1, Qnl

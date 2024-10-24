@@ -40,7 +40,6 @@ Program conf_pt
     !             Other dimensions are:
     !                   valence e              2*3*Nlv
     !                   positions for val. e   Nst
-    !                   different Jtot         IPjd
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !Init mpi
     Call MPI_Init(mpierr)
