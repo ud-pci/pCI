@@ -10,6 +10,8 @@ from get_atomic_term import *
 from pathlib import Path
 from subprocess import run
 from compare_res import *
+from glob import glob
+from utils import get_dict_value
 
 def read_yaml(filename):
     """ 
@@ -488,34 +490,76 @@ def convert_roman_to_num(roman):
     
     return num
 
-if __name__ == "__main__":
-    # Read atom name from config.yml if it exists
-    config_exists = os.path.isfile('config.yml')
+def find_ci_dirs(ci_path):
+    os.chdir(ci_path)
+    
+    even_dirs = glob('even*')
+    odd_dirs = glob('odd*')
+    dtm_dirs = glob('tm*')
+    
+    if even_dirs and odd_dirs:
+        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(ci_path + ' directory was found - use data from this directory? ')))))
+    
+    if not use_path:
+        return None, None, None
+    
+    if len(even_dirs) > 1:
+        even_dir = input(str(len(even_dirs)) + ' even directories were found: (' + ', '.join(even_dirs) + ') - which one would you like to use data from? ')
+    else:
+        even_dir = even_dirs[0]
+    if len(odd_dirs) > 1:
+        odd_dir = input(str(len(odd_dirs)) + ' odd directories were found: (' + ', '.join(odd_dirs) + ') - which one would you like to use data from? ')
+    else:
+        odd_dir = odd_dirs[0]
+    if len(dtm_dirs) > 1:
+        dtm_dir = input(str(len(dtm_dirs)) + ' dtm directories were found: (' + ', '.join(dtm_dirs) + ') - which one would you like to use data from? ')
+    else:
+        dtm_dir = dtm_dirs[0]
+        
+    os.chdir('..')
+        
+    return even_dir, odd_dir, dtm_dir
 
-    atom = ''
-    if config_exists:
-        config = read_yaml('config.yml')
-        config_name = config['atom']['name']
-        if len(config_name.split()) == 1:
-            atom = config_name + ' I'
-        elif len(config_name.split()) == 2:
-            if '+' in config_name.split()[1]: 
-                atom = config_name
-            elif config_name.split()[1].isnumeric():
-                atom = config_name.split()[0] + ' ' + str(int(config_name.split()[1])-1) + '+'
+if __name__ == "__main__":
+    use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
+    
+    if use_config_yml:
+        config_yml = input("Input yml-file: ")
+        config = read_yaml(config_yml)
+        atom_name = get_dict_value(config['atom'],'name')
+        
+        # Parse atom name
+        if len(atom_name.split()) == 1:
+            atom = atom_name + ' I'
+        elif len(atom_name.split()) == 2:
+            if '+' in atom_name.split()[1]: 
+                atom = atom_name
+            elif atom_name.split()[1].isnumeric():
+                atom = atom_name.split()[0] + ' ' + str(int(atom_name.split()[1])-1) + '+'
             else:
-                atom = config_name.split()[0] + ' ' + str(convert_roman_to_num(config_name.split()[1])-1) + '+'
+                atom = atom_name.split()[0] + ' ' + str(convert_roman_to_num(atom_name.split()[1])-1) + '+'
         else:
             print('ERROR: atom name not supported')
             sys.exit()
-        try:
-            ignore_g = config['portal']['ignore_g']
-        except KeyError:
-            ignore_g = True
-        try:
-            min_uncertainty = float(config['portal']['min_uncertainty'])
-        except KeyError:
-            min_uncertainty = 1.5  # default minimum uncertainty as percentage of value
+        
+        # conf parameters
+        conf = get_dict_value(config, 'conf')
+        even = get_dict_value(conf, 'even')
+        even_J = get_dict_value(even, 'J')
+        odd = get_dict_value(conf, 'odd')
+        odd_J = get_dict_value(odd, 'J')
+        even_dir = 'even' + str(even_J)[0]
+        odd_dir = 'odd' + str(odd_J)[0]
+        tm_dir = 'tm'
+        
+        # portal parameters
+        portal = get_dict_value(config, 'portal')
+        
+        # set default ignore configurations with 'g' and terms with 'G'
+        ignore_g = get_dict_value(portal, 'ignore_g') if portal else True
+        
+        # set default minimum uncertainty as percentage of value to 1.5
+        min_uncertainty = float(get_dict_value(portal, 'min_uncertainty')) if portal else 1.5
     else:
         atom = input('Input name of atom: ')
     name = atom.replace(" ","_")
@@ -531,30 +575,35 @@ if __name__ == "__main__":
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
-        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(all_order_path + ' directory was found - use data from this directory? ')))))
-        if use_path:
-            if os.path.isdir(all_order_path + '/even'):
-                run('cp ci+all-order/even/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
-            if os.path.isdir(all_order_path + '/odd'):   
-                run('cp ci+all-order/odd/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
-            if os.path.isdir(all_order_path + '/dtm'):   
-                run('cp ci+all-order/dtm/E1.RES DATA_RAW/E1.RES', shell=True)
+        if not even_dir or not odd_dir or not tm_dir:
+            even_dir, odd_dir, tm_dir = find_ci_dirs(dir_path + '/' + all_order_path)
+        if even_dir and odd_dir:
+            if os.path.isdir(all_order_path + '/' + even_dir):
+                run('cp ci+all-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
+            if os.path.isdir(all_order_path + '/' + odd_dir):   
+                run('cp ci+all-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
+        if tm_dir:
+            if os.path.isdir(all_order_path + '/' + tm_dir):   
+                run('cp ci+all-order/' + tm_dir + '/E1.RES DATA_RAW/E1.RES', shell=True)
             print('data from ' + all_order_path + ' moved to DATA_RAW directory')
     
     second_order_path = 'ci+second-order'
     if os.path.isdir(second_order_path):
-        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(second_order_path + ' directory was found - use data from this directory? ')))))
-        if use_path:
-            if os.path.isdir(second_order_path + '/even'):
-                run('cp ci+second-order/even/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
-            if os.path.isdir(second_order_path + '/odd'):   
-                run('cp ci+second-order/odd/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
-            if os.path.isdir(second_order_path + '/dtm'):   
-                run('cp ci+second-order/dtm/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+        if not even_dir or not odd_dir or not tm_dir:
+            even_dir, odd_dir, tm_dir = find_ci_dirs(dir_path + '/' + second_order_path)
+        if even_dir and odd_dir:
+            if os.path.isdir(second_order_path + '/' + even_dir):
+                run('cp ci+second-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
+            if os.path.isdir(second_order_path + '/' + odd_dir):   
+                run('cp ci+second-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
+        if tm_dir:
+            if os.path.isdir(second_order_path + '/' + tm_dir):   
+                run('cp ci+second-order/' + tm_dir + '/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
             print('data from ' + second_order_path + ' moved to DATA_RAW directory')
         
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
+    print(url_nist)
     data_nist = generate_df_from_asd(url_nist)
     
     # Write new CONF.RES (CONFFINAL.csv) with uncertainties
