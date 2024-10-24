@@ -51,6 +51,11 @@ $ make
 $ make install
 ```
 
+If problems related to incompatible compilers or modules, one can specify:
+```
+FC=ifort cmake -DCMAKE_Fortran_COMPILER=ifort -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+```
+
 A Debug build can be done:
 ```
 $ cd pCI

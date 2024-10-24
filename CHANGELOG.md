@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2024-10-24
+- update gen_portal_csv.py to use new config.yml format
+- add requirements.txt for required dependencies for pci-py-scripts
+- check if SLURM is installed in pci-py scripts before attempting to write SLURM job scripts
+- updated root CMakeLists.txt to account for latest LLVM-based Intel Fortran compiler
+
 ## [1.0.3] - 2024-10-24
 - refactored several older subroutines
 
