@@ -548,9 +548,9 @@ if __name__ == "__main__":
         even_J = get_dict_value(even, 'J')
         odd = get_dict_value(conf, 'odd')
         odd_J = get_dict_value(odd, 'J')
-        even_dir = 'even' + str(even_J)[0]
-        odd_dir = 'odd' + str(odd_J)[0]
-        tm_dir = 'tm'
+        even_dir = 'even' + str(even_J)[0] if even_J else None
+        odd_dir = 'odd' + str(odd_J)[0] if odd_J else None
+        tm_dir = 'tm' if even_J and odd_J else None
         
         # portal parameters
         portal = get_dict_value(config, 'portal')
