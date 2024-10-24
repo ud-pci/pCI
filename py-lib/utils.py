@@ -30,3 +30,12 @@ def convert_params_to_list(param):
             param[istr] = param[istr].strip()
 
     return param
+
+def check_slurm_installed():
+    """ Check for the scontrol command """
+    
+    try:
+        result = run(['scontrol', '--version'], stdout=PIPE)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
