@@ -66,7 +66,7 @@ Contains
                     iskip, ics, ji, k, jk, idif, qqmax, nozmax
         Real(dp) :: x
         Integer, Allocatable, Dimension(:) :: nyi, myi, nyk, myk
-        Real(dp), Dimension(40) :: Qnl
+        Real(dp), Allocatable, Dimension(:) :: Qnl
         Real(dp), Dimension(:,:), Allocatable :: Ac0
         Character(Len=1), Dimension(:), Allocatable :: let, chr
         Character(Len=1), Dimension(4) :: txt
@@ -93,6 +93,7 @@ Contains
         iskip=0     ! - skipped rel. configurations
         ics=0       ! - basic non-rel. configurations 
 
+        Allocate(Qnl(40)) ! max number of shells in a configuration
         Allocate(Nn(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
         Allocate(NOz(IPad1))
 
@@ -153,6 +154,8 @@ Contains
                 Ac0(ic,j)=Qnl(j)
             end do
         End Do
+
+        Deallocate(Qnl)
 
         nozmax = maxval(NOz)+1
         If (.not. Allocated(nyi)) Allocate(nyi(nozmax))
