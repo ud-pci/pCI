@@ -8,48 +8,27 @@ Program add
     Integer, Allocatable, Dimension(:) :: NOz, Knr
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
 
+    ! Print program header
     strfmt = '(/4X,"Program Add (NR) v2.2"/)'
     Write(6, strfmt)
-    Open(unit=10, file='ADD.INP')
 
     ! Read inputs from ADD.INP
     Call Input 
 
-    ! Construct new configurations from excitations
-    Do l=1,Mult
-        Write(*,*) ' multiplicity of excitation:    ',l
-        Call Constr
-        Write(*,*) ' number of NR conf-s after Constr: ',Nc
-        if (Nc.GT.IPad1) Then
-            strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
-            Write(*, strfmt) Nc, IPad1
-            Stop
-        End If
-    End Do
+    ! Construct new non-relativistic configurations from excitations
+    Call Constr
 
     ! Test parity
-    Write(*,*) " test of parity..."
     Call Parity
-    Write(*,*) " NR conf-s of proper parity: ", Nc
-    Write(*,*) ' forming relativistic conf-s...'
+    
+    ! Expand non-relativistic configurations into relativistic configurations
     Call Expand
-    Write(*,*) ' relativistic conf-s: ',Nc
-    Write(*,*) " forming output..."
 
-    Open(unit=11, file="CONF.INP")
-    Open(unit=12, file="CONF_.INP")
-    Call CI_or_PT(Ncpt,keyPT) ! Choosing Nc, or Ncpt
+    ! Choose CI or CI+PT
+    Call CI_or_PT(Ncpt,keyPT)
 
+    ! Form CONF.INP
     Call PrintConfINP(Ncpt,keyPT)     ! Forms CONF.INP
-
-    ! Dellocate Arrays
-    Deallocate(NOz, Knr)
-
-    ! Close ADD.INP and CONF.INP
-    Close(12)
-    Close(11)
-    Close(10)
-    Write(*,*) " File CONF.INP is formed"
 
 Contains
 
@@ -74,6 +53,8 @@ Contains
         txt(4)=' '
 
         ! Read in the header of ADD.INP
+        Open(unit=10, file='ADD.INP')
+        
         strfmt = '(2(5X,I3))'
         Read(10, strfmt) Ncor    ! number of basic configurations
         Read(10, strfmt) NsvNR   ! number of active non-relativistic shells
@@ -275,12 +256,13 @@ Contains
         Integer, Allocatable, Dimension(:, :)   :: mx1, mx2, ivv
         Real(dp), Allocatable, Dimension(:, :) :: AcN
 
+        Write(*,*) ' forming relativistic conf-s...'
+        Write(*,*) ' Expanding ',Nc,' configurations'
+
         ic=0
         icnr=0
         kc=0
         ji=0
-
-        Write(*,*) ' Expanding ',Nc,' configurations'
 
         nozmax = maxval(NOz)+1
 
@@ -447,6 +429,8 @@ Contains
             End Do
         End Do
 
+        Write(*,*) ' relativistic conf-s: ',Nc
+
         Deallocate(NozN, AcN, nyi, myi, nyk, myk, ivc, ni, li, iv, mx1, mx2)
 
         Return
@@ -501,50 +485,66 @@ Contains
 
     Subroutine Constr
         Implicit None
-        Integer :: n, i, k, j, jj, ii, mlast
+        Integer :: Nc0, i, k, j, jj, l, ii, mlast
         Real(dp) :: B
         Real(dp), Allocatable, Dimension(:) :: Ac1
         Character(Len=128) :: strfmt
 
         If (.not. Allocated(Ac1)) Allocate(Ac1(max_num_shells))
 
-        n=Nc
-        Do i=1,n
-            Do k=1,NOz(i)
-                Do jj=1,NsvNR
-                    If (k.EQ.1) Then
-                      Continue
-                    Else
-                        Do ii=1,k-1
-                          Ac1(ii) = Ac(i,ii)
-                        End Do
-                    End If
-                    If (Ac(i,k).LT.0.) Ac1(k)= Ac(i,k) + 0.0001
-                    If (Ac(i,k).GT.0.) Ac1(k)= Ac(i,k) - 0.0001
-                    If (NOz(i).GT.1.and.NOz(i).GT.k) Then
-                        Do j=k+1,NOz(i)
-                            Ac1(j)= Ac(i,j)
-                        End Do
-                    End if
-                    mlast= NOz(i)+1
-                    B = abs(V(jj)) + 0.0001
-                    Ac1(mlast) = sign(B,V(jj))
-                    Call Shell(Ac1,mlast)
-                    Call Reorder(Ac1,mlast)
-                    If (New(Ac1,mlast)) Then
-                        Nc=Nc+1
-                        NOz(Nc) = mlast
-                        Do j=1,mlast
-                            Ac(Nc,j)=Ac1(j)
-                        End Do
+        ! Loop over number of excitations
+        Do l=1,Mult
+            Write(*,*) ' multiplicity of excitation:    ',l
+
+            Nc0=Nc ! number of configurations to allow excitations froms
+
+            ! Loop over currently constructed non-rel. configurations
+            Do i=1,Nc0
+                ! Loop over number of shells in non-rel. configurations
+                Do k=1,NOz(i)
+                    ! Loop over number of active non-rel. shells
+                    Do jj=1,NsvNR
+                        If (k.EQ.1) Then
+                          Continue
+                        Else
+                            Do ii=1,k-1
+                              Ac1(ii) = Ac(i,ii)
+                            End Do
+                        End If
+                        If (Ac(i,k).LT.0.) Ac1(k)= Ac(i,k) + 0.0001
+                        If (Ac(i,k).GT.0.) Ac1(k)= Ac(i,k) - 0.0001
+                        If (NOz(i).GT.1.and.NOz(i).GT.k) Then
+                            Do j=k+1,NOz(i)
+                                Ac1(j)= Ac(i,j)
+                            End Do
+                        End if
+                        mlast= NOz(i)+1
+                        B = abs(V(jj)) + 0.0001
+                        Ac1(mlast) = sign(B,V(jj))
+                        Call Shell(Ac1,mlast)
+                        Call Reorder(Ac1,mlast)
+                        If (New(Ac1,mlast)) Then
+                            Nc=Nc+1
+                            NOz(Nc) = mlast
+                            Do j=1,mlast
+                                Ac(Nc,j)=Ac1(j)
+                            End Do
+                        End If
+                    End Do
+                    If (Nc.GT.IPad1) Then
+                        strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
+                        Write(*, strfmt) Nc, IPad1
                     End If
                 End Do
-                If (Nc.GT.IPad1) Then
-                    strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
-                    Write(*, strfmt) Nc, IPad1
-                End If
             End Do
+            Write(*,*) ' number of NR conf-s after Constr: ',Nc
+            if (Nc.GT.IPad1) Then
+                strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
+                Write(*, strfmt) Nc, IPad1
+                Stop
+            End If
         End Do
+        
 
         Deallocate(Ac1)
 
@@ -692,6 +692,8 @@ Contains
         Integer :: l1, j, n1j, l1j, n1q, is1, mz, n, ln1, nnj, lnj, nnq, isn
         Real(dp) :: d
 
+        Write(*,*) " test of parity..."
+
         l1=0
         Do j=1,NOz(1)
             d=abs(Ac(1,j))+1.E-6
@@ -732,6 +734,8 @@ Contains
                 NOz(n-mz)=NOz(n)
             End If
         End Do
+
+        Write(*,*) " NR conf-s of proper parity: ", Nc
 
         Return
     End Subroutine Parity
@@ -797,6 +801,10 @@ Contains
         Character(Len=1), Dimension(5) :: com
         Character(Len=70) :: string
         Character(Len=128) :: strfmt
+
+        Write(*,*) " forming output..."
+        Open(unit=11, file="CONF.INP")
+        Open(unit=12, file="CONF_.INP")
 
         ! last line before head of CONF.INP must start with ">"
         Rewind(10)
@@ -906,6 +914,15 @@ Contains
             end if
           end if
         end do
+
+        ! Close ADD.INP and CONF.INP
+        Close(12)
+        Close(11)
+        Close(10)
+        Write(*,*) " File CONF.INP is formed"
+
+        ! Dellocate Arrays
+        Deallocate(NOz, Knr, Ac)
 
         Return
  200    write (*,*) " Expected Nso=, got: ",com
