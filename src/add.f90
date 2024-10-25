@@ -2,7 +2,7 @@ Program add
     Use params, nlvl => Nlv, nnparam => Nn
     Implicit None
 
-    Integer :: Ncor, NsvNR, Mult, l, keyPT, vaGrowBy, max_num_shells
+    Integer :: Ncor, NsvNR, Mult, l, keyPT, max_num_shells
     Character(Len=32) :: strfmt
     Real(dp), Dimension(:, :), Allocatable :: Ac
     Integer, Dimension(:), Allocatable :: NOz, Knr
@@ -11,11 +11,9 @@ Program add
     Integer, Dimension(:), Allocatable :: Nq1, Nq2, Nq3, Nn
     Character(Len=1), Dimension(:), Allocatable :: let
 
-    strfmt = '(/4X,"Program Add (NR) v2.1"/)'
+    strfmt = '(/4X,"Program Add (NR) v2.2"/)'
     Write(6, strfmt)
     Open(unit=10, file='ADD.INP')
-
-    vaGrowBy = 1000
 
     ! Read inputs from ADD.INP
     Call Input 
@@ -65,9 +63,9 @@ Contains
     Subroutine Input
         Implicit None
         Integer :: nsmc, ic, ne0, i, i1, i2, iz, j, nx, ny, nz, ncheck, ndum, nlvi, nl1, &
-                    iskip, ics, ji, k, jk, idif, qqmax
+                    iskip, ics, ji, k, jk, idif, qqmax, nozmax
         Real(dp) :: x
-        Integer, Dimension(20) :: nyi, myi, nyk, myk
+        Integer, Allocatable, Dimension(:) :: nyi, myi, nyk, myk
         Real(dp), Dimension(40) :: Qnl
         Real(dp), Dimension(:,:), Allocatable :: Ac0
         Character(Len=1), Dimension(:), Allocatable :: let, chr
@@ -156,8 +154,14 @@ Contains
             end do
         End Do
 
+        nozmax = maxval(NOz)+1
+        If (.not. Allocated(nyi)) Allocate(nyi(nozmax))
+        If (.not. Allocated(myi)) Allocate(myi(nozmax))
+        If (.not. Allocated(nyk)) Allocate(nyk(nozmax))
+        If (.not. Allocated(myk)) Allocate(myk(nozmax))
+
         Do ic=1,Ncor
-            call Squeeze(ic, Ac0, ji, nyi, myi) 
+            call Squeeze(ic,Ac0,ji,nyi,myi) 
             new=.TRUE.
             outer: do k=1,ics
                 call Squeeze(k,Ac0,jk,nyk,myk)
@@ -184,6 +188,8 @@ Contains
                 iskip=iskip+1
             end if         
         End Do
+
+        Deallocate(nyi, myi, nyk, myk)
 
         max_num_shells = nsmc+2*Mult
         Allocate(Ac(IPad1, max_num_shells))
@@ -261,15 +267,13 @@ Contains
     End Subroutine ConvertChar
 
     Subroutine Expand
-        ! Form complete list of relativistic configurations from initial list
+        ! Expand the list of non-relativistic configurations into a list of relativistic configurations
         Implicit None
         Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar
-        Integer :: j, ir, j1, l, iq1, iq2, idif, ncr
+        Integer :: j, ir, j1, l, iq1, iq2, idif, ncr, jkmax, nozmax, num_rel_confs
         Real(dp) :: qnl
-        Integer, Dimension(20)      :: nyi, myi, nyk, myk, ivc, ni, li, iv
-        Integer, Dimension(20, 9)   :: mx1, mx2
-        Integer, Dimension(500, 20) :: ivv
-        Integer, Dimension(:), Allocatable   :: NozN
+        Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN
+        Integer, Allocatable, Dimension(:, :)   :: mx1, mx2, ivv
         Real(dp), Dimension(:, :), Allocatable :: AcN
 
         ic=0
@@ -277,38 +281,67 @@ Contains
         kc=0
         ji=0
 
-        If (.not. Allocated(Knr)) Allocate(Knr(IPad1))
-        If (.not. Allocated(NozN)) Allocate(NozN(IPad1))
-        If (.not. Allocated(AcN)) Allocate(AcN(IPad1, max_num_shells))
         Write(*,*) ' Expanding ',Nc,' configurations'
 
-        Do
-            ic=ic+1 ! current configuration
-            If (ic.EQ.Ncor+1) then
+        nozmax = maxval(NOz)+1
+
+        Allocate(nyi(nozmax), myi(nozmax))
+        Allocate(nyk(nozmax), myk(nozmax))
+        Allocate(ivc(nozmax), ni(nozmax), li(nozmax), iv(nozmax))
+        Allocate(mx1(nozmax, 9), mx2(nozmax, 9), ivv(500, nozmax))
+
+        ! Count number of relativistic configurations
+        num_rel_confs=0
+        Do ic=1,Nc
+            ! Process the current configuration
+            Call Squeeze(ic,Ac,jk,nyk,myk)
+
+            ! Number of relativistic cofiguration in the current non-relativistic configuration
+            ir=1 
+            Do i=1,jk
+                nx=nyk(i)
+                ni(i)=nx/10             ! quantum number n
+                li(i)=nx-10*ni(i)       ! quantum number l
+              
+                If (li(i).EQ.0) Then
+                    iv(i)=1             ! variants of occupations
+                Else
+                    mx=myk(i)
+                    mmax1=2*li(i)
+                    mmax2=mmax1+2
+                    mmin1=max(0,mx-mmax2)
+                    m1=min(mx,mmax1)    ! max occupation for j=l-1/2 shell
+                    iv(i)=m1-mmin1+1    ! variants of occupations
+                End If
+                ir=ir*iv(i)
+            End Do
+            num_rel_confs = num_rel_confs + ir
+        End Do
+
+        If (.not. Allocated(Knr)) Allocate(Knr(num_rel_confs))
+        If (.not. Allocated(NozN)) Allocate(NozN(num_rel_confs))
+        If (.not. Allocated(AcN)) Allocate(AcN(num_rel_confs, max_num_shells))
+
+        ! Loop over non-relativistic configurations
+        Do ic=1,Nc
+            ! Print message when all core configurations are expanded
+            If (ic == Ncor+1) then
                 Write (*,*) Ncor,' initial config-s expanded in ',kc,' relat. config-s'
                 ncr=kc
             End If
-            If (ic.GT.Nc) Then
-                Write (*,*) Nc,' config-s expanded in ',kc,' relat. config-s'
-                Nc=kc
-                Ncor=ncr
-                Do k=1,kc
-                    Noz(k)=NozN(k)
-                    Do n=1,Noz(k)
-                        Ac(k,n)=AcN(k,n)
-                    End Do
-                End Do
-                Return
-            End If
 
+            ! Process the current configuration
             Call Squeeze(ic,Ac,jk,nyk,myk)
 
-            ! compare two non-relativistic configuration configurations
-            If (ji.EQ.jk) Then   
+            ! Compare two non-relativistic configurations
+            If (ji.EQ.jk) Then
+                ! Compare element by element and skip the configuration if a difference is found
                 Do j=1,ji
                   idif = iabs(nyi(j)-nyk(j)) + iabs(myi(j)-myk(j))
-                  If (idif.GT.0) goto 110
+                  If (idif > 0) Exit
                 End Do
+
+                ! If all elements match, update the configuration and continue
                 ji=jk
                 Do i=1,ji
                     nyi(i)=nyk(i)
@@ -317,11 +350,12 @@ Contains
                 Cycle
             End If
 
-            ! new non-relativistic configuration
-110         icnr=icnr+1
+            ! New non-relativistic configuration
+            icnr=icnr+1
             Knr(icnr)=kc+1
 
-            ir=1 ! number of relativistic cofiguration in non-relativistic configuration
+            ! Number of relativistic cofiguration in the current non-relativistic configuration
+            ir=1 
             Do i=1,jk
                 nx=nyk(i)
                 ni(i)=nx/10             ! quantum number n
@@ -345,8 +379,9 @@ Contains
                     End Do
                 End If
                 ir=ir*iv(i)
-            End Do     
+            End Do
 
+            ! Check if number of relativistic configurations exceeds ivv array limit
             If (ir.GT.500) Then
                 write(*,*) ' number of relativistic configurations ',ir
                 write(*,*) ' in one NR configuration exceed array size 500'
@@ -368,7 +403,6 @@ Contains
                 End do
             End do 
 
-            strfmt = '(I4,F7.4,5F11.4,/6F11.4)'
             Do i=1,ir
                 kc=kc+1
                 j1=0
@@ -390,9 +424,21 @@ Contains
                     End If
                 End Do
                 NozN(kc)=j1
-                !Write(*, strfmt) kc,(AcN(kc,j),j=1,j1)
             End Do       
         End Do
+
+        ! Print message when all configurations of proper parity are expanded
+        Write (*,*) Nc,' config-s expanded in ',kc,' relat. config-s'
+        Nc=kc
+        Ncor=ncr
+        Do k=1,kc
+            Noz(k)=NozN(k)
+            Do n=1,Noz(k)
+                Ac(k,n)=AcN(k,n)
+            End Do
+        End Do
+
+        Deallocate(NozN, AcN, nyi, myi, nyk, myk, ivc, ni, li, iv, mx1, mx2)
 
         Return
     End Subroutine Expand
@@ -407,8 +453,14 @@ Contains
         ! myi - array of occupation numbers
         Implicit None
         Integer :: k, j, j1, ic
-        Integer, Dimension(20) :: nyi, myi, nzi, mzi
+        Integer, Allocatable, Dimension(:), Intent(Out) :: nyi, myi
+        Integer, Allocatable, Dimension(:) :: nzi, mzi
         Real(dp), Dimension(:,:), Allocatable :: Ac
+
+        If (.not. Allocated(nzi)) Allocate(nzi(NOz(ic)+1))
+        If (.not. Allocated(mzi)) Allocate(mzi(NOz(ic)+1))
+        If (.not. Allocated(nyi)) Allocate(nyi(NOz(ic)+1))
+        If (.not. Allocated(myi)) Allocate(myi(NOz(ic)+1))
 
         Do j=1,NOz(ic)
             j1=j
@@ -419,19 +471,21 @@ Contains
 
         k=0
         j=0
-        
+
         Do while (j.LT.NOz(ic))
             k=k+1
             j=j+1
             nyi(k)=nzi(j)
             ! If two shells have same quantum numbers n & l
             If (nzi(j).EQ.nzi(j+1)) Then  
-              myi(k)=mzi(j)+mzi(j+1)
-              j=j+1
+                myi(k)=mzi(j)+mzi(j+1)
+                j=j+1
             Else  
-              myi(k)=mzi(j)
+                myi(k)=mzi(j)
             End If
         End Do
+
+        Deallocate(nzi, mzi)
 
         Return
     End Subroutine Squeeze
