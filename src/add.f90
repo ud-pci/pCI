@@ -4,12 +4,10 @@ Program add
 
     Integer :: Ncor, NsvNR, Mult, l, keyPT, max_num_shells
     Character(Len=32) :: strfmt
-    Real(dp), Dimension(:, :), Allocatable :: Ac
-    Integer, Dimension(:), Allocatable :: NOz, Knr
-    Real(dp), Dimension(39) :: Q
-    Real(dp), Dimension(:), Allocatable :: V, Nqmin, Nqmax
-    Integer, Dimension(:), Allocatable :: Nq1, Nq2, Nq3, Nn
-    Character(Len=1), Dimension(:), Allocatable :: let
+    Real(dp), Allocatable, Dimension(:, :) :: Ac
+    Integer, Allocatable, Dimension(:) :: NOz, Knr
+    Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
+    Integer, Allocatable, Dimension(:) :: Nq1, Nq2, Nq3, Nn
 
     strfmt = '(/4X,"Program Add (NR) v2.2"/)'
     Write(6, strfmt)
@@ -67,8 +65,8 @@ Contains
         Real(dp) :: x
         Integer, Allocatable, Dimension(:) :: nyi, myi, nyk, myk
         Real(dp), Allocatable, Dimension(:) :: Qnl
-        Real(dp), Dimension(:,:), Allocatable :: Ac0
-        Character(Len=1), Dimension(:), Allocatable :: let, chr
+        Real(dp), Allocatable, Dimension(:,:) :: Ac0
+        Character(Len=1), Allocatable, Dimension(:) :: let, chr
         Character(Len=1), Dimension(4) :: txt
         Character(Len=128) :: string, strfmt
         Logical :: new
@@ -277,7 +275,7 @@ Contains
         Real(dp) :: qnl
         Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN
         Integer, Allocatable, Dimension(:, :)   :: mx1, mx2, ivv
-        Real(dp), Dimension(:, :), Allocatable :: AcN
+        Real(dp), Allocatable, Dimension(:, :) :: AcN
 
         ic=0
         icnr=0
@@ -458,7 +456,7 @@ Contains
         Integer :: k, j, j1, ic
         Integer, Allocatable, Dimension(:), Intent(Out) :: nyi, myi
         Integer, Allocatable, Dimension(:) :: nzi, mzi
-        Real(dp), Dimension(:,:), Allocatable :: Ac
+        Real(dp), Allocatable, Dimension(:,:) :: Ac
 
         If (.not. Allocated(nzi)) Allocate(nzi(NOz(ic)+1))
         If (.not. Allocated(mzi)) Allocate(mzi(NOz(ic)+1))
@@ -497,7 +495,7 @@ Contains
         Implicit None
         Integer :: n, i, k, j, jj, ii, mlast
         Real(dp) :: B
-        Real(dp), Dimension(:), Allocatable :: Ac1
+        Real(dp), Allocatable, Dimension(:) :: Ac1
         Character(Len=128) :: strfmt
 
         If (.not. Allocated(Ac1)) Allocate(Ac1(max_num_shells))
@@ -549,8 +547,7 @@ Contains
         Implicit None
         Integer :: j, nozi, k, nx, ny, iz, nac, nxy
         Real(dp) :: B, R
-        Real(dp), Dimension(:), Allocatable :: Ac1
-
+        Real(dp), Allocatable, Dimension(:) :: Ac1
 
         Do j=1,nozi-1
             k=j+1
@@ -589,7 +586,7 @@ Contains
         Implicit None
         Integer :: n1, j, m, k, k1, k2, nozi
         Real(dp) :: P1, P2, A
-        Real(dp), Dimension(:), Allocatable :: Ac1
+        Real(dp), Allocatable, Dimension(:) :: Ac1
         Character(Len=128) :: strfmt
 
         strfmt = '(2x,"Ac1(",I4,")=",F10.4," is not in V:",/(6F10.4))'
@@ -630,7 +627,7 @@ Contains
         Integer :: noz1, j, i1, nnj, llj, jlj, nq, j1, i2, nnj2, llj2, jlj2, nq2, ierr, nlj
         Integer :: nozi, i, nq1
         Real(dp) :: d, d2, del
-        Real(dp), Dimension(:), Allocatable :: Ac1
+        Real(dp), Allocatable, Dimension(:) :: Ac1
 
         New=.FALSE.
   
@@ -789,6 +786,7 @@ Contains
         Implicit None
         Integer :: i, k, Ncpt, keyPT, Ncl, ic, ic1, j, icnr, ne1
         Real(kind=dp) :: Jm
+        Real(dp), Allocatable, Dimension(:) :: Q
         Character(Len=1), Dimension(5) :: com
         Character(Len=70) :: string
         Character(Len=128) :: strfmt
@@ -858,11 +856,13 @@ Contains
         write(12,15) (com(k),k=1,5),string
         goto 100
 
- 140    if (Nso.NE.0) then
+ 140    Allocate(Q(Nso))
+        if (Nso.NE.0) then
           read (10,55) (Q(i),i=1,Nso)
         end if
         write(11,55) (Q(i),i=1,Nso) ! for Nso=0 empty line written
         write(12,55) (Q(i),i=1,Nso)
+        Deallocate(Q)
 
  55     format (6(4X,F7.4))
  65     format (I4,F7.4,5(4X,F7.4))
