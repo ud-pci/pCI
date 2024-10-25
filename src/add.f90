@@ -268,7 +268,7 @@ Contains
     Subroutine Expand
         ! Expand the list of non-relativistic configurations into a list of relativistic configurations
         Implicit None
-        Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar
+        Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar, irmax
         Integer :: j, ir, j1, l, iq1, iq2, idif, ncr, jkmax, nozmax, num_rel_confs
         Real(dp) :: qnl
         Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN
@@ -287,10 +287,13 @@ Contains
         Allocate(nyi(nozmax), myi(nozmax))
         Allocate(nyk(nozmax), myk(nozmax))
         Allocate(ivc(nozmax), ni(nozmax), li(nozmax), iv(nozmax))
-        Allocate(mx1(nozmax, 9), mx2(nozmax, 9), ivv(500, nozmax))
+        Allocate(mx1(nozmax, 9), mx2(nozmax, 9))
 
         ! Count number of relativistic configurations
         num_rel_confs=0
+
+        ! Count max number of relativistic configurations for a non-relativistic configuration
+        irmax=0 
         Do ic=1,Nc
             ! Process the current configuration
             Call Squeeze(ic,Ac,jk,nyk,myk)
@@ -314,12 +317,14 @@ Contains
                 End If
                 ir=ir*iv(i)
             End Do
+            if (ir > irmax) irmax = ir
             num_rel_confs = num_rel_confs + ir
         End Do
 
         If (.not. Allocated(Knr)) Allocate(Knr(num_rel_confs))
         If (.not. Allocated(NozN)) Allocate(NozN(num_rel_confs))
         If (.not. Allocated(AcN)) Allocate(AcN(num_rel_confs, max_num_shells))
+        If (.not. Allocated(ivv)) Allocate(ivv(irmax, nozmax))
 
         ! Loop over non-relativistic configurations
         Do ic=1,Nc
