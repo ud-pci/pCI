@@ -7,7 +7,6 @@ Program add
     Real(dp), Allocatable, Dimension(:, :) :: Ac
     Integer, Allocatable, Dimension(:) :: NOz, Knr
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
-    Integer, Allocatable, Dimension(:) :: Nq1, Nq2, Nq3, Nn
 
     strfmt = '(/4X,"Program Add (NR) v2.2"/)'
     Write(6, strfmt)
@@ -15,9 +14,6 @@ Program add
 
     ! Read inputs from ADD.INP
     Call Input 
-
-    ! Form complete list of relativistic configurations
-    Nc=Ncor
 
     ! Construct new configurations from excitations
     Do l=1,Mult
@@ -43,7 +39,6 @@ Program add
     Open(unit=11, file="CONF.INP")
     Open(unit=12, file="CONF_.INP")
     Call CI_or_PT(Ncpt,keyPT) ! Choosing Nc, or Ncpt
-    Rewind(10)
 
     Call PrintConfINP(Ncpt,keyPT)     ! Forms CONF.INP
 
@@ -64,6 +59,7 @@ Contains
                     iskip, ics, ji, k, jk, idif, qqmax, nozmax
         Real(dp) :: x
         Integer, Allocatable, Dimension(:) :: nyi, myi, nyk, myk
+        Integer, Allocatable, Dimension(:) :: Nq1, Nq2, Nq3, Nn
         Real(dp), Allocatable, Dimension(:) :: Qnl
         Real(dp), Allocatable, Dimension(:,:) :: Ac0
         Character(Len=1), Allocatable, Dimension(:) :: let, chr
@@ -244,6 +240,8 @@ Contains
             Nn(j)=nl1/10
             Ll(j)=nl1-10*Nn(j)
         End Do
+
+        Nc=Ncor
 
         Return
     End Subroutine Input
@@ -624,8 +622,7 @@ Contains
     Logical Function New(Ac1, noz1)
         ! Returns TRUE if configuration is new and valid
         Implicit None
-        Integer :: noz1, j, i1, nnj, llj, jlj, nq, j1, i2, nnj2, llj2, jlj2, nq2, ierr, nlj
-        Integer :: nozi, i, nq1
+        Integer :: noz1, i, j, i1, nnj, llj, jlj, nq, j1, i2, nnj2, llj2, jlj2, nq2, ierr, nlj, nozi
         Real(dp) :: d, d2, del
         Real(dp), Allocatable, Dimension(:) :: Ac1
 
@@ -792,6 +789,7 @@ Contains
         Character(Len=128) :: strfmt
 
         ! last line before head of CONF.INP must start with ">"
+        Rewind(10)
         strfmt = '(A)'
         Do While (com(1).NE.">")
             Read (10, strfmt) com(1)      
