@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 project(pci 
-        VERSION 1.0.4
+        VERSION 1.0.5
         DESCRIPTION "pCI software package"
         LANGUAGES Fortran)
 include(GNUInstallDirs)

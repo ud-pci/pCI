@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2024-10-25
+- add v3.0 - main arrays are now dynamically allocated 
+
 ## [1.0.4] - 2024-10-24
 - update gen_portal_csv.py to use new config.yml format
 - add requirements.txt for required dependencies for pci-py-scripts
