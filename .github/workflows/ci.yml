@@ -22,7 +22,7 @@ jobs:
           wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.3.tar.gz
           tar -xzf openmpi-5.0.3.tar.gz
           ./openmpi-5.0.3/configure --prefix=/home/${USER}/openmpi CC=icx CXX=icpx FC=ifx
-          make
+          make -j$(nproc)
           make install
 
       # Install CMake
@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          FC=ifx cmake -DCMAKE_Fortran_COMPILER=ifx -DMPI_Fortran_COMPILER=mpifort -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          FC=ifx cmake -DCMAKE_Fortran_COMPILER=ifx -DMPI_Fortran_COMPILER=mpifort -DMPIHOME=/home/${USER}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
 
       # Build the project
       - name: Build
