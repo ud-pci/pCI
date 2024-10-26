@@ -38,9 +38,6 @@ Module params
                                                  ! =4 if word=1B (Pentium)
                                                  ! =1 if word=4B (Alpha-processor)   
 
-    ! defining parameters which determine dimensions of main arrays in add
-    Integer, Parameter :: IPad1 = 1000000        ! max number of configurations
-
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
     Integer, Parameter :: type_real=dp
     Type(MPI_Datatype) :: mpi_type_real

@@ -2,6 +2,9 @@ Program add
     Use params, nlvl => Nlv, nnparam => Nn
     Implicit None
 
+    ! set initial size and growth size for storing max number of configurations in Ac, NOz
+    Integer, Parameter :: growth_size = 1000
+
     Integer :: Ncor, NsvNR, Mult, l, keyPT, max_num_shells
     Character(Len=32) :: strfmt
     Real(dp), Allocatable, Dimension(:, :) :: Ac
@@ -9,7 +12,7 @@ Program add
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
 
     ! Print program header
-    strfmt = '(/4X,"Program Add (NR) v2.2"/)'
+    strfmt = '(/4X,"PROGRAM add v3.0"/)'
     Write(6, strfmt)
 
     ! Read inputs from ADD.INP
@@ -54,7 +57,7 @@ Contains
 
         ! Read in the header of ADD.INP
         Open(unit=10, file='ADD.INP')
-        
+
         strfmt = '(2(5X,I3))'
         Read(10, strfmt) Ncor    ! number of basic configurations
         Read(10, strfmt) NsvNR   ! number of active non-relativistic shells
@@ -70,7 +73,7 @@ Contains
 
         Allocate(Qnl(40)) ! max number of shells in a configuration
         Allocate(Nn(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
-        Allocate(NOz(IPad1))
+        Allocate(NOz(growth_size))
 
         ! Run through each core configuration
         Do ic=1,Ncor
@@ -170,7 +173,7 @@ Contains
         Deallocate(nyi, myi, nyk, myk)
 
         max_num_shells = nsmc+2*Mult
-        Allocate(Ac(IPad1, max_num_shells))
+        Allocate(Ac(growth_size, max_num_shells))
         Do ic=1,Ncor
             Do j=1,nsmc
                 Ac(ic,j) = Ac0(ic,j)
@@ -252,9 +255,9 @@ Contains
         Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar, irmax, k1max
         Integer :: j, ir, j1, l, iq1, iq2, idif, ncr, jkmax, nozmax, num_rel_confs
         Real(dp) :: qnl
-        Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN
+        Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN, temp
         Integer, Allocatable, Dimension(:, :)   :: mx1, mx2, ivv
-        Real(dp), Allocatable, Dimension(:, :) :: AcN
+        Real(dp), Allocatable, Dimension(:, :) :: AcN, temp2
 
         Write(*,*) ' forming relativistic conf-s...'
         Write(*,*) ' Expanding ',Nc,' configurations'
@@ -312,6 +315,14 @@ Contains
         If (.not. Allocated(ivv)) Allocate(ivv(irmax, nozmax))
         If (.not. Allocated(mx1)) Allocate(mx1(nozmax, k1max))
         If (.not. Allocated(mx2)) Allocate(mx2(nozmax, k1max))
+
+        ! Reallocate Ac, NOz
+        Call move_alloc(Ac, temp2)
+        Call move_alloc(NOz, temp)
+        Allocate(NOz(num_rel_confs), Ac(num_rel_confs, max_num_shells))
+        NOz(1:num_rel_confs) = temp
+        Ac(1:num_rel_confs,1:max_num_shells) = temp2
+        Deallocate(temp, temp2)
 
         ! Loop over non-relativistic configurations
         Do ic=1,Nc
@@ -487,11 +498,13 @@ Contains
         Implicit None
         Integer :: Nc0, i, k, j, jj, l, ii, mlast
         Real(dp) :: B
+        Integer, Allocatable, Dimension(:) :: temp
         Real(dp), Allocatable, Dimension(:) :: Ac1
+        Real(dp), Allocatable, Dimension(:,:) :: temp2
         Character(Len=128) :: strfmt
 
         If (.not. Allocated(Ac1)) Allocate(Ac1(max_num_shells))
-
+        
         ! Loop over number of excitations
         Do l=1,Mult
             Write(*,*) ' multiplicity of excitation:    ',l
@@ -513,7 +526,7 @@ Contains
                         End If
                         If (Ac(i,k).LT.0.) Ac1(k)= Ac(i,k) + 0.0001
                         If (Ac(i,k).GT.0.) Ac1(k)= Ac(i,k) - 0.0001
-                        If (NOz(i).GT.1.and.NOz(i).GT.k) Then
+                        If (NOz(i).GT.k) Then
                             Do j=k+1,NOz(i)
                                 Ac1(j)= Ac(i,j)
                             End Do
@@ -525,26 +538,25 @@ Contains
                         Call Reorder(Ac1,mlast)
                         If (New(Ac1,mlast)) Then
                             Nc=Nc+1
+                            If (Nc > size(NOz)) Then
+                                Call move_alloc(NOz, temp)
+                                Call move_alloc(Ac, temp2)
+
+                                Allocate(NOz(size(temp)+growth_size), Ac(size(temp2,1)+growth_size, max_num_shells))
+                                NOz(1:size(temp)) = temp
+                                Ac(1:size(temp2,1),1:max_num_shells) = temp2
+                                Deallocate(temp, temp2)
+                            End If
                             NOz(Nc) = mlast
                             Do j=1,mlast
                                 Ac(Nc,j)=Ac1(j)
                             End Do
                         End If
                     End Do
-                    If (Nc.GT.IPad1) Then
-                        strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
-                        Write(*, strfmt) Nc, IPad1
-                    End If
                 End Do
             End Do
             Write(*,*) ' number of NR conf-s after Constr: ',Nc
-            if (Nc.GT.IPad1) Then
-                strfmt = '(2x,"Nc =",I7," is larger than IPad1=",I7,/)'
-                Write(*, strfmt) Nc, IPad1
-                Stop
-            End If
         End Do
-        
 
         Deallocate(Ac1)
 
@@ -802,7 +814,6 @@ Contains
         Character(Len=70) :: string
         Character(Len=128) :: strfmt
 
-        Write(*,*) " forming output..."
         Open(unit=11, file="CONF.INP")
         Open(unit=12, file="CONF_.INP")
 
