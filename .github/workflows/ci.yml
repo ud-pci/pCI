@@ -5,6 +5,12 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      CC: icx
+      CXX: icpx
+      FC: ifx
+
     strategy:
       fail-fast: false
       matrix:
