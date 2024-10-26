@@ -8,9 +8,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain:
-          - {compiler: intel, version: '2024.1'}
-          - {compiler: intel-classic, version: '2021.12'}
         openmpi:
           - {series: '4.1', version: '4.1.5'}
           - {series: '5.0', version: '5.0.3'}
@@ -24,31 +21,29 @@ jobs:
         with:
           cmake-version: '3.13'
 
-      - name: Install Fortran compiler
-        uses: fortran-lang/setup-fortran@v1.6.1
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-
-      - name: Install C compiler with intel-classic
-        if: ${{ matrix.toolchain.compiler }} == 'intel-classic'
+      - name: Setup Intel oneAPI repository
         run: |
-          sudo apt install intel-oneapi-compiler-dpcpp-cpp
+          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt update
+
+      - name: Install Intel oneAPI compilers
+        run: sudo apt install intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp
+
+      - name: Install Intel oneMKL library
+        run: sudo apt install intel-oneapi-mkl
 
       - name: Setup Intel oneAPI environment
         run: |
+          source /opt/intel/oneapi/setvars.sh
           printenv >> $GITHUB_ENV
           printenv | grep intel
 
-      - name: Check compiler version
+      - name: Check compiler versions
         run: |
           ${CC} --version
           ${CXX} --version
           ${FC} --version
-
-      - name: Install Intel MKL library
-        run: |
-          sudo apt install intel-oneapi-mkl
 
       - name: Install OpenMPI
         run: |
