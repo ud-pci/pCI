@@ -11,6 +11,7 @@ if (NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel" AND NOT ${CMAKE_Fortran_CO
     message(FATAL_ERROR "Intel Fortran compiler (ifort or ifx) not found. Please ensure FC is set to 'ifort' or 'ifx'.")
 else()
     message(STATUS "Intel Fortran compiler found: ${CMAKE_Fortran_COMPILER}")
+    message(STATUS "Intel Fortran compiler: ${CMAKE_Fortran_COMPILER_ID}")
 endif()
 
 # Need MPI
@@ -27,12 +28,12 @@ else()
 endif()
 
 # Add default Intel compile/link flags:
-if (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel")
+if (${CMAKE_Fortran_COMPILER} MATCHES "ifort")
     set(MKL_PARALLEL_FLAGS -qopenmp -mkl=parallel)
     set(MKL_PARALLEL_LINK_FLAGS -qopenmp -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
     add_compile_options(-qopenmp -mkl=sequential)
     add_link_options(-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
-elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "IntelLLVM")
+elseif (${CMAKE_Fortran_COMPILER} MATCHES "ifx")
     set(MKL_PARALLEL_FLAGS -qopenmp -qmkl=parallel)
     set(MKL_PARALLEL_LINK_FLAGS -qopenmp -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
     add_compile_options(-qopenmp -qmkl=sequential)
