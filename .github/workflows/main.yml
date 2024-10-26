@@ -32,7 +32,7 @@ jobs:
       - name: Cache OpenMPI
         uses: actions/cache@v4
         with:
-          path: /home/${USER}/openmpi-${{ matrix.openmpi.version }}
+          path: /home/${USER}/openmpi/${{ matrix.openmpi.version }}
           key: ${{ runner.os }}-${{ matrix.openmpi.series }}-${{ matrix.openmpi.version }}
       
       - name: Install CMake
