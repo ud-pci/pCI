@@ -1,9 +1,11 @@
 name: Build
 
 on:
-  push:
-    tags:
-      -'*'
+  release:
+    types:
+      - published
+  pull__request:
+    [main]
 
 jobs:
   build:
