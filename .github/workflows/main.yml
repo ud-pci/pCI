@@ -71,7 +71,7 @@ jobs:
         run: |
           wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
           tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
-          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=/home/${USER}/openmpi-${{ matrix.openmpi.version }} CC=${CC} CXX=${CXX} FC=${FC}
+          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=/home/${USER}/openmpi/${{ matrix.openmpi.version }} CC=${CC} CXX=${CXX} FC=${FC}
           make -j$(nproc)
           make install
 
@@ -79,6 +79,6 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=/home/${USER}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=/home/${USER}/openmpi/${{ matrix.openmpi.version }} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
           make
           make install
