@@ -29,7 +29,7 @@ jobs:
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2.0.2
         with:
-          cmake-version: '3.12'
+          cmake-version: '3.13'
 
       # Configure CMake
       - name: Configure with CMake
