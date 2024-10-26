@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          FC=ifx cmake -DCMAKE_Fortran_COMPILER=ifx -DMPI_Fortran_COMPILER=mpifort -DMPIHOME=/home/${USER}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          FC=ifx cmake -DCMAKE_Fortran_COMPILER=ifx -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=/home/${USER}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
 
       # Build the project
       - name: Build
