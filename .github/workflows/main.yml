@@ -29,7 +29,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Cache OpenMPI
+      - name: OpenMPI cache
+        id: openmpi-cache
         uses: actions/cache@v4
         with:
           path: ~/openmpi
@@ -66,8 +67,8 @@ jobs:
           ${CXX} --version
           ${FC} --version
 
-      - name: Install OpenMPI
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Install and build OpenMPI
+        if: steps.openmpi-cache.outputs.cache-hit != 'true'
         run: |
           wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
           tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
