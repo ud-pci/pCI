@@ -1,3 +1,4 @@
+![Build](https://github.com/ud-pci/pCI/actions/workflows/YAML/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/pci/badge/?version=latest)](https://pci.readthedocs.io/en/latest/?badge=latest)
 
 # pCI
