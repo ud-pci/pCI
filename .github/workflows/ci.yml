@@ -33,11 +33,14 @@ jobs:
       - name: Install Intel oneMKL library
         run: sudo apt install intel-oneapi-mkl
 
-      - name: Setup Intel oneAPI environment
+      - name: Setup environment
         run: |
           source /opt/intel/oneapi/setvars.sh
           printenv >> $GITHUB_ENV
           printenv | grep intel
+          echo "CC=${CC}" >> $GITHUB_ENV
+          echo "CXX=${CXX}" >> $GITHUB_ENV
+          echo "FC=${FC}" >> $GITHUB_ENV
 
       - name: Check compiler versions
         run: |
