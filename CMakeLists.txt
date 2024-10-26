@@ -11,6 +11,7 @@ if (NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel" AND NOT ${CMAKE_Fortran_CO
     message(FATAL_ERROR "Intel Fortran compiler (ifort or ifx) not found. Please ensure FC is set to 'ifort' or 'ifx'.")
 else()
     message(STATUS "Intel Fortran compiler found: ${CMAKE_Fortran_COMPILER}")
+    message(STATUS "Intel Fortran compiler: ${CMAKE_Fortran_COMPILER_ID}")
 endif()
 
 # Need MPI
