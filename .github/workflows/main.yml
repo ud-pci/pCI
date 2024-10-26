@@ -1,0 +1,84 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      CC: icx
+      CXX: icpx
+      FC: ifx
+
+    strategy:
+      fail-fast: false
+      matrix:
+        openmpi:
+          - {series: '4.1', version: '4.1.5'}
+          - {series: '5.0', version: '5.0.3'}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: OpenMPI cache
+        id: openmpi-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/openmpi
+          key: ${{ runner.os }}-openmpi-cache-v${{ matrix.openmpi.version }}
+      
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2.0.2
+        with:
+          cmake-version: '3.13'
+
+      - name: Setup Intel oneAPI repository
+        run: |
+          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt update
+
+      - name: Install Intel oneAPI compilers
+        run: sudo apt install intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp
+
+      - name: Install Intel oneMKL library
+        run: sudo apt install intel-oneapi-mkl
+
+      - name: Setup environment
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          printenv >> $GITHUB_ENV
+          echo "CC=${CC}" >> $GITHUB_ENV
+          echo "CXX=${CXX}" >> $GITHUB_ENV
+          echo "FC=${FC}" >> $GITHUB_ENV
+
+      - name: Check compiler versions
+        run: |
+          ${CC} --version
+          ${CXX} --version
+          ${FC} --version
+
+      - name: Install and build OpenMPI
+        if: steps.openmpi-cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
+          tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
+          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=${HOME}/openmpi CC=${CC} CXX=${CXX} FC=${FC}
+          make -j$(nproc)
+          make install
+
+      - name: Build pCI package
+        run: |
+          mkdir -p build
+          cd build
+          FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=${HOME}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          make
+          make install
