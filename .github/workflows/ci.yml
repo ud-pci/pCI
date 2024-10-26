@@ -17,28 +17,35 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
-      # Install Fortran compiler
-      - name: Setup Fortran
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2.0.2
+        with:
+          cmake-version: '3.13'
+
+      - name: Install Fortran compiler
         uses: fortran-lang/setup-fortran@v1.6.1
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      # Check compiler version
-      - name: Compiler Version
+      - name: Setup Intel oneAPI environment
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          printenv >> $GITHUB_ENV
+          printenv | grep intel
+
+      - name: Check compiler version
         run: |
           ${CC} --version
           ${CXX} --version
           ${FC} --version
 
-      # Install Intel MKL library
-      - name: Setup MKL
+      - name: Install Intel MKL library
         run: |
           sudo apt install intel-oneapi-mkl
 
-      # Install OpenMPI
       - name: Install OpenMPI
         run: |
           wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
@@ -47,14 +54,7 @@ jobs:
           make -j$(nproc)
           make install
 
-      # Install CMake
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2.0.2
-        with:
-          cmake-version: '3.13'
-
-      # Build the project with CMake
-      - name: Build
+      - name: Build pCI package
         run: |
           export MKLROOT=/opt/intel/oneapi/mkl/latest
           export LD_LIBRARY_PATH=$MKLROOT/lib/intel64:$LD_LIBRARY_PATH
