@@ -29,6 +29,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Cache OpenMPI
+        uses: actions/cache@v4
+        with:
+          path: /home/${USER}/openmpi-${{ matrix.openmpi.version }}
+          key: ${{ runner.os }}-${{ matrix.openmpi.series }}-${{ matrix.openmpi.version }}
+      
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2.0.2
         with:
@@ -61,10 +67,11 @@ jobs:
           ${FC} --version
 
       - name: Install OpenMPI
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
           tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
-          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=/home/${USER}/openmpi CC=${CC} CXX=${CXX} FC=${FC}
+          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=/home/${USER}/openmpi-${{ matrix.openmpi.version }} CC=${CC} CXX=${CXX} FC=${FC}
           make -j$(nproc)
           make install
 
