@@ -1,4 +1,3 @@
-[![Build](https://img.shields.io/github/actions/workflow/status/ud-pci/pCI/main.yml)](https://github.com/ud-pci/pCI/actions)
 [![Documentation Status](https://readthedocs.org/projects/pci/badge/?version=latest)](https://pci.readthedocs.io/en/latest/?badge=latest)
 
 # pCI

@@ -5,7 +5,7 @@ The pCI software package was designed to work primarily on
 In order to compile pCI the following software libraries and tools are required: 
 
 * Intel Fortran compiler 2020u4+
-* CMake v3.13+ 
+* CMake v3.12+ 
 * OpenMPI v4.1+ 
 * Python v3.x 
 
