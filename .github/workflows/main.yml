@@ -1,11 +1,13 @@
 name: Build
 
 on:
-  release:
-    types:
-      - published
-  pull__request:
-    [main]
+  push:
+    branches:
+      - main
+      - cicd
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
