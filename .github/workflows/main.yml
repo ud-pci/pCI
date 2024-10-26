@@ -32,8 +32,8 @@ jobs:
       - name: Cache OpenMPI
         uses: actions/cache@v4
         with:
-          path: ~/openmpi
-          key: ${{ runner.os }}-openmpi-cache-${{ matrix.openmpi.series }}-v.${{ matrix.openmpi.version }}
+          path: /home/openmpi
+          key: ${{ runner.os }}-openmpi-cache-v.${{ matrix.openmpi.version }}
       
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2.0.2
@@ -71,7 +71,7 @@ jobs:
         run: |
           wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
           tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
-          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=~/openmpi CC=${CC} CXX=${CXX} FC=${FC}
+          ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=/home/openmpi CC=${CC} CXX=${CXX} FC=${FC}
           make -j$(nproc)
           make install
 
@@ -79,6 +79,6 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=~/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=/home/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
           make
           make install
