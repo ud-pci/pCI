@@ -220,13 +220,13 @@ def create_add_inp(config):
         print('no odd reference configurations specified')
 
 def form_conf_inp(parity, bin_dir):
-    if bin_dir and bin_dir[-1] == '/':
+    if bin_dir and bin_dir[-1] != '/':
         bin_dir = bin_dir[:-1]
     run_shell("cp ADD" + parity + ".INP ADD.INP")
     if on_hpc:
-        run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
+        run_shell(bin_dir + "add < add.in > add" + parity + ".out")
     else:
-        run_shell(bin_dir + "/add < add.in > add" + parity + ".out")
+        run_shell(bin_dir + "add < add.in > add" + parity + ".out")
     print("output of add saved to add" + parity + ".out")
     run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
