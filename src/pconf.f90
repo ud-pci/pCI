@@ -748,6 +748,7 @@ Contains
         Call MPI_Bcast(Nlx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
@@ -759,7 +760,11 @@ Contains
         If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. Allocated(num_gaunts_per_partial_wave)) Allocate(num_gaunts_per_partial_wave(Nlx+1))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
-        If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
+        If (Kbrt == 0) Then
+            If (.not. Allocated(Rint2)) Allocate(Rint2(1,Ngint))
+        Else
+            If (.not. Allocated(Rint2)) Allocate(Rint2(2,Ngint))
+        End If
         If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
@@ -907,7 +912,11 @@ Contains
         Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        count = IPbr*Int(Ngint,kind=int64)
+        If (Kbrt == 0) Then
+            count = Ngint
+        Else
+            count = Ngint*2_int64
+        End If
         Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)

@@ -734,7 +734,12 @@ Contains
         End If
 
         allocate(Rint1(nhint),Iint1(nhint),I_is(maxn),R_is(maxn))
-        allocate(Rint2(IPbr,ngint),Iint2(ngint),Iint3(ngint))
+        If (Kbrt == 0) Then
+            allocate(Rint2(1,ngint))
+        Else
+            allocate(Rint2(2,ngint))
+        End If
+        allocate(Iint2(ngint),Iint3(ngint))
         allocate(IntOrd(IPx*IPx))
 
     End Subroutine AllocateRintArrays
@@ -1010,7 +1015,7 @@ Contains
             ! Evaluation of two-electron integrals R(K;NA,NB,NC,ND)
             Call startTimer(start_time)
             
-            l_br=Kbrt /= 0 .and. IPbr == 2
+            l_br=Kbrt /= 0
             nm_br=0
             If (Ne /= 1) Then
                 kt1=Kt
@@ -1128,7 +1133,7 @@ Contains
                                             kac=nx*nx*K+nx*(na-Nso-1)+(nc-Nso)
                                             kbd=nx*(nb-Nso-1)+(nd-Nso)
                                             rint2(1,ngint)=rabcd
-                                            If (l_br) rint2(IPbr,ngint)=r_br
+                                            If (l_br) rint2(2,ngint)=r_br
                                             iint2(ngint)=kac
                                             iint3(ngint)=kbd
                                             ln=1.d0-dlog10(dabs(rabcd)+dabs(r_br)+1.d-9)
@@ -1150,7 +1155,11 @@ Contains
                 Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                 Call MPI_AllReduce(MPI_IN_PLACE, ngint, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
                 
-                count = ngint*Int(IPbr, kind=int64)
+                If (Kbrt == 0) Then
+                    count = ngint
+                Else
+                    count = ngint*2_int64
+                End If
                 Call AllReduceR(Rint2, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Call AllReduceI(Iint2, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Call AllReduceI(Iint3, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1195,7 +1204,11 @@ Contains
             Write (13) (Rint1(i), i=1,nhint)
             Write (13) (Iint1(i), i=1,nhint)
             Write (13) ngint,0,nx*nx
-            Write (13) ((Rint2(k,i8),k=1,IPbr), i8=1,ngint)
+            If (Kbrt == 0) Then
+                Write (13) (Rint2(1,i8), i8=1,ngint)
+            Else
+                Write (13) ((Rint2(k,i8),k=1,2), i8=1,ngint)
+            End If
             Write (13) (Iint2(i8), i8=1,ngint)
             Write (13) (Iint3(i8), i8=1,ngint)
             Write (13) (IntOrd(i), i=1,nx*nx)
@@ -1233,7 +1246,7 @@ Contains
 
         ngint=0
         n0=Nso+1
-        l_br=Kbrt /= 0 .and. IPbr == 2
+        l_br=Kbrt /= 0
 
         Do n1=n0,Nsx2
             If (Ll(n1) > lsx) Cycle

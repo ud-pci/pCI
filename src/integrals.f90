@@ -69,7 +69,12 @@ Module integrals
         Read (13) (Rint1(i), i=1,Nhint)
         Read (13) (Iint1(i), i=1,Nhint)
         Read (13) Ngint,Nlist,nrd
-        Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
+        If (Kbrt == 0) Then
+            Allocate(Rint2(1,Ngint))
+        Else
+            Allocate(Rint2(2,Ngint))
+        End If
+        Allocate(Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
         If (nrd /=  nx*nx) Then
             nx1=int(sqrt(real(nrd)))
             Write(key1, '(I3)') nx1
@@ -78,7 +83,11 @@ Module integrals
             Write(*,*)' Rint error: Please re-compile pCI programs with IPx=', Trim(AdjustL(key1))
             Stop
         End If
-        Read (13) ((Rint2(k,i8), k=1,IPbr), i8=1,Ngint)
+        If (Kbrt == 0) Then
+            Read (13) (Rint2(1,i8), i8=1,Ngint)
+        Else
+            Read (13) ((Rint2(k,i8), k=1,2), i8=1,Ngint)
+        End If
         Read (13) (Iint2(i8), i8=1,Ngint)
         Read (13) (Iint3(i8), i8=1,Ngint)
         Read (13) (IntOrd(i), i=1,nrd)
@@ -174,7 +183,7 @@ Module integrals
         l_is= .not. (C_is == 0.d0)                ! False If C_is=0
         l_is=l_is .and. (K_is == 2 .or. K_is == 4)  ! False If K_is /= 2,4
         l_is=l_is .and. (K_sms >= 2)              ! False If K_sms<2
-        l_br=Kbrt /= 0 .and. IPbr == 2
+        l_br=Kbrt /= 0
         e=0.d0
         nx = IPx
         is=1
@@ -279,7 +288,7 @@ Module integrals
                             End If
                         End Do
                         rabcd=Rint2(1,mi8)
-                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi8)
+                        If (l_br) rabcd=rabcd+is_br*Rint2(2,mi8)
                         If (Ksig >= 2) Then
                             If (max(na,nb,nc,nd) > Nd .or. max(la,lb,lc,ld) > Lmax) Then
                                 If (k < 10) Then

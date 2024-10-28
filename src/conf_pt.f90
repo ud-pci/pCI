@@ -428,7 +428,11 @@ Contains
         If (.not. allocated(Iint1)) allocate(Iint1(Nhint))
         If (.not. allocated(Iint2)) allocate(Iint2(Ngint))
         If (.not. allocated(Iint3)) allocate(Iint3(Ngint))
-        If (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
+        If (Kbrt == 0) Then
+            If (.not. allocated(Rint2)) allocate(Rint2(1,Ngint))
+        Else
+            If (.not. allocated(Rint2)) allocate(Rint2(2,Ngint))
+        End If
         If (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
         If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(DVnr)) allocate(DVnr(Nc))
@@ -459,7 +463,11 @@ Contains
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        count = IPbr*Int(Ngint,kind=int64)
+        If (Kbrt == 0) Then
+            count = Ngint
+        Else
+            count = Ngint*2_int64
+        End If
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
