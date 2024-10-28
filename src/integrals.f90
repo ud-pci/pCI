@@ -13,10 +13,10 @@ Module integrals
     subroutine Rint
         Implicit None
         Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
-                       k, mlow, m_is, err_stat, kbrt1
+                       k, mlow, m_is, err_stat, kbrt1, nx1
         Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
-        Character(Len=1) :: key1, key2
+        Character(Len=3) :: key1, key2
 
         Data str /'Coulomb','Gaunt  ','Breit  '/
         Data str1 /' VS','SMS','NMS',' MS'/
@@ -71,7 +71,11 @@ Module integrals
         Read (13) Ngint,Nlist,nrd
         Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
         If (nrd /=  nx*nx) Then
-            Write(*,*)' Rint error: IPx was changed from ', 'nrd=', int(sqrt(real(nrd))), 'to IPx=', nx
+            nx1=int(sqrt(real(nrd)))
+            Write(key1, '(I3)') nx1
+            Write(key2, '(I3)') nx
+            Write(*,*)' Rint error: IPx was changed from IPx=', Trim(AdjustL(key1)), ' to IPx=', Trim(AdjustL(key2))
+            Write(*,*)' Rint error: Please re-compile pCI programs with IPx=', Trim(AdjustL(key1))
             Stop
         End If
         Read (13) ((Rint2(k,i8), k=1,IPbr), i8=1,Ngint)
