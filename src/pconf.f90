@@ -530,16 +530,14 @@ Contains
     Subroutine RintS
         ! Reading of files SGC.CON and SCRC.CON with the self-energy and screening radial integrals.
         Implicit None
-        Integer :: na, nb, ierr, k, nsh, nx, khot, la, lb, ja, jb, na1, nb1, ind, &
+        Integer :: na, nb, ierr, k, nsh, khot, la, lb, ja, jb, na1, nb1, ind, &
                    nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy, err_stat, Nmax1, Lmax1
         Real :: x, y
         Character(Len=256) :: strfmt, err_msg
+        Character(Len=3) :: key1, key2
         
         If (Ksig == 0) Return
         nsh=Nso+1
-
-        ! parameter for indexation of integrals:
-        nx = IPx
 
         ! Reading matrix element of Sigma from SGC.CON
         If (Kdsig /= 0) Then
@@ -601,7 +599,7 @@ Contains
                     Write(*,*)' expected ',na,nb,' got ',na1,nb1
                     Stop
                 End If
-                ind=nx*(na-nsh)+(nb-nsh+1)
+                ind=Nx*(na-nsh)+(nb-nsh+1)
                 Iint1S(i)=ind
                 Rsig(i)=x
                 Dsig(i)=y
@@ -659,8 +657,10 @@ Contains
             If (NmaxS < Nmax1 .or. LmaxS < Lmax1) ierr=ierr+1
         End If
         Read (13) NgintS,nrd
-        If (nrd /= nx*nx) Then
-            Write(*,*)' RintS: IPx was changed from IPx=',int(sqrt(real(nrd))),'to ',nx
+        If (nrd /= Nx*Nx) Then
+            Write(key1,'(I3)') int(sqrt(real(nrd)))
+            Write(key2,'(I3)') Nx
+            Write(*,*)' RintS: SCRC.CON formed with IPx=',Trim(AdjustL(key1)), ', but CONF.INT with IPx=', Trim(AdjustL(key2))
             ierr=ierr+1
         End If
         If (ierr > 0) Then
@@ -873,6 +873,7 @@ Contains
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Crt4, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc4, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -921,7 +922,7 @@ Contains
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, Nx*Nx, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
@@ -940,7 +941,7 @@ Contains
             Call MPI_Bcast(Rint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Dint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Eint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(IntOrdS, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(IntOrdS, Nx*Nx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
