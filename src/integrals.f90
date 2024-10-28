@@ -13,9 +13,11 @@ Module integrals
     subroutine Rint
         Implicit None
         Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
-                       k, mlow, m_is, err_stat
+                       k, mlow, m_is, err_stat, kbrt1
         Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
+        Character(Len=1) :: key1, key2
+
         Data str /'Coulomb','Gaunt  ','Breit  '/
         Data str1 /' VS','SMS','NMS',' MS'/
 
@@ -54,7 +56,15 @@ Module integrals
 
         Read (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsu)
         Read (13)
-        Read (13) Nhint,Kbrt
+        Read (13) Nhint,kbrt1
+        ! Handle mismatched key for inclusion of Breit corrections
+        If (Kbrt /= kbrt1) Then
+            Write(key1, '(I1)') kbrt1
+            Write(key2, '(I1)') Kbrt
+            Write(*,*) ' Rint error: Key for Breit was changed from Kbrt=', Trim(AdjustL(key1)), ' to Kbrt=', Trim(AdjustL(key2))
+            Write(*,*) ' Rint error: Please re-run pbasc to update radial integrals with Kbrt=', Trim(AdjustL(key2))
+            Stop
+        End If
         Allocate(Rint1(Nhint),Iint1(Nhint))
         Read (13) (Rint1(i), i=1,Nhint)
         Read (13) (Iint1(i), i=1,Nhint)
@@ -64,7 +74,6 @@ Module integrals
             Write(*,*)' Rint error: IPx was changed from ', 'nrd=', int(sqrt(real(nrd))), 'to IPx=', nx
             Stop
         End If
-        print*, 'Ngint=', Ngint
         Read (13) ((Rint2(k,i8), k=1,IPbr), i8=1,Ngint)
         Read (13) (Iint2(i8), i8=1,Ngint)
         Read (13) (Iint3(i8), i8=1,Ngint)
@@ -93,8 +102,8 @@ Module integrals
             End If
         End If
         Close(unit=13)
-        Write( *,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
-        Write(11,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
+        Write( *,'(4X,A7," integrals read from CONF.INT")') str(Kbrt+1)
+        Write(11,'(4X,A7," integrals read from CONF.INT")') str(Kbrt+1)
         If (K_is >= 1) Then
             Write( *,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
             Write(11,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
