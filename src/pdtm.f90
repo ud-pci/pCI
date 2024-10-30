@@ -1,12 +1,22 @@
 Program pdtm 
-    Use dtm_variables
+    Use params
     Use mpi_f08
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
+    Use amp_ops, Only : Rnt, Intg, Alet, Let
     Implicit None
     
     Integer :: mpierr, mype, npes
-    Integer(kind=int64) :: start_time    
+    Integer :: nterm1, nterm1f, nterm2, nterm2f, nlvs
+    Integer :: Nd1, Nd2, Nmax, Npo, Kt, Kdm, Ii, Ng, Iprt, K_M1, Kl1, Njf, Nint
+    Real(dp) :: Cl, Trd, H0, Anuc, Dint, MaxT, all, Tm2, tj1
+    Integer, Allocatable, Dimension(:,:) :: Iarr2, iconf1, iconf2
+    Real(dp), Allocatable, Dimension(:) :: e2s, tj2s
+    Real(dp), Dimension(IP6) :: C, R, V
+    Real(dp), Allocatable, Dimension(:,:) :: ArrB2, Ro, Rro
+    Integer(kind=int64) :: start_time
+    Character(Len=4), Dimension(2) :: chm1
+    Character(Len=4), Dimension(5) :: Blet
     Character(Len=16)   :: timeStr
     Character(Len=64), Allocatable, Dimension(:) :: strc1, strc2
     Character(Len=6), Allocatable, Dimension(:) :: strt1, strt2
@@ -373,12 +383,12 @@ Contains
 
         Call Init_Char(Let, Alet, Blet, yes, chm1)
 
-        Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
-        Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
-
         Trd=1.d-10
         Kdm=0
         K_M1=2
+
+        Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
+        Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
 
         call ReadConfInp
         call ReadConfigurations
@@ -656,8 +666,7 @@ Contains
         End If
         Open (13,file='DTM2.INT',status='OLD',form='UNFORMATTED',err=200)
         Read (13,End=200,err=200) ns2,nso2,z2,rn2,km2
-        x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1) &
-            + dabs(z1-Z)+dabs(rn1-Rnuc)
+        x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x < 1.d-6) Then
             Read (13) Nint2,(l2(i),i=1,ns2)
             Allocate(Rnt2(Nint2), Intg2(Nint2))
@@ -689,74 +698,62 @@ Contains
     End Subroutine RintA
 
     Subroutine calcNint
-        ! this Subroutine calculates the number of radial integrals for one-electron operators
+        ! this subroutine calculates the number of radial integrals for one-electron operators
         Implicit None
         Integer :: na, nb, ja, jb, la, lb, jab, ip, nmin, cnt
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         nmin=Nso+1
         cnt=0
         ! RADIAL INTEGRALS:
         Do na=nmin,Nsu                   !### - final state
             la=Ll(na)
             ja=Jj(na)
+
             Do nb=na,Nsu                  !### - initial state
                 lb=Ll(nb)
                 jb=Jj(nb)
                 jab=iabs(ja-jb)
                 ip=mod(iabs(la-lb),2)
-                If (ip == 1) Goto 220
+                
+                If (ip == 1) Cycle
+                
                 ! POSITIVE PARITY:
-                If (jab > 2) Goto 210
-                ! Non-rel. M1-amplitude  (K_M1=1)
-                If (K_M1 == 1 .and. la == lb) Then
-                    If (na == nb .or. ja /= jb) Then
-                        cnt=cnt+1
+                If (jab <= 2) Then
+                    ! Non-rel. M1-amplitude  (K_M1=1)
+                    If (K_M1 == 1 .and. la == lb) Then
+                        If (na == nb .or. ja /= jb) cnt=cnt+1
                     End If
+
+                    ! M1-amplitude  (K_M1 /= 1)
+                    If (K_M1 /= 1) cnt=cnt+1
+
+                    ! g-factor, gQED, Dipole HFS
+                    cnt=cnt+3
+
+                    ! Quadrupole HFS and E2 amplitude
+                    if (ja+jb >= 4) cnt=cnt+2
+
+                    ! M3 amplitude
+                    if (ja+jb >= 6) cnt=cnt+1
                 End If
-                ! M1-amplitude  (K_M1 /= 1)
-                If (K_M1 /= 1) Then
-                    cnt=cnt+1
-                End If
-                ! gQED
-                cnt=cnt+2
-                ! DIPOLE HFS:
-                cnt=cnt+1
-    210             If (jab > 4 .or. ja+jb < 4) Goto 211
-                ! QUADRUPOLE HFS:
-                cnt=cnt+1
-                ! E2 AMPLITUDE:
-                cnt=cnt+1
-    211             If (jab > 6 .or. ja+jb < 6) Cycle
-                ! M3 AMPLITUDE:
-                cnt=cnt+1
-                Cycle
+                
                 ! NEGATIVE PARITY:
-    220             If (jab > 6) Cycle
-                If (ja+jb < 6) Goto 230
-                ! E3 AMPLITUDE:
-                cnt=cnt+1
-    230             If (jab > 4) Cycle
-                If (ja+jb < 4) Goto 240
-                ! MQM AMPLITUDE:
-                cnt=cnt+1
-                ! M2 AMPLITUDE:
-                cnt=cnt+1    
-    240             If (iabs(ja-jb) > 2) Cycle
-                ! E1 AMPLITUDE (L GAUGE):
-                cnt=cnt+1
-                ! E1 AMPLITUDE (V GAUGE):
-                cnt=cnt+1
-                ! ANAPOLE MOMENT
-                cnt=cnt+1
-                ! EDM OF THE ELECTRON:
-                If (ja == jb) Then
-                    cnt=cnt+1
-                    ! PNC AMPLITUDE:
-                    cnt=cnt+1
+                If (jab <= 6) Then
+                    ! E3 amplitude
+                    If (ja+jb >= 6) cnt=cnt+1
+
+                    ! MQM and M2 amplitudes
+                    If (ja+jb >=4) cnt=cnt+2
+
+                    ! E1 amplitudes (L and V gauge), Anapole moment
+                    cnt=cnt+3
+
+                    ! EDM of the electron and PNC amplitude
+                    If (ja == jb) cnt=cnt+2
                 End If
             End Do
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Nint=cnt
         Return
     End Subroutine calcNint
@@ -1162,7 +1159,7 @@ Contains
         Use conf_variables, Only : iconf1, iconf2
         Implicit None
         Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, err_stat, &
-                   ic2, kx, n1, ic1, imin, nx, Ndpt, j1, j2, i1, iab2, l, &
+                   ic2, kx, n1, ic1, imin, n2, Ndpt, j1, j2, i1, iab2, l, &
                    imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, size
         Integer :: npes,mype
         Integer*8 :: mem, memsum
@@ -1278,8 +1275,8 @@ Contains
             pgs=start+pgs0
             pct=0
             Do ic1=start,End
-                nx = Ndc(ic1)
-                Do n1=1,nx
+                n2 = Ndc(ic1)
+                Do n1=1,n2
                     n=n+1
                     Ndr=n
                     bn=B1(n)
@@ -1392,7 +1389,9 @@ Contains
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Rnt)) Allocate(Rnt(Nint))
-        If (.not. Allocated(Intg)) Allocate(Intg(Nint))   
+        If (.not. Allocated(Intg)) Allocate(Intg(Nint))
+        If (.not. Allocated(Ro)) Allocate(Ro(IP1, IP1))
+        If (.not. Allocated(Rro)) Allocate(Rro(IPx, IPx))
         Call MPI_Bcast(Nn, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
