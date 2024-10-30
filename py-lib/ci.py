@@ -221,7 +221,7 @@ def create_add_inp(config):
 
 def form_conf_inp(parity, bin_dir):
     if bin_dir and bin_dir[-1] != '/':
-        bin_dir = bin_dir[:-1]
+        bin_dir += '/'
     run_shell("cp ADD" + parity + ".INP ADD.INP")
     if on_hpc:
         run_shell(bin_dir + "add < add.in > add" + parity + ".out")
