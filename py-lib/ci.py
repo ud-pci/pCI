@@ -341,7 +341,7 @@ if __name__ == "__main__":
         for root, dirs, files in os.walk('.'):
             if 'BASS.INP' in files:
                 bass_inp_paths.append(root)
-    if code_method == 'ci':
+    if not isinstance(code_method, list):
         run_shell('cp ./basis/BASS.INP .')
         print('BASS.INP taken from basis/')
     else:
