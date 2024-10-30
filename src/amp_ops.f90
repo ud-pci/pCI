@@ -14,7 +14,7 @@ Module amp_ops
     !       AM2  = REDUCED M2 AMPLITUDE
     !       AM3  = REDUCED M3 AMPLITUDE
     !       gQED = REDUCED gfactor QED AMPLITUDE
-    Use dtm_variables
+    Use params
     Implicit None
 
     Private
@@ -23,13 +23,19 @@ Module amp_ops
     Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
     Public :: gQED
 
+    Integer, Allocatable, Dimension(:), Public      :: Intg
+    Real(dp), Allocatable, Dimension(:), Public     :: Rnt
+    Real(dp), Public :: AE1V
+    Character(Len=4), Dimension(14), Public :: Alet
+    Character(Len=1), Dimension(6), Public :: Let
+
   Contains 
 
     Real(dp) function Fint(is,nfin,nini,ic)       
         ! this function searches for radial integrals of one-electron operators
         Implicit None
         Integer :: isg, na, nb, is, nfin, nini, ic, ind, i
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         isg=1
         na=nfin
         nb=nini
@@ -39,15 +45,18 @@ Module amp_ops
             isg=ic
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
-        Do i=1,Nint
+
+        Do i=1,size(Intg, 1)
             If (ind == Intg(i)) Then
                 Fint=Rnt(i)*isg
                 Return
             End If
         End Do
+
         Write( 6,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
         Write(11,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
         Fint=0.d0
+        
         Return
     End function Fint
     
