@@ -1346,8 +1346,6 @@ Contains
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
 700     Write (*,*) 'FormDM: norma for vector ',ntr,' is ',s
         Return
-710     Write (*,*) 'FormDM: index out of range (IP1<imax):'
-        Write (*,*) 'IP1=',IP1,' imax=',imax,' n=',n
         Return
     End Subroutine FormDM
 
@@ -1614,10 +1612,6 @@ Contains
                                                 imax=max(imax,j1,j2)
                                                 imin=min(imin,j1,j2)
                                                 Ro(j1,j2)=Ro(j1,j2)+bn*bk*is
-                                            End If
-                                            If (imax > IP1) Then
-                                                Write(*,*) imax,'= imax > IP1 =',IP1
-                                                Stop
                                             End If
                                         End If
                                     End Do
