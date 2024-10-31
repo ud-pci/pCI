@@ -45,7 +45,7 @@ target_include_directories(conf_pt PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
 target_link_options(conf_pt PUBLIC ${MPI_Fortran_LINK_FLAGS})
 target_link_libraries(conf_pt PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
 
-ADD_EXECUTABLE(pdtm dtm_variables.f90 amp_ops.f90 pdtm.f90)
+ADD_EXECUTABLE(pdtm amp_ops.f90 pdtm.f90)
 target_compile_definitions(pdtm PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
 target_compile_options(pdtm PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
 target_include_directories(pdtm PUBLIC ${MPI_Fortran_INCLUDE_DIRS})

@@ -1,43 +1,31 @@
 import sys
-from subprocess import run
+from subprocess import run, CalledProcessError
 import os
 
-def find_cluster():
-    '''
-    This function finds the name of the cluster you are working on - caviness or darwin
-    '''
-    cluster = ''
-    
-    # Fetch slurm node and core information
-    run('sinfo -o "%n %e %m %a %c %C" > sinfo.out', shell=True)
-    
-    f = open('sinfo.out', 'r')
-    lines = f.readlines()
-    f.close()
-
-    if lines[0].split()[0] == 'HOSTNAMES':
-        hostname = lines[1].split()[0]
-    else:
-        hostname = ''
-    
-    # Current logic for determining cluster:
-    # Caviness hostname has length 6: rxxnxx
-    # Darwin hostname has length 5: rxnxx
-    if len(hostname) == 5:
-        cluster = 'darwin'
-    elif len(hostname) == 6:
-        cluster = 'caviness'
-    else:
-        cluster = 'cluster could not be identified'
-    
-    run('rm sinfo.out', shell=True)
-    
-    return cluster
-
 def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version, bin_dir):
+    """
+    This function writes a SLURM job script and returns the name of the job script.
+    """
     
-    # Determine cluster information
-    cluster = find_cluster()
+    # Determine cluster information from SLURM_CLUSTER_NAME
+    cluster = os.getenv('SLURM_CLUSTER_NAME')
+    if not cluster:
+        print("SLURM_CLUSTER_NAME environment variable not found. Job script will not be written.")
+        return None
+    
+    # Obtain list of partitions
+    try:
+        sinfo_output = run(['sinfo', '--format=%P'], capture_output=True, text=True, check=True)
+        partitions = set(sinfo_output.stdout.strip().splitlines())
+        if partition in partitions:
+            print('partition', partition, 'found on', cluster)
+        else:
+            print('partition', partition, 'not found on', cluster)
+            return None
+    except CalledProcessError as e:
+        print('Failed to retrieve partitions.')
+        print(e)
+        return None
     
     # Set default job parameters
     if not num_nodes:
@@ -53,18 +41,9 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             print('partition name was not specified')
             return None
     
-    # Ensure partition is in cluster
-    darwin_partitions = ['standard', 'large-mem', 'xlarge-mem', 'idle']
-    if partition in darwin_partitions and cluster == 'darwin':
-        print('partition ' + partition + ' found on darwin')
-    else:
-        print('partition ' + partition + ' was not found on darwin')
-        partition = 'standard'
-        print('partition has been defaulted to the standard partition')
-    
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
-        bin_dir = bin_dir + '/'
+        bin_dir += '/'
     
     # Default filenames
     filenames = {'ci+all-order': 'ao.qs', 
@@ -94,7 +73,8 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     
     # OpenMP codes
     use_omp = False
-    if code == 'ine' or code == 'pol':
+    omp_codes = ['ine', 'pol']
+    if code in omp_codes:
         use_omp = True
     
     os.chdir(path)
@@ -176,11 +156,14 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     return filename    
     
 if __name__ == '__main__':
+    output_path = '.'
     code = 'ci+all-order'
     num_nodes = 5
     num_procs_per_node = 64
     exclusive = True
     mem = 0
-    partition = 'safrono'
+    partition = 'large-mem'
+    pci_version = 'default'
+    bin_dir = '/lustre/safrono/users/1813/pCI-dev/bin'
     
-    write_job_script(code, num_nodes, num_procs_per_node, exclusive, mem, partition)
+    print(write_job_script(output_path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version, bin_dir))

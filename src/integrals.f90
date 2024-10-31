@@ -12,23 +12,19 @@ Module integrals
 
     subroutine Rint
         Implicit None
-        Integer     :: i, nsh, nx, ns1, nso1, nsu1, nsp1, Nlist, &
-                       k, mlow, m_is, err_stat
+        Integer     :: i, nsh, ns1, nso1, nsu1, nsp1, Nlist, &
+                       k, mlow, m_is, err_stat, kbrt1, nx1
         Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
+        Character(Len=3) :: key1, key2
+
         Data str /'Coulomb','Gaunt  ','Breit  '/
         Data str1 /' VS','SMS','NMS',' MS'/
 
         nsh=Nso+1
         Nhint=0
         Ngint=0_int64
-        ! parameter for indexation of integrals:
-        If (Nsu > IPx+nsh-2) Then
-            Write (*,*) ' Rint: IPx is too small'
-            Stop
-        Else
-            nx = IPx
-        End If
+
         Open(unit=13,file='CONF.INT',status='OLD',form='UNFORMATTED',iostat=err_stat)
         If (err_stat /= 0) Then
             Write( 6,'(2X," Can not find file CONF.INT...")')
@@ -54,18 +50,34 @@ Module integrals
 
         Read (13) (Nn(i),Kk(i),Ll(i),Jj(i), i=1,Nsu)
         Read (13)
-        Read (13) Nhint,Kbrt
+        Read (13) Nhint,kbrt1
+        ! Handle mismatched key for inclusion of Breit corrections
+        If (Kbrt /= kbrt1) Then
+            Write(key1, '(I1)') kbrt1
+            Write(key2, '(I1)') Kbrt
+            Write(*,*) ' Rint error: Key for Breit was changed from Kbrt=', Trim(AdjustL(key1)), ' to Kbrt=', Trim(AdjustL(key2))
+            Write(*,*) ' Rint error: Please re-run pbasc to update radial integrals with Kbrt=', Trim(AdjustL(key2))
+            Stop
+        End If
         Allocate(Rint1(Nhint),Iint1(Nhint))
         Read (13) (Rint1(i), i=1,Nhint)
         Read (13) (Iint1(i), i=1,Nhint)
         Read (13) Ngint,Nlist,nrd
-        Allocate(Rint2(IPbr,Ngint),Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
-        If (nrd /=  nx*nx) Then
-            Write(*,*)' Rint error: IPx was changed from ', 'nrd=', int(sqrt(real(nrd))), 'to IPx=', nx
-            Stop
+
+        Nx = int(sqrt(real(nrd)))
+
+        If (Kbrt == 0) Then
+            Allocate(Rint2(1,Ngint))
+        Else
+            Allocate(Rint2(2,Ngint))
         End If
-        print*, 'Ngint=', Ngint
-        Read (13) ((Rint2(k,i8), k=1,IPbr), i8=1,Ngint)
+        Allocate(Iint2(Ngint),Iint3(Ngint),IntOrd(nrd))
+        
+        If (Kbrt == 0) Then
+            Read (13) (Rint2(1,i8), i8=1,Ngint)
+        Else
+            Read (13) ((Rint2(k,i8), k=1,2), i8=1,Ngint)
+        End If
         Read (13) (Iint2(i8), i8=1,Ngint)
         Read (13) (Iint3(i8), i8=1,Ngint)
         Read (13) (IntOrd(i), i=1,nrd)
@@ -93,8 +105,8 @@ Module integrals
             End If
         End If
         Close(unit=13)
-        Write( *,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
-        Write(11,'(4X,A7," integrals Read from CONF.INT")') str(Kbrt+1)
+        Write( *,'(4X,A7," integrals read from CONF.INT")') str(Kbrt+1)
+        Write(11,'(4X,A7," integrals read from CONF.INT")') str(Kbrt+1)
         If (K_is >= 1) Then
             Write( *,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
             Write(11,'(4X,I7," integrals for ",A3," operator found")') num_is,str1(K_is)
@@ -109,11 +121,11 @@ Module integrals
 
     Real(dp) Function Hint(ia,ib)
         Implicit None
-        Integer  :: nx, n, na, nb, n0, ind, i, nab, ia, ib
+        Integer  :: n, na, nb, n0, ind, i, nab, ia, ib
         Real(dp) :: e
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         e=0.d0
-        nx = IPx
+
         If (Jz(ia) == Jz(ib)) Then
             na=Nh(ia)
             nb=Nh(ib)
@@ -124,7 +136,7 @@ Module integrals
                     na=nb
                     nb=n
                 End If
-                ind=nx*(na-Nso-1)+(nb-Nso)
+                ind=Nx*(na-Nso-1)+(nb-Nso)
                 Do i=1,Nhint
                     nab=Iint1(i)
                     If (nab == ind) Then
@@ -149,7 +161,7 @@ Module integrals
 
     Real(dp) Function Gint(i1,i2,i3,i4)
         Implicit None
-        Integer  :: i2, ib, i1, ia, is, nx, la, nd, nc, nb, na, md, mc, mb, ma, &
+        Integer  :: i2, ib, i1, ia, is, la, nd, nc, nb, na, md, mc, mb, ma, &
                     is_sms, ii, i4, id, i3, ic, iac, k1, is_br, i_br, minint, &
                     iab, kmax, kmin, ibd0, iac0, k, jd, jc, jb, ja, ibr, i, ld, &
                     lc, lb, ibd, kac, kbd, mi
@@ -161,9 +173,8 @@ Module integrals
         l_is= .not. (C_is == 0.d0)                ! False If C_is=0
         l_is=l_is .and. (K_is == 2 .or. K_is == 4)  ! False If K_is /= 2,4
         l_is=l_is .and. (K_sms >= 2)              ! False If K_sms<2
-        l_br=Kbrt /= 0 .and. IPbr == 2
+        l_br=Kbrt /= 0
         e=0.d0
-        nx = IPx
         is=1
         ia=i1
         ib=i2
@@ -227,15 +238,15 @@ Module integrals
                 Else
                     ibr=1
                 End If
-                iac0=nx*(na-Nso-1)+(nc-Nso)
-                ibd0=nx*(nb-Nso-1)+(nd-Nso)
+                iac0=Nx*(na-Nso-1)+(nc-Nso)
+                ibd0=Nx*(nb-Nso-1)+(nd-Nso)
                 kmin=iabs(ja-jc)/2+1
                 k=iabs(jb-jd)/2+1
                 If (kmin < k) kmin=k
                 kmax=(ja+jc)/2+1
                 k=(jb+jd)/2+1
                 If (kmax > k) kmax=k
-                iab = nx*(na-Nso-1)+(nb-Nso)
+                iab = Nx*(na-Nso-1)+(nb-Nso)
                 minint8 = IntOrd(iab)
                 i_br=la+lc+kmin-1
                 If (i_br /= 2*(i_br/2)) Then
@@ -249,7 +260,7 @@ Module integrals
                     l_pr=i == 2*(i/2)
                     If (l_pr .or. l_br) Then
                         is_br=is_br*ibr
-                        iac=nx*nx*k+iac0
+                        iac=Nx*Nx*k+iac0
                         ibd=ibd0
                         Do i8=minint8,ngint
                             mi8=i8
@@ -266,7 +277,7 @@ Module integrals
                             End If
                         End Do
                         rabcd=Rint2(1,mi8)
-                        If (l_br) rabcd=rabcd+is_br*Rint2(IPbr,mi8)
+                        If (l_br) rabcd=rabcd+is_br*Rint2(2,mi8)
                         If (Ksig >= 2) Then
                             If (max(na,nb,nc,nd) > Nd .or. max(la,lb,lc,ld) > Lmax) Then
                                 If (k < 10) Then
@@ -304,9 +315,9 @@ Module integrals
         Integer :: n, na, nb, iab, nmin, nmax, kab
 
         If (na <= nb) Then
-            iab=IPx*(na-Nso-1)+nb-Nso
+            iab=Nx*(na-Nso-1)+nb-Nso
         Else
-            iab=IPx*(nb-Nso-1)+na-Nso
+            iab=Nx*(nb-Nso-1)+na-Nso
         End If
 
         nmin=1
@@ -346,10 +357,10 @@ Module integrals
 
         If (na <= nb) Then
             is=1
-            iab=IPx*(na-Nso-1)+nb-Nso
+            iab=Nx*(na-Nso-1)+nb-Nso
         Else
             is=-1
-            iab=IPx*(nb-Nso-1)+na-Nso
+            iab=Nx*(nb-Nso-1)+na-Nso
         End If
 
         nmin=1
@@ -386,15 +397,14 @@ Module integrals
     Real(dp) Function HintS(na,nb,n0)
         Implicit None
         Real(dp)  :: e, d, dr, dd, de, d1
-        Integer   :: nx, ind, nab, i, na, nb, n0
+        Integer   :: ind, nab, i, na, nb, n0
 
         e=0.d0
         HintS=e
-        nx = IPx
 
         ! Check that quantum numbers are within range
         If (Ll(na) > LmaxS .or. nb > NmaxS) Return
-        ind=nx*(na-Nso-1)+(nb-Nso)
+        ind=Nx*(na-Nso-1)+(nb-Nso)
 
         ! Loop through one-electron effective radial integrals to find a match
         Do i=1,NhintS
@@ -448,13 +458,12 @@ Module integrals
         Implicit None
         Integer   :: is, ia, ib, ic, id, ma, mb, mc, md, na, nb, nc, nd, &
                      na0, nb0, la, lb, lc, ld, i, ja, jb, jc, jd, k, iab, &
-                     iac0, ibd0, kmn, kmx, minint, k1, mi, nx, i1, i2, i3, i4, &
+                     iac0, ibd0, kmn, kmx, minint, k1, mi, i1, i2, i3, i4, &
                      ii, iac, ibd, kac, kbd
         Real(dp)  :: e, rabcd, dabcd, de, dd, dmin1, dr, dmax1, d1, eabcd
 
         e=0.d0
         GintS=e
-        nx = IPx
         is=1
         ia=i1
         ib=i2
@@ -512,16 +521,16 @@ Module integrals
                 If (na == nb .and. nc > nd) Call SwapValues(nc, nd)
             End If
     
-            iac0=nx*(na-Nso-1)+(nc-Nso)
-            ibd0=nx*(nb-Nso-1)+(nd-Nso)
+            iac0=Nx*(na-Nso-1)+(nc-Nso)
+            ibd0=Nx*(nb-Nso-1)+(nd-Nso)
             kmn=max(iabs(ja-jc)/2+1,iabs(jb-jd)/2+1)
             kmx=min((ja+jc)/2+1,(jb+jd)/2+1,Kmax+1)
-            iab = nx*(na-Nso-1)+(nb-Nso)
+            iab = Nx*(na-Nso-1)+(nb-Nso)
             minint = IntOrdS(iab)
 
             Do k1=kmn,kmx
                 k=k1-1
-                iac=nx*nx*k+iac0
+                iac=Nx*Nx*k+iac0
                 ibd=ibd0
                 mi=minint-1
                 Do i=minint,NgintS
