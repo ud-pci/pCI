@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2024-10-30
+- refactored IPbr parameter out of params.f90
+- removed IPx dependency from pconf
+- handle mismatched Kbrt key between pbasc and pconf
+- refactored dtm, merging dtm_variables module with main program
+- refactored amp_ops module to use params module instead of dtm_variables
+- removed dtm_variables module
+- refactored write_job_script python script
+
 ## [1.0.5] - 2024-10-25
 - add v3.0 - main arrays are now dynamically allocated 
 
