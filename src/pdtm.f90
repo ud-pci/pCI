@@ -1157,18 +1157,18 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Use determinants, Only : Gdet, CompC, Rspq
         Use conf_variables, Only : iconf1, iconf2
+        Use mpi_utils, Only : AllReduceD
         Implicit None
         Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, err_stat, &
                    ic2, kx, n1, ic1, imin, n2, Ndpt, j1, j2, i1, iab2, l, &
-                   imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, size
+                   imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, sizebin
         Integer :: npes,mype
-        Integer*8 :: mem, memsum
+        Integer*8 :: mem, memsum, count
         Real(dp) :: s, bn, bk, Tj, Etrm
         Character(Len=16)     :: memStr, npesStr, err_msg
         Integer, Allocatable, Dimension(:) :: idet1, idet2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
-        Npo=Nf0(Nso+1)    !### - last position of the core orbitals
         If (mype==0) Write (*,'(1X," DM for terms .. - .. : ", &
                 I3,1X,I3)') nterm1, nterm2
         ntrm=nterm1
@@ -1242,11 +1242,11 @@ Contains
             start=mype*(Nc/npes)+1
         End If
         If (mype==npes-1) Then
-            End = Nc
+            end = Nc
         Else
-            End = (mype+1)*(Nc/npes)
+            end = (mype+1)*(Nc/npes)
         End If
-        size=End-start+1
+        sizebin=end-start+1
 
         lf=0
         iab2=0
@@ -1271,10 +1271,10 @@ Contains
             Else
                 n=sum(Ndc(1:start-1))
             End If
-            pgs0=size/10
+            pgs0=sizebin/10
             pgs=start+pgs0
             pct=0
-            Do ic1=start,End
+            Do ic1=start,end
                 n2 = Ndc(ic1)
                 Do n1=1,n2
                     n=n+1
@@ -1319,27 +1319,16 @@ Contains
                                 End Do
                             End If
                         End Do
-                        If (imax > IP1) Goto 710
                     End If
                 End Do
-                    !If (ic1 == pgs .and. pct < 90) Then
-                    !    pct=pct+10
-                    !    Write(*,'(2X,"core ",I3," is",I3,"% done")') mype,pct
-                    !    pgs=pgs+pgs0
-                    !Else If (ic1 == End) Then
-                    !    Write(*,'(2X,"core ",I3," has completed")') mype
-                    !End If
-                End Do
+            End Do
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            If (mype==0) Then
-              Call MPI_Reduce(MPI_IN_PLACE, Ro(1:IP1,1:IP1), IP1*IP1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                  MPI_COMM_WORLD, mpierr)
-            Else
-              Call MPI_Reduce(Ro(1:IP1,1:IP1), Ro(1:IP1,1:IP1), IP1*IP1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                  MPI_COMM_WORLD, mpierr)
-            End If
             Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
+
+            count = imax**2
+            Call AllReduceD(Ro, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            
             If (mype==0) Then
                 s=0.d0
                 Do i=imin,imax
@@ -1347,8 +1336,7 @@ Contains
                 End Do
                 If (lf == 1 .and. Kl /= 0) Write( 6,35) Ne,s,imin,imax
                 If (Kl /= 0)             Write(11,35) Ne,s,imin,imax
-35              format(1X,'Ne = ',I2,'; Trace(Ro) = ',F12.8, &
-                      5X,'Imin, Imax =',2I4)
+35              format(1X,'Ne = ',I2,'; Trace(Ro) = ',F12.8,5X,'Imin, Imax =',2I4)
                 Call RdcDM(ntr,l,Etrm,Tj,imin,imax,lf)
             End If
         End Do
@@ -1366,7 +1354,7 @@ Contains
     Subroutine InitTDM
         Use mpi_f08
         Implicit None
-        Integer :: mpierr
+        Integer :: mpierr, num_val_positions
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1390,7 +1378,6 @@ Contains
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Rnt)) Allocate(Rnt(Nint))
         If (.not. Allocated(Intg)) Allocate(Intg(Nint))
-        If (.not. Allocated(Ro)) Allocate(Ro(IP1, IP1))
         If (.not. Allocated(Rro)) Allocate(Rro(IPx, IPx))
         Call MPI_Bcast(Nn, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1402,6 +1389,11 @@ Contains
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rnt, Nint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Intg, Nint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
+        If (mype == 0) num_val_positions = maxval(Iarr)-Npo
+        Call MPI_Bcast(num_val_positions, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (.not. Allocated(Ro)) Allocate(Ro(num_val_positions, num_val_positions))
 
     End Subroutine InitTDM
 
@@ -1432,19 +1424,19 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Use determinants, Only : Gdet, CompC, Rspq
         Use conf_variables, Only : iconf1, iconf2
+        Use mpi_utils, Only : AllReduceD
         ! calculates transition matrix & amplitudes
         Implicit None
         Integer :: lf, imax, k, i, l1, l2, i1, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
-                  imin, n, n1, ndpt, n20, jt, iab2, start, End, pgs, pgs0, pct
-        Integer :: mype, npes, mpierr, size, err_stat, err_stat2
-        Integer*8 :: mem, memsum
+                  imin, n, n1, ndpt, n20, jt, iab2, start, end, pgs, pgs0, pct
+        Integer :: mype, npes, mpierr, sizebin, err_stat, err_stat2
+        Integer*8 :: mem, memsum, count
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Character(Len=16)     :: memStr, npesStr, err_msg, err_msg2
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
-        Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
         If (mype == 0) Write (*,'(1X," TM from terms ",I2," - ",I2," to terms ",I2," - ",I2)') nterm1, nterm1f, nterm2, nterm2f
         n21=nterm2
         n22=nterm2f
@@ -1550,7 +1542,7 @@ Contains
         Else
             end = (mype+1)*(Nd2/npes)
         End If
-        size=end-start+1
+        sizebin=end-start+1
 
         l1=0
         Do n1=nterm1,nterm1f
@@ -1578,7 +1570,7 @@ Contains
                     Ro=0.d0
                     imax=0
                     imin=1000
-                    pgs0=size/10
+                    pgs0=sizebin/10
                     pgs=start+pgs0
                     pct=0
                     Do n=start,end   !### - final state
@@ -1632,41 +1624,13 @@ Contains
                                 End If
                             End Do
                         End If
-                        ! If (n == pgs .and. pct < 90) Then
-                        !     pct=pct+10
-                        !     Write(*,'(2X,"core ",I3," is",I3,"% done")') mype,pct
-                        !     pgs=pgs+pgs0
-                        ! Else If (n == End) Then
-                        !     Write(*,'(2X,"core ",I3," has completed")') mype
-                        ! End If
                     End Do
                     Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-                
-                    ! A manual implementation of MPI_Reduce for Ro
-                    !Allocate(ro1(imax))
-                    !Do i = 1,npes-1
-                    !    Do j=1,imax
-                    !        If (mype == i) Call MPI_SEND(Ro(j,1:imax),imax,MPI_DOUBLE_PRECISION,0,&
-                    !                                      0,MPI_COMM_WORLD,mpierr)
-                    !        If (mype == 0) Then
-                    !            Call MPI_RECV(ro1(1:imax),imax,MPI_DOUBLE_PRECISION,i,&
-                    !                          0,MPI_COMM_WORLD,MPI_STATUS_IGNORE,mpierr)
-                    !            Ro(j,1:imax)=Ro(j,1:imax)+ro1(1:imax)
-                    !        End If
-                    !    End Do
-                    !End Do
-                    !Deallocate(ro1)
-
-                    ! MPI_Reduce elements of Ro to master process
-                    If (mype==0) Then
-                      Call MPI_Reduce(MPI_IN_PLACE, Ro(1:imax,1:imax), imax**2, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                          MPI_COMM_WORLD, mpierr)
-                    Else
-                      Call MPI_Reduce(Ro(1:imax,1:imax), Ro(1:imax,1:imax), imax**2, MPI_DOUBLE_PRECISION, MPI_SUM, 0, &
-                                          MPI_COMM_WORLD, mpierr)
-                    End If
+        
+                    count = imax**2
+                    Call AllReduceD(Ro, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
                     If (mype==0) Then 
                         s=0.d0
@@ -1924,7 +1888,6 @@ Contains
         If (iprt == 1) Then
             A=-Gnuc/(DPcl*4*DPmp)*A*DPau*1.d-6
             B= Qnuc*B*DPau/(DPrb*DPrb)*1.d-30
-            !print*, ppl, G, A, AE2, AM3
             Write( 6,55) ppl,G,A,AE2,AM3
             Write(11,55) ppl,G,A,AE2,AM3
 55          format(' Trace =',F8.4,' <b||M1||a> =',F9.5,' mu_0',2x, &
