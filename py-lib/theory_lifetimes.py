@@ -32,7 +32,7 @@ def format_time_in_seconds(time):
         time_cut = time
         unit = 's'
     
-    str_time = f'{time_cut:.0f}' + ' ' + unit
+    str_time = f'{time_cut:.2f}' + ' ' + unit
         
     return str_time
         
@@ -52,6 +52,7 @@ def parse_dtm_res():
                                          'branching_ratio', 'transition_rate', 'state_one_energy', 'state_two_energy'])
     # Parse the RES files
     e1_res = parse_matrix_res('E1.RES')
+    e11_res = parse_matrix_res('E11.RES')
     e2_res = parse_matrix_res('E2.RES')
     e3_res = parse_matrix_res('E3.RES')
     
@@ -62,6 +63,7 @@ def parse_dtm_res():
     # Generate dictionary of matrix elements
     matrix_elements = {}
     if e1_res: add_res_to_dict('E1', e1_res, matrix_elements)
+    if e11_res: add_res_to_dict('E1', e11_res, matrix_elements)
     if e2_res: add_res_to_dict('E2', e2_res, matrix_elements)
     if e3_res: add_res_to_dict('E3', e3_res, matrix_elements)
     
@@ -89,7 +91,7 @@ def parse_dtm_res():
         for rate in rates:
             total_rates += rate[2]
         
-        lifetime = 1/total_rates*1e9
+        lifetime = 1/total_rates
         lifetimes.append([configuration, term, J, round(lifetime,3)])
         
         # skip to next configuration if conditions are met
@@ -159,7 +161,26 @@ def add_res_to_dict(matrix_element_type, res, lifetime_dict):
         termJ2 = term2 + J2
         energy2 = float(line[8])
         config2 = conf2 + ' ' + termJ2
-        
+
+        # skip line if matrix element already in lifetime_dict
+        match = False
+        try:
+            if len(lifetime_dict[config1]) > 0:
+                for item in lifetime_dict[config1]:
+                    if item[1] == config2:
+                        match = True
+                        break
+            if len(lifetime_dict[config2]) > 0:
+                for item in lifetime_dict[config2]:
+                    if item[1] == config1:
+                        match = True
+                        break
+        except:
+            pass
+
+        if match:
+            continue
+
         # matrix elementa
         matrix_element_val = float(line[6])
         
