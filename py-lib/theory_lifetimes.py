@@ -1,6 +1,8 @@
 import pandas as pd
 from compare_res import parse_matrix_res
 import datetime
+import re
+import os.path
 
 def format_time_in_seconds(time):
     str_time = ''
@@ -50,28 +52,61 @@ def parse_dtm_res():
                                          'state_two_configuration', 'state_two_term', 'state_two_J', 'type',
                                          'wavelength (nm)', 'reduced_matrix_element', 
                                          'branching_ratio', 'transition_rate', 'state_one_energy', 'state_two_energy'])
-    # Parse the RES files
-    e1_res = parse_matrix_res('E1.RES')
-    e11_res = parse_matrix_res('E11.RES')
-    e2_res = parse_matrix_res('E2.RES')
-    e3_res = parse_matrix_res('E3.RES')
     
-    m1_res = parse_matrix_res('M1.RES')
-    m2_res = parse_matrix_res('M2.RES')
-    m3_res = parse_matrix_res('M3.RES')
-    
-    # Generate dictionary of matrix elements
+    # Read experimental values from inputted file
+    expt_dict = {}
+    use_expt = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Use experimental values from file? ')))))
+    if use_expt:
+        expt_filename = input('Name of file? ')
+        with open(expt_filename, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                items = line.split(',')
+                config = items[0] + items[1]
+                expt_dict[config] = float(items[2])
+    else:
+        print('Using theory energies..')
+
+    # Parse the *.RES files and generate dictionary of matrix elements
     matrix_elements = {}
-    if e1_res: add_res_to_dict('E1', e1_res, matrix_elements)
-    if e11_res: add_res_to_dict('E1', e11_res, matrix_elements)
-    if e2_res: add_res_to_dict('E2', e2_res, matrix_elements)
-    if e3_res: add_res_to_dict('E3', e3_res, matrix_elements)
-    
-    if m1_res: add_res_to_dict('M1', m1_res, matrix_elements)
-    if m2_res: add_res_to_dict('M2', m2_res, matrix_elements)
-    if m3_res: add_res_to_dict('M3', m3_res, matrix_elements)
-    
-    
+    if os.path.isfile('E1.RES'):
+        e1_res = parse_matrix_res('E1.RES')
+        add_res_to_dict('E1', e1_res, expt_dict, matrix_elements)
+    if os.path.isfile('E11.RES'):
+        e11_res = parse_matrix_res('E11.RES')
+        add_res_to_dict('E1', e11_res, expt_dict, matrix_elements)
+    if os.path.isfile('E2.RES'):
+        e2_res = parse_matrix_res('E2.RES')
+        add_res_to_dict('E2', e2_res, expt_dict, matrix_elements)
+    if os.path.isfile('E22.RES'):
+        e22_res = parse_matrix_res('E22.RES')
+        add_res_to_dict('E2', e22_res, expt_dict, matrix_elements)
+    if os.path.isfile('E3.RES'):
+        e3_res = parse_matrix_res('E3.RES')
+        add_res_to_dict('E3', e3_res, expt_dict, matrix_elements)
+    if os.path.isfile('E33.RES'):
+        e33_res = parse_matrix_res('E33.RES')
+        add_res_to_dict('E3', e33_res, expt_dict, matrix_elements)
+        
+    if os.path.isfile('M1.RES'):
+        m1_res = parse_matrix_res('M1.RES')
+        add_res_to_dict('M1', m1_res, expt_dict, matrix_elements)
+    if os.path.isfile('M11.RES'):
+        m11_res = parse_matrix_res('M11.RES')
+        add_res_to_dict('M1', m11_res, expt_dict, matrix_elements)
+    if os.path.isfile('M2.RES'):
+        m2_res = parse_matrix_res('M2.RES')
+        add_res_to_dict('M2', m2_res, expt_dict, matrix_elements)
+    if os.path.isfile('M22.RES'):
+        m22_res = parse_matrix_res('M22.RES')
+        add_res_to_dict('M2', m22_res, expt_dict, matrix_elements)
+    if os.path.isfile('M3.RES'):
+        m3_res = parse_matrix_res('M3.RES')
+        add_res_to_dict('M3', m3_res, expt_dict, matrix_elements)
+    if os.path.isfile('M33.RES'):
+        m33_res = parse_matrix_res('M33.RES')
+        add_res_to_dict('M3', m33_res, expt_dict, matrix_elements)
+
     # Calculate lifetimes and branching ratios
     ignore_g = True
     lifetime_threshold = 1e10 # set lifetime threshold to 317.1 yrs
@@ -142,7 +177,7 @@ def parse_dtm_res():
     br_ratios_df.to_csv(filename_br_ratios, index=False)
     lifetimes_df.to_csv(filename_lifetimes, index=False)
 
-def add_res_to_dict(matrix_element_type, res, lifetime_dict):
+def add_res_to_dict(matrix_element_type, res, expt_dict, lifetime_dict):
     
     # [conf1, term1, J1, conf2, term2, J2, matrix_element_value, energy1, energy2, wavelength, index1, index2])
     for line in res:
@@ -181,13 +216,25 @@ def add_res_to_dict(matrix_element_type, res, lifetime_dict):
         if match:
             continue
 
+        ht_to_cm = 219474.63 # hartree to cm-1
+
+        # replace energy with experimental value if available
+        if config1 in expt_dict:
+            energy1 = -expt_dict[config1]
+        else:
+            energy1 = energy1*ht_to_cm
+
+        if config2 in expt_dict:
+            energy2 = -expt_dict[config2]
+        else:
+            energy2 = energy2*ht_to_cm
+
         # matrix elementa
         matrix_element_val = float(line[6])
         
-        # recalculated wavelength for more precision
-        ht_to_cm = 219474.63 # hartree to cm-1
+        # recalculated wavelength with more precision
         try:
-            wavelength_nm = 1e7/(abs(energy2-energy1)*ht_to_cm) # in nm
+            wavelength_nm = 1e7/(abs(energy2-energy1)) # in nm
         except ZeroDivisionError:
             continue
         wavelength = wavelength_nm*10 # wavelength in angstroms
