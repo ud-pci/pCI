@@ -1429,6 +1429,7 @@ Contains
         Integer*8 :: mem, memsum, count
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
         Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Real(dp), Allocatable, Dimension(:) :: save_energies, save_J
         Character(Len=16)     :: memStr, npesStr, err_msg, err_msg2
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
@@ -1440,6 +1441,9 @@ Contains
         Allocate(ArrB2(Nd2,nlvs))
         Allocate(B1(Nd1),B2(Nd2))
         Allocate(Iarr2(Ne,Nd2))
+        Allocate(save_energies(nterm1f-nterm1+1), save_J(nterm1f-nterm1+1))
+        save_energies = 0_dp
+        save_J = 0_dp
 
         If (mype==0) Then
             ! Read in determinants of CONF1.DET
@@ -1554,6 +1558,8 @@ Contains
             lf=0
             iab2=0
             l2=0
+            save_energies(n1) = e1
+            save_J(n1) = tj1
             Do n2=n21,n22
                 l2=l2+1
                 lf=lf+1
@@ -1562,8 +1568,8 @@ Contains
                 e2=e2s(iab2)
                 tj2=tj2s(iab2)
 
-                ! Skip transition if states/energies are the same
-                If (e1 == e2 .and. tj1 == tj2) Cycle
+                ! Skip transition if state2 == state1, or state2 <-> state1 has already been accounted for
+                If (any(save_energies == e2) .and. any(save_J == tj2)) Cycle
                 
                 If (dabs(tj2-tj1) < 3.1d0) Then
                     Ro=0.d0
