@@ -1564,6 +1564,10 @@ Contains
                 B2(1:Nd2)=ArrB2(1:Nd2,iab2)
                 e2=e2s(iab2)
                 tj2=tj2s(iab2)
+
+                ! Skip transition if states/energies are the same
+                If (e1 == e2 .and. tj1 == tj2) Cycle
+                
                 If (dabs(tj2-tj1) < 3.1d0) Then
                     Ro=0.d0
                     imax=0
