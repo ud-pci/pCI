@@ -1161,7 +1161,7 @@ Contains
         Implicit None
         Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, err_stat, &
                    ic2, kx, n1, ic1, imin, n2, Ndpt, j1, j2, i1, iab2, l, &
-                   imax, nn, ntrm, ntrm1, start, End, mpierr, pgs0, pgs, pct, sizebin
+                   imax, nn, ntrm, ntrm1, start, end, mpierr, sizebin
         Integer :: npes,mype
         Integer*8 :: mem, memsum, count
         Real(dp) :: s, bn, bk, Tj, Etrm
@@ -1271,9 +1271,6 @@ Contains
             Else
                 n=sum(Ndc(1:start-1))
             End If
-            pgs0=sizebin/10
-            pgs=start+pgs0
-            pct=0
             Do ic1=start,end
                 n2 = Ndc(ic1)
                 Do n1=1,n2
@@ -1343,7 +1340,7 @@ Contains
     
         Deallocate(idet1,idet2)
         Return
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
 700     Write (*,*) 'FormDM: norma for vector ',ntr,' is ',s
         Return
         Return
@@ -1427,7 +1424,7 @@ Contains
         Implicit None
         Integer :: lf, imax, k, i, l1, l2, i1, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
-                  imin, n, n1, ndpt, n20, jt, iab2, start, end, pgs, pgs0, pct
+                  imin, n, n1, ndpt, n20, jt, iab2, start, end
         Integer :: mype, npes, mpierr, sizebin, err_stat, err_stat2
         Integer*8 :: mem, memsum, count
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
@@ -1572,9 +1569,6 @@ Contains
                     Ro=0.d0
                     imax=0
                     imin=1000
-                    pgs0=sizebin/10
-                    pgs=start+pgs0
-                    pct=0
                     Do n=start,end   !### - final state
                         Ndr=n
                         bn=B2(n)
