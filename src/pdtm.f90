@@ -617,7 +617,7 @@ Contains
         Integer, Allocatable, Dimension(:) :: Intg2
         Real (dp), Allocatable, Dimension(:) :: Rnt2
         Integer, Dimension(13) :: ki, ki2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Nsu=0              !### Nsu is used to eliminate integrals
         Do i=Nso+1,Nsp
             is=Nip(i)
@@ -682,7 +682,7 @@ Contains
         End If
 
         Return
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
 200     Open(13,file='DTM.INT',status='UNKNOWN',form='UNFORMATTED')
         Close(13,status='DELETE')
         Call Rint
@@ -767,7 +767,7 @@ Contains
         Real(dp) :: x, c3, s1, s2, w1, w2, w3, ga, gb, gab, dn, tab, Alfd, qe
         Real(dp), Dimension(IP6)  :: p, q, a, b, ro
         Real(dp), Dimension(10) :: rcut
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         MaxT=9     !## Max power in Taylor expansion at the origin
         If (Rnuc == 0.d0) Rnuc = 1.2D-13/0.529D-8*Anuc**0.33333d0
         !  >>>>>>>>>>>>>> ECP of the core <<<<<<<<<<<<<<<<<<
@@ -1025,7 +1025,7 @@ Contains
                 End If
             End Do
         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Write( 6,'(4X,"Nint=",I7," Nsu=",I3)') Nint,Nsu
         Write(11,'(4X,"Nint=",I7," Nsu=",I3)') Nint,Nsu
         Close(12)
@@ -1039,12 +1039,12 @@ Contains
         Real(dp) :: R1, R2, R3, T1, T2, F1, F2, F3, F21, F32, F321, &
                     C0, C1, C2, G, P1, P2, T, Q, HH, Gam
         Real(dp), intent(out) :: DS
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Gam=C(ii+4)
         IH=2-KT
         HH=H*IH/3.d0
         I0=IH+1
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         I1=1
         I2=I1+IH
         I3=I2+IH
@@ -1089,7 +1089,7 @@ Contains
         Implicit None
         Integer :: nna, na, la, ja, nnb, lb, jb, ir, nab1, nb
         Real(dp) :: dn, tab
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         nna=Nn(na)
         la=Ll(na)
         ja=Jj(na)
@@ -1715,6 +1715,7 @@ Contains
         Integer, Dimension(3*IPx) :: ind
         Integer, Dimension(IPx) :: i1, i2
         Character(Len=512) :: strfmt, strsp
+        
         ! tj1,tj2,tm1,Tm2 - TOTAL MOMENTA AND THEIR PROJECTIONS.
         imin1=imin+Npo
         imax1=imax+Npo
@@ -1753,7 +1754,7 @@ Contains
             Write (11,'(10(3X,I2,3X))') (i2(k)-i1(k)+1,k=1,kmax)
             Write (11,'(10(1X,3I2,1X))') (ind(k),ind(k+IPx),ind(k+2*IPx),k=1,kmax)
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ppl = 0.d0 !###  ppl  = TRACE OF TM,
         AE1 = 0.d0 !###  AE1  = REDUCED E1 AMPLITUDE IN L GAUGE
         AE1V= 0.d0 !###  AE1V = REDUCED E1 AMPLITUDE IN V GAUGE
@@ -2074,22 +2075,32 @@ Contains
         Implicit None
         Integer :: i, nspaces01, nspaces02, nspaces1, nspaces2
         Character(Len=128) :: strsp
+
         strsp = ''
         nspaces1 = 0
         nspaces2 = 0
 
-        Do i=1,nterm1f-nterm1+1
-            If (len(Trim(AdjustL(strc1(i)))) > nspaces1) nspaces1 = len(Trim(AdjustL(strc1(i))))
-        End Do
+        If (Kl1 == 1) Then
+            Do i=1,nterm2-nterm1+1
+                If (len(Trim(AdjustL(strc1(i)))) > nspaces1) nspaces1 = len(Trim(AdjustL(strc1(i))))
+            End Do
+        Else If (Kl1 == 2) Then
+            Do i=1,nterm1f-nterm1+1
+                If (len(Trim(AdjustL(strc1(i)))) > nspaces1) nspaces1 = len(Trim(AdjustL(strc1(i))))
+            End Do
 
-        Do i=1,nterm2f-nterm2+1
-            If (len(Trim(AdjustL(strc2(i)))) > nspaces2) nspaces2 = len(Trim(AdjustL(strc2(i))))
-        End Do   
+            Do i=1,nterm2f-nterm2+1
+                If (len(Trim(AdjustL(strc2(i)))) > nspaces2) nspaces2 = len(Trim(AdjustL(strc2(i))))
+            End Do
 
-        nspaces01 = nspaces1-1
-        nspaces02 = nspaces2-1
+            nspaces01 = nspaces1-1
+            nspaces02 = nspaces2-1
+        End If
+
+        
 
         If (existStr) Then
+            ! TM headers
             If (Keys%E1_L == 1 .and. Keys%E1_V == 1) Then
                 Write(100,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || E1 || conf2' // strsp(1:nspaces02) // 'trm2>   <J1||E1_L||J2>  <J1||E1_V||J2>      E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)         WL (nm)   Tr. Rate (1/s)'
             Else If (Keys%E1_L == 1) Then
@@ -2106,7 +2117,14 @@ Contains
             If (Keys%PNC == 1) Write(109,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || PNC || conf2' // strsp(1:nspaces02) // 'trm2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
             If (Keys%AM == 1) Write(110,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || AM || conf2' // strsp(1:nspaces02) // 'trm2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
             If (Keys%MQM == 1) Write(111,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 |  MQM | conf2' // strsp(1:nspaces02) // 'trm2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
+
+            ! DM headers
+            If (Keys%GF == 1) Write(112,'(A)') ' n   conf' // strsp(1:nspaces1) // 'term     gfactor      E_n (a.u.)'
+            If (Keys%gQED == 1) Write(113,'(A)') ' n   conf' // strsp(1:nspaces1) // 'term     gQED      E_n (a.u.)'
+            If (Keys%A_hf == 1) Write(106,'(A)') ' n   conf' // strsp(1:nspaces1) // 'term        A_hfs (MHz)         E_n (a.u.)'
+            If (Keys%B_hf == 1) Write(107,'(A)') ' n   conf' // strsp(1:nspaces1) // 'term        B_hfs (MHz)         E_n (a.u.)'
         Else
+            ! TM headers
             If (Keys%E1_L == 1 .and. Keys%E1_V == 1) Then
                 Write(100,'(A)') 'N1  ->  N2:  < J1      M1 || E1 ||  J2      M2>  <J1||E1_L||J2>  <J1||E1_V||J2>       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)         WL (nm)   Tr. Rate (1/s)'
             Else If (Keys%E1_L == 1) Then
@@ -2123,6 +2141,11 @@ Contains
             If (Keys%PNC == 1) Write(109,'(A)') 'N1  ->  N2:  < J1      M1 || PNC ||  J2      M2>    PNC (a.u.)      PNC (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
             If (Keys%AM == 1) Write(110,'(A)') 'N1  ->  N2:  < J1      M1 || AM ||  J2      M2>      AM (a.u)       AM (Hz)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
             If (Keys%MQM == 1) Write(111,'(A)') 'N1  ->  N2:  < J1      M1 || MQM ||  J2      M2>     MQM (a.u.)     MQM (Hz/e/cm**2)       E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
+            ! DM headers
+            If (Keys%GF == 1) Write(112,'(A)') ' n  J1       M1      gfactor      E_n (a.u.)'
+            If (Keys%gQED == 1) Write(113,'(A)') ' n  J1       M1      gQED      E_n (a.u.)'
+            If (Keys%A_hf == 1) Write(106,'(A)') ' n  J1       M1      A_hfs (MHz)            E_n (a.u.)'
+            If (Keys%B_hf == 1) Write(107,'(A)') ' n  J1       M1      B_hfs (MHz)            E_n (a.u.)'
         End If
 
     End Subroutine
@@ -2142,10 +2165,10 @@ Contains
         Real(dp), Dimension(IPx) :: pp
         Integer, Dimension(IPx) :: npp, lpp
         Character(Len=256) :: strfmt, strsp
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         imin1=imin+Npo
         imax1=imax+Npo
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         tj=Tj1        !### tj and tm -total momentum and its projection
         jt=tj+tj+0.1d0
         tj=jt/2.d0
@@ -2160,7 +2183,8 @@ Contains
         ! EACH SHELL ONLY Q.N. Jz CHANGES. k IS INDEX OF A SHELL
         k=0
         i=imin1
-500     k=k+1
+        Do While (i < imax1)
+            k=k+1
             no=Nh(i)
             ind(k)=Nn(no)
             ind(k+IPx)=Ll(no)
@@ -2170,7 +2194,7 @@ Contains
             i2(k)=i+(Jj(no)-Jz(i))/2
             If (i2(k) > imax1) i2(k)=imax1
             i=i2(k)+1
-        If (i < imax1) Goto 500
+        End Do
         kmax=k
         If (kmax > IPx) Then
             Write(*,*)' Dimension of reduced DM =',kmax,' > ',IPx
@@ -2181,7 +2205,7 @@ Contains
             Write (11,'(10(3X,I2,3X))') (i2(k)-i1(k)+1,k=1,kmax)
             Write (11,'(10(1X,3I2,1X))') (ind(k),ind(k+IPx),ind(k+2*IPx),k=1,kmax)
         End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         ppl=0.d0        !### = NUMBER OF ELECTRONS,
         G=0.d0          !### = G-FACTOR,
         A=0.d0          !### A,B - HFS CONSTANTS
@@ -2190,7 +2214,7 @@ Contains
         lk0=-1          ! lk0,nk0,ipp,xpp used to calculate
         nk0=-1          !!  occupation numbers for n,l shells
         ipp=0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         Do l1=1,3       !### loop for ranks 0,1,2:
             tl=l1-1
             c=Isgn((jt-mj)/2) * Fj3(tj,tl,tj,-tm,0.d0,tm)
@@ -2325,49 +2349,21 @@ Contains
         nspaces1 = nspaces1 - len(Trim(AdjustL(strc1(k1))))
 
         If (Keys%GF == 1) Then
-            If (ntrm == 1) Then
-                If (existStr) Then
-                    Write(112,'(A)') ' n   conf' // strsp(1:nspaces0) // 'term     gfactor      E_n (a.u.)'
-                Else
-                    Write(112,'(A)') ' n  J1       M1      gfactor      E_n (a.u.)'
-                End If
-            End If
             strfmt = '(I2,2X,A,3X,A,4X,F8.5,5X,F10.5)'
             Write(112,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), G, Etrm
         End If
 
         If (Keys%A_hf == 1) Then
-            If (ntrm == 1) Then
-                If (existStr) Then
-                    Write(106,'(A)') ' n   conf' // strsp(1:nspaces0) // 'term        A_hfs (MHz)         E_n (a.u.)'
-                Else
-                    Write(106,'(A)') ' n  J1       M1      A_hfs (MHz)            E_n (a.u.)'
-                End If
-            End If
             strfmt = '(I2,2X,A,3X,A,4X,E15.8,8X,F10.5)'
             Write(106,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), A, Etrm
         End If
 
         If (Keys%B_hf == 1) Then
-            If (ntrm == 1) Then
-                If (existStr) Then
-                    Write(107,'(A)') ' n   conf' // strsp(1:nspaces0) // 'term        B_hfs (MHz)         E_n (a.u.)'
-                Else
-                    Write(107,'(A)') ' n  J1       M1      B_hfs (MHz)            E_n (a.u.)'
-                End If
-            End If
             strfmt = '(I2,2X,A,3X,A,4X,E15.8,8X,F10.5)'
             Write(107,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), B, Etrm
         End If
 
         If (Keys%gQED == 1) Then
-            If (ntrm == 1) Then
-                If (existStr) Then
-                    Write(113,'(A)') ' n   conf' // strsp(1:nspaces0) // 'term     gQED      E_n (a.u.)'
-                Else
-                    Write(113,'(A)') ' n  J1       M1      gQED      E_n (a.u.)'
-                End If
-            End If
             strfmt = '(I2,2X,A,3X,A,4X,F8.5,5X,F10.5)'
             Write(113,strfmt) k1, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), gQ, Etrm
         End If
@@ -2376,12 +2372,12 @@ Contains
     End Subroutine RdcDM
 
     Subroutine DM_out(ntrm,kmax,ind,i1)  
-        ! this Subroutine opens the file DM0.RES and Writes Rro
+        ! this subroutine opens the file DM0.RES and Writes Rro
         Implicit None
         Integer :: ntrm, kmax, k, i
         Integer, Dimension(3*IPx) :: ind
         Integer, Dimension(IPx) :: i1, no
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         If (Kdm < 1) Return
         If (Kdm == 1) Then
             Kdm=2
