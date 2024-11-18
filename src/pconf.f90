@@ -202,8 +202,7 @@ Contains
         Call ReadCiIn
         
         If (K_is == 2.OR.K_is == 4) Then
-            Read(99,*) K_sms
-            Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+            Write( 6,'(/4X,"K_sms = (1-1el,2-2el,3-both) ",I1)') K_sms
             If ((K_sms-1)*(K_sms-2)*(K_sms-3) /= 0) Stop
         End If
 

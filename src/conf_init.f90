@@ -192,7 +192,7 @@ Module conf_init
                 Case('K_sms')
                     ! SMS to include 1-e (1), 2-e (2), or both (3)
                     Read(val, *) K_sms
-                    Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+                    ! Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
                 End Select
             End If
         End Do

@@ -216,7 +216,7 @@ Contains
         Implicit None
 
         Character(Len=1), Dimension(6) :: Let
-        Character(Len=4), Dimension(14) :: Alet
+        Character(Len=4), Dimension(15) :: Alet
         Character(Len=4), Dimension(5) :: Blet
         Character(Len=4), Dimension(2) :: yes*3, chm1
 
@@ -240,7 +240,8 @@ Contains
         Alet(11)='E3  '
         Alet(12)='M2  '
         Alet(13)='M3  '
-        Alet(14)='gQED'
+        Alet(14)='gQ_P'
+        Alet(15)='gQ_Q'
 
         Blet(1)= 'Rint'
         Blet(2)= 'RPA1'
@@ -727,7 +728,7 @@ Contains
                     ! M1-amplitude  (K_M1 /= 1)
                     If (K_M1 /= 1) cnt=cnt+1
 
-                    ! g-factor, gQED, Dipole HFS
+                    ! gQED (gQ_P and gQ_Q), Dipole HFS
                     cnt=cnt+3
 
                     ! Quadrupole HFS and E2 amplitude
