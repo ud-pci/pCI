@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2024-11-17
+- refactored IP1 parameter out of pdtm.f90 and removed IP1 array size warnings
+- fixed formatting of Operator.RES files produced by pdtm
+- pdtm now skips transitions that have already been accounted for, e.g. b -> a is skipped if a -> b was done
+- introduced AllReduceD subroutine in mpi_utils.f90 to handle MPI_AllReduce for double precision
+- updated theory_lifetimes.py script to handle multiple input files
+- updated gen_job_script.py script to use scontrol show config to determine cluster information if using SLURM
+- fixed bug in reading K_sms
+- optimized gQED calculation
+
 ## [1.0.6] - 2024-10-30
 - refactored IPbr parameter out of params.f90
 - removed IPx dependency from pconf
