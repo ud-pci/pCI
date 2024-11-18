@@ -19,7 +19,7 @@ Module mpi_utils
     
     Private
     
-    Public :: BroadcastI, BroadcastR, BroadcastD, AllReduceI, AllReduceR
+    Public :: BroadcastI, BroadcastR, BroadcastD, AllReduceI, AllReduceR, AllReduceD
 
     Integer, Parameter :: MaxStride8Byte = 134217728
     
@@ -255,5 +255,50 @@ Module mpi_utils
             End If
         End If
     End Subroutine AllReduceR
+
+    Subroutine AllReduceD(buffer, count, stride, op, comm, mpierr)
+        Use mpi_f08
+        Implicit None
+
+        EXTERNAL :: GetEnv
+        Type(MPI_Comm), Intent(In)                     :: comm
+        Type(MPI_Op), Intent(In)                       :: op
+        Integer(Kind=int64), Intent(In)                :: count
+        Integer, Intent(In)                            :: stride
+        Real(dp), Dimension(*), Intent(InOut)          :: buffer
+        Integer, Intent(InOut)                         :: mpierr
+        Character(Len=255)                             :: envvar
+        Integer(Kind=int64)                            :: count_remain, i
+        Integer                                        :: count_remain2, use_stride
+
+        If (stride .le. 0) Then
+            Call GetEnv('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i)') use_stride
+            If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
+        Else
+            use_stride = stride
+        End If
+        If (stride .gt. MaxStride8Byte * 2) use_stride = MaxStride8Byte * 2
+        count_remain = count
+        i = 1_int64
+        mpierr = 0
+        Do While (count_remain .gt. use_stride)
+            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+use_stride), use_stride, MPI_DOUBLE_PRECISION, op, comm, mpierr) 
+            If (mpierr .ne. 0 ) Then
+                Write(*,*) 'Failure reducing real range ',i,':',i+use_stride
+                Return
+            End If
+            count_remain = count_remain - use_stride
+            i = i + use_stride
+        End Do
+        If (count_remain .gt. 0) Then
+            count_remain2 = count_remain
+            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+count_remain2), count_remain2, MPI_DOUBLE_PRECISION, op, comm, mpierr) 
+            If (mpierr .ne. 0 ) Then
+                Write(*,*) 'Failure reducing real range ',i,':',i+use_stride
+                Return
+            End If
+        End If
+    End Subroutine AllReduceD
 
 End Module mpi_utils

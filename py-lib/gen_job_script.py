@@ -7,9 +7,14 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     This function writes a SLURM job script and returns the name of the job script.
     """
     
-    # Determine cluster information from SLURM_CLUSTER_NAME
-    cluster = os.getenv('SLURM_CLUSTER_NAME')
-    if not cluster:
+    # Determine cluster information from 'scontrol show config'
+    try:
+        scontrol_output = run(['scontrol','show','config'], capture_output=True, text=True, check=True)
+        for line in scontrol_output.stdout.splitlines():
+            if line.startswith('ClusterName'):
+                cluster = line.split('=')[1].strip()
+                print("Cluster found: " +  cluster)
+    except (CalledProcessError, FileNotFoundError):
         print("SLURM_CLUSTER_NAME environment variable not found. Job script will not be written.")
         return None
     
