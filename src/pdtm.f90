@@ -760,7 +760,7 @@ Contains
 
     Subroutine Rint     
         Use wigner
-        ! this Subroutine calculates radial integrals for one-electron operators
+        ! this subroutine calculates radial integrals for one-electron operators
         Implicit None
         Integer :: kab, na, nb, ja, jb, la, lb, i, in, nmin, ih, k, &
                   lg, lbs, is, las, ip, jab, n12
@@ -2096,8 +2096,6 @@ Contains
             nspaces01 = nspaces1-1
             nspaces02 = nspaces2-1
         End If
-
-        
 
         If (existStr) Then
             ! TM headers
