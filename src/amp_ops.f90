@@ -13,7 +13,7 @@ Module amp_ops
     !       AE3  = REDUCED E3 AMPLITUDE
     !       AM2  = REDUCED M2 AMPLITUDE
     !       AM3  = REDUCED M3 AMPLITUDE
-    !       gQED = REDUCED gfactor QED AMPLITUDE
+    !       gQED = REDUCED AMPLITUDE for QED correction to g factor 
     Use params
     Implicit None
 
@@ -26,7 +26,7 @@ Module amp_ops
     Integer, Allocatable, Dimension(:), Public      :: Intg
     Real(dp), Allocatable, Dimension(:), Public     :: Rnt
     Real(dp), Public :: AE1V
-    Character(Len=4), Dimension(14), Public :: Alet
+    Character(Len=4), Dimension(15), Public :: Alet
     Character(Len=1), Dimension(6), Public :: Let
 
   Contains 
@@ -347,28 +347,29 @@ Module amp_ops
 
 
     Real(dp) function gQED(Ro, nk,xjk,lk, nl,xjl,ll)   
-        ! this function calculates electric quadrupole hyperfine structure constant <k|B|l>
+        ! this function calculates matrix element for QED correction to g factor <k||beta Sigma_z||l>
         Use wigner    
         Implicit None
-        Integer :: nk, nl, lk, ll, lkbar, llbar, kd1, kd2, is, k
-        Real(dp) :: Ro, G, G1, G2, xjk, xjl, xll
-            kd1 = 0 
-            if (lk == ll) kd1 = 1
-            kd2 = 0
-            lkbar = 2*xjk-lk
-            llbar = 2*xjl-ll
-            if (lkbar == llbar) kd2 = 1
-            G1=Ro*Fint(14,nk,nl,+1)*kd1
-            G2=Ro*Fint(15,nk,nl,+1)*kd2            
+        Integer :: nk, nl, lk, ll, kpl, kpk, is, k
+        Real(dp) :: Ro, G, G1, G2, xjk, xjl
+            G=0.d0
+            G1=Ro*Fint(14,nk,nl,+1)
+            G2=Ro*Fint(15,nk,nl,+1)           
             If ((G1 /= 0.d0).or.(G2 /= 0.d0)) Then
               is = 1
-              k=xjk+lk+1.51d0
+              k=xjl+0.51d0
               If (k /= 2*(k/2)) is=-is
-              xll=ll
-              G=is*dsqrt(6*(2*xjk+1)*(2*xjl+1)) &
-                 *(Fj6(xjk,1.d0,xjl,0.5d0,xll,0.5d0)*G1 &
-                  +Fj6(xjk,1.d0,xjl,0.5d0,2.d0*xjl-xll,0.5d0)*G2)
-              If (Kl == 1) Call AmpOut(14,Ro,nl,nk,xjl,xjk,ll,lk,G)
+              kpk=(lk-xjk)*(2*xjk+1)
+              kpl=(ll-xjl)*(2*xjl+1)  
+              G1=G1*(kpk+kpl-1)*is*dsqrt((2*xjk+1)*(2*xjl+1)) & 
+                *Fj3(xjk,xjl,1.d0,0.5d0,-0.5d0,0.d0)
+              G2=G2*(kpk+kpl+1)*is*dsqrt((2*xjk+1)*(2*xjl+1)) & 
+                *Fj3(xjk,xjl,1.d0,0.5d0,-0.5d0,0.d0)
+              G=G1+G2  
+              If (Kl == 1) Then
+                Call AmpOut(14,Ro,nl,nk,xjl,xjk,ll,lk,G1)
+                Call AmpOut(15,Ro,nl,nk,xjl,xjk,ll,lk,G2)
+              End If  
             End If
             gQED=G
         Return
