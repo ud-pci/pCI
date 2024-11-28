@@ -1,13 +1,14 @@
 Program bass
     Use basc_variables, Kbasparam => Kbas, Qqparam => Qq, letparam => let, Rint2param => Rint2
     Use readfff
+    Use utils, Only : DetermineRecordLength
     Implicit None
     
-    Integer :: irec, Nsint, Kdg, Ksg, Khf, Kkin, Ierr, Norb, Nsv, ni, iort, i, n,  &
+    Integer :: irec, Nsint, Kdg, Ksg, Khf, Kkin, Ierr, Norb, Nsv, ni, iort, i, n, &
                 nlst, nr, nmin, idg, ier_A, n11, n1, j1, n3, j3, n4, j4, n5, j5, l, ii3, Ns3
     Real(dp) :: Sf, Emin, Emax
 
-    Logical :: intrpl
+    Logical :: intrpl, success
     Integer, Dimension(IPs) :: Jj3, Nn3, Ll3
     Integer, Dimension(IPs) :: kw, numw, nb, jjw ! PW
     Integer, Allocatable, Dimension(:) :: Kbas
@@ -30,11 +31,15 @@ Program bass
     R3=0_dp
     V3=0_dp
 
-    call recunit
-    IPmr=1           ! word length in direct access files
+    Call DetermineRecordLength(Mrec, success)
+    If (.not. success) Then
+        Write(*,*) 'ERROR: record length could not be determined'
+        Stop
+    End If
+
     MaxT=9           !### length of expansion at the origin
     kout=1           !### output details
-    irec=2*IP6*IPmr  !### record length in DAT files
+    irec=2*IP6*Mrec  !### record length in DAT files
     small=1.d-8
     FNAME='BAS_A.DAT'
     Kt1=0            !### used as Kt for Breit integrals
@@ -233,41 +238,6 @@ Contains
         end do
     End Function N_orb
 
-    Subroutine recunit
-        ! Determination of the record unit.
-        Implicit None
-        
-        Integer :: lrec, iflag, ipmr, nbytes
-        Character(Len=8) :: d1,t1,d2,t2
-
-        t1='abcdefgh'
-        d1='        '
-        t2='hgfedcba'
-        d2='        '
-        lrec=0
-        iflag=1
-200     lrec=lrec+1
-        if (lrec.gt.8) then
-          write(*,*)  'lrec > 8'
-          stop
-        end if
-        open(unit=13,file='test.tmp',status='unknown',access='direct',recl=lrec)
-        write(13,rec=1,err=210) t1
-        write(13,rec=2,err=210) t2
-        read(13,rec=1,err=210) d1
-        read(13,rec=2,err=210) d2
-        if (d1.ne.t1) goto 210
-        if (d2.ne.t2) goto 210
-        iflag=0
-210     close(unit=13,status='delete')
-        if (iflag.ne.0) goto 200
-        nbytes=8/lrec
-        ipmr=4/nbytes
-
-        Return
-
-    End Subroutine recunit
-
     Subroutine Input
         Use conf_init, Only : inpstr
         Implicit None
@@ -456,7 +426,7 @@ Contains
         Mj=2*dabs(Jm)+0.01d0
         Qw=0_dp
 
-        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file HFD.DAT is absent"/)'
             Write( *,strfmt)
@@ -616,7 +586,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file=FNAME,status='UNKNOWN',access='DIRECT',recl=2*IP6*IPmr)
+        Open(13,file=FNAME,status='UNKNOWN',access='DIRECT',recl=2*IP6*Mrec)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -648,7 +618,7 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        open(12,file=FNAME,status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+        open(12,file=FNAME,status='OLD',access='DIRECT',recl=2*IP6*Mrec)
         Ecore=0.d0
         Hcore=0.d0
         ih=2-kt
@@ -965,7 +935,8 @@ Contains
     Subroutine Sint(ds)
         Implicit None
         Integer :: ih, i0, i1, i2, i3, i
-        Real(dp) :: h1, v0, r0, gam, r1, rr2, r3, t0, p0, f0, g, f1, f2, f3, f21, f32, f321, c0, c1, c2, dt, f, s, t, ds, q, hh, p1, p2, t1, t2
+        Real(dp) :: h1, v0, r0, gam, r1, rr2, r3, t0, p0, f0, g, f1, f2, f3, f21, f32, f321, &
+                    c0, c1, c2, dt, f, s, t, ds, q, hh, p1, p2, t1, t2
 
         gam=c(ii+4)
         ih=2-kt
@@ -1487,7 +1458,7 @@ Contains
         sg=0.d0               !### ME of Sigma
         br=0.d0               !### Breit ME
         nx = ns - Nsv + 1     !### parameter for indexation of integrals
-        irec=2*IP6*IPmr
+        irec=2*IP6*Mrec
         open(12,file=FNAME,status='OLD',access='DIRECT',recl=irec)
         open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=irec)
         call ReadF (12,1,Pa,Qa,2)
@@ -1620,13 +1591,14 @@ Contains
         Implicit None
 
         Integer :: Norb, iw, kcg, ksin, nj, nnj, llj, kkj, i1, n1, l1, kbk, nbk, &
-                    nnk, llk, jjk, kkk, nk, m1, mx, if, longbasis, itail, lort, nim, &
+                    nnk, llk, jjk, kkk, nk, m1, mx, if, itail, lort, nim, &
                     iwx, jjj, j1
         Real(dp) :: gj, qn
         Integer, Dimension(4*IPs) :: Iqn
         Real(dp), Dimension(IPs) :: Qq1
         Real(dp), Dimension(4*IP6) :: PQ
         Real(dp), Dimension(IP6) :: A, B, P, Q
+        Logical :: longbasis
 
         Character(Len=256) :: strfmt
         
@@ -1861,7 +1833,7 @@ Contains
         zmax=1.d-2                !### max |H_ik/(E_i-E_k)| gor idg=2
         trd=1.d-8                 !### convergence threshold
         nw=0
-        irec=2*IP6*IPmr
+        irec=2*IP6*Mrec
         nmin=Nsv+1
         nmin=max(nmin,N_orb(n1,ch1,j1)) !### define diagonalization domain
                                         !### if kdg=0, then energies are
@@ -2419,7 +2391,7 @@ Contains
         ! res - max residue
         Implicit None
 
-        Integer :: nd, nd1, nzx, k
+        Integer :: nd, nd1, nzx, k, n
         Real(dp) :: res, res1, s, e, zx, xk, a, a2, xd
         Real(dp), Dimension(nd1) :: D, X
         Real(dp), Dimension(nd1,nd1) :: H, Z
@@ -2553,7 +2525,7 @@ Contains
   
         write(*,*) ' Give file name for additional orbitals: '
         read(*,'(A12)') FNAME3
-        open(16,file=FNAME3,access='DIRECT',status='OLD',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        open(16,file=FNAME3,access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             write( *,*) ' No file ',FNAME3
             write(11,*) ' No file ',FNAME3
