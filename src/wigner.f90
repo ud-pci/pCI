@@ -5,296 +5,334 @@ Module wigner
     Implicit None
 
     Private
-
-    Real(dp), Public :: ALL
     
-    Public :: FJ3, FJ6, FJ9, DELFJ, NGFJ, OBME, PORAD
+    Public :: FJ3, FJ6, FJ9, DELFJ, NGFJ, swap, sortArray
 
   Contains
 
-    Real(dp) Function FJ3(A1,A2,A3,A4,A5,A6)
-      Implicit None
+    Real(dp) Function FJ3(a1, a2, a3, a4, a5, a6)
+        Implicit None
 
-      Integer                  :: K, L, KU, KM
-      Real(dp)                 :: A1, A2, A3, A4, A5, A6, EPS, UN
-      Real(dp), Dimension(9)   :: X
-      Integer, Dimension(9)    :: LU, LI
-      Real(dp), Dimension(3)   :: Y, Z
-      Integer, Dimension(3)    :: MA, NA
+        Real(dp), Intent(In) :: a1, a2, a3, a4, a5, a6
 
-      IF(dABS(A4+A5+A6)-0.0001_dp) 20,2,2
-20    X(1)=A1+A2-A3
-      X(2)=A1-A2+A3
-      X(3)=-A1+A2+A3
-      X(4)=A1+A4
-      X(5)=A1-A4
-      X(6)=A2+A5
-      X(7)=A2-A5
-      X(8)=A3+A6
-      X(9)=A3-A6
-      EPS=0.0001_dp
-      X=ANINT(X*100.0)/100.0
-      DO 1 K=1,9
-      IF(X(K)) 2,3,3
-3     LU(K)=X(K)
-      IF(dABS(LU(K)-X(K))-EPS) 1,2,2
-1     CONTINUE
-      GO TO  4
-2     FJ3=0._dp
-      GO TO 5
-4     Y(1)=A1+A2-A3
-      Y(2)=A1-A4
-      Y(3)=A2+A5
-      Y=ANINT(Y*100.0)/100.0
-      Z(1)=0._dp
-      Z(2)=-A3+A2-A4
-      Z(3)=-A3+A1+A5
-      Z=ANINT(Z*100.0)/100.0
-      DO 6 K=1,3
-      MA(K)=Y(K)
-      NA(K)=Z(K)
-      IF(dABS(MA(K)-Y(K))-EPS) 7,2,2
-7     IF(dABS(NA(K)-Z(K))-EPS) 6,2,2
-6     CONTINUE
-      CALL PORAD(MA,3)
-      CALL PORAD(NA,3)
-      IF(MA(1)) 2,8,8
-8     IF(MA(1)-NA(3)) 2,9,9
-9     LI(1)=A1+A2+A3+1._dp
-      DO 10 K=1,2
-      LI(K+1)=MA(K+1)-MA(1)
-      LI(K+3)=MA(K+1)-MA(1)
-      LI(K+5)=NA(3)-NA(K)
-10    LI(K+7)=NA(3)-NA(K)
-      CALL PORAD(LU,9)
-      CALL PORAD(LI,9)
-      ALL=0._dp
-      DO 11 K=1,9
-      IF(LU(K)-LI(K)) 12,11,13
-12    CALL NGFJ(-1,LU(K),LI(K))
-      GO TO 11
-13    CALL NGFJ(1,LI(K),LU(K))
-11    CONTINUE
-      FJ3=0._dp
-      UN=ALL/2
-      KM=MA(1)-NA(3)+1
-      DO 14 KU=1,KM
-      K=NA(3)+KU-1
-      ALL=0._dp
-      CALL NGFJ(-1,0,MA(1)-K)
-      CALL NGFJ(-1,MA(2)-MA(1),MA(2)-K)
-      CALL NGFJ(-1,MA(3)-MA(1),MA(3)-K)
-      CALL NGFJ(-1,0,K-NA(3))
-      CALL NGFJ(-1,NA(3)-NA(1),K-NA(1))
-      CALL NGFJ(-1,NA(3)-NA(2),K-NA(2))
-      L=K+A1-A2-A6
-14    FJ3=FJ3+(-1)**L*dEXP(ALL)
-      FJ3=dEXP(UN)*FJ3
-5     CONTINUE
-      RETURN
+        Integer :: k, l, ku, km
+        Real(dp) :: eps, un, all
+        Real(dp), Dimension(9) :: x
+        Integer, Dimension(9) :: lu, li
+        Real(dp), Dimension(3) :: y, z
+        Integer, Dimension(3) :: ma, na
+
+        eps = 0.0001_dp
+
+        If (dabs(a4 + a5 + a6) >= eps) Then
+            fj3 = 0_dp
+            Return
+        End If
+
+        x(1) = a1 + a2 - a3
+        x(2) = a1 - a2 + a3
+        x(3) = -a1 + a2 + a3
+        x(4) = a1 + a4
+        x(5) = a1 - a4
+        x(6) = a2 + a5
+        x(7) = a2 - a5
+        x(8) = a3 + a6
+        x(9) = a3 - a6
+        x = Anint(x * 100_dp) / 100_dp
+        
+        Do k = 1, 9
+            If (x(k) < 0_dp) Then
+                fj3 = 0_dp
+                Return
+            Else
+                lu(k) = Int(x(k))
+                If (dabs(lu(k) - x(k)) >= eps) Then
+                    fj3 = 0.0_dp
+                    Return
+                End If
+            End If
+        End Do
+        
+        y(1) = a1 + a2 - a3
+        y(2) = a1 - a4
+        y(3) = a2 + a5
+        y = Anint(y * 100_dp) / 100_dp
+        
+        z(1) = 0_dp
+        z(2) = -a3 + a2 - a4
+        z(3) = -a3 + a1 + a5
+        z = Anint(z * 100_dp) / 100_dp
+        
+        DO k = 1, 3
+            ma(k) = Int(y(k))
+            na(k) = Int(z(k))
+            If (dabs(ma(k) - y(k)) >= eps .or. dabs(na(k) - z(k)) >= eps) Then
+                fj3 = 0.0_dp
+                Return
+            End If
+        End Do
+        
+        Call sortArray(ma, 3)
+        Call sortArray(na, 3)
+        
+        If (ma(1) < 0 .or. ma(1) < na(3)) Then
+            fj3 = 0.0_dp
+            Return
+        End If
+        
+        li(1) = a1 + a2 + a3 + 1_dp
+        Do k = 1, 2
+            li(k + 1) = ma(k + 1) - ma(1)
+            li(k + 3) = ma(k + 1) - ma(1)
+            li(k + 5) = na(3) - na(k)
+            li(k + 7) = na(3) - na(k)
+        End Do
+        
+        Call sortArray(lu, 9)
+        Call sortArray(li, 9)
+        
+        all = 0_dp
+        Do k = 1, 9
+            If (lu(k) /= li(k)) Then
+                If (lu(k) > li(k)) Then
+                    Call NGFJ(1, li(k), lu(k), all)
+                Else
+                    Call NGFJ(-1, lu(k), li(k), all)
+                End If
+            End If
+        End Do
+        
+        un = all / 2_dp
+        km = ma(1) - na(3) + 1
+
+        fj3 = 0.0_dp
+        Do ku = 1, km
+            k = na(3) + ku - 1
+            all = 0.0_dp
+            Call NGFJ(-1, 0, ma(1) - k, all)
+            Call NGFJ(-1, ma(2) - ma(1), ma(2) - k, all)
+            Call NGFJ(-1, ma(3) - ma(1), ma(3) - k, all)
+            Call NGFJ(-1, 0, k - na(3), all)
+            Call NGFJ(-1, na(3) - na(1), k - na(1), all)
+            Call NGFJ(-1, na(3) - na(2), k - na(2), all)
+            l = k + a1 - a2 - a6
+            fj3 = fj3 + (-1)**l * dexp(all)
+        End Do
+        
+        fj3 = dexp(un) * fj3
+
     End Function FJ3
 
-    Real(dp) Function FJ6(A1,A2,A3,A4,A5,A6)
-      Implicit None
+    Real(dp) Function FJ6(a1, a2, a3, a4, a5, a6)
+        Implicit None
 
-      Integer                 :: K, L, KM
-      Real(dp)                :: EPS, A1, A2, A3, A4, A5, A6
-      Real(dp)                :: X1, X2, X3, X4, Y1, Y2, Y3, UN
-      Integer, Dimension(4)   :: MA
-      Integer, Dimension(3)   :: NA
-      Real(dp), Dimension(12) :: X
-      Integer, Dimension(13)  :: LU, LI
+        Real(dp), Intent(In) :: a1, a2, a3, a4, a5, a6
 
-      X1=A1+A2+A3
-      X2=A1+A5+A6
-      X3=A4+A2+A6
-      X4=A4+A5+A3
-      Y1=A1+A2+A4+A5
-      Y2=A2+A3+A5+A6
-      Y3=A3+A1+A6+A4
-      EPS=0.0001_dp
-      MA(1)=X1+EPS
-      MA(2)=X2+EPS
-      MA(3)=X3+EPS
-      MA(4)=X4+EPS
-      NA(1)=Y1+EPS
-      NA(2)=Y2+EPS
-      NA(3)=Y3+EPS
-      IF(dABS(MA(1)-X1)-EPS) 20,12,12
-20    IF(dABS(MA(2)-X2)-EPS) 21,12,12
-21    IF(dABS(MA(3)-X3)-EPS) 22,12,12
-22    IF(dABS(MA(4)-X4)-EPS) 23,12,12
-23    IF(dABS(NA(1)-Y1)-EPS) 24,12,12
-24    IF(dABS(NA(2)-Y2)-EPS) 25,12,12
-25    IF(dABS(NA(3)-Y3)-EPS) 26,12,12
-26    GO TO 10
-12    FJ6=0._dp
-      GO TO 11
-10    CALL PORAD(MA,4)
-      CALL PORAD(NA,3)
-      IF(MA(4)-NA(1)) 27,27,12
-27    X(1)=A1+A2-A3
-      X(2)=A1-A2+A3
-      X(3)=-A1+A2+A3
-      X(4)=A1+A5-A6
-      X(5)=A1-A5+A6
-      X(6)=-A1+A5+A6
-      X(7)=A4+A2-A6
-      X(8)=A4-A2+A6
-      X(9)=-A4+A2+A6
-      X(10)=A4+A5-A3
-      X(11)=A4-A5+A3
-      X(12)=-A4+A5+A3
-      X=ANINT(X*100.0)/100.0
-      ALL=0._dp
-      DO 1 K=1,12
-      IF(X(K)) 12,1,1
-1     LU(K)=X(K)+EPS
-      LU(13)=MA(4)+1
-      DO 2 K=1,3
-      LI(K)=MA(K)+1
-      LI(3+K)=MA(4)-MA(K)
-2     LI(6+K)=LI(3+K)
-      DO 3 K=1,2
-      LI(9+K)=NA(K+1)-NA(1)
-3     LI(11+K)=LI(9+K)
-      CALL PORAD(LU,13)
-      CALL PORAD(LI,13)
-      ALL=0._dp
-      DO 4 K=1,13
-      IF(LU(K)-LI(K)) 5,4,7
-5     CALL NGFJ(-1,LU(K),LI(K))
-      GO  TO  4
-7     CALL NGFJ(1,LI(K),LU(K))
-4     CONTINUE
-      FJ6=0._dp
-      UN=ALL/2
-      KM=NA(1)-MA(4)+1
-      DO 6 L=1,KM
-      K=MA(4)+L-1
-      ALL=0._dp
-      CALL NGFJ(1,MA(4)+1,K+1)
-      CALL NGFJ(-1,MA(4)-MA(1),K-MA(1))
-      CALL NGFJ(-1,MA(4)-MA(2),K-MA(2))
-      CALL NGFJ(-1,MA(4)-MA(3),K-MA(3))
-      CALL NGFJ(-1,0,K-MA(4))
-      CALL NGFJ(-1,0,NA(1)-K)
-      CALL NGFJ(-1,NA(2)-NA(1),NA(2)-K)
-      CALL NGFJ(-1,NA(3)-NA(1),NA(3)-K)
-      FJ6=FJ6+(-1)**K*dEXP(ALL)
-6     CONTINUE
-      FJ6=dEXP(UN)*FJ6
-11    RETURN
+        Integer :: k, l, km
+        Real(dp) :: eps, x1, x2, x3, x4, y1, y2, y3, un, all
+        Integer, Dimension(4) :: ma
+        Integer, Dimension(3) :: na
+        Real(dp), Dimension(12) :: x
+        Integer, Dimension(13) :: lu, li
+
+        fj6 = 0.0_dp
+
+        x1 = a1 + a2 + a3
+        x2 = a1 + a5 + a6
+        x3 = a4 + a2 + a6
+        x4 = a4 + a5 + a3
+        y1 = a1 + a2 + a4 + a5
+        y2 = a2 + a3 + a5 + a6
+        y3 = a3 + a1 + a6 + a4
+
+        eps = 0.0001_dp
+        ma(1) = x1 + eps
+        ma(2) = x2 + eps
+        ma(3) = x3 + eps
+        ma(4) = x4 + eps
+        na(1) = y1 + eps
+        na(2) = y2 + eps
+        na(3) = y3 + eps
+
+        If (Any(dabs(ma - [x1, x2, x3, x4]) >= eps) .or. &
+            Any(dabs(na - [y1, y2, y3]) >= eps)) Return
+
+        Call sortArray(ma, 4)
+        Call sortArray(na, 3)
+
+        If (ma(4) > na(1)) Return
+        
+        x(1) = a1 + a2 - a3
+        x(2) = a1 - a2 + a3
+        x(3) = -a1 + a2 + a3
+        x(4) = a1 + a5 - a6
+        x(5) = a1 - a5 + a6
+        x(6) = -a1 + a5 + a6
+        x(7) = a4 + a2 - a6
+        x(8) = a4 - a2 + a6
+        x(9) = -a4 + a2 + a6
+        x(10) = a4 + a5 - a3
+        x(11) = a4 - a5 + a3
+        x(12) = -a4 + a5 + a3
+        x = Anint(x * 100_dp) / 100_dp
+
+        Do k = 1, 12
+            If (x(k) >= 0) lu(k) = x(k) + eps
+        End Do
+        lu(13) = ma(4) + 1
+        li(1:3) = ma(1:3) + 1
+        li(4:6) = ma(4) - ma(1:3)
+        li(7:9) = li(4:6)
+        li(10:11) = na(2:3) - na(1)
+        li(12:13) = li(10:11)
+
+        Call sortArray(lu, 13)
+        Call sortArray(li, 13)
+
+        all = 0._dp
+        Do k = 1, 13
+            If (lu(k) /= li(k)) Then
+                If (lu(k) < li(k)) Then
+                    Call NGFJ(-1, lu(k), li(k), all)
+                Else
+                    Call NGFJ(1, li(k), lu(k), all)
+                End If
+            End If
+        End Do
+    
+        un = all / 2_dp
+        km = na(1) - ma(4) + 1
+        Do l = 1, km
+            k = ma(4) + l - 1
+            all = 0_dp
+            Call NGFJ(1, ma(4) + 1, k + 1, all)
+            Call NGFJ(-1, ma(4) - ma(1), k - ma(1), all)
+            Call NGFJ(-1, ma(4) - ma(2), k - ma(2), all)
+            Call NGFJ(-1, ma(4) - ma(3), k - ma(3), all)
+            Call NGFJ(-1, 0, k - ma(4), all)
+            Call NGFJ(-1, 0, na(1) - k, all)
+            Call NGFJ(-1, na(2) - na(1), na(2) - k, all)
+            Call NGFJ(-1, na(3) - na(1), na(3) - k, all)
+            fj6 = fj6 + (-1)**k * dexp(all)
+        End Do
+    
+        fj6 = dexp(un) * fj6
     End Function FJ6
 
-    Real(dp) Function FJ9(A11,A12,A13,A21,A22,A23,A31,A32,A33)
-      Implicit None
+    Real(dp) Function FJ9(a11, a12, a13, a21, a22, a23, a31, a32, a33)
+        Implicit None
 
-      Integer                :: N, M
-      Real(dp)               :: A11, A12, A13, A21, A22, A23, A31, A32, A33
-      Real(dp)               :: X, Y, A, K, D
-      Real(dp), Dimension(3) :: UP, DOUN
+        Real(dp), Intent(In) :: a11, a12, a13, a21, a22, a23, a31, a32, a33
 
-      CALL DELFJ(A11,A12,A13,N)
-      GO TO(10,3),N
-10    CALL DELFJ(A21,A22,A23,N)
-      GO TO(11,3),N
-11    CALL DELFJ(A31,A32,A33,N)
-      GO TO(12,3),N
-12    CALL DELFJ(A11,A21,A31,N)
-      GO TO(13,3),N
-13    CALL DELFJ(A12,A22,A32,N)
-      GO TO(14,3),N
-14    CALL DELFJ(A13,A23,A33,N)
-      GO TO(15,3),N
-15    UP(1)=A11+A33
-      DOUN(1)=dABS(A11-A33)
-      UP(2)=A32+A21
-      DOUN(2)=dABS(A32-A21)
-      UP(3)=A12+A23
-      DOUN(3)=dABS(A12-A23)
-      X=UP(1)
-      DO 1 N=2,3
-      IF(UP(N)-X) 6,1,1
-6     X=UP(N)
-1     CONTINUE
-      Y=DOUN(1)
-      DO 2 N=2,3
-      IF(DOUN(N)-Y) 2,2,7
-7     Y=DOUN(N)
-2     CONTINUE
-      IF(X-Y)3,8,8
-8     D=X-Y+1._dp
-      N=D
-      IF(dABS(D-N)-0.00001_dp) 9,3,3
-9     FJ9=0._dp
-      DO 4 K=1,N
-      A=Y+K-1._dp
-      M=2*A+0.00001_dp
-      FJ9=FJ9+(-1)**M*(M+1)*FJ6(A11,A21,A31,A32,A33,A)* &
-      FJ6(A12,A22,A32,A21,A,A23)*FJ6(A13,A23,A33,A,A11,A12)
-4     CONTINUE
-      GO TO 5
-3     FJ9=0._dp
-5     RETURN
+        Integer :: n, m, k
+        Real(dp) :: x, y, a, d
+        Real(dp), Dimension(3) :: up, down
+
+        fj9 = 0.0_dp
+
+        Call DELFJ(a11, a12, a13, n)
+        If (n /= 1) Return
+        Call DELFJ(a21, a22, a23, n)
+        If (n /= 1) Return
+        Call DELFJ(a31, a32, a33, n)
+        If (n /= 1) Return
+        Call DELFJ(a11, a21, a31, n)
+        If (n /= 1) Return
+        Call DELFJ(a12, a22, a32, n)
+        If (n /= 1) Return
+        Call DELFJ(a13, a23, a33, n)
+        If (n /= 1) Return
+
+        up(1) = a11 + a33
+        down(1) = dabs(a11 - a33)
+        up(2) = a32 + a21
+        down(2) = dabs(a32 - a21)
+        up(3) = a12 + a23
+        down(3) = dabs(a12 - a23)
+
+        x = Maxval(up)
+        y = Minval(down)
+        IF (x <= y) Return
+
+        d = x - y + 1.0_dp
+        n = Int(d)
+        If (dabs(d - Real(n, dp)) > 0.00001_dp) Return
+
+        Do k = 1, n
+            a = y + Real(k - 1, dp)
+            m = Int(2 * a + 0.00001_dp)
+            fj9 = fj9 + (-1)**m * (m + 1) * &
+                   FJ6(a11, a21, a31, a32, a33, a) * &
+                   FJ6(a12, a22, a32, a21, a, a23) * &
+                   FJ6(a13, a23, a33, a, a11, a12)
+        End Do
     End Function FJ9
 
-    Subroutine DELFJ(A,B,C,N)
-      Implicit None
+    Subroutine DELFJ(a, b, c, n)
+        Implicit None
 
-      Integer  :: N
-      Real(dp) :: X, Y, A, B, C
+        Real(dp), Intent(In) :: a, b, c
+        Integer, Intent(Out) :: n
+        Real(dp) :: x, y
 
-      X=A+B
-      Y=dABS(A-B)
-      IF(X-C) 1,2,2
-2     IF(Y-C) 3,3,1
-3     N=1
-      GO TO 4
-1     N=2
-4     RETURN
+        x = a + b
+        y = dabs(a - b)
+
+        If (x < c) Then
+            n = 2
+        Else If (y < c) Then
+            n = 1
+        Else
+            n = 2
+        End If
+
     End Subroutine DELFJ
 
-    Subroutine NGFJ(J,M,N)
-      Implicit None
+    Subroutine NGFJ(j, m, n, all)
+        Implicit None
 
-      Integer  :: J, K, L, M, N
-      Real(dp) :: AL
+        Integer, Intent(In) :: j, m, n
+        Real(dp), Intent(InOut) :: all
+        Integer  :: l
+        Real(dp) :: al
 
-      IF(M-N) 4,3,3
-4     K=M+1
-      DO 1 L=K,N
-      AL=dLOG(1._dp*L)
-1     ALL=ALL+J*AL
-3     RETURN
+        If (m < n) Then
+            Do l = m + 1, n
+                al = log(1.0_dp * l)
+                all = all + j * al
+            End Do
+        End If
+        
     End Subroutine NGFJ
 
-    Subroutine OBME(M1,M2)
-      Implicit None
+    Subroutine swap(m1, m2)
+        Implicit None
 
-      Integer :: N, M1, M2
+        Integer, Intent(InOut) :: m1, m2
+        Integer :: n
 
-      N=M1
-      M1=M2
-      M2=N
-      RETURN
-    End Subroutine OBME
+        n = m1
+        m1 = m2
+        m2 = n
+        
+    End Subroutine swap
 
-    Subroutine PORAD(I,N)
-      Implicit None
+    Subroutine sortArray(arr, n)
+        Implicit None
+        
+        Integer, Intent(In) :: n
+        Integer, Dimension(n), Intent(InOut) :: arr
 
-      Integer               :: N, K, L, K1, K2
-      Integer, Dimension(N) :: I
-      
-      K1=N-1
-      DO 1 K=1,K1
-      K2=K+1
-      DO 2 L=K2,N
-      IF(I(K)-I(L)) 2,2,3
-3     CALL OBME(I(K),I(L))
-2     CONTINUE
-1     CONTINUE
-      RETURN
-    End Subroutine PORAD
+        Integer :: i, j
+        
+        Do i = 1, n-1
+            Do j = i+1, n
+                If (arr(i) > arr(j)) Then
+                    Call swap(arr(i), arr(j))
+                End If
+              End Do
+        End Do
+
+    End Subroutine sortArray
 
 End Module
