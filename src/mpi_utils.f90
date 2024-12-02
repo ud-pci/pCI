@@ -29,7 +29,6 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
@@ -40,8 +39,8 @@ Module mpi_utils
         Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
@@ -73,7 +72,6 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
@@ -84,8 +82,8 @@ Module mpi_utils
         Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
@@ -114,11 +112,11 @@ Module mpi_utils
         End If
     End Subroutine BroadcastR
 
-    Subroutine BroadcastD(buffer, count, stride, rank, comm, mpierr)
+    Subroutine BroadcastD(buffer, count, stride, mpi_rtype, rank, comm, mpierr)
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
+        Type(MPI_Datatype), Intent(In)              :: mpi_rtype
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
@@ -129,8 +127,8 @@ Module mpi_utils
         Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) Then
                 use_stride = MaxStride8Byte
                 If (type2_real == sp) use_stride = use_stride * 2
@@ -148,7 +146,7 @@ Module mpi_utils
         i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
-            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_type2_real, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_rtype, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
@@ -158,7 +156,7 @@ Module mpi_utils
         End Do
         If (count_remain .gt. 0) Then
             count_remain2 = count_remain
-            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_type2_real, rank, comm, mpierr)
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_rtype, rank, comm, mpierr)
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
@@ -170,7 +168,6 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                  :: comm
         Type(MPI_Op), Intent(In)                    :: op
         Integer(Kind=int64), Intent(In)             :: count
@@ -182,8 +179,8 @@ Module mpi_utils
         Integer                                     :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
@@ -211,11 +208,11 @@ Module mpi_utils
         End If
     End Subroutine AllReduceI
 
-    Subroutine AllReduceR(buffer, count, stride, op, comm, mpierr)
+    Subroutine AllReduceR(buffer, count, stride, mpi_rtype, op, comm, mpierr)
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
+        Type(MPI_Datatype), Intent(In)                 :: mpi_rtype
         Type(MPI_Comm), Intent(In)                     :: comm
         Type(MPI_Op), Intent(In)                       :: op
         Integer(Kind=int64), Intent(In)                :: count
@@ -227,8 +224,8 @@ Module mpi_utils
         Integer                                        :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
@@ -238,7 +235,7 @@ Module mpi_utils
         i = 1_int64
         mpierr = 0
         Do While (count_remain .gt. use_stride)
-            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+use_stride), use_stride, mpi_type2_real, op, comm, mpierr) 
+            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+use_stride), use_stride, mpi_rtype, op, comm, mpierr) 
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure reducing real range ',i,':',i+use_stride
                 Return
@@ -248,7 +245,7 @@ Module mpi_utils
         End Do
         If (count_remain .gt. 0) Then
             count_remain2 = count_remain
-            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+count_remain2), count_remain2, mpi_type2_real, op, comm, mpierr) 
+            Call MPI_AllReduce(MPI_IN_PLACE, buffer(i:i+count_remain2), count_remain2, mpi_rtype, op, comm, mpierr) 
             If (mpierr .ne. 0 ) Then
                 Write(*,*) 'Failure reducing real range ',i,':',i+use_stride
                 Return
@@ -260,7 +257,6 @@ Module mpi_utils
         Use mpi_f08
         Implicit None
 
-        EXTERNAL :: GetEnv
         Type(MPI_Comm), Intent(In)                     :: comm
         Type(MPI_Op), Intent(In)                       :: op
         Integer(Kind=int64), Intent(In)                :: count
@@ -272,8 +268,8 @@ Module mpi_utils
         Integer                                        :: count_remain2, use_stride
 
         If (stride .le. 0) Then
-            Call GetEnv('CONF_BROADCAST_MAX', envvar)
-            Read(envvar, '(i)') use_stride
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
             If (use_stride .le. 0) use_stride = MaxStride8Byte * 2
         Else
             use_stride = stride
