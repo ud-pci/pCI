@@ -149,7 +149,7 @@ Module matrix_io
         ! Print time to write file
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            write(*,'(2X,A)'), 'TIMING >>> Writing ' // filename // ' took ' // trim(timeStr)
+            write(*,'(2X,A)') 'TIMING >>> Writing ' // filename // ' took ' // trim(timeStr)
         End If
     End Subroutine WriteMatrix
 
@@ -258,7 +258,7 @@ Module matrix_io
         ! Print time to write file
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            write(*,'(2X,A)'), 'TIMING >>> Reading ' // filename // ' took ' // trim(timeStr)
+            write(*,'(2X,A)') 'TIMING >>> Reading ' // filename // ' took ' // trim(timeStr)
         End If
     
         Return
