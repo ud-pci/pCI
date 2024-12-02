@@ -13,7 +13,7 @@ Module integrals
     subroutine Rint
         Implicit None
         Integer     :: i, nsh, ns1, nso1, nsu1, nsp1, Nlist, &
-                       k, mlow, m_is, err_stat, kbrt1, nx1
+                       k, mlow, m_is, err_stat, kbrt1
         Integer(Kind=int64) :: i8
         Character*7 :: str(3),str1(4)*4
         Character(Len=3) :: key1, key2
@@ -162,18 +162,20 @@ Module integrals
     Real(dp) Function Gint(i1,i2,i3,i4)
         Implicit None
         Integer  :: i2, ib, i1, ia, is, la, nd, nc, nb, na, md, mc, mb, ma, &
-                    is_sms, ii, i4, id, i3, ic, iac, k1, is_br, i_br, minint, &
+                    is_sms, ii, i4, id, i3, ic, iac, k1, is_br, i_br, &
                     iab, kmax, kmin, ibd0, iac0, k, jd, jc, jb, ja, ibr, i, ld, &
-                    lc, lb, ibd, kac, kbd, mi
-        Integer(Kind=int64) :: i8, mi8, minint8=0_int64
+                    lc, lb, ibd, kac, kbd
+        Integer(Kind=int64) :: i8, mi8, minint8
         Real(dp) :: e, rabcd
         Logical  :: l_is, l_br, l_pr
         Character(Len=256) :: strfmt
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         l_is= .not. (C_is == 0.d0)                ! False If C_is=0
         l_is=l_is .and. (K_is == 2 .or. K_is == 4)  ! False If K_is /= 2,4
         l_is=l_is .and. (K_sms >= 2)              ! False If K_sms<2
         l_br=Kbrt /= 0
+
+        minint8=0_int64
         e=0.d0
         is=1
         ia=i1
@@ -616,7 +618,7 @@ Module integrals
         m2=xm2
         is = 1
         g = 0.d0
-        im = abs(m2-m1)
+        im = Int(abs(m2-m1))
         If (k >= im) Then
             If (k == 0) Then
                 If (j1 == j2) Then
@@ -637,12 +639,12 @@ Module integrals
                 If (m1 <= 0.d0) Then
                    m1 = -m1
                    m2 = -m2
-                   ij = k+j1-j2
+                   ij = Int(k+j1-j2)
                    If(ij /= 2*(ij/2)) is = -is
                 End If
                 ib1=2*Nlx+1
                 ib2=ib1*ib1
-                ind = ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2)
+                ind = Int(ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2))
                 ! TODO - use num_gaunts_per_partial_wave to start looking for gaunt factors in their respective blocks of l
                 Do i=1,Ngaunt
                    If(In(i) == ind) Then
