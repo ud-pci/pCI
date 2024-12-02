@@ -253,7 +253,7 @@ Contains
         ! Expand the list of non-relativistic configurations into a list of relativistic configurations
         Implicit None
         Integer :: ic, icnr, kc, ji, k, n, jk, i, nx, mx, mmax1, mmax2, mmin1, m1, k1, ivar, irmax, k1max
-        Integer :: j, ir, j1, l, iq1, iq2, idif, ncr, jkmax, nozmax, num_rel_confs
+        Integer :: j, ir, j1, l, iq1, iq2, idif, ncr, jkmax, nozmax, num_rel_confs, num_rel_confs0
         Real(dp) :: qnl
         Integer, Allocatable, Dimension(:)  :: nyi, myi, nyk, myk, ivc, ni, li, iv, NozN, temp
         Integer, Allocatable, Dimension(:, :)   :: mx1, mx2, ivv
@@ -317,11 +317,12 @@ Contains
         If (.not. Allocated(mx2)) Allocate(mx2(nozmax, k1max))
 
         ! Reallocate Ac, NOz
+        num_rel_confs0 = size(NOz)
         Call move_alloc(Ac, temp2)
         Call move_alloc(NOz, temp)
         Allocate(NOz(num_rel_confs), Ac(num_rel_confs, max_num_shells))
-        NOz(1:num_rel_confs) = temp
-        Ac(1:num_rel_confs,1:max_num_shells) = temp2
+        NOz(1:num_rel_confs0) = temp
+        Ac(1:num_rel_confs0,1:max_num_shells) = temp2
         Deallocate(temp, temp2)
 
         ! Loop over non-relativistic configurations
