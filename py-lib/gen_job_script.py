@@ -21,7 +21,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     # Obtain list of partitions
     try:
         sinfo_output = run(['sinfo', '--format=%P'], capture_output=True, text=True, check=True)
-        partitions = set(sinfo_output.stdout.strip().splitlines())
+        partitions = set(line.rstrip('*') for line in sinfo_output.stdout.strip().splitlines())
         if partition in partitions:
             print('partition', partition, 'found on', cluster)
         else:
