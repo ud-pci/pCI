@@ -38,9 +38,6 @@ Module params
 
     ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
     Integer, Parameter :: type2_real=sp
-
-    ! Set key to turn on extra outputs for developing
-    Integer, Parameter :: devmode=1
     
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj, Mrec
