@@ -1,5 +1,5 @@
 program formy
-    use params, ipmr1 => IPmr, IP1conf => IP1
+    use params, IP1conf => IP1
     use determinants, only : Dinit, Jterm
     use str_fmt, only : startTimer, stopTimer, FormattedTime
     use mpi_f08
@@ -44,9 +44,8 @@ program formy
     call BcastVector(mype)
     call Vector(kl,mype)                   !###  the equation and vectors Yi
 
-    
     call stopTimer(start_time, timeStr)
-    If (mype == 0) write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    If (mype == 0) write(*,'(2X,A)') 'TIMING >>> Total computation time of formy was '// trim(timeStr)
 
     call MPI_Finalize(mpierr)
 

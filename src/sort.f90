@@ -16,7 +16,7 @@ program sort
 
     ! End program timer
     call stopTimer(start_time, time_str)
-    write(*,'(2X,A)'), 'TIMING >>> Total computation time of sort was '// trim(time_str)
+    write(*,'(2X,A)') 'TIMING >>> Total computation time of sort was '// trim(time_str)
 
 contains
 
@@ -57,7 +57,7 @@ contains
     
         ! Sort matrix elements
         call startTimer(start_time2)
-        call quicksort_matrix(mat%indices1, mat%indices2, mat%values, 1, num_total_elements)
+        call quicksort_matrix(mat%indices1, mat%indices2, mat%values, 1_int64, num_total_elements)
         call stopTimer(start_time2, time_str2)
         print*, trim(adjustl(filename)) // ' sorted in ' // trim(adjustl(time_str2))
         
