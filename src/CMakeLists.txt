@@ -14,7 +14,7 @@ target_link_libraries(hfd PUBLIC pci_common)
 ADD_EXECUTABLE(bass bass.f90)
 target_link_libraries(bass PUBLIC pci_common)
 
-ADD_EXECUTABLE(add params.f90 vaccumulator.f90 add.f90)
+ADD_EXECUTABLE(add params.f90 add.f90)
 target_link_libraries(add PUBLIC pci_common)
 
 ADD_EXECUTABLE(pbasc pbasc.f90)
