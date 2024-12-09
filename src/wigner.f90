@@ -1,6 +1,6 @@
 Module wigner
 
-    Use params 
+    Use, Intrinsic :: iso_fortran_env, Only : dp => real64
 
     Implicit None
 
