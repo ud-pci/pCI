@@ -14,9 +14,9 @@ Module diff
         ! This subroutine should be used for functions which are not very smooth at R=R(1).
         Implicit None
 
-        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT
+        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT, m
         Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err, h
-        Real(dp), Dimension(IP6) :: P, CP, R, V                 !
+        Real(dp), Dimension(IP6) :: P, CP, R, V
 
         If (MaxT.EQ.0) MaxT=9      !### hfd uses Nmax instead of MaxT
         ih=2-kt
