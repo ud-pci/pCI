@@ -24,7 +24,7 @@ target_include_directories(pbasc PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
 target_link_options(pbasc PUBLIC ${MPI_Fortran_LINK_FLAGS})
 target_link_libraries(pbasc PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
 
-ADD_EXECUTABLE(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 pconf.f90)
+ADD_EXECUTABLE(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 pconf.F90)
 target_compile_definitions(pconf PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
 target_compile_options(pconf PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
 target_include_directories(pconf PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
