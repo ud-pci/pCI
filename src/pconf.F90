@@ -64,7 +64,11 @@ Program pconf
     Use env_var
     
     Implicit None
+
+#ifdef USE_SCALAPACK
     External :: BLACS_PINFO, BLACS_EXIT
+#endif
+
     Integer   :: n, i, ierr, mype, npes, mpierr, threadLevel
     Integer(kind=int64) :: start_time
     Character(Len=255)  :: strfmt
@@ -80,8 +84,11 @@ Program pconf
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+
+#ifdef USE_SCALAPACK
     Call BLACS_PINFO(mype,npes)
-    
+#endif
+
     Call startTimer(start_time)
     
     ! Set MPI type for type_real
@@ -164,7 +171,11 @@ Program pconf
     End If
 
     ! All done: 
+#ifdef USE_SCALAPACK
     Call BLACS_EXIT(0)
+#else
+    Call MPI_Finalize(mpierr)
+#endif
 
 Contains
 
@@ -1500,8 +1511,11 @@ Contains
 
         Implicit None
         
-        External :: INFOG2L, PDELGET, SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, &
+        External :: SSYEV, DSYEV
+#ifdef USE_SCALAPACK
+        External :: INFOG2L, PDELGET, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, &
                     BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+#endif
 
         Integer :: I, J, lwork, mype, npes, ifail
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
@@ -1528,42 +1542,12 @@ Contains
         Call MPI_Bcast(isVerbose, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(shouldForceSerial, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(shouldForceScalapack, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
-        
+
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
-        ! If running in serial or size of initial approximation is below threshold, 
-        If (.not. shouldForceScalapack .and. (npes == 1 .or. Nd0 <= scalapackThreshold .or. shouldForceSerial)) Then
-            If (mype==0) Then
-                If (npes==1 .or. shouldForceSerial) Then
-                    Write(*,"(A)") "DiagInitApprox: ScaLAPACK not used, running serially"
-                Else
-                    Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
-                End If
-
-                Select Case(type_real)
-                Case(sp)
-                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
-                Case(dp)
-                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
-                End Select
-
-                lwork = Nint(realtmp(1))
-
-                Allocate(W(lwork))
-                If (isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
-                Select Case(type_real)
-                Case(sp)
-                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
-                Case(dp)
-                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
-                End Select
-                If (isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
-                Deallocate(W)
-            End If
-            Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(E1, Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Else
+#ifdef USE_SCALAPACK
+        If (shouldForceScalapack .and. (npes > 1 .or. Nd0 > scalapackThreshold)) Then
             If (mype==0) Write(*,"(A,I5,A)") "DiagInitApprox: ScaLAPACK used, will distribute across ", npes, " cpus"
             NPROW=1
             NPCOL=npes
@@ -1653,12 +1637,47 @@ Contains
             ! Clean up
             Deallocate(IWORK, W, Z, A)
         End If
+#endif
+        If (.not. shouldForceScalapack .and. (npes <= 1 .or. Nd0 <= scalapackThreshold)) Then
+            If (mype==0) Then
+                If (npes==1 .or. shouldForceSerial) Then
+                    Write(*,"(A)") "DiagInitApprox: ScaLAPACK not used, running serially"
+                Else
+                    Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
+                End If
+            
+                Select Case(type_real)
+                Case(sp)
+                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                Case(dp)
+                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                End Select
+            
+                lwork = Nint(realtmp(1))
+            
+                Allocate(W(lwork))
+                If (isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
+                Select Case(type_real)
+                Case(sp)
+                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                Case(dp)
+                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                End Select
+                If (isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
+                Deallocate(W)
+            End If
+            Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(E1, Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        End If
+
         If (mype==0) Then
             ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
             Write(*,"(2X,A,A,A)") "TIMING >>> Initial diagonalization took ", trim(timeStr), " to complete"
         End If
+
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
     End Subroutine DiagInitApprox
 
     Subroutine Diag4(mype, npes)
