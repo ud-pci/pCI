@@ -117,13 +117,13 @@ Contains
         ! Write name of program
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(/4X,"Program CONF_PT v2.2", &
+            strfmt = '(/4X,"Program CONF_PT v2.3", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
         Case(dp) 
-            strfmt = '(/4X,"Program CONF_PT v2.2 with double precision for 2e integrals", &
+            strfmt = '(/4X,"Program CONF_PT v2.3 with double precision for 2e integrals", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &

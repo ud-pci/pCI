@@ -390,7 +390,7 @@ Contains
 
         Call ReadPolIn
 
-        strfmt = '(1X,70("-"),/1X,"Program pol v1.0")'
+        strfmt = '(1X,70("-"),/1X,"Program pol v1.1")'
         Write( 6,strfmt) 
         Write(11,strfmt) 
 

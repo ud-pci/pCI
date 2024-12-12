@@ -81,9 +81,9 @@ Contains
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(4X,"Program conf_lsj v2.4")'
+            strfmt = '(4X,"Program conf_lsj v2.5")'
         Case(dp)            
-            strfmt = '(4X,"Program conf_lsj v2.4 with double precision for 2e integrals")'
+            strfmt = '(4X,"Program conf_lsj v2.5 with double precision for 2e integrals")'
         End Select
         Write( 6,strfmt)
         Write(11,strfmt)

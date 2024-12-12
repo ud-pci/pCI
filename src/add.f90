@@ -12,7 +12,7 @@ Program add
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
 
     ! Print program header
-    strfmt = '(/4X,"PROGRAM add v3.0"/)'
+    strfmt = '(/4X,"PROGRAM add v3.1"/)'
     Write(6, strfmt)
 
     ! Read inputs from ADD.INP

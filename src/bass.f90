@@ -248,7 +248,7 @@ Contains
 
         data str1,str2,str3 /'   DF','Brcnr','Breit','Br+Bt',' NO','YES','YES','E = V = 0','E=0, V_c ','E_hf, V_c'/
 
-        strfmt = '(/4X,"Program Bass v1.2")'
+        strfmt = '(/4X,"Program Bass v1.3")'
         write( *,strfmt)
         write(11,strfmt)
 

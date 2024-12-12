@@ -454,7 +454,7 @@ Contains
         strfmt = '(1X,16A1)'
         Read(10,strfmt) NAME
 
-        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.2",4X,16A1)'
+        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.3",4X,16A1)'
         Write( *,strfmt) NAME
         Write(11,strfmt) NAME
 

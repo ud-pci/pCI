@@ -188,13 +188,13 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program pconf v6.1 with single precision")'
+            strfmt = '(4X,"Program pconf v6.2 with single precision")'
         Case(dp)            
             Select Case(type2_real)
             Case(sp)
-                strfmt = '(4X,"Program pconf v6.1")'
+                strfmt = '(4X,"Program pconf v6.2")'
             Case(dp)
-                strfmt = '(4X,"Program pconf v6.1 with double precision for 2e integrals")'
+                strfmt = '(4X,"Program pconf v6.2 with double precision for 2e integrals")'
             End Select
         End Select
         
@@ -1645,16 +1645,16 @@ Contains
                 Else
                     Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
                 End If
-            
+
                 Select Case(type_real)
                 Case(sp)
                     Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
                 Case(dp)
                     Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
                 End Select
-            
+
                 lwork = Nint(realtmp(1))
-            
+
                 Allocate(W(lwork))
                 If (isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
                 Select Case(type_real)
