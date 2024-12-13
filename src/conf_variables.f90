@@ -40,7 +40,7 @@ Module conf_variables
     Real(dp), Dimension(IPs)   :: Eps
     Real(dp), Dimension(IP1)   :: C
 
-    Type Matrix(knd)
+    Type :: Matrix(knd)
         Integer, kind :: knd
         Real(kind=knd) :: minval
         Integer,  Allocatable, Dimension(:) :: ind1, ind2

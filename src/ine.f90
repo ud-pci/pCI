@@ -51,7 +51,7 @@ Program ine
     !         General convention: GLOBAL VARIABLES     |||
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
-    Use params, ipmr1 => IPmr, IP1conf => IP1
+    Use params, IP1conf => IP1
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 
@@ -202,7 +202,7 @@ Program ine
     Close(unit=11) ! Close INE.RES
     Close(unit=99) ! Close INEFINAL.RES
     Call stopTimer(start_time, timeStr)
-    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    Write(*,'(2X,A)') 'TIMING >>> Total computation time of ine was '// trim(timeStr)
     
 Contains
 
@@ -365,7 +365,7 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.23",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.24",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
@@ -946,7 +946,7 @@ Contains
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
         cnt=0
         Do i8=1,NumH
-            Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            Read(15) Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
             if (Hamil%n(i8) == Nd + 1) then
                 NumH=cnt
                 print*,'For Nd=',Nd,', NumH=', NumH
@@ -1090,7 +1090,7 @@ Contains
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
         
         strfmt = '(3X," NumH =",I12,";  Hmin =",F12.6/)'
         Write(*,strfmt) NumH,Hmin
@@ -1124,14 +1124,14 @@ Contains
         Call system_clock(end2)
         ttime2=Real((end2-start2)/clock_rate)
         Call FormattedTime(ttime2, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: Zspsv in '// trim(timeStr)// '.'
 
         X1= 0.d0 
         X1(1:Ntr)= Real(XX1(1:Ntr), kind=dp)
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: decomp in '// trim(timeStr)// '.'
 
         ! Orthogonalization of X1 to X0 (If J0 /= 0)
         If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  

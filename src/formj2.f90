@@ -6,38 +6,9 @@ Module formj2
 
     Private
 
-    Public :: F_J0, F_J2, Plj, J_av, Formj
+    Public :: F_J2, Plj, J_av, FormJ
 
   Contains
-
-    Real(type_real) Function F_J0(idet)
-        Implicit None
-    
-        Integer :: ia, na, ja, ma, jq0, iq, ib, nf, jq
-        Integer, allocatable, dimension(:) :: idet
-        Real(type_real)  :: t
-    
-        t=0_type_real
-        If (nf == 0) Then !determinants are equal
-            t=mj*mj
-            Do iq=1,Ne
-                ia=idet(iq)
-                na=Nh(ia)
-                ja=Jj(na)
-                ma=Jz(ia)
-                t=t+ja*(ja+2)-ma**2
-                jq0=iq+1
-                If (jq0 <= Ne) Then
-                    Do jq=jq0,Ne
-                        ib=idet(jq)
-                        t=t-Plj(ia,ib)**2-Plj(ib,ia)**2
-                    End Do
-                End If
-            End Do
-        End If
-        F_J0=t
-        Return
-    End Function F_J0
 
     Real(type_real) Function F_J2(idet, is, nf, ia, ic, ib, id) 
         Implicit None
@@ -211,7 +182,7 @@ Module formj2
 
                 Do 
                     Call MPI_Recv(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status.MPI_SOURCE
+                    sender = status%MPI_SOURCE
              
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy
@@ -235,11 +206,11 @@ Module formj2
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
+                        Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
                                 ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
                                 ', '//trim(memStr2)//' for a single core)'
                         If (memTotalPerCPU /= 0 .and. memEstimate > memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
+                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
                             Trim(memTotStr2) ,' is available.'
                             Stop
                         End If
@@ -253,7 +224,7 @@ Module formj2
                         Call FormattedMemSize(maxmem, memStr2)
                         memEstimate = memEstimate + maxmem
                         Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
+                        Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
                         Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
                         Exit
                     End If
@@ -327,7 +298,7 @@ Module formj2
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
             ij8 = counter1
-            ij4 = ij8
+            ij4 = Int(ij8, kind=int32)
             Call MPI_AllReduce(ij8, NumJ, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
             ! Write J^2 matrix to file CONFp.JJJ
@@ -340,16 +311,17 @@ Module formj2
             Write(11,strfmt) Trim(AdjustL(counterStr))
             Write( *,strfmt) Trim(AdjustL(counterStr))
             Call stopTimer(stot, timeStr)
-            write(*,'(2X,A)'), 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
+            write(*,'(2X,A)') 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If
         Deallocate(idet1,idet2,cntarray)
 
     End Subroutine FormJ
     
-    Subroutine J_av(X1, nx, xj, ierr)    !# <x1|J**2|x1>
+    Subroutine J_av(X1, nx, xj, mpi_rtype, ierr)    !# <x1|J**2|x1>
         Use mpi_f08
         Implicit None
 
+        Type(MPI_Datatype) :: mpi_rtype
         Integer :: ierr, k, n, nx, mpierr
         Integer(Kind=int64) :: i
         Real(type_real) :: r, t, xj
@@ -370,7 +342,7 @@ Module formj2
             End If
         End Do
         ! MPI Reduce sum all xj to master core here 
-        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_rtype, MPI_SUM, MPI_COMM_WORLD, mpierr)
         xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
 
         If (K_prj == 1) Then

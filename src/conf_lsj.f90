@@ -16,12 +16,21 @@ Program conf_lsj
     Character(Len=255)  :: eValue
     Character(Len=16)   :: timeStr
 
+    Type(MPI_Datatype) :: mpi_type2_real
+
     ! Initialize MPI
     Call MPI_Init(mpierr)
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
     Call startTimer(start_time)
+
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
@@ -46,11 +55,11 @@ Program conf_lsj
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call stopTimer(s1, timeStr)
-        Write(*,'(2X,A)'), 'LSJ done in '// trim(timeStr)
+        Write(*,'(2X,A)') 'LSJ done in '// trim(timeStr)
         Call PrintLSJ   !#   Output of the results
 
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf_lsj was '// trim(timeStr)
+        write(*,'(2X,A)') 'TIMING >>> Total computation time of conf_lsj was '// trim(timeStr)
     End If
 
     Call MPI_Finalize(mpierr)
@@ -72,9 +81,9 @@ Contains
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(4X,"Program conf_lsj v2.4")'
+            strfmt = '(4X,"Program conf_lsj v2.5")'
         Case(dp)            
-            strfmt = '(4X,"Program conf_lsj v2.4 with double precision for 2e integrals")'
+            strfmt = '(4X,"Program conf_lsj v2.5 with double precision for 2e integrals")'
         End Select
         Write( 6,strfmt)
         Write(11,strfmt)
@@ -99,6 +108,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
+        Use utils, Only : DetermineRecordLength
         Implicit None
         Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, If, &
                     ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
@@ -108,7 +118,7 @@ Contains
         Integer, Dimension(33)  ::  nnn ,jjj ,nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
-        logical :: longbasis
+        logical :: longbasis, success
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Character(Len=256) :: strfmt, err_msg
@@ -119,8 +129,14 @@ Contains
 
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
+        
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
@@ -456,7 +472,7 @@ Contains
         Else
             count = Ngint*2_int64
         End If
-        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
@@ -612,14 +628,14 @@ Contains
 
                     If (nnc == nccnt .and. nnc /= ncsplit*10) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         j=j-1
                         nccnt = nccnt + ncsplit
                     End If
 
                     If (num_done == npes-1) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         Exit
                     End If
                 End Do

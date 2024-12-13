@@ -11,6 +11,9 @@ Program pbasc
     Integer :: Norb, nsx, nsx2, lsx
     Integer(kind=int64) :: start_time
     Character(Len=16) :: timeStr
+    Logical :: success
+
+    Type(MPI_Datatype) :: mpi_type2_real
 
     ! Initialize MPI
     Call MPI_Init(mpierr)
@@ -30,12 +33,11 @@ Program pbasc
     Call startTimer(start_time)
 
     If (mype == 0) Then
-        Call recunit
         Call Input
         Call Init(Norb) ! Norb = number of orbitals to be formed by Fbas:
         If (Norb /= 0) then
-            write (*,*) ' Run "bass" to form ',Norb,' new orbitals.'
-            stop
+            Write (*,*) ' Run "bass" to form ',Norb,' new orbitals.'
+            Stop
         End If
         Call Fill_N_l
         Call Core
@@ -51,46 +53,12 @@ Program pbasc
         write(*,*)' GAUNT finished'
         Close(11)
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of basc was '// trim(timeStr)
+        write(*,'(2X,A)') 'TIMING >>> Total computation time of basc was '// trim(timeStr)
     End If
 
     Call MPI_Finalize(mpierr)
 
 Contains
-
-    Subroutine recunit
-        ! This subroutine determines the record unit
-        Implicit None
-
-        Integer          :: lrec, iflag, nbytes
-        Character(Len=8) :: d1, t1, d2, t2
-
-        t1='abcdefgh'
-        d1='        '
-        t2='hgfedcba'
-        d2='        '
-        lrec=0
-        iflag=1
-200     lrec=lrec+1
-        If (lrec > 8) Then
-          Write(*,*)  'lrec > 8'
-          Stop
-        End If
-        Open(unit=13,file='test.tmp',status='unknown',access='direct',recl=lrec)
-        Write(13,rec=1,err=210) t1
-        Write(13,rec=2,err=210) t2
-        Read(13,rec=1,err=210) d1
-        Read(13,rec=2,err=210) d2
-        If (d1 /= t1) goto 210
-        If (d2 /= t2) goto 210
-        iflag=0
-210     Close(unit=13,status='delete')
-        If (iflag /= 0) goto 200
-        nbytes=8/lrec
-        ipmr=4/nbytes
-
-        Return
-    End Subroutine recunit
 
     Subroutine Input
         Use conf_init, Only : ReadConfInp, ReadConfigurations
@@ -103,9 +71,9 @@ Contains
         Open(unit=11,status='UNKNOWN',file='BASC.RES')
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(4X,"PROGRAM pbasc v3.0")'
+            strfmt = '(4X,"PROGRAM pbasc v3.1")'
         Case(dp)            
-            strfmt = '(4X,"PROGRAM pbasc v3.0 with double precision for 2e integrals")'
+            strfmt = '(4X,"PROGRAM pbasc v3.1 with double precision for 2e integrals")'
         End Select
         Write( *,strfmt)
         Write(11,strfmt)
@@ -135,10 +103,11 @@ Contains
 
     Subroutine Init(Norb)
         Use readfff
+        Use utils, Only : DetermineRecordLength
         Implicit None
         Integer, Intent(Out) :: Norb
 
-        Integer :: i, i0, ic, imax, j, n, n0, ni, nmin, nsmax, nsmax1, If
+        Integer :: i, i0, ic, imax, j, n, n0, ni, nmin, nsmax, nsmax1, nf
         Integer :: nsb, kkj, llj, jjj, nj, ng, nnj, err_stat
         Real(dp) :: c1, c2, r1, z1, d
         Integer, Dimension(4*IPs) :: IQN
@@ -159,7 +128,13 @@ Contains
         Mj=2*dabs(Jm)+0.01d0
         Qw=0_dp
 
-        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
+
+        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file HFD.DAT is absent"/)'
             Write( *,strfmt)
@@ -211,20 +186,20 @@ Contains
                 Qq(ni)=Qq1(ni)
             End Do
         Else
-            If=20
+            nf=20
             Do ni=1,Ns
-                If=If+1
-                Nn(ni)=PQ(If)+c1
-                If=If+1
-                Ll(ni)=PQ(If)+c1
-                If=If+1
-                Qq(ni)=PQ(If)
-                If=If+2
-                c2=dsign(c1,PQ(If))
-                Kk(ni)=PQ(If)+c2
-                If=If+1
-                c2=dsign(c1,PQ(If))
-                Jj(ni)=PQ(If)+c2
+                nf=nf+1
+                Nn(ni)=PQ(nf)+c1
+                nf=nf+1
+                Ll(ni)=PQ(nf)+c1
+                nf=nf+1
+                Qq(ni)=PQ(nf)
+                nf=nf+2
+                c2=dsign(c1,PQ(nf))
+                Kk(ni)=PQ(nf)+c2
+                nf=nf+1
+                c2=dsign(c1,PQ(nf))
+                Jj(ni)=PQ(nf)+c2
                 Qw(ni)=0.d0
             End Do
         End If
@@ -236,13 +211,13 @@ Contains
             i=dsign(1.d0,Qnl(nj))
             d=dabs(Qnl(nj))+1.d-14
             d=10.0*d
-            nnj=d
+            nnj=Int(d)
             d=10.0d0*(d-nnj)
-            llj=d
+            llj=Int(d)
             jjj=2*llj+i
             kkj=-i*((jjj+1)/2)
             d=100.0d0*(d-llj)
-            Nq(nj)=d+0.1d0
+            Nq(nj)=Int(d+0.1d0)
             If (nj <= Nso) Then
                 Do ni=1,Nso
                     If (Nn(ni) == Nn(nj) .and. Ll(ni) == Ll(nj)) Qw(ni) = Qw(ni) + Nq(nj)   ! number of e on NR shell
@@ -320,7 +295,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=2*IP6*IPmr)
+        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=2*IP6*Mrec)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -388,7 +363,7 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
         Ecore=0.d0
         Hcore=0.d0
         Ebcore=0.d0
@@ -894,7 +869,7 @@ Contains
         Integer :: lnx, num_is, nx, i, Idel, idel1, nsx, ih, nmin, na, lsx
         Integer :: nna, lla, jjd, lb, la, nnc, nnb, iis, nb, n4, n3, n2, n1
         Integer :: nsx2, kmin, kmax, k, k1, lc, ld, ja, jb, jc, jd, Iab, nm_br
-        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld, cut1, rem, ngint4
+        Integer :: ln, kac, kbd, n0, nad, jja, nnd, lld
         Integer(Kind=int64) :: ngint2, i8, count
         Real(dp) :: dint1, r_e1, r_e2, fis, tab_br, tad_br, r_br, rabcd, r_c, tad
         Real(dp), Dimension(IP6) :: cp, cq, ca, cb
@@ -951,7 +926,7 @@ Contains
             Continue
         Else
             If (mype == 0) Then
-                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
                 ih=2-Kt
                 nmin=Nso+1
 
@@ -1005,7 +980,7 @@ Contains
                 End Do
 
                 Call stopTimer(start_time, timeStr)
-                Write(*,'(2X,A)'), 'TIMING >>> Evaluation of one-electron integrals took '// trim(timeStr)
+                Write(*,'(2X,A)') 'TIMING >>> Evaluation of one-electron integrals took '// trim(timeStr)
             End If
             If (K_is == 1) num_is=nhint            
 
@@ -1160,7 +1135,7 @@ Contains
                 Else
                     count = ngint*2_int64
                 End If
-                Call AllReduceR(Rint2, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                Call AllReduceR(Rint2, count, 0, mpi_type2_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Call AllReduceI(Iint2, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
                 Call AllReduceI(Iint3, ngint, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
@@ -1177,7 +1152,7 @@ Contains
             If (Ne /= 1) Call PrintRint2Table(idel1)
 
             Call stopTimer(start_time, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Evaluation of two-electron integrals took '// trim(timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> Evaluation of two-electron integrals took '// trim(timeStr)
 
             Close(unit=12)
 
@@ -1188,7 +1163,7 @@ Contains
  
             ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             If (K_is >= 2) Then
-                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr)
+                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
                 Call Rint_MS(nsx,lsx,num_is)
                 Close(13)
             End If

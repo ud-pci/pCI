@@ -153,7 +153,7 @@ Module conf_init
         equals_in_str = .true.
         Do While (equals_in_str)
             Read(99, '(A)', iostat=err_stat) line
-            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+            If (index(string=line, substring="=") == 0 .or. err_stat /= 0) Then
                 equals_in_str = .false.
             Else
                 index_equals = index(string=line, substring="=")
@@ -208,9 +208,9 @@ Module conf_init
     Subroutine ReadConfInp
         ! This subroutine reads input parameters from the header of CONF.INP
         Implicit None
-        Integer :: istr
+        
         Character(Len=1) :: name(16)
-        ! - - - - - - - - - - - - - - - - - - - - - -
+
         ! Optional parameters
         K_is = 0 
         C_is = 0.d0 
@@ -268,8 +268,6 @@ Module conf_init
         Implicit None
         Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
-        logical  :: equals_in_str
-        ! - - - - - - - - - - - - - - - - - - - - - -
         
         Call calcNsp
         Call GotoConfigurations
@@ -290,8 +288,8 @@ Module conf_init
                 Do i=i1,i2
                    x=abs(Qnl(i))+1.d-9
                    If (x < 1.d-8) Exit
-                   nx=10000*x
-                   ny=100*x
+                   nx=Int(10000*x)
+                   ny=Int(100*x)
                    nz=(nx-100*ny)
                    ne0=ne0+nz
                    If (mod(ny,10) > Nlx) Nlx=mod(ny,10) ! Set Nlx to be max partial wave
@@ -340,8 +338,8 @@ Module conf_init
                 Do i=1,num_orbitals_per_line
                    x=abs(line(i))+1.d-9
                    If (x < 1.d-8) Exit
-                   nx=10000*x
-                   ny=100*x
+                   nx=Int(10000*x)
+                   ny=Int(100*x)
                    nz=(nx-100*ny)
                    ne0=ne0+nz
                    counter = counter + 1

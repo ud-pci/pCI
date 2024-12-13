@@ -12,7 +12,7 @@ Program add
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
 
     ! Print program header
-    strfmt = '(/4X,"PROGRAM add v3.0"/)'
+    strfmt = '(/4X,"PROGRAM add v3.1"/)'
     Write(6, strfmt)
 
     ! Read inputs from ADD.INP
@@ -652,7 +652,7 @@ Contains
         New=.FALSE.
   
         Do j=1,noz1                  !### check of the Pauli principle:
-            i1=sign(1.01,Ac1(j))     !#### nq.LE.(4*l+2)
+            i1=sign(1.01_dp,Ac1(j))     !#### nq.LE.(4*l+2)
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d
@@ -665,7 +665,7 @@ Contains
         End Do
 
         Do j=1,noz1                  ! does this config.
-            i1=sign(1.01,Ac1(j))     !  belong to RAS?
+            i1=sign(1.01_dp,Ac1(j))     !  belong to RAS?
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d

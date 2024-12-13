@@ -14,9 +14,9 @@ Module diff
         ! This subroutine should be used for functions which are not very smooth at R=R(1).
         Implicit None
 
-        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT
+        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT, m
         Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err, h
-        Real(dp), Dimension(IP6) :: P, CP, R, V                 !
+        Real(dp), Dimension(IP6) :: P, CP, R, V
 
         If (MaxT.EQ.0) MaxT=9      !### hfd uses Nmax instead of MaxT
         ih=2-kt
@@ -111,7 +111,7 @@ Module diff
         If (dabs(err).GT.1.d-1) Then
             Write(*,'(4X,"Dif: matching error at R1. Taylor:",E12.5, &
                    ", Num:",E12.5,/4X,"Using Origin for new expansion.")') cp1,CP(1)
-            Ierr=Ierr+10*dabs(err)
+            ierr=ierr+10*Int(dabs(err))
             If (dabs(CP(ii+5)).GT.dabs(CP(ii+6))) Then
                 kap=1                            ! For kap>0 expansion
             Else                                 ! goes over even powers
@@ -176,6 +176,7 @@ Module diff
         If (MaxT.EQ.0) MaxT=9        !### hfd uses Nmax instead of MaxT
 
         P(ii+5:ii+5+MaxT)=0.d0
+        ierr=0
 
         If (P(1).EQ.0.d0) Return
 
@@ -226,7 +227,7 @@ Module diff
         pr2=rk*(c0+c1*y+c2*y*y+c3*y**3)*R(2)**gam / P(2) !# should be equal to 1
         dr2=rk*(g*c0+(g+2)*c1*y+(g+4)*c2*y*y+(g+6)*c3*y**3)*R(2)**(gam-1) / dp2    
 
-        ier=1.d6*(dabs(pr1-1.d0)+dabs(dr1-1.d0)+dabs(pr2-1.d0)+dabs(dr2-1.d0))
+        ier=Int(1.d6*(dabs(pr1-1.d0)+dabs(dr1-1.d0)+dabs(pr2-1.d0)+dabs(dr2-1.d0)))
         If (ier.GE.1) Then
             strfmt='(4X,"Expansion error for gam = ",F5.1," kap = ",I2, &
                 /4X,"pr1 = ",E15.7," dr1 = ",E15.7 &
