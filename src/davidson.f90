@@ -136,7 +136,7 @@ Module davidson
                 strfmt = '(1X,"E(",I3,") =",F12.6," Jtot =",F10.6)'
                 Write( 6,strfmt) j,E(j),Tj(j)
                 Write(11,strfmt) j,E(j),Tj(j)
-                If (kXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
+                If (KXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
             End Do
             close (unit=17)
             If (nskip > 0) Then

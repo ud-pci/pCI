@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.f90 -> pconf.F90, use preprocessing directives to compile ScaLAPACK routines
 - pconf - fixed allocation of array E for LAPACK subroutines
 - removed IPmr parameter from params.f90 and refactored IPmr-associated arrays
+- pconf - refactored KXIJ and KWeights into optional inputs
 
 ## [1.0.7] - 2024-11-17
 - refactored IP1 parameter out of pdtm.f90 and removed IP1 array size warnings

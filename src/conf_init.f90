@@ -148,6 +148,8 @@ Module conf_init
         Kw = 0
         KLSJ = 0
         K_sms = 0
+        KWeights = 0
+        KXIJ = 10
         
         ! read parameters (lines with "=")
         equals_in_str = .true.
@@ -193,6 +195,13 @@ Module conf_init
                     ! SMS to include 1-e (1), 2-e (2), or both (3)
                     Read(val, *) K_sms
                     ! Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+                Case('KXIJ')
+                    ! KXIJ determines the interval in which CONF.XIJ will be written
+                    ! e.g. KXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
+                    Read(val, *) KXIJ
+                Case('KWeights')
+                    ! KWeights determines whether CONF.WGT is written (1) or not (0)
+                    Read(val, *) KWeights
                 End Select
             End If
         End Do

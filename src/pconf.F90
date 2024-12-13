@@ -897,6 +897,8 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KXIJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KWeights, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1869,11 +1871,11 @@ Contains
                     End If
                     
                     Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                    ! Write intermediate CONF.XIJ in frequency of kXIJ
+                    ! Write intermediate CONF.XIJ in frequency of KXIJ
                     Call startTimer(s1)
-                    If (kXIJ > 0) Then
-                        ! Only write each kXIJ iteration
-                        If (mod(it, kXIJ) == 0) Then 
+                    If (KXIJ > 0) Then
+                        ! Only write each KXIJ iteration
+                        If (mod(it, KXIJ) == 0) Then 
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
@@ -1954,7 +1956,7 @@ Contains
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
 
-        If (iter <= kXIJ) Then
+        If (iter <= KXIJ) Then
             Open(unit=81,status='REPLACE',file='CONF.ENG',action='WRITE')
         Else
             Open(unit=81,status='UNKNOWN',POSITION='APPEND',file='CONF.ENG',action='WRITE')
@@ -2048,7 +2050,7 @@ Contains
         If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
 
-        If (iter <= kXIJ) Then
+        If (iter <= KXIJ) Then
             Open(unit=98,status='REPLACE',file='CONF.LVL',action='WRITE')
         Else
             Open(unit=98,status='UNKNOWN',POSITION='APPEND',file='CONF.LVL',action='WRITE')
@@ -2894,7 +2896,7 @@ Contains
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
         If (.not. Allocated(converged)) Allocate(converged(Nlv))
 
-        If (kWeights == 1) Then
+        If (KWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
             strfmt = '(I8,I6,F11.7)'
         End If
@@ -2928,7 +2930,7 @@ Contains
         If (mod(Ne,2) == 1) nspacesterm = 3
         Wsave = 0_dp
         Do j=1,Nlv
-            If (kWeights == 1) Then
+            If (KWeights == 1) Then
                 Write(88,'(A,I3)') 'Level #', j
                 Write(88,'(A25)') '========================='
                 Write(88,'(A25)') '      ID    IC     W     '
@@ -2941,10 +2943,10 @@ Contains
                 Do k=1,ndk
                     i=i+1
                     W(ic,j)=W(ic,j)+C(i)**2
-                    If (kWeights == 1) Write(88,strfmt) i, ic, C(i)**2
+                    If (KWeights == 1) Write(88,strfmt) i, ic, C(i)**2
                 End Do
             End Do
-            If (kWeights == 1) Write(88,'(A25)') '========================='
+            If (KWeights == 1) Write(88,'(A25)') '========================='
             k=0
 
             ! Calculate weights of non-relativistic configurations and store in array W2
@@ -3207,7 +3209,7 @@ Contains
         Close(97)
         Close(98)
         Close(99)
-        If (kWeights == 1) Close(88)
+        If (KWeights == 1) Close(88)
 
         ! Print the weights of each configuration
         n=(Nlv-1)/5+1
