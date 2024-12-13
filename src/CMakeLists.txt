@@ -56,6 +56,7 @@ ADD_EXECUTABLE(sort str_fmt.f90 sort.f90)
 target_link_libraries(sort PUBLIC pci_common)
 
 ADD_EXECUTABLE(check_matrices check_matrices.f90)
+target_link_libraries(check_matrices PUBLIC pci_common)
 
 ADD_EXECUTABLE(ine ine.f90)
 target_link_options(ine PRIVATE ${MKL_PARALLEL_LINK_FLAGS})
