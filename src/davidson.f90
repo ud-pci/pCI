@@ -322,8 +322,11 @@ Module davidson
 
         Integer :: j1, i, k, n01
         Real(type_real) :: val, t, cnorm, s
+        Real(type_real), Dimension(:), Allocatable :: C
         character(len=9) :: char
 
+        If (.not. Allocated(C)) Allocate(C(Nd0))
+        
         cnorm=0_type_real
         j1=j+Nlv
         val=P(j,j)
@@ -378,6 +381,9 @@ Module davidson
         End Do
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
+
+        If (Allocated(C)) Deallocate(C)
+
         Return
     End Subroutine Dvdsn
 

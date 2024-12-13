@@ -31,14 +31,18 @@ Module conf_variables
     Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D
     Real(dp), Allocatable, Dimension(:,:)  :: W
 
+    ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
+    Integer, Parameter :: type_real=dp
+
+    ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
+    Integer, Parameter :: type2_real=sp
+    
     Real(type2_real), Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real(type2_real), Allocatable, Dimension(:,:)  :: Rint2
     
     Real(type_real),  Allocatable, Dimension(:,:) :: ArrB, P, Z1
     Real(type_real),  Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
-
-    Real(dp), Dimension(IPs)   :: Eps
-    Real(dp), Dimension(IP1)   :: C
+    Real(type_real), Allocatable, Dimension(:) :: B1, B2
 
     Type :: Matrix(knd)
         Integer, kind :: knd

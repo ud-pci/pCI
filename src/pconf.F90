@@ -838,7 +838,7 @@ Contains
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
-                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(C)+(8+type_real)*vaBinSize
+                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize
 
     End Subroutine calcMemStaticArrays
 

@@ -1,5 +1,6 @@
 Program pdtm 
     Use params
+    Use conf_variables, Only : B1, B2
     Use mpi_f08
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime

@@ -32,12 +32,6 @@ Module params
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
-
-    ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
-    Integer, Parameter :: type_real=dp
-
-    ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
-    Integer, Parameter :: type2_real=sp
     
     ! Global variables 
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj, Mrec
@@ -50,8 +44,7 @@ Module params
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
     Real(dp), Allocatable, Dimension(:)   :: D1, Qnl
     Integer, Allocatable, Dimension(:,:)  :: Iarr
-
-    Real(type_real), Allocatable, Dimension(:) :: B1, B2
+    Real(dp), Dimension(IPs)              :: Eps
 
     Save
                                        

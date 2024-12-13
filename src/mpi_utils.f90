@@ -13,7 +13,7 @@ Module mpi_utils
     ! exceeds the maximum threshold, the maximum threshold is used.  The
     ! maximum equates to 1 GiB worth of elements.
     !
-    Use params
+    Use conf_variables
 
     Implicit None
     
