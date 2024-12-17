@@ -31,7 +31,7 @@ c       - - - - - - - - - - - - - - - - - - - - - - - - -
 210     close(unit=13,status='delete')
         if (iflag.ne.0) goto 200
         nbytes=8/lrec
-        ipmr=4/nbytes
+        ipmr=8/nbytes
 C        write( *,5) nbytes
 C5       format(/2x,'Record unit =',i2,' byte(s)')
 c       - - - - - - - - - - - - - - - - - - - - - - - - -
