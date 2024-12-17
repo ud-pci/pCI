@@ -19,7 +19,7 @@ Module determinants
         Integer :: ic, n1, n0
 
         ic1=0
-        n0=IP1+1
+        n0=MaxNd0+1
         n1=0
 
         Do ic=1,Nc4

@@ -1153,7 +1153,7 @@ Contains
             Do ic=ic0,ic1
               kd=kd+Ndc(ic)
             End Do
-            If (kd4+kd > IP1) goto 100
+            If (kd4+kd > MaxNd0) goto 100
             kd4=kd4+kd
             kc4=kc4+NRN(icnr)
           End Do

@@ -51,7 +51,7 @@ Program ine
     !         General convention: GLOBAL VARIABLES     |||
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
-    Use params, IP1conf => IP1
+    Use params
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 

@@ -6,7 +6,7 @@ Module conf_variables
     
     Public
 
-    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0, kLSJ=0, KXIJ, KWeights
+    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0, kLSJ=0, KXIJ, KWeights, MaxNd0
     Integer             :: NmaxS=0, LmaxS=0, Nhint=0, NhintS=0, NgintS=0
     Integer             :: IPlv, nrd, kdavidson, num_is, Nc1, Nc_prev, Nd_prev
     Integer             :: Kherr=0, Kgerr=0, Lmax, Kmax, Ksym, Nsum, Nnr

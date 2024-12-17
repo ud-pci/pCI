@@ -134,7 +134,7 @@ Module conf_init
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat
-        character(len=5) :: key
+        character(len=10) :: key
         character(len=10) :: val
         character(len=80) :: line
         logical :: equals_in_str
@@ -150,6 +150,7 @@ Module conf_init
         K_sms = 0
         KWeights = 0
         KXIJ = 10
+        MaxNd0 = 3000
         
         ! read parameters (lines with "=")
         equals_in_str = .true.
@@ -202,6 +203,9 @@ Module conf_init
                 Case('KWeights')
                     ! KWeights determines whether CONF.WGT is written (1) or not (0)
                     Read(val, *) KWeights
+                Case('MaxNd0')
+                    ! MaxNd0 determines the size of the initial approximation in determinants
+                    Read(val, *) MaxNd0
                 End Select
             End If
         End Do

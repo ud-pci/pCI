@@ -1,5 +1,5 @@
 program formy
-    use params, IP1conf => IP1
+    use params
     use determinants, only : Dinit, Jterm
     use str_fmt, only : startTimer, stopTimer, FormattedTime
     use mpi_f08

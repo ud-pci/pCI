@@ -28,7 +28,6 @@ Module params
     !                     Array dimension          Associated variable
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
     Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
-    Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for direct diagonalization   
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
