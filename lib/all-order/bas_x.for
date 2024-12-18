@@ -23,10 +23,12 @@ C     - - - - - - - - - - - - - - - - - - - - - - - - -
      >        /C/C(IP6)/R/R(IP6)/V/V(IP6)
      >        /P/P(IP6)/Q/Q(IP6)/CP/CP(IP6)/CQ/CQ(IP6)
        common /kout/kout/small/small/let/let(6)
+       common /ipmr/ipmr
        character*1 let,ch4,FNAME*12
 C     - - - - - - - - - - - - - - - - - - - - - - - - -
         MaxT=9           !### length of expansion at the origin
         kout=1           !### output details
+        call recunit
         irec=2*IP6*IPmr  !### record length in DAT files
         let(1)='s'
         let(2)='p'
@@ -45,6 +47,7 @@ c        open(unit=11,file='BAS_X.RES',status='UNKNOWN')
 C     =================================================
       include "readf.inc"
       include "rintms.f"
+      include "rec_unit.inc"
 C     =================================================
       subroutine Init
       implicit real*8 (a-h,o-z)
@@ -56,6 +59,7 @@ C     =================================================
      1        /Z/Z/Cl/Cl/H/H/Rnuc/Rnuc
        common /Kk/Kk(IPs)/Jj/Jj(IPs)/Nn/Nn(IPs)/Ll/Ll(IPs)/Qq/Qq(IPs)
      >        /R/R(IP6)/V/V(IP6)
+       common /ipmr/ipmr
        dimension P(IP6),Q(IP6),P1(IP6),Q1(IP6),PQ(4*IP6)
        logical longbasis
        dimension IQN(4*IPs),Qq1(IPs)
@@ -288,6 +292,7 @@ C     =================================================
        common /ii/ii/iix/iix/Kt/Kt/H/H/Rnuc/Rnuc
        common /P/P(IP6)/Q/Q(IP6)/Pn/Pn(IPx6)/Qn/Qn(IPx6)
      >        /En/En(2*IPxo)/Rn/Rn(IPx6)/Vn/Vn(IPx6)/C/C(IPx6)
+       common /ipmr/ipmr
        dimension g(IPx6,IPxo),f(IPx6,IPxo)
 C     - - - - - - - - - - - - - - - - - - - - - - - - -
        write(*,*) ' Rewriting orbitals on new grid'

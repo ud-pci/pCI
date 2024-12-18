@@ -6,13 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2024-12-13
+## [1.1.0] - 2024-12-16
 - refactored main programs for gfortran compatibility
 - check_matrices.f90 - small new program check_matrices to check for errors in CONFp.HIJ and CONFp.JJJ
 - updated matrix_io.f90 to use mpi_f08
 - pconf.f90 -> pconf.F90, use preprocessing directives to compile ScaLAPACK routines
 - pconf - fixed allocation of array E for LAPACK subroutines
 - removed IPmr parameter from params.f90 and refactored IPmr-associated arrays
+- removed IPmr parameter from all-order package and refactored IPmr-associated arrays using rec_unit module
 - pconf - refactored KXIJ and KWeights into optional inputs
 - removed IP1 parameter from params.f90 and refactored IP1-associated arrays from main programs
 

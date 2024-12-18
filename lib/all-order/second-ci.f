@@ -518,6 +518,7 @@ C     =================================================
       include "hfd.par"  !### check directory for hfd.par!
       include "second.par"
        common /bassinp/ nor(nsorb),kor(nsorb),norb
+       common /ipmr/ipmr
        dimension P(IP6),Q(IP6),P1(IP6),Q1(IP6),PQ(4*IP6)
        logical longbasis
        dimension IQN(4000) ! dimension should be .GE. 4*IPs, IPs from conf.par
@@ -527,6 +528,7 @@ C     =================================================
 C     - - - - - - - - - - - - - - - - - - - - - - - - -
 c small number:
         c1=0.01d0
+        call recunit
 C     - - - - - - - - - - - - - - - - - - - - - - - - -
         open(12,file='HFD.DAT',access='DIRECT',
      >       status='OLD',recl=2*IP6*IPmr,err=700)
@@ -2373,3 +2375,4 @@ c     ========================================
       include "yfun.f"
       include "yint.f"
       include "inidat.f"
+      include "rec_unit.inc"
