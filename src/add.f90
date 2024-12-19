@@ -172,7 +172,7 @@ Contains
 
         Deallocate(nyi, myi, nyk, myk)
 
-        max_num_shells = nsmc+2*Mult
+        max_num_shells = nsmc+2*Mult+1
         Allocate(Ac(growth_size, max_num_shells))
         Do ic=1,Ncor
             Do j=1,nsmc
@@ -383,13 +383,6 @@ Contains
                 End If
                 ir=ir*iv(i)
             End Do
-
-            ! Check if number of relativistic configurations exceeds ivv array limit
-            If (ir.GT.500) Then
-                write(*,*) ' number of relativistic configurations ',ir
-                write(*,*) ' in one NR configuration exceed array size 500'
-                stop
-            End If
 
             ivc(jk)=1
             Do i=jk-1,1,-1
