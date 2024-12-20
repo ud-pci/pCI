@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - removed IPmr parameter from all-order package and refactored IPmr-associated arrays using rec_unit module
 - pconf - refactored KXIJ and KWeights into optional inputs
 - removed IP1 parameter from params.f90 and refactored IP1-associated arrays from main programs
+- add - increased allowed number of shells per configuration to up to 24
 
 ## [1.0.7] - 2024-11-17
 - refactored IP1 parameter out of pdtm.f90 and removed IP1 array size warnings

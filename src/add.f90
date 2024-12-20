@@ -172,7 +172,7 @@ Contains
 
         Deallocate(nyi, myi, nyk, myk)
 
-        max_num_shells = nsmc+2*Mult+1
+        max_num_shells = nsmc*2
         Allocate(Ac(growth_size, max_num_shells))
         Do ic=1,Ncor
             Do j=1,nsmc
@@ -912,9 +912,18 @@ Contains
             if (NOz(ic).GT.6.AND.NOz(ic).LE.12) then
               write (11,65) ic1,(Ac(ic,j),j=1,6)
               write (11,55) (Ac(ic,j),j=7,NOz(ic))
+            else if (NOz(ic).GT.12.AND.NOz(ic).LE.18) then
+                write (11,65) ic1,(Ac(ic,j),j=1,6)
+                write (11,55) (Ac(ic,j),j=7,12)
+                write (11,55) (Ac(ic,j),j=13,NOz(ic))
+            else if (NOz(ic).GT.18.AND.NOz(ic).LE.24) then
+                write (11,65) ic1,(Ac(ic,j),j=1,6)
+                write (11,55) (Ac(ic,j),j=7,12)
+                write (11,55) (Ac(ic,j),j=13,18)
+                write (11,55) (Ac(ic,j),j=19,NOz(ic))
             else
               write (*,75) ic,NOz(ic)
- 75           format ("NOz(",I5,")=",I3," is greater than 12")
+ 75           format ("NOz(",I5,")=",I3," is greater than 24")
               Stop
             end if
           end if
