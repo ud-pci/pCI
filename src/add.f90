@@ -172,7 +172,7 @@ Contains
 
         Deallocate(nyi, myi, nyk, myk)
 
-        max_num_shells = nsmc*2
+        max_num_shells = (nsmc+Mult)*2
         Allocate(Ac(growth_size, max_num_shells))
         Do ic=1,Ncor
             Do j=1,nsmc
