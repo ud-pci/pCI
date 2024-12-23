@@ -475,16 +475,27 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
             if shell_fmt not in frozen_shells:
                 frozen_shells.append(shell_fmt)
                 frozen_found[shell_fmt] = False
-        
+
         # Write the HFD.INP to construct orbitals for this shell
         NS = len(NL)
-        NSO = len(core_shells)
+        NSO = count_orbitals_in_list(core_shells)
         write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         
         index += 1
 
+def count_orbitals_in_list(shell_list):
+    # count number of orbitals in list of shells
+    num_orbitals = 0
+    for shell in shell_list:
+        if 'S' in shell or 's' in shell:
+            num_orbitals += 1
+        else:
+            num_orbitals += 2
+    
+    return num_orbitals
+
 def construct_vvorbs(core, valence, codename, nmax, lmax):
-# Construct list of valence and virtual orbitals
+    # Construct list of valence and virtual orbitals
     vorbs = []
     norbs = []
 
