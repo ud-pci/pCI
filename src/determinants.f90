@@ -19,7 +19,7 @@ Module determinants
         Integer :: ic, n1, n0
 
         ic1=0
-        n0=IP1+1
+        n0=MaxNd0+1
         n1=0
 
         Do ic=1,Nc4
@@ -96,7 +96,7 @@ Module determinants
     Subroutine Jterm
         Implicit None
 
-        Integer         :: i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1, jmax
+        Integer         :: j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1, jmax
         Real(dp)        :: d
         Integer, allocatable, dimension(:) :: idet, nmj
         logical :: fin, swapped
@@ -492,7 +492,7 @@ Module determinants
         ! it does NOT post-process the located indices to determine scaling factor (is) or
         ! correct differing indices
         !
-        ! The two Integer index vectors, "i" and "j", are three elements in size and are
+        ! The two integer index vectors, "i" and "j", are three elements in size and are
         ! used as:
         !
         !     i(1)        running index over comparison

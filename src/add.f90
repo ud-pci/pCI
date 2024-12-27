@@ -12,7 +12,7 @@ Program add
     Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
 
     ! Print program header
-    strfmt = '(/4X,"PROGRAM add v3.0"/)'
+    strfmt = '(/4X,"PROGRAM add v3.1"/)'
     Write(6, strfmt)
 
     ! Read inputs from ADD.INP
@@ -172,7 +172,7 @@ Contains
 
         Deallocate(nyi, myi, nyk, myk)
 
-        max_num_shells = nsmc+2*Mult
+        max_num_shells = (nsmc+Mult)*2
         Allocate(Ac(growth_size, max_num_shells))
         Do ic=1,Ncor
             Do j=1,nsmc
@@ -383,13 +383,6 @@ Contains
                 End If
                 ir=ir*iv(i)
             End Do
-
-            ! Check if number of relativistic configurations exceeds ivv array limit
-            If (ir.GT.500) Then
-                write(*,*) ' number of relativistic configurations ',ir
-                write(*,*) ' in one NR configuration exceed array size 500'
-                stop
-            End If
 
             ivc(jk)=1
             Do i=jk-1,1,-1
@@ -652,7 +645,7 @@ Contains
         New=.FALSE.
   
         Do j=1,noz1                  !### check of the Pauli principle:
-            i1=sign(1.01,Ac1(j))     !#### nq.LE.(4*l+2)
+            i1=sign(1.01_dp,Ac1(j))     !#### nq.LE.(4*l+2)
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d
@@ -665,7 +658,7 @@ Contains
         End Do
 
         Do j=1,noz1                  ! does this config.
-            i1=sign(1.01,Ac1(j))     !  belong to RAS?
+            i1=sign(1.01_dp,Ac1(j))     !  belong to RAS?
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d
@@ -919,9 +912,18 @@ Contains
             if (NOz(ic).GT.6.AND.NOz(ic).LE.12) then
               write (11,65) ic1,(Ac(ic,j),j=1,6)
               write (11,55) (Ac(ic,j),j=7,NOz(ic))
+            else if (NOz(ic).GT.12.AND.NOz(ic).LE.18) then
+                write (11,65) ic1,(Ac(ic,j),j=1,6)
+                write (11,55) (Ac(ic,j),j=7,12)
+                write (11,55) (Ac(ic,j),j=13,NOz(ic))
+            else if (NOz(ic).GT.18.AND.NOz(ic).LE.24) then
+                write (11,65) ic1,(Ac(ic,j),j=1,6)
+                write (11,55) (Ac(ic,j),j=7,12)
+                write (11,55) (Ac(ic,j),j=13,18)
+                write (11,55) (Ac(ic,j),j=19,NOz(ic))
             else
               write (*,75) ic,NOz(ic)
- 75           format ("NOz(",I5,")=",I3," is greater than 12")
+ 75           format ("NOz(",I5,")=",I3," is greater than 24")
               Stop
             end if
           end if

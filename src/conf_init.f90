@@ -134,7 +134,7 @@ Module conf_init
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat
-        character(len=5) :: key
+        character(len=10) :: key
         character(len=10) :: val
         character(len=80) :: line
         logical :: equals_in_str
@@ -148,12 +148,15 @@ Module conf_init
         Kw = 0
         KLSJ = 0
         K_sms = 0
+        KWeights = 0
+        KXIJ = 10
+        MaxNd0 = 3000
         
         ! read parameters (lines with "=")
         equals_in_str = .true.
         Do While (equals_in_str)
             Read(99, '(A)', iostat=err_stat) line
-            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+            If (index(string=line, substring="=") == 0 .or. err_stat /= 0) Then
                 equals_in_str = .false.
             Else
                 index_equals = index(string=line, substring="=")
@@ -193,6 +196,16 @@ Module conf_init
                     ! SMS to include 1-e (1), 2-e (2), or both (3)
                     Read(val, *) K_sms
                     ! Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
+                Case('KXIJ')
+                    ! KXIJ determines the interval in which CONF.XIJ will be written
+                    ! e.g. KXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
+                    Read(val, *) KXIJ
+                Case('KWeights')
+                    ! KWeights determines whether CONF.WGT is written (1) or not (0)
+                    Read(val, *) KWeights
+                Case('MaxNd0')
+                    ! MaxNd0 determines the size of the initial approximation in determinants
+                    Read(val, *) MaxNd0
                 End Select
             End If
         End Do
@@ -208,9 +221,9 @@ Module conf_init
     Subroutine ReadConfInp
         ! This subroutine reads input parameters from the header of CONF.INP
         Implicit None
-        Integer :: istr
+        
         Character(Len=1) :: name(16)
-        ! - - - - - - - - - - - - - - - - - - - - - -
+
         ! Optional parameters
         K_is = 0 
         C_is = 0.d0 
@@ -268,8 +281,6 @@ Module conf_init
         Implicit None
         Integer  :: i, i1, i2, ic, ne0, nx, ny, nz
         Real(dp) :: x
-        logical  :: equals_in_str
-        ! - - - - - - - - - - - - - - - - - - - - - -
         
         Call calcNsp
         Call GotoConfigurations
@@ -290,8 +301,8 @@ Module conf_init
                 Do i=i1,i2
                    x=abs(Qnl(i))+1.d-9
                    If (x < 1.d-8) Exit
-                   nx=10000*x
-                   ny=100*x
+                   nx=Int(10000*x)
+                   ny=Int(100*x)
                    nz=(nx-100*ny)
                    ne0=ne0+nz
                    If (mod(ny,10) > Nlx) Nlx=mod(ny,10) ! Set Nlx to be max partial wave
@@ -340,8 +351,8 @@ Module conf_init
                 Do i=1,num_orbitals_per_line
                    x=abs(line(i))+1.d-9
                    If (x < 1.d-8) Exit
-                   nx=10000*x
-                   ny=100*x
+                   nx=Int(10000*x)
+                   ny=Int(100*x)
                    nz=(nx-100*ny)
                    ne0=ne0+nz
                    counter = counter + 1

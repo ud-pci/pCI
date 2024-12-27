@@ -62,15 +62,21 @@ Program pconf
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
     Use env_var
-
+    
     Implicit None
+
+#ifdef USE_SCALAPACK
     External :: BLACS_PINFO, BLACS_EXIT
-    Integer   :: n, nnd, i, ierr, mype, npes, mpierr, threadLevel
-    Integer :: ncsf, nccj, max_ndcs, nbas
+#endif
+
+    Integer   :: n, i, ierr, mype, npes, mpierr, threadLevel
     Integer(kind=int64) :: start_time
-    Character(Len=255)  :: eValue, strfmt
+    Character(Len=255)  :: strfmt
     Character(Len=16)   :: timeStr
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
+
+    Type(MPI_Datatype) :: mpi_type_real
+    Type(MPI_Datatype) :: mpi_type2_real
 
     ! Initialize MPI
     Call MPI_Init_thread(MPI_THREAD_SINGLE, threadLevel, mpierr)
@@ -78,8 +84,11 @@ Program pconf
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     ! Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+
+#ifdef USE_SCALAPACK
     Call BLACS_PINFO(mype,npes)
-    
+#endif
+
     Call startTimer(start_time)
     
     ! Set MPI type for type_real
@@ -139,7 +148,7 @@ Program pconf
     
     ! Davidson diagonalization
     Call Diag4(mype,npes) 
-    
+
     ! Print table of final energies
     If (mype==0) Call PrintEnergies
 
@@ -155,18 +164,18 @@ Program pconf
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call PrintWeights
+        Close(11)
         
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf was '// trim(timeStr)
-    End If
-
-    ! In rank 0, close-out unit 11
-    If (mype == 0) Then
-        Close(11)
+        write(*,'(2X,A)') 'TIMING >>> Total computation time of conf was '// trim(timeStr)
     End If
 
     ! All done: 
+#ifdef USE_SCALAPACK
     Call BLACS_EXIT(0)
+#else
+    Call MPI_Finalize(mpierr)
+#endif
 
 Contains
 
@@ -179,13 +188,13 @@ Contains
 
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program pconf v6.1 with single precision")'
+            strfmt = '(4X,"Program pconf v6.2 with single precision")'
         Case(dp)            
             Select Case(type2_real)
             Case(sp)
-                strfmt = '(4X,"Program pconf v6.1")'
+                strfmt = '(4X,"Program pconf v6.2")'
             Case(dp)
-                strfmt = '(4X,"Program pconf v6.1 with double precision for 2e integrals")'
+                strfmt = '(4X,"Program pconf v6.2 with double precision for 2e integrals")'
             End Select
         End Select
         
@@ -268,8 +277,10 @@ Contains
     End Subroutine Input
 
     Subroutine Init
+        Use utils, Only : DetermineRecordLength
+
         Implicit None
-        Integer  :: ic, n, j, imax, ni, ni2, kkj, llj, nnj, i, nj, nr, if, &
+        Integer  :: ic, n, j, imax, ni, ni2, kkj, llj, nnj, i, nj, nr, nf, &
                     ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
         Real(dp) :: d, c1, c2, z1
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
@@ -277,7 +288,7 @@ Contains
         Integer, Dimension(0:33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(0:33):: lll, lll1, lll2
-        logical :: longbasis
+        Logical :: longbasis, success
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Character(Len=256) :: strfmt, err_msg
@@ -287,9 +298,26 @@ Contains
         Data Let/'s','p','d','f','g','h','i','k','l'/
 
         c1 = 0.01d0
-        mj = 2*dabs(Jm)+0.01d0
+        mj = Int(2*dabs(Jm)+0.01d0)
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        nnn=0
+        jjj=0
+        nqq=0
+        nnn1=0
+        qqq1=0
+        nnn2=0
+        qqq2=0
+        lll=''
+        lll1=''
+        lll2=''
+
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
+
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
@@ -312,8 +340,8 @@ Contains
 
         Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
         Allocate(Nrnrc(Nc))
-        Ns = pq(2)+c1
-        ii = pq(3)+c1
+        Ns = Int(pq(2)+c1)
+        ii = Int(pq(3)+c1)
         Rnuc=pq(13)
         dR_N=pq(16)
         
@@ -333,34 +361,34 @@ Contains
                 Jj(ni)=IQN(4*ni)
             End Do
         Else
-            if=20
+            nf=20
             Do ni=1,Ns
-                if=if+1
-                Nn(ni)=pq(if)+c1
-                if=if+1
-                Ll(ni)=pq(if)+c1
-                if=if+3
-                c2=dsign(c1,pq(if))
-                Kk(ni)=pq(if)+c2
-                if=if+1
-                c2=dsign(c1,pq(if))
-                Jj(ni)=pq(if)+c2
+                nf=nf+1
+                Nn(ni)=Int(pq(nf)+c1)
+                nf=nf+1
+                Ll(ni)=Int(pq(nf)+c1)
+                nf=nf+3
+                c2=dsign(c1,pq(nf))
+                Kk(ni)=Int(pq(nf)+c2)
+                nf=nf+1
+                c2=dsign(c1,pq(nf))
+                Jj(ni)=Int(pq(nf)+c2)
             End Do
         End If
 
         Nsu=0
         Do nj=1,Nsp
-            i=sign(1.d0,Qnl(nj))
+            i=Int(sign(1.d0,Qnl(nj)))
             d=dabs(Qnl(nj))+1.d-14
             d=10.0*d
-            nnj=d
+            nnj=Int(d)
             d=10.0d0*(d-nnj)
-            llj=d
+            llj=Int(d)
             jlj=2*llj+i
             kkj=-i*((jlj+1)/2)
             d=100.0d0*(d-llj)
-            Nq(nj)=d+0.1d0
-            Do ni=1,ns
+            Nq(nj)=Int(d+0.1d0)
+            Do ni=1,Ns
                 If (nnj == Nn(ni) .and. Kk(ni) == kkj) Then
                     Exit
                 Else If (ni == ns) Then
@@ -602,7 +630,7 @@ Contains
                 Iint1S(i)=ind
                 Rsig(i)=x
                 Dsig(i)=y
-                Esig(i)=z
+                Esig(i)=Real(z, kind=type2_real)
             End Do
         End Do
         xscr=10.d0
@@ -810,7 +838,7 @@ Contains
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
-                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+sizeof(C)+(8+type_real)*vaBinSize
+                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize
 
     End Subroutine calcMemStaticArrays
 
@@ -827,10 +855,12 @@ Contains
     
         Call calcMemStaticArrays
         Call FormattedMemSize(memStaticArrays, memStr)
-        Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr),' of memory per core. (These will not be deallocated)' 
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr), &
+                            ' of memory per core. (These will not be deallocated)' 
 
         Call FormattedMemSize(memFormH, memStr)
-        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr),' of memory per core' 
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr), &
+                            ' of memory per core' 
         
         memEstimate = memFormH + memStaticArrays
     
@@ -867,6 +897,8 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KXIJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KWeights, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(N_it, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -917,7 +949,7 @@ Contains
         Else
             count = Ngint*2_int64
         End If
-        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
@@ -1081,7 +1113,7 @@ Contains
                                     Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                                     tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                    If (tt /= 0) Then
+                                    If (tt /= 0_type_real) Then
                                         cntarray = cntarray + 1
                                         Call IVAccumulatorAdd(iva1, nn)
                                         Call IVAccumulatorAdd(iva2, kk)
@@ -1111,7 +1143,6 @@ Contains
                     Call MPI_RECV( cntarray, 3, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
              
-                    !If (devmode == 1) print*, cntarray(3), cntarray(1), sender
                     If (nnd + ndGrowBy <= Nd) Then
                         nnd = nnd + ndGrowBy
                         Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
@@ -1135,11 +1166,12 @@ Contains
                         Call FormattedMemSize(maxmem, memStr2)
                         Call FormattedMemSize(NumH*(8+type_real), memStr3)
                         Write(counterStr,fmt='(I16)') NumH
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
-                        Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+                        Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                            trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
                                                     Trim(memTotStr2) ,' is available.'
                             Stop
                         End If
@@ -1158,22 +1190,23 @@ Contains
                         memEstimate = memEstimate + maxmem
                         Write(counterStr,fmt='(I16)') NumH
                         Call FormattedMemSize(mem, memStr)
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
-                        Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
-                        Write(*,'(A)'), 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                        Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                            trim(memStr2)//')'
+                        Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
                                             // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
                         If (memTotalPerCPU /= 0) Then
                             If (statmem > memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
                                                         Trim(memTotStr2) ,' is available.'
                                 Stop
                             Else If (statmem < memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , &
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , &
                                                         Trim(memTotStr2) ,' is available.'
                             End If
                         Else
-                            Write(*,'(2X,A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, &
+                            Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, &
                                                         but available memory was not saved to environment'
                         End If
                         Exit
@@ -1264,7 +1297,7 @@ Contains
                     If (Kl /=3 .and. t == 0) numzero=numzero+1
                     If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
                         j=j+1
                     End If
                 End Do
@@ -1279,7 +1312,7 @@ Contains
         End If
 
         ih8=size(Hamil%val, kind=int64)
-        ih4=ih8
+        ih4=Int(ih8, kind=int32)
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
@@ -1330,7 +1363,7 @@ Contains
         ! Stop timer and output computation time of FormH 
         If (mype == 0) Then
             Call stopTimer(stot, timeStr)
-            write(*,'(2X,A)'), 'TIMING >>> FormH took '// trim(timeStr) // ' to complete'
+            write(*,'(2X,A)') 'TIMING >>> FormH took '// trim(timeStr) // ' to complete'
         End If
 
         Return
@@ -1340,7 +1373,7 @@ Contains
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
         Use determinants, Only : Rspq
         Use integrals, Only : Gint, Hint
-        Use formj2, Only : F_J0, F_J2
+        Use formj2, Only : F_J2
         Implicit None
         Integer, Allocatable, Dimension(:), Intent(InOut)   :: idet
         Integer, Intent(InOut)                              :: is, nf, i1, i2, j1, j2
@@ -1423,13 +1456,14 @@ Contains
         Implicit None
         Integer :: mpierr, mype
         Character(Len=16) :: memStr, memTotStr
+
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
-        If (.not. Allocated(E)) Allocate(E(Nlv))
+        If (.not. Allocated(E)) Allocate(E(2*Nlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(Nlv))
         If (.not. Allocated(B1)) Allocate(B1(Nd))
         If (.not. Allocated(B2)) Allocate(B2(Nd))
@@ -1457,15 +1491,15 @@ Contains
             Call FormattedMemSize(memTotalPerCPU, memTotStr)
             If (memTotalPerCPU /= 0) Then
                 If (memEstimate > memTotalPerCPU) Then
-                    Write(*,'(A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, but only ', &
+                    Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, but only ', &
                                             Trim(memTotStr) ,' is available.'
                     Stop
                 Else If (memEstimate < memTotalPerCPU) Then
-                    Write(*,'(A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, and ' , &
+                    Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, and ' , &
                                             Trim(memTotStr) ,' is available.'
                 End If
             Else
-                Write(*,'(2X,A,A,A,A)'), 'At least '// Trim(memStr), ' is required to finish conf, &
+                Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, &
                                             but available memory was not saved to environment'
             End If
         End If   
@@ -1476,10 +1510,16 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use env_var
-        Implicit None
-        External :: INFOG2L, PDELGET, SSYEV, DSYEV, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
 
-        Integer :: I, J, lwork, mype, npes, ifail, srcRow, srcCol
+        Implicit None
+        
+        External :: SSYEV, DSYEV
+#ifdef USE_SCALAPACK
+        External :: INFOG2L, PDELGET, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, &
+                    BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
+#endif
+
+        Integer :: I, J, lwork, mype, npes, ifail
         Integer :: NPROW, NPCOL, CONTEXT, MYROW, MYCOL, LIWORK, NROWSA, NCOLSA, NUMROC
         Integer(Kind=int64) :: s1, scalapackThreshold
         Integer(Kind=int64), Dimension(2) :: blacsGrid
@@ -1490,12 +1530,11 @@ Contains
         Integer, Allocatable, Dimension(:)     :: IWORK ! integer work array
         Real(type_real), Allocatable, Dimension(:)    :: W     ! double precision work array
         Real(type_real), Allocatable, Dimension(:,:)  :: A, Z
-        Character(len=48) :: blacsGridSpec
 
         If (mype == 0) Then
             ! At what point should we switch to the BLACS/ScaLAPACK algorithm?  The default
             ! value 10240 is just a guess and equates with an 800 MiB Z1:
-            scalapackThreshold = GetEnvInteger64("CONF_DIAG_INIT_APPROX_THRESHOLD", 10240)
+            scalapackThreshold = GetEnvInteger64("CONF_DIAG_INIT_APPROX_THRESHOLD", 10240_int64)
             isVerbose = GetEnvLogical("CONF_DIAG_INIT_APPROX_VERBOSE", .false.)
             shouldForceSerial = GetEnvLogical("CONF_DIAG_INIT_APPROX_FORCE_SERIAL", .false.)
             shouldForceScalapack = GetEnvLogical("CONF_DIAG_INIT_APPROX_FORCE_SCALAPACK", .false.)
@@ -1505,37 +1544,12 @@ Contains
         Call MPI_Bcast(isVerbose, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(shouldForceSerial, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(shouldForceScalapack, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
-        
+
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
-        ! If running in serial or size of initial approximation is below threshold, 
-        If (.not. shouldForceScalapack .and. (npes == 1 .or. Nd0 <= scalapackThreshold .or. shouldForceSerial)) Then
-            If (mype==0) Then
-                If (npes==1 .or. shouldForceSerial) Then
-                    Write(*,"(A)") "DiagInitApprox: ScaLAPACK not used, running serially"
-                Else
-                    Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
-                End If
-            End If
-            Select Case(type_real)
-            Case(sp)
-                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
-            Case(dp)
-                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
-            End Select
-            lwork = Nint(realtmp(1))
-            Allocate(W(lwork))
-            If (mype==0 .and. isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
-            Select Case(type_real)
-            Case(sp)
-                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
-            Case(dp)
-                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
-            End Select
-            If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
-            Deallocate(W)
-        Else
+#ifdef USE_SCALAPACK
+        If (shouldForceScalapack .and. (npes > 1 .or. Nd0 > scalapackThreshold)) Then
             If (mype==0) Write(*,"(A,I5,A)") "DiagInitApprox: ScaLAPACK used, will distribute across ", npes, " cpus"
             NPROW=1
             NPCOL=npes
@@ -1544,20 +1558,23 @@ Contains
             CALL BLACS_GET(-1, 0, CONTEXT)
             CALL BLACS_GRIDINIT(CONTEXT, 'R', NPROW, NPCOL)
             CALL BLACS_GRIDINFO(CONTEXT, NPROW, NPCOL, MYROW, MYCOL)
-            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: BLACS grid init, rank ", mype, " -> ", MYROW,  ",", MYCOL
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: BLACS grid init, rank ", &
+                                                            mype, " -> ", MYROW,  ",", MYCOL
 
             ! Calculate the number of rows, NROWSA, and the number of columns, NCOLSA, for the local matrices A
             If (mype==0) Then
                 blacsGrid(1) = GetEnvInteger("CONF_DIAG_INIT_APPROX_BLACS_ROWS", Nd0)
                 blacsGrid(2) = GetEnvInteger("CONF_DIAG_INIT_APPROX_BLACS_COLS", 1)
-                If (isVerbose) Write(*,"(A,I5,A,I5,A)") "DiagInitApprox: BLACS grid will be ", blacsGrid(1), " rows by ", blacsGrid(2), " columns"
+                If (isVerbose) Write(*,"(A,I5,A,I5,A)") "DiagInitApprox: BLACS grid will be ", blacsGrid(1), &
+                                                        " rows by ", blacsGrid(2), " columns"
             End If
             Call MPI_Bcast(blacsGrid, 2, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
             
             NROWSA = NUMROC(Nd0,blacsGrid(1),MYROW,0,NPROW)
             NCOLSA = NUMROC(Nd0,blacsGrid(2),MYCOL,0,NPCOL)
             ALLOCATE(A(NROWSA,NCOLSA), Z(NROWSA,NCOLSA))
-            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated local storage, rank ", mype, " -> ", NROWSA,  " x ", NCOLSA
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated local storage, rank ", &
+                                                            mype, " -> ", NROWSA,  " x ", NCOLSA
 
             ! Initialize array descriptors DESCA and DESCZ
             CALL DESCINIT(DESCA, Nd0, Nd0, blacsGrid(1), blacsGrid(2), 0, 0, CONTEXT, NROWSA, ifail)
@@ -1594,7 +1611,8 @@ Contains
             LWORK = realtmp(1)
             LIWORK = itmp(1)
             ALLOCATE(IWORK(LIWORK), W(LWORK))
-            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated work arrays, rank ", mype, " -> real=", LWORK,  ", integer=", LIWORK
+            If (isVerbose) Write(*,"(A,I5,A,I12,A,I12)") "DiagInitApprox: Allocated work arrays, rank ", mype, &
+                                                            " -> real=", LWORK,  ", integer=", LIWORK
 
             ! Compute the eigenvalues E1 and eigenvectors Z
             Select Case(type_real)
@@ -1621,12 +1639,47 @@ Contains
             ! Clean up
             Deallocate(IWORK, W, Z, A)
         End If
+#endif
+        If (.not. shouldForceScalapack .and. (npes <= 1 .or. Nd0 <= scalapackThreshold)) Then
+            If (mype==0) Then
+                If (npes==1 .or. shouldForceSerial) Then
+                    Write(*,"(A)") "DiagInitApprox: ScaLAPACK not used, running serially"
+                Else
+                    Write(*,"(A,I12,A,I12)") "DiagInitApprox: ScaLAPACK not used, ", Nd0, " <= ", scalapackThreshold
+                End If
+
+                Select Case(type_real)
+                Case(sp)
+                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                Case(dp)
+                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                End Select
+
+                lwork = Nint(realtmp(1))
+
+                Allocate(W(lwork))
+                If (isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
+                Select Case(type_real)
+                Case(sp)
+                    Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                Case(dp)
+                    Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                End Select
+                If (isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
+                Deallocate(W)
+            End If
+            Call MPI_Bcast(Z1, Nd0*Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(E1, Nd0, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        End If
+
         If (mype==0) Then
             ! Stop timer and print time for initial diagonalization
             Call stopTimer(s1, timeStr)
-            Write(*,"(2X,A,A,A)"), "TIMING >>> Initial diagonalization took ", trim(timeStr), " to complete"
+            Write(*,"(2X,A,A,A)") "TIMING >>> Initial diagonalization took ", trim(timeStr), " to complete"
         End If
+
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
     End Subroutine DiagInitApprox
 
     Subroutine Diag4(mype, npes)
@@ -1640,21 +1693,20 @@ Contains
         Implicit None
         External :: DSYEV, SSYEV
 
-        Integer  :: k1, k, i, n1, kx, i1, it, js, mype, npes, mpierr, ifail=0, lwork
+        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail, lwork
         Real(kind=type_real), Dimension(4) :: realtmp
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
         Character(Len=16) :: timeStr, iStr
-        Integer,  Allocatable, Dimension(:) :: Jn, Jk
-        Real(kind=type_real), Allocatable, Dimension(:) :: Jv
 
         ! Initialize parameters and arrays
         Iconverge = 0
         crit=1.d-6
         ax=1.d0
         cnx=1.d0
+        ifail=0
         If (.not. Allocated(ax_array)) Allocate(ax_array(Nlv))
 
         ! Start timer for Davidson procedure
@@ -1668,13 +1720,13 @@ Contains
         End If
 
         ! Construct initial approximation from Hamiltonian matrix
-        Call Init4(mype)
+        Call Init4(mype, mpi_type_real)
 
         ! Diagonalize the initial approximation 
         Call DiagInitApprox(mype, npes)
 
         ! Write initial approximation to file CONF.XIJ
-        Call FormB0(mype)
+        Call FormB0(mype, mpi_type_real)
         
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
         If (mype == 0) Then
@@ -1687,15 +1739,6 @@ Contains
             End Select
             lwork = Nint(realtmp(1))
             Allocate(W(lwork))
-        End If
-
-        ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        If (mype == 0) Then
-            js = size(Jsq%ind1)
-            Allocate(Jn(js),Jk(js),Jv(js))
-            Jn=Jsq%ind1
-            Jk=Jsq%ind2
-            Jv=Jsq%val
         End If
 
         ! Davidson loop:
@@ -1728,7 +1771,7 @@ Contains
                 End If
 
                 ! Formation of the left-upper block of the energy matrix P
-                Call Mxmpy(1, mype)
+                Call Mxmpy(1, mpi_type_real, mype)
                 If (mype==0) Then 
                     Call stopTimer(s1, timeStr)
                     Write(77,*) 'Mxmpy1 took ' // timeStr
@@ -1756,13 +1799,9 @@ Contains
                     Call stopTimer(s1, timeStr)
                     Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
                 End If
+                
                 If (K_prj == 1) Then
-                    If (mype == 0) Then
-                        Jsq%ind1=Jn
-                        Jsq%ind2=Jk
-                        Jsq%val=Jv
-                    End If
-                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mype)
+                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mpi_type_real, mype)
                     If (mype == 0) Then
                         Call startTimer(s1)
                         Do i=Nlv+1,2*Nlv
@@ -1785,11 +1824,12 @@ Contains
                         Write(77,*) 'Orthogonalization of Nlv additional probe vectors took ' // timeStr
                     End If
                 End If
+                
                 Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
                 If (cnx > Crt4) Then
                     ! Formation of other three blocks of the matrix P:
                     Call startTimer(s1)
-                    Call Mxmpy(2, mype)
+                    Call Mxmpy(2, mpi_type_real, mype)
                     If (mype==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'Mxmpy2 took ' // timeStr
@@ -1797,8 +1837,7 @@ Contains
                         Call FormP(2, vmax)
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'FormP2 took ' // timeStr
-                        ! >>>>> this block of code causes problem allocating xj, xl, xs arrays >>>>>
-                        ! >>>>>>>>>>>>>>>> if allocation occurs after this block >>>>>>>>>>>>>>>>>>>
+
                         ! Evaluation of Nlv eigenvectors:
                         Call startTimer(s1)
                         Select Case(type_real)
@@ -1807,7 +1846,6 @@ Contains
                         Case(dp)
                             Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
                         End Select
-                        ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
                         
@@ -1833,20 +1871,15 @@ Contains
                     End If
                     
                     Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                    ! Write intermediate CONF.XIJ in frequency of kXIJ
+                    ! Write intermediate CONF.XIJ in frequency of KXIJ
                     Call startTimer(s1)
-                    If (kXIJ > 0) Then
-                        ! Only write each kXIJ iteration
-                        If (mod(it, kXIJ) == 0) Then 
+                    If (KXIJ > 0) Then
+                        ! Only write each KXIJ iteration
+                        If (mod(it, KXIJ) == 0) Then 
                             ! Calculate J for each energy level
                             Do n=1,Nlv
                                 Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                                If (mype == 0) Then
-                                    Jsq%ind1=Jn
-                                    Jsq%ind2=Jk
-                                    Jsq%val=Jv
-                                End If
-                                Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+                                Call J_av(ArrB(1,n),Nd,Tj(n),mpi_type_real,ierr)  ! calculates expectation values for J^2
                             End Do
                             If (mype == 0) Then
                                 Call FormB
@@ -1878,21 +1911,12 @@ Contains
             End If
         End Do
 
-        ! temporary solution for value of Jsq%ind1 changing during LAPACK ZSYEV subroutine
-        If (mype == 0) Then
-            Jsq%ind1=Jn
-            Jsq%ind2=Jk
-            Jsq%val=Jv
-            If (allocated(Jn)) Deallocate(Jn)
-            If (allocated(Jk)) Deallocate(Jk)
-            If (allocated(Jv)) Deallocate(Jv)
-        End If
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
 
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
+            Write(*,'(2X,A)') 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
             Close(77)
         End If
 
@@ -1932,7 +1956,7 @@ Contains
         data strsms/'(1-e) ','(2-e) ','(full)','      '/
         data strms/'SMS','NMS',' MS'/
 
-        If (iter <= kXIJ) Then
+        If (iter <= KXIJ) Then
             Open(unit=81,status='REPLACE',file='CONF.ENG',action='WRITE')
         Else
             Open(unit=81,status='UNKNOWN',POSITION='APPEND',file='CONF.ENG',action='WRITE')
@@ -2005,13 +2029,13 @@ Contains
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: Weights, W2, Wsave
         Character(Len=512) :: strfmt, strconfig, strsp
-        Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
+        Character(Len=512), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq
         Integer, Dimension(0:33)  ::  nnn, nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(0:33):: lll
         Type WeightTable
-            Character(Len=64), Allocatable, Dimension(:) :: strconfs, strconfsave
+            Character(Len=512), Allocatable, Dimension(:) :: strconfs, strconfsave
             Integer, Allocatable, Dimension(:) :: nconfs, nconfsave
             Real(dp), Allocatable, Dimension(:) :: wgt, wgtsave
         End Type WeightTable
@@ -2026,7 +2050,7 @@ Contains
         If (.not. Allocated(Wpsave)) Allocate(Wpsave(nconfs,Nlv))
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
 
-        If (iter <= kXIJ) Then
+        If (iter <= KXIJ) Then
             Open(unit=98,status='REPLACE',file='CONF.LVL',action='WRITE')
         Else
             Open(unit=98,status='UNKNOWN',POSITION='APPEND',file='CONF.LVL',action='WRITE')
@@ -2102,7 +2126,8 @@ Contains
                     Else
                         strq = ''
                     End If
-                    strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                    strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // &
+                                Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
                 End Do
                 strcsave(k,j) = strconfig
             End Do
@@ -2151,8 +2176,10 @@ Contains
                     wgtconfs%strconfs(k) = strcsave(i,j)
                     k = k + 1
                 End If
-                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
-                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
+                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = &
+                    wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
+                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = &
+                    wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
                 wsum = wsum + Wsave(i,j)
             End Do
             Write(98,'(A)') '_______'
@@ -2207,16 +2234,13 @@ Contains
         Implicit None
         Integer :: i, n, ierr, mype, mpierr
 
-        !If (K_prj == 1) Then
-        !    Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype)
-        !End If
         If (mype == 0) Then
             open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
         End If
         
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-            Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+            Call J_av(ArrB(1,n),Nd,Tj(n),mpi_type_real,ierr)  ! calculates expectation values for J^2
             If (mype==0) Then
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
@@ -2366,14 +2390,14 @@ Contains
 
                     If (nnc == nccnt .and. nnc /= ncsplit*10) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         j=j-1
                         nccnt = nccnt + ncsplit
                     End If
 
                     If (num_done == npes-1) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         Exit
                     End If
                 End Do
@@ -2835,7 +2859,8 @@ Contains
     Subroutine PrintWeights
         ! This subroutine prints the weights of configurations
         Implicit None
-        Integer :: j, k, j1, j2, j3, ic, i, ii, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, nconfs, cnt, nspacesterm, maxlenconfig, num_blanks, num_blanks2
+        Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, &
+                    nconfs, cnt, nspacesterm, maxlenconfig, num_blanks, num_blanks2
         Real(dp) :: wsum, gfactor, ax_crit, j_crit
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
@@ -2871,7 +2896,7 @@ Contains
         If (.not. Allocated(strcsave)) Allocate(strcsave(nconfs,Nlv))
         If (.not. Allocated(converged)) Allocate(converged(Nlv))
 
-        If (kWeights == 1) Then
+        If (KWeights == 1) Then
             Open(88,file='CONF.WGT',status='UNKNOWN')
             strfmt = '(I8,I6,F11.7)'
         End If
@@ -2905,7 +2930,7 @@ Contains
         If (mod(Ne,2) == 1) nspacesterm = 3
         Wsave = 0_dp
         Do j=1,Nlv
-            If (kWeights == 1) Then
+            If (KWeights == 1) Then
                 Write(88,'(A,I3)') 'Level #', j
                 Write(88,'(A25)') '========================='
                 Write(88,'(A25)') '      ID    IC     W     '
@@ -2918,10 +2943,10 @@ Contains
                 Do k=1,ndk
                     i=i+1
                     W(ic,j)=W(ic,j)+C(i)**2
-                    If (kWeights == 1) Write(88,strfmt) i, ic, C(i)**2
+                    If (KWeights == 1) Write(88,strfmt) i, ic, C(i)**2
                 End Do
             End Do
-            If (kWeights == 1) Write(88,'(A25)') '========================='
+            If (KWeights == 1) Write(88,'(A25)') '========================='
             k=0
 
             ! Calculate weights of non-relativistic configurations and store in array W2
@@ -2972,7 +2997,8 @@ Contains
                     If (strconfig == '') Then
                         strconfig = Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
                     Else
-                        strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
+                        strconfig = Trim(AdjustL(strconfig)) // ' ' // Trim(AdjustL(strc)) // &
+                                    Trim(AdjustL(lll(i))) // Trim(AdjustL(strq))
                     End If
                 End Do
                 strcsave(k,j) = strconfig
@@ -3032,25 +3058,31 @@ Contains
                 ! Write column names if first iteration
                 If (j == 1) Then
                     num_blanks = max(0, maxlenconfig-3)
-                    Write(99, '(A)') '  n' // '  ' // repeat(' ', num_blanks) // 'conf  term     E_n (a.u.)   DEL (cm^-1)     S     L     J     gf     conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                    Write(99, '(A)') '  n' // '  ' // repeat(' ', num_blanks) // 'conf  term     E_n (a.u.)   DEL (cm^-1) &
+                                        S     L     J     gf     conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
                 End If
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 num_blanks = max(0, maxlenconfig-len_trim(strcsave(1,j))+1)
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
                     strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,2X,A,3X,f5.1,"%")'
-                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), &
+                                     (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, &
+                                     repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
                     strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f5.1,"%",5X,A)'
-                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100, strconverged
+                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), &
+                                        Tk(j), (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, maxval(W2(1:Nnr,j))*100, &
+                                        strconverged
                 End If
             ! If L, S, J is not needed
             Else
                 ! Write column names if first iteration
                 If (j == 1) Then
                     num_blanks = max(0, maxlenconfig-3)
-                    Write(99, '(A)') '  n ' // '  ' // repeat(' ', num_blanks) // 'conf       J         E_n (a.u.)   DEL (cm^-1)    conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                    Write(99, '(A)') '  n ' // '  ' // repeat(' ', num_blanks) // 'conf       J         E_n (a.u.)  &
+                                         DEL (cm^-1)    conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
                 End If
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
@@ -3058,11 +3090,14 @@ Contains
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
                     strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",,5X,A,2X,A,3X,f5.1,"%")'
-                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
+                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), &
+                                        (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) &
+                                        // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
                 ! Else we include only the main configuration
                 Else
                     strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f5.1,"%",5X,A)'
-                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100, strconverged
+                    Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), &
+                                        (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
             End If 
         End Do
@@ -3099,8 +3134,10 @@ Contains
                     wgtconfs%strconfs(k) = strcsave(i,j)
                     k = k + 1
                 End If
-                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
-                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
+                wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) = &
+                    wgtconfs%nconfs(findloc(wgtconfs%strconfs, strcsave(i,j))) + 1  
+                wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) = &
+                    wgtconfs%wgt(findloc(wgtconfs%strconfs, strcsave(i,j))) + Wsave(i,j)
                 wsum = wsum + Wsave(i,j)
             End Do
             Write(98,'(A)') '_______'
@@ -3172,7 +3209,7 @@ Contains
         Close(97)
         Close(98)
         Close(99)
-        If (kWeights == 1) Close(88)
+        If (KWeights == 1) Close(88)
 
         ! Print the weights of each configuration
         n=(Nlv-1)/5+1
@@ -3197,9 +3234,16 @@ Contains
             End Do
             Write(11,strfmt) (st1,i=j1,j3)
         End Do
-        Deallocate(C, W, W2, Wsave, Wpsave, strcsave, Ndc, Tk, Tj, ArrB)
-        Close(11)
-        
+
+        If (Allocated(W)) Deallocate(W)
+        If (Allocated(W2)) Deallocate(W2)
+        If (Allocated(Wsave)) Deallocate(Wsave)
+        If (Allocated(Wpsave)) Deallocate(Wpsave)
+        If (Allocated(strcsave)) Deallocate(strcsave)
+        If (Allocated(Ndc)) Deallocate(Ndc)
+        If (Allocated(Tk)) Deallocate(Tk)
+        If (Allocated(ArrB)) Deallocate(ArrB)
+                
     End Subroutine PrintWeights
 
     Character(Len=6) Function term(L, S, J)

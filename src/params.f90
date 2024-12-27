@@ -4,8 +4,7 @@ Module params
     !                      parameters determining dimensions of arrays,
     !                      and global variables and arrays used in parallel programs
     !
-    Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, int64
-    Use mpi_f08, Only : MPI_Datatype
+    Use, Intrinsic :: iso_fortran_env, Only : sp => real32, dp => real64, int32, int64
 
     Implicit None
     
@@ -29,27 +28,12 @@ Module params
     !                     Array dimension          Associated variable
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
     Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
-    Integer, Parameter :: IP1   =   3000         ! Nd1 - number of determinants for direct diagonalization   
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
-    Integer, Parameter :: IPmr  =      1         ! word length in direct access files
-                                                 ! =4 if word=1B (Pentium)
-                                                 ! =1 if word=4B (Alpha-processor)   
-
-    ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
-    Integer, Parameter :: type_real=dp
-    Type(MPI_Datatype) :: mpi_type_real
-
-    ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
-    Integer, Parameter :: type2_real=sp
-    Type(MPI_Datatype) :: mpi_type2_real
-
-    ! Set key to turn on extra outputs for developing
-    Integer, Parameter :: devmode=1
     
     ! Global variables 
-    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj
+    Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj, Mrec
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, Nx
     Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm, Crt4
 
@@ -59,8 +43,7 @@ Module params
     Integer, Allocatable, Dimension(:)    :: Jz, Nh, Nh0, Nip, Nq, Nq0, Nc0, Ndc, Nvc, Jtc
     Real(dp), Allocatable, Dimension(:)   :: D1, Qnl
     Integer, Allocatable, Dimension(:,:)  :: Iarr
-
-    Real(type_real), Allocatable, Dimension(:) :: B1, B2
+    Real(dp), Dimension(IPs)              :: Eps
 
     Save
                                        

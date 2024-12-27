@@ -25,6 +25,8 @@ Program conf_pt
     integer, allocatable, dimension(:)    :: Ndcnr, Nvcnr, NRR, NRN, Ndirc
     real(dp), allocatable, dimension(:)   :: B1h, En, Xj, EnG, Ey, DEnr, DVnr
     real(dp), allocatable, dimension(:,:) :: X0
+    
+    Type(MPI_Datatype) :: mpi_type2_real
 
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !
@@ -115,13 +117,13 @@ Contains
         ! Write name of program
         Select Case(type2_real)
         Case(sp)
-            strfmt = '(/4X,"Program CONF_PT v2.2", &
+            strfmt = '(/4X,"Program CONF_PT v2.3", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
         Case(dp) 
-            strfmt = '(/4X,"Program CONF_PT v2.2 with double precision for 2e integrals", &
+            strfmt = '(/4X,"Program CONF_PT v2.3 with double precision for 2e integrals", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
@@ -162,6 +164,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
+        Use utils, Only : DetermineRecordLength
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, err_stat, &
                                        nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
@@ -173,7 +176,8 @@ Contains
         Integer, Dimension(33)      :: nnn, jjj, nqq
         Character(Len=1)            :: Let(9), lll(33)
         Character(Len=512)          :: strfmt, err_msg
-        Logical                     :: longbasis
+        Logical                     :: longbasis, success
+
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                     (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
@@ -182,7 +186,13 @@ Contains
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
+
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
@@ -471,7 +481,7 @@ Contains
         Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(IntOrd, nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
-        Call BroadcastD(Rint2, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1143,7 +1153,7 @@ Contains
             Do ic=ic0,ic1
               kd=kd+Ndc(ic)
             End Do
-            If (kd4+kd > IP1) goto 100
+            If (kd4+kd > MaxNd0) goto 100
             kd4=kd4+kd
             kc4=kc4+NRN(icnr)
           End Do

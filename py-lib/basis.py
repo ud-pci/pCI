@@ -475,16 +475,27 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
             if shell_fmt not in frozen_shells:
                 frozen_shells.append(shell_fmt)
                 frozen_found[shell_fmt] = False
-        
+
         # Write the HFD.INP to construct orbitals for this shell
         NS = len(NL)
-        NSO = len(core_shells)
+        NSO = count_orbitals_in_list(core_shells)
         write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         
         index += 1
 
+def count_orbitals_in_list(shell_list):
+    # count number of orbitals in list of shells
+    num_orbitals = 0
+    for shell in shell_list:
+        if 'S' in shell or 's' in shell:
+            num_orbitals += 1
+        else:
+            num_orbitals += 2
+    
+    return num_orbitals
+
 def construct_vvorbs(core, valence, codename, nmax, lmax):
-# Construct list of valence and virtual orbitals
+    # Construct list of valence and virtual orbitals
     vorbs = []
     norbs = []
 
@@ -942,7 +953,7 @@ def run_ci_executables(bin_dir, order, custom):
     else:
         print("bass completed with no errors after", nTry - 1, "attempts")
     
-def run_ao_executables(K_is, C_is, bin_dir):
+def run_ao_executables(diag_basis, K_is, C_is, bin_dir):
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
@@ -976,9 +987,11 @@ def run_ao_executables(K_is, C_is, bin_dir):
     print("bas_wj complete")
 
     # Edit BASS.INP
-    f = open('BASS.INP', 'r')
-    lines = f.readlines()
-    f.close()
+    with open('BASS.INP', 'r') as f:
+        lines = f.readlines()
+
+    # Set diagonalization
+    Kdg = '0' if not diag_basis else '1'
 
     # Set first orbital for diagonalization to be first valence orbital
     fvalorb = vorbs[0]
@@ -994,31 +1007,31 @@ def run_ao_executables(K_is, C_is, bin_dir):
     frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core_orbitals.split()[-1])[-1])
     frorb = frorb_str[0] + " " + frorb_str[1][0]   
     
-    f = open('BASS.INP','w')
-    for line in lines:
-        if line[:4] == ' lst':
-            continue
-        elif 'first' in line.split() and 'diagonalization' in line.split():
-            f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
-        elif 'kin.bal.' in line.split():
-            f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
-        elif 'frozen' in line.split():
-            f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
-        elif line[:4] == 'kbrt':
-            f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
-            if K_is != 0:
-                f.write('K_is=' + str(K_is).rjust(2," ") + '\n')
-                f.write('C_is=' + str(C_is) + '\n')
-        elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
-            f.write(line[:12] + "\n")
-        else:
-            f.write(line)
-    f.close()
+    with open('BASS.INP','w') as f:
+        for line in lines:
+            if line[:4] == ' lst':
+                continue
+            elif 'diagonalization' in line.split() and 'Hamiltonian' in line.split():
+                f.write(' Kdg=' + Kdg.rjust(5," ") + '# diagonalization of Hamiltonian (0=no,1,2=yes)\n')
+            elif 'first' in line.split() and 'diagonalization' in line.split():
+                f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
+            elif 'kin.bal.' in line.split():
+                f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
+            elif 'frozen' in line.split():
+                f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
+            elif line[:4] == 'kbrt':
+                f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
+                if K_is != 0:
+                    f.write('K_is=' + str(K_is).rjust(2," ") + '\n')
+                    f.write('C_is=' + str(C_is) + '\n')
+            elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
+                f.write(line[:12] + "\n")
+            else:
+                f.write(line)
 
     # run bass until there are no errors in output
     with open('bass.in','w') as f: 
         f.write('WJ.DAT')
-    f.close()
 
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
@@ -1091,6 +1104,7 @@ if __name__ == "__main__":
     orbitals = get_dict_value(basis, 'orbitals')
     core_orbitals = get_dict_value(orbitals, 'core')
     valence_orbitals = get_dict_value(orbitals, 'valence')
+    diagonalize_basis = get_dict_value(basis, 'diagonalized')
     basis_nmax = get_dict_value(orbitals, 'nmax')
     basis_lmax = get_dict_value(orbitals, 'lmax')
     val_energies = get_dict_value(basis, 'val_energies')
@@ -1202,7 +1216,7 @@ if __name__ == "__main__":
                             dir_name = dir_prefix+str(abs(c))+'/basis'
                             os.chdir(dir_name)
                             run_shell('pwd')
-                            run_ao_executables(K_is, c, bin_dir)
+                            run_ao_executables(diagonalize_basis, K_is, c, bin_dir)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                             if script_name and submit_job:
                                 run_shell('sbatch ' + script_name)
@@ -1220,7 +1234,7 @@ if __name__ == "__main__":
                             Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                             os.chdir(method+'/basis')
                             run_shell('pwd')
-                            run_ao_executables(0, 0, bin_dir)
+                            run_ao_executables(diagonalize_basis, 0, 0, bin_dir)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                             if script_name and submit_job:
                                 run_shell('sbatch ' + script_name)
@@ -1232,7 +1246,7 @@ if __name__ == "__main__":
                         Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
                         run_shell('pwd')
-                        run_ao_executables(0, 0, bin_dir)
+                        run_ao_executables(diagonalize_basis, 0, 0, bin_dir)
                         script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                         if script_name and submit_job:
                             run_shell('sbatch ' + script_name)

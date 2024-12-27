@@ -40,7 +40,7 @@ Program pol
     !         General convention: GLOBAL VARIABLES     |||
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
-    Use params, ipmr1 => IPmr, IP1conf => IP1
+    Use params
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 
@@ -171,7 +171,7 @@ Program pol
     Close(unit=11) ! Close POL.RES
     Close(unit=99) ! Close POL_E1.RES
     Call stopTimer(start_time, timeStr)
-    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of pol was '// trim(timeStr)
+    Write(*,'(2X,A)') 'TIMING >>> Total computation time of pol was '// trim(timeStr)
     
 Contains
 
@@ -286,7 +286,7 @@ Contains
         equals_in_str = .true.
         Do While (equals_in_str)
             Read(88, '(A)', iostat=err_stat) line
-            If (index(string=line, substring="=") == 0 .or. err_stat) Then
+            If (index(string=line, substring="=") == 0 .or. err_stat /= 0) Then
                 equals_in_str = .false.
             Else
                 index_equals = index(string=line, substring="=")
@@ -360,7 +360,8 @@ Contains
         If (nrange > 0) Then
             Write(*,'(I2,A)') nrange, ' wavelength intervals with step size found:'
             Do i=1,nrange
-                Write(*,'(A,F11.3,A,F11.3,A,F11.4,A)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' nm in steps of ',xlambsteps(i), ' nm'
+                Write(*,'(A,F11.3,A,F11.3,A,F11.4,A)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i), &
+                                                        ' nm in steps of ',xlambsteps(i), ' nm'
             End Do
         Else
             Write(*,'(A)') 'ERROR: no wavelengths were specified'
@@ -389,7 +390,7 @@ Contains
 
         Call ReadPolIn
 
-        strfmt = '(1X,70("-"),/1X,"Program pol v1.0")'
+        strfmt = '(1X,70("-"),/1X,"Program pol v1.1")'
         Write( 6,strfmt) 
         Write(11,strfmt) 
 
@@ -864,7 +865,7 @@ Contains
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
         cnt=0
         Do i8=1,NumH
-            Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            Read(15) Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
             if (Hamil%n(i8) == Nd + 1) then
                 NumH=cnt
                 print*,'For Nd=',Nd,', NumH=', NumH
@@ -1003,7 +1004,7 @@ Contains
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
         
         strfmt = '(3X," NumH =",I10,";  Hmin =",F12.6/)'
         Write(*,strfmt) NumH,Hmin
@@ -1036,14 +1037,14 @@ Contains
         Call system_clock(end2)
         ttime2=Real((end2-start2)/clock_rate)
         Call FormattedTime(ttime2, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: Zspsv in '// trim(timeStr)// '.'
 
         X1= 0.d0
         X1(1:Ntr)= Real(XX1(1:Ntr), kind=dp)
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: decomp in '// trim(timeStr)// '.'
         
         If (sign == 1) Then
             Open(unit=16,file='POL_p.XIJ',status='UNKNOWN',form='UNFORMATTED')

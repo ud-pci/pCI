@@ -1,9 +1,10 @@
 Program hfd
     Use params, Ncc => Nc, Nqparams => Nq, Nnparams => Nn, Llparams => Ll, Kkparams => Kk, Jjparams => Jj
+    Use utils, Only : DetermineRecordLength
 
     Implicit None
 
-    Integer :: Mrec, iconf, MaxNc, is, ni, kt, ki, kf, n12, l, i, ii, nii, nit, iwr, iis, MaxT, &
+    Integer :: iconf, MaxNc, is, ni, kt, ki, kf, n12, l, i, ii, nii, nit, iwr, iis, MaxT, &
                 m1, m2, m3, ifin, kbr, n_is, Nmax, Imax, Nsmin, Nsmax, Ni0, Niter, ng, Lag, Klag
     Real(dp) :: eps0, eps1, e, d, del, r2, Rnucl, Gs, Es, Al, Bt, Cl, G0, R1, xja, xjc, Hs, Bts, Als
     Real(dp), Dimension(10) :: Vnuc
@@ -16,6 +17,7 @@ Program hfd
     Real(dp), Allocatable, Dimension(:) :: Qq, Qw, Zat
     Character(Len=1) :: let(5), str(4)*8, str1(2)*5, name(16)
     Character(Len=256) :: strfmt
+    Logical :: success
     
     let(1)='S'
     let(2)='P'
@@ -65,8 +67,11 @@ Program hfd
     M3=0
     
     Call OpenFS('HFD.RES',11,1)
-    Call recunit  ! determines word length
-    Mrec=ipmr
+    Call DetermineRecordLength(Mrec, success)
+    If (.not. success) Then
+        Write(*,*) 'ERROR: record length could not be determined'
+        Stop
+    End If
     Call INPUT
 
     eps0=1.d-7         !### eps0 defines covergence criterion
@@ -180,41 +185,6 @@ Program hfd
     Call CLOSEF(12)
 
 Contains
-
-    Subroutine recunit
-        ! Determination of the record unit.
-        Implicit None
-        
-        Integer :: lrec, iflag, ipmr, nbytes
-        Character(Len=8) :: d1,t1,d2,t2
-
-        t1='abcdefgh'
-        d1='        '
-        t2='hgfedcba'
-        d2='        '
-        lrec=0
-        iflag=1
-200     lrec=lrec+1
-        if (lrec.gt.8) then
-          write(*,*)  'lrec > 8'
-          stop
-        end if
-        open(unit=13,file='test.tmp',status='unknown',access='direct',recl=lrec)
-        write(13,rec=1,err=210) t1
-        write(13,rec=2,err=210) t2
-        read(13,rec=1,err=210) d1
-        read(13,rec=2,err=210) d2
-        if (d1.ne.t1) goto 210
-        if (d2.ne.t2) goto 210
-        iflag=0
-210     close(unit=13,status='delete')
-        if (iflag.ne.0) goto 200
-        nbytes=8/lrec
-        ipmr=4/nbytes
-
-        Return
-
-    End Subroutine recunit
 
     Subroutine OpenFS(fnam,kan,ntype)
         Implicit None
@@ -484,7 +454,7 @@ Contains
         strfmt = '(1X,16A1)'
         Read(10,strfmt) NAME
 
-        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.2",4X,16A1)'
+        strfmt = '(/2X,"PROGRAM HFD (version with IS and Breit) v1.3",4X,16A1)'
         Write( *,strfmt) NAME
         Write(11,strfmt) NAME
 
@@ -1240,8 +1210,11 @@ Contains
     Subroutine Fed(ni)
         Implicit None
 
-        Integer :: ni, ih, k, n, mm, im, j, i0, i1, i2, j1, j2, j3, j4, n1, n3, nt1, nt3, nj, i, m, l
-        Real(dp) :: eps, h1, hh, gam, e, e0, st, t, t1, s, hk, t2, t3, tp, tq, qm2, rj, pi, qi, pj, qj, d, dw, dc, da, db, dt, dq, pm2, e1, e3, dt1, dt3, dpp
+        Integer :: ni, ih, k, n, mm, im, j, i0, i1, i2, j1, j2, j3, j4, &
+                    n1, n3, nt1, nt3, nj, i, m, l
+        Real(dp) :: eps, h1, hh, gam, e, e0, st, t, t1, s, hk, &
+                    t2, t3, tp, tq, qm2, rj, pi, qi, pj, qj, &
+                    d, dw, dc, da, db, dt, dq, pm2, e1, e3, dt1, dt3, dpp
         Real(dp), Dimension(IP6) :: W
 
         W=0_dp
@@ -2968,13 +2941,13 @@ Contains
         Character(Len=256) :: strfmt
 
         C1=0.01D0
+
+        Allocate(Nn1(Ns), Kk1(Ns), Kp1(Ns), Nc1(Ns), Qq1(Ns))
         Nn1=0
         Kk1=0
         Kp1=0
         Nc1=0
         Qq1=0_dp
-
-        Allocate(Nn1(Ns), Kk1(Ns), Kp1(Ns), Nc1(Ns), Qq1(Ns))
 
         ITEST=0
         CALL READF (12,1,P,P,1)
@@ -3079,7 +3052,8 @@ Contains
             end if
 
             IF (ITEST.EQ.2) GOTO 380
-            strfmt = '(/2X,"CONFIGURATION WAS CHANGED"//10X,"HFD.INP",26X,"HFD.DAT"//8X,"NL",2X,"JJ",4X,"QQ",2X,"NC",16X,"NL",2X,"JJ",4X,"QQ",2X,"NC")'
+            strfmt = '(/2X,"CONFIGURATION WAS CHANGED"//10X,"HFD.INP",26X,"HFD.DAT"//8X,&
+                        "NL",2X,"JJ",4X,"QQ",2X,"NC",16X,"NL",2X,"JJ",4X,"QQ",2X,"NC")'
             WRITE( *,strfmt)
             WRITE(11,strfmt)
 

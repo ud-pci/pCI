@@ -11,7 +11,7 @@ Module davidson
 
   Contains
     
-    Subroutine Init4(mype)
+    Subroutine Init4(mype, mpi_type_real)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
         ! The initial approximation Hamilonian is stored in the 
@@ -22,6 +22,8 @@ Module davidson
         Use determinants, Only : calcNd0
         Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer  :: k, n, mype, mpierr
         Integer(Kind=int64) :: l8, s1
         Real(type_real) :: t
@@ -64,12 +66,12 @@ Module davidson
 
         If (mype == 0) Then
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Initial approximation constructed in '// trim(timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> Initial approximation constructed in '// trim(timeStr)
         End If
 
     End Subroutine Init4
 
-    Subroutine FormB0(mype)
+    Subroutine FormB0(mype, mpi_type_real)
         ! This subroutine constructs the initial eigenvectors for the Davidson iteration
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are written to CONF.XIJ 
@@ -77,6 +79,8 @@ Module davidson
         Use formj2, Only : J_av
         Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
         Integer(kind=int64) :: s1
         Real(dp) :: dummy
@@ -98,7 +102,7 @@ Module davidson
         If (abs(Kl4) /= 2) Then ! If not reading CONF.XIJ
             Do j=1,Nd0
                 B1(1:Nd0)=Z1(1:Nd0,j)
-                Call J_av(B1,Nd0,xj,ierr)
+                Call J_av(B1,Nd0,xj,mpi_type_real,ierr)
                 If (ierr == 0) Then
                     num=num+1
                     E(num)=-(E1(j)+Hamil%minval)
@@ -132,7 +136,7 @@ Module davidson
                 strfmt = '(1X,"E(",I3,") =",F12.6," Jtot =",F10.6)'
                 Write( 6,strfmt) j,E(j),Tj(j)
                 Write(11,strfmt) j,E(j),Tj(j)
-                If (kXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
+                If (KXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
             End Do
             close (unit=17)
             If (nskip > 0) Then
@@ -140,7 +144,7 @@ Module davidson
                 Write(11,*) ' Selection is done', nskip,' vectors skiped'
             End If
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Initial eigenvectors constructed in '// trim(timeStr) // '.'
+            Write(*,'(2X,A)') 'TIMING >>> Initial eigenvectors constructed in '// trim(timeStr) // '.'
         End If
         
         Return
@@ -318,8 +322,11 @@ Module davidson
 
         Integer :: j1, i, k, n01
         Real(type_real) :: val, t, cnorm, s
+        Real(type_real), Dimension(:), Allocatable :: C
         character(len=9) :: char
 
+        If (.not. Allocated(C)) Allocate(C(Nd0))
+        
         cnorm=0_type_real
         j1=j+Nlv
         val=P(j,j)
@@ -374,16 +381,21 @@ Module davidson
         End Do
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
+
+        If (Allocated(C)) Deallocate(C)
+
         Return
     End Subroutine Dvdsn
 
-    Subroutine Mxmpy(ip, mype)
+    Subroutine Mxmpy(ip, mpi_type_real, mype)
         ! This subroutine evaluates the products Q_i = H_ij * B_j
         ! if ip=1, products are stored in the second block of ArrB
         ! if ip=2, products are stored in the third block of ArrB
         Use mpi_f08
         Use mpi_utils, Only : BroadcastD
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer, Intent(In) :: ip, mype
 
         Integer :: i, k, nlp, n, mpierr, i2min, i2max, i1min, i1max, kd
@@ -420,7 +432,6 @@ Module davidson
                 t=t-Hamil%minval
                 If (kd == 1) Diag(n)=t
             End If
-            !If (devmode == 1 .and. mype == 1) print*, n, k, t, ArrB(n,i2min:i2max)
             ArrB(n,i2min:i2max)=ArrB(n,i2min:i2max)+t*ArrB(k,i1min:i1max)
             If (n /= k) ArrB(k,i2min:i2max)=ArrB(k,i2min:i2max)+t*ArrB(n,i1min:i1max)
         End Do
@@ -505,12 +516,15 @@ Module davidson
         Return
     End Subroutine Ortn
 
-    Subroutine Prj_J(lin, num, lout, trsd, mype) 
+    Subroutine Prj_J(lin, num, lout, trsd, mpi_type_real, mype) 
         Use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, lout, num, lin, jav, mpierr, imin, imax
         Integer, optional :: mype
+        Integer(kind=int64) :: j8
         Real(dp) :: err1, err, f, trsd
         Real(type_real) :: t, sj, aj, s, s1, a
         logical :: proceed
@@ -523,7 +537,7 @@ Module davidson
             Write(11,strfmt) Nlv,lout+num-1,IPlv
             Stop
         End If
-        jav=2*XJ_av+0.1d0
+        jav=Int(2*XJ_av+0.1d0)
         If (mype == 0) Then
             strfmt = '(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)'
             Write( *,strfmt) num,XJ_av
@@ -548,10 +562,10 @@ Module davidson
                     i2=lout+i-1
                     ArrB(1:Nd,i2)=0_type_real
                 End Do
-                Do j=1,ij8
-                    n=Jsq%ind1(j)
-                    k=Jsq%ind2(j)
-                    t=Jsq%val(j)
+                Do j8=1,ij8
+                    n=Jsq%ind1(j8)
+                    k=Jsq%ind2(j8)
+                    t=Jsq%val(j8)
                     Do i=1,num
                         proceed=(lin-1)*Iconverge(i)==0
                         If (proceed) Then

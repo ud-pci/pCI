@@ -14,7 +14,7 @@ target_link_libraries(hfd PUBLIC pci_common)
 ADD_EXECUTABLE(bass bass.f90)
 target_link_libraries(bass PUBLIC pci_common)
 
-ADD_EXECUTABLE(add params.f90 vaccumulator.f90 add.f90)
+ADD_EXECUTABLE(add params.f90 add.f90)
 target_link_libraries(add PUBLIC pci_common)
 
 ADD_EXECUTABLE(pbasc pbasc.f90)
@@ -24,7 +24,7 @@ target_include_directories(pbasc PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
 target_link_options(pbasc PUBLIC ${MPI_Fortran_LINK_FLAGS})
 target_link_libraries(pbasc PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
 
-ADD_EXECUTABLE(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 pconf.f90)
+ADD_EXECUTABLE(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 pconf.F90)
 target_compile_definitions(pconf PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
 target_compile_options(pconf PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
 target_include_directories(pconf PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
@@ -55,6 +55,9 @@ target_link_libraries(pdtm PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
 ADD_EXECUTABLE(sort str_fmt.f90 sort.f90)
 target_link_libraries(sort PUBLIC pci_common)
 
+ADD_EXECUTABLE(check_matrices check_matrices.f90)
+target_link_libraries(check_matrices PUBLIC pci_common)
+
 ADD_EXECUTABLE(ine ine.f90)
 target_link_options(ine PRIVATE ${MKL_PARALLEL_LINK_FLAGS})
 target_link_libraries(ine PRIVATE ${MKL_PARALLEL_LINK_FLAGS} pci_common)
@@ -70,4 +73,4 @@ target_include_directories(formy PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
 target_link_options(formy PUBLIC ${MPI_Fortran_LINK_FLAGS})
 target_link_libraries(formy PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
 
-INSTALL(TARGETS hfd bass add pbasc pconf conf_lsj pdtm ine pol conf_pt sort formy DESTINATION ${CMAKE_INSTALL_BINDIR})
+INSTALL(TARGETS hfd bass add pbasc pconf conf_lsj pdtm ine pol conf_pt sort check_matrices formy DESTINATION ${CMAKE_INSTALL_BINDIR})

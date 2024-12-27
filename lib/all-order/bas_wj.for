@@ -51,6 +51,7 @@ C     - - - - - - - - - - - - - - - - - - - - - - - - -
 C     =================================================
       include "readf.inc"
       include "rintms.f"
+      include "rec_unit.inc"
 C     =================================================
       subroutine Input
       implicit real*8 (a-h,o-z)
@@ -499,11 +500,13 @@ C     =================================================
        common /g0/g0(IPx6,IPxo,IPpw)/f0/f0(IPx6,IPxo,IPpw)
      >        /En0/En0(2*IPxo,IPpw)/Pn/Pn(IPx6)/Qn/Qn(IPx6)
      >        /Norb/Norb(IPxo,IPpw)
-
+       common /ipmr/ipmr
        dimension P(IP6),Q(IP6),P1(IP6),Q1(IP6)
 
        character*1 let, FNAME1*12
+
 C     - - - - - - - - - - - - - - - - - - - - - - - - -
+        call recunit
         open(12,file=FNAME1,access='DIRECT',
      >       status='UNKNOWN',recl=2*IP6*IPmr)
         close(12,status='DELETE')

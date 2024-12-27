@@ -6,6 +6,5 @@ c #################################################################
      >           IPxo =     40,  !### number of orbitals in PW =nx
      >           IPkx =     15,  !### defines array tx in hfspl.1 =kx
      >           IPpw =     17)  !### max num of partial waves
-       PARAMETER(IPmr  =     1)  !###  =4 if word=1B (Pentium)
-                                 !###  =1 if word=4B (Alpha-processor)
+     
 !!!! Note that these parameters should agree with nhf,nx, &kx in allcore.par

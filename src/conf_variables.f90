@@ -6,16 +6,7 @@ Module conf_variables
     
     Public
 
-    ! Set kXIJ to determine the interval in which CONF.XIJ will be written
-    ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
-    Integer, Parameter :: kXIJ=10
-    
-    ! Set kWeights to determine whether CONF.WGT is written or not
-    ! If kWeights=0, then CONF.WGT is not written
-    ! If kWeights=1, then CONF.WGT is written
-    Integer, Parameter :: kWeights=0
-
-    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0, kLSJ=0
+    Integer             :: Kexn=0, Ksig=0, Kdsig=0, K_prj=0, K_sms=0, Kw=0, kLSJ=0, KXIJ, KWeights, MaxNd0
     Integer             :: NmaxS=0, LmaxS=0, Nhint=0, NhintS=0, NgintS=0
     Integer             :: IPlv, nrd, kdavidson, num_is, Nc1, Nc_prev, Nd_prev
     Integer             :: Kherr=0, Kgerr=0, Lmax, Kmax, Ksym, Nsum, Nnr
@@ -31,16 +22,20 @@ Module conf_variables
     Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D
     Real(dp), Allocatable, Dimension(:,:)  :: W
 
+    ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
+    Integer, Parameter :: type_real=dp
+
+    ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
+    Integer, Parameter :: type2_real=sp
+    
     Real(type2_real), Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real(type2_real), Allocatable, Dimension(:,:)  :: Rint2
     
     Real(type_real),  Allocatable, Dimension(:,:) :: ArrB, P, Z1
     Real(type_real),  Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
+    Real(type_real), Allocatable, Dimension(:) :: B1, B2
 
-    Real(dp), Dimension(IPs)   :: Eps
-    Real(dp), Dimension(IP1)   :: C
-
-    Type Matrix(knd)
+    Type :: Matrix(knd)
         Integer, kind :: knd
         Real(kind=knd) :: minval
         Integer,  Allocatable, Dimension(:) :: ind1, ind2
