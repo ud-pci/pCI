@@ -123,12 +123,15 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         
         if not is_serial[code]:
             f.write('CONF_MAX_BYTES_PER_CPU=$((SLURM_MEM_PER_CPU*1024*1024))\n')
-            f.write('export CONF_MAX_BYTES_PER_CPU\n')
+            f.write('export CONF_MAX_BYTES_PER_CPU\n\n')
         
         # Executables
         if code == 'ci':
             f.write('${UD_MPIRUN} ' + bin_dir + 'pbasc\n')
-            f.write('${UD_MPIRUN} ' + bin_dir + 'pconf\n')
+            f.write('if [ $? -eq 0 ]; then\n')
+            f.write('    ${UD_MPIRUN} ' + bin_dir + 'pconf\n')
+            f.write('else\n')
+            f.write('    echo "pbasc failed, so pconf will not run."\n    exit 1\nfi\n')
         elif code == 'dtm':
             f.write('${UD_MPIRUN} ' + bin_dir + 'pdtm\n')
         elif code == 'dtm_rpa':
@@ -162,7 +165,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
     
 if __name__ == '__main__':
     output_path = '.'
-    code = 'ci+all-order'
+    code = 'ci'
     num_nodes = 5
     num_procs_per_node = 64
     exclusive = True
