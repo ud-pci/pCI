@@ -8,7 +8,7 @@ Module conf_variables
 
     ! Set kXIJ to determine the interval in which CONF.XIJ will be written
     ! e.g. kXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
-    Integer, Parameter :: kXIJ=10
+    Integer, Parameter :: kXIJ=5
     
     ! Set kWeights to determine whether CONF.WGT is written or not
     ! If kWeights=0, then CONF.WGT is not written

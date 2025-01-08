@@ -2239,7 +2239,8 @@ Contains
         !    Call Prj_J(1,Nlv,Nlv+1,1.d-8,mype)
         !End If
         If (mype == 0) Then
-            open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+            ! open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
+            Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
         End If
         
         Do n=1,Nlv
