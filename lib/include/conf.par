@@ -15,7 +15,6 @@ c                Array dimension       Associated variable
      >           IPc   =9000000,  !### Nc     - number of config-s
      >           IPst  =  50000,  !### Nst    = sum_i=1^Ns (2j_i+1)
      >           IPjd  =     33,  !### Njd    - number of possible J's
-     >           IPx   =    440)  !### Nx     - used for indexation of int-ls
        PARAMETER(IP1   =   2000,  !### Nd1    - number of determinants for
                                   !####         direct diagonalization
      >           IP4   =8990000,  !### Nd4    - number of determinants for

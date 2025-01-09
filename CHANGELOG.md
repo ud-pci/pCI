@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-01-09
+- pdtm v4.2 - appended value of IPx parameter to end of DTM.INT to remove dependency on IPx parameter from rpa_dtm
+
 ## [1.1.0] - 2024-12-16
 - refactored main programs for gfortran compatibility
 - check_matrices.f90 - small new program check_matrices to check for errors in CONFp.HIJ and CONFp.JJJ
