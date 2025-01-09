@@ -74,6 +74,7 @@ Contains
         Allocate(Qnl(40)) ! max number of shells in a configuration
         Allocate(Nn(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
         Allocate(NOz(growth_size))
+        NOz=0
 
         ! Run through each core configuration
         Do ic=1,Ncor
@@ -268,7 +269,6 @@ Contains
         ji=0
 
         nozmax = maxval(NOz)+1
-
         Allocate(nyi(nozmax), myi(nozmax))
         Allocate(nyk(nozmax), myk(nozmax))
         Allocate(ivc(nozmax), ni(nozmax), li(nozmax), iv(nozmax))
@@ -321,7 +321,9 @@ Contains
         Call move_alloc(Ac, temp2)
         Call move_alloc(NOz, temp)
         Allocate(NOz(num_rel_confs), Ac(num_rel_confs, max_num_shells))
+        NOz=0
         NOz(1:num_rel_confs0) = temp
+        Ac=0_dp
         Ac(1:num_rel_confs0,1:max_num_shells) = temp2
         Deallocate(temp, temp2)
 
@@ -537,7 +539,9 @@ Contains
                                 Call move_alloc(Ac, temp2)
 
                                 Allocate(NOz(size(temp)+growth_size), Ac(size(temp2,1)+growth_size, max_num_shells))
+                                NOz=0
                                 NOz(1:size(temp)) = temp
+                                Ac=0_dp
                                 Ac(1:size(temp2,1),1:max_num_shells) = temp2
                                 Deallocate(temp, temp2)
                             End If

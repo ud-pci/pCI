@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.1] - 2025-01-09
 - pdtm v4.2 - appended value of IPx parameter to end of DTM.INT to remove dependency on IPx parameter from rpa_dtm
+- add.f90 - initialize NOz and Ac arrays
 
 ## [1.1.0] - 2024-12-16
 - refactored main programs for gfortran compatibility
