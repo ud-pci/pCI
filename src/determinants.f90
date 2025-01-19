@@ -10,6 +10,12 @@ Module determinants
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
     Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC
+    Public :: print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, FormBarr
+
+    Integer, Parameter, Public :: bits_per_int = 32
+    Integer, Public :: num_ints_bit_rep
+    Integer, Dimension(:), Allocatable, Public :: bdet, bdet1, bdet2
+    Integer, Dimension(:,:), Allocatable, Public :: Barr
 
   Contains
 
@@ -733,4 +739,120 @@ Module determinants
         Return
     End Subroutine CompNRC
 
-end module determinants
+    Subroutine FormBarr
+        Implicit None
+        
+        Integer :: i
+        Integer, Dimension(:), Allocatable :: idet, bdet
+
+        print*, 'Forming Barr...'
+
+        ! Calculate number of integers needed to store basis orbitals in bit representation
+        num_ints_bit_rep = (Nst + bits_per_int - 1) / bits_per_int
+
+        ! Allocate bit_rep equivalent of Iarr
+        Allocate(Barr(num_ints_bit_rep, Nd), bdet(num_ints_bit_rep), idet(Ne))
+
+        ! convert integer representation to bit representation
+        Do i=1,Nd
+            idet = Iarr(1:Ne, i)
+            Call convert_int_rep_to_bit_rep(idet, bdet, Ne)
+            Barr(1:num_ints_bit_rep, i) = bdet
+        End Do
+
+        Deallocate(bdet, idet)
+
+    End Subroutine FormBarr
+
+    Function print_bits(num, n_bits) Result(bitstr)
+        ! print bit string from bit representation of determinant
+        Implicit None
+        Integer, Intent(In) :: num, n_bits
+        Character(Len=n_bits) :: bitstr
+        Integer :: i
+
+        Do i=1,n_bits
+            If (btest(num, i-1)) Then
+                bitstr(i:i) = '1'
+            Else
+                bitstr(i:i) = '0'
+            End If
+        End Do
+
+    End Function print_bits
+
+    Subroutine convert_int_rep_to_bit_rep(int_rep, bit_rep, size_int_rep)
+        Implicit none
+        Integer, Dimension(:), Allocatable, Intent(In) :: int_rep ! integer representation
+        Integer, Dimension(:), Allocatable, Intent(InOut) :: bit_rep ! bit representation
+        Integer, Intent(In) :: size_int_rep
+        Integer :: i, index, bit_position ! loop index, integer index, bit position
+
+        ! initialize bit representation array to 0 (all orbitals unoccupied)
+        bit_rep = 0
+
+        ! loop over occupied orbitals and set the corresponding bits
+        Do i=1, size_int_rep
+            ! find which integer the orbital falls in
+            index = (int_rep(i) - 1) / bits_per_int + 1
+            
+            ! find which bit position within the integer the orbital falls in
+            bit_position = mod(int_rep(i) - 1, bits_per_int)
+            
+            ! set the bit corresponding to the orbital
+            bit_rep(index) = ibset(bit_rep(index), bit_position)
+        End Do
+
+    End Subroutine convert_int_rep_to_bit_rep
+
+    Subroutine convert_bit_rep_to_int_rep(bit_rep, int_rep)
+        Implicit None
+        Integer, Dimension(:), Allocatable, Intent(In) :: bit_rep ! bit representation
+        Integer, Dimension(:), Allocatable :: int_rep             ! integer representation
+        Integer :: i, j, cnt                                      ! loop index, integer index, bit position
+        Character(len=bits_per_int) :: bit_int
+
+        ! initialize int representation array to 0
+        int_rep = 0
+
+        ! loop over occupied orbitals and set the corresponding integer positions
+        cnt = 1
+        Do i=1, size(bit_rep)
+            ! we can skip '0' elements of the bit_rep since they correspond to no occupancy 
+            If (bit_rep(i) == 0) Cycle
+            bit_int = print_bits(bit_rep(i), bits_per_int)
+            Do j = 1, bits_per_int
+                If (bit_int(j:j) == '1') Then
+                    int_rep(cnt) = j + (i-1)*bits_per_int
+                    cnt = cnt + 1
+                End If
+            End Do
+        End Do
+
+    End Subroutine convert_bit_rep_to_int_rep
+
+    Function compare_bit_dets(bdet1, bdet2, n_ints) Result(ndiffs)
+        ! print bit string from bit representation of determinant
+        Implicit None
+        Integer, Dimension(:), Allocatable, Intent(In) :: bdet1, bdet2
+        Integer :: i, n_ints, nf, ndiffs
+
+        nf=0
+
+        Do i=1,n_ints
+            ! we can skip the i-th element of bdet1 and bdet2 if there are no occupancies
+            If (bdet1(i) /= 0 .or. bdet2(i) /= 0) Then
+
+                ! count differing bits
+                nf = nf + popcnt(ieor(bdet1(i), bdet2(i)))
+
+                ! we only care if the number of differences between determinants is < 3
+                If (nf >= 6) Exit
+            End If
+        End Do
+
+        ndiffs = (nf + 1) / 2
+
+    End Function compare_bit_dets
+
+End Module determinants
