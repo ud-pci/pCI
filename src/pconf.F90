@@ -1083,11 +1083,7 @@ Contains
 
         ! If Hamiltonian has not been fully constructed
         Else 
-            ! Read the previous Hamiltonian from file CONFp.HIJ
-            !!! Details of future implementation:
-            !!!    the matrix elements will have to be saved to arrays iva1, iva2, rva1
-            !!!    so those arrays can be extended when calculating new matrix elements 
-            !Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            ! If Kl = 3, read the previous Hamiltonian from file CONFp.HIJ
             If (Kl == 3) Then
                 Call ReadMatrix(iva1%vAccum,iva2%vAccum,rva1%vAccum,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
 
