@@ -9,8 +9,8 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC
-    Public :: print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, FormBarr
+    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC, FormBarr
+    Public :: print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, get_det_indexes
 
     Integer, Parameter, Public :: bits_per_int = 32
     Integer, Public :: num_ints_bit_rep
@@ -854,5 +854,81 @@ Module determinants
         ndiffs = (nf + 1) / 2
 
     End Function compare_bit_dets
+
+    Subroutine get_det_indexes(bdet1, bdet2, n_ints, ndiffs, is, det1_indexes, det2_indexes)
+        Implicit None
+
+        Integer, Dimension(:), Allocatable, Intent(In) :: bdet1, bdet2
+        Integer, Intent(In) :: n_ints, ndiffs
+        Integer, Intent(Out) :: is
+        Integer, Dimension(3), Intent(InOut) :: det1_indexes, det2_indexes
+        Integer, Dimension(2) :: l1, l2
+        Integer :: i, j, i1, j1, bit_position, temp, num_zero_bits, l
+        Logical :: first_found, bt1, bt2
+
+        i1=1
+        j1=1
+        det1_indexes = 0
+        det2_indexes = 0
+
+        num_zero_bits = 0
+        first_found = .false.
+
+        ! loop through integers representing bitstring determinants
+        Do i=1,n_ints
+            ! skip the i-th element of bdet1 and bdet2 if there are no occupancies
+            If (bdet1(i) == 0 .and. bdet2(i) == 0) Cycle
+
+            Do j=0,bits_per_int-1
+                bt1 = btest(bdet1(i), j)
+                bt2 = btest(bdet2(i), j)
+
+                ! mark first occupancy
+                If (bt1 .or. bt2) first_found = .true.
+
+                ! count zero bits after first occupancy
+                If (.not. bt1 .and. .not. bt2) Then
+                    if (first_found) num_zero_bits = num_zero_bits + 1
+                Else If (bt1 /= bt2) Then
+                    bit_position = (32 * (i-1)) + j + 1
+
+                    If (bt1) Then
+                        i1 = i1 + 1
+                        det1_indexes(i1) = bit_position
+                        l1(i1 - 1) = bit_position - num_zero_bits
+                    end If
+
+                    If (bt2) Then
+                        j1 = j1 + 1
+                        det2_indexes(j1) = bit_position
+                        l2(j1 - 1) = bit_position - num_zero_bits
+                    End If
+
+                    if ((ndiffs == 1 .and. i1 == 2 .and. j1 == 2) .or. (ndiffs == 2 .and. i1 == 3 .and. j1 == 3)) exit
+                End If
+            End Do
+        End Do
+
+        is = 1
+        Select Case(ndiffs)
+            Case(1)
+                If (num_zero_bits > 0) then
+                    l = iabs(l2(1) - l1(1) - 1)
+                    If (mod(l,2) == 1) is = -is 
+                End If
+            Case(2)
+                l = iabs(l2(1) - l1(1) - mod(num_zero_bits,2))
+                If (mod(l,2) == 1) is = -is 
+                l = iabs(l2(2) - l1(2) - mod(num_zero_bits,2))
+                If (mod(l,2) == 1) is = -is
+                temp = det2_indexes(2)
+                det2_indexes(2) = det2_indexes(3)
+                det2_indexes(3) = temp
+                temp = det1_indexes(2)
+                det1_indexes(2) = det1_indexes(3)
+                det1_indexes(3) = temp
+        End Select
+
+    End Subroutine get_det_indexes
 
 End Module determinants
