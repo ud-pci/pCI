@@ -26,7 +26,11 @@ Module conf_variables
     Integer, Parameter :: type_real=dp
 
     ! Set type2_real to determine whether to use single precision (sp) or double precision (dp) for two-electron and IS integrals
+#ifdef USE_DP_INTEGRALS
+    Integer, Parameter :: type2_real=dp
+#else
     Integer, Parameter :: type2_real=sp
+#endif
     
     Real(type2_real), Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr
     Real(type2_real), Allocatable, Dimension(:,:)  :: Rint2

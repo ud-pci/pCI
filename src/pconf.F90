@@ -57,7 +57,8 @@ Program pconf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    use determinants, only : Wdet, Dinit, Jterm, Rdet
+    use determinants, only : Wdet, Dinit, Jterm, Rdet, bits_per_int, &
+                            Barr, FormBarr, convert_int_rep_to_bit_rep, num_ints_bit_rep
     Use integrals, only : Rint
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -74,6 +75,8 @@ Program pconf
     Character(Len=255)  :: strfmt
     Character(Len=16)   :: timeStr
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
+
+    Logical :: use_bit_rep = .false., mem_check_passed = .false.
 
     Type(MPI_Datatype) :: mpi_type_real
     Type(MPI_Datatype) :: mpi_type2_real
@@ -129,7 +132,29 @@ Program pconf
         Call Jterm                  ! prints table with numbers of levels with given J
         Call Wdet('CONF.DET')       ! writes determinants to file CONF.DET
         Call FormD
+
+        ! determine whether bit representation should be used via 2 checks:
+        ! 1. comparing size of determinants
+        num_ints_bit_rep = ((Nst + bits_per_int - 1) / bits_per_int)
+
+        ! 2. compare total memory of Iarr + Barr vs ArrB
+        mem_check_passed = (Ne+num_ints_bit_rep)*Nd <= IPlv*2*Nd
+        If (Ne >= num_ints_bit_rep .and. mem_check_passed) Then
+            use_bit_rep = .true.
+            Call FormBarr
+        Else
+            use_bit_rep = .false.
+            if (Ne >= num_ints_bit_rep) print*, 'Memory check 1 failed: Ne > num_ints_bit_rep: ', Ne, '>', num_ints_bit_rep
+            if (.not. mem_check_passed) print*, 'Memory check 2 failed: Iarr + Barr > ArrB: ', (Ne+num_ints_bit_rep)*Nd, '>', IPlv*2*Nd
+        End If
     End If
+
+#ifdef FORCE_BIT_DET
+    use_bit_rep = .true.
+#endif
+#ifdef FORCE_INT_DET
+    use_bit_rep = .false.
+#endif
 
     ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype)
@@ -185,16 +210,18 @@ Contains
         Implicit None
         Integer :: err_stat
         Character(Len=64) :: strfmt
+        Character(Len=4) :: version
 
+        version = '7.0'
         Select Case(type_real)
         Case(sp)
-            strfmt = '(4X,"Program pconf v6.2 with single precision")'
+            strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
         Case(dp)            
             Select Case(type2_real)
             Case(sp)
-                strfmt = '(4X,"Program pconf v6.2")'
+                strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) // '")'
             Case(dp)
-                strfmt = '(4X,"Program pconf v6.2 with double precision for 2e integrals")'
+                strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) // ' with double precision for 2e integrals")'
             End Select
         End Select
         
@@ -777,6 +804,7 @@ Contains
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(K_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(use_bit_rep, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -822,6 +850,7 @@ Contains
             memFormH = sizeof(Nvc)+sizeof(Nc0) &
                 + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
                 + sizeof(IntOrd)
+            if (use_bit_rep) memFormH = memFormH + sizeof(Barr)
             If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
@@ -957,6 +986,14 @@ Contains
         Call MPI_Bcast(Diag, Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+
+        If (use_bit_rep) Then
+            Call MPI_Bcast(num_ints_bit_rep, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            If (.not. Allocated(Barr)) Allocate(Barr(num_ints_bit_rep, Nd))
+            count = num_ints_bit_rep*Int(Nd,kind=int64)
+            Call BroadcastI(Barr, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        End If
+
         If (K_is /= 0) Then
             Call MPI_Bcast(R_is, num_is, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -981,7 +1018,10 @@ Contains
     Subroutine FormH(npes, mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize, FormattedTime
-        Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2
+        Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2, &
+                                    bits_per_int, bdet1, bdet2, Barr, print_bits, &
+                                    convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, &
+                                    compare_bit_dets
         Use matrix_io
         Use vaccumulator
 
@@ -1012,6 +1052,11 @@ Contains
             Call calcMemReqs
         End If
 
+        If (use_bit_rep) Then
+            If (.not. allocated(bdet1)) allocate(bdet1(num_ints_bit_rep))
+            If (.not. allocated(bdet2)) allocate(bdet2(num_ints_bit_rep))
+        End If
+
         ! Read number of processors
         If (Kl == 3) Then
             Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
@@ -1038,11 +1083,7 @@ Contains
 
         ! If Hamiltonian has not been fully constructed
         Else 
-            ! Read the previous Hamiltonian from file CONFp.HIJ
-            !!! Details of future implementation:
-            !!!    the matrix elements will have to be saved to arrays iva1, iva2, rva1
-            !!!    so those arrays can be extended when calculating new matrix elements 
-            !Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            ! If Kl = 3, read the previous Hamiltonian from file CONFp.HIJ
             If (Kl == 3) Then
                 Call ReadMatrix(iva1%vAccum,iva2%vAccum,rva1%vAccum,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
 
@@ -1227,6 +1268,7 @@ Contains
                         cntarray(1)=0
                         Do n=nnd,endnd
                             Call Gdet(n,idet1)
+                            If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                             k=0
                             Do ic=1,Nc 
                                 kx=Ndc(ic)
@@ -1239,14 +1281,18 @@ Contains
                                     Else
                                         Do k1=1,kx
                                             k=k+1
-                                            Call Gdet(k,idet2)
-                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            If (use_bit_rep) Then
+                                                bdet2 = Barr(1:num_ints_bit_rep, k)
+                                                diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                                            Else
+                                                Call Gdet(k,idet2)
+                                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)    
+                                            End If
+                                            
                                             If (diff <= 2) Then
-                                                nn=n
-                                                kk=k
                                                 cntarray = cntarray + 1
-                                                Call IVAccumulatorAdd(iva1, nn)
-                                                Call IVAccumulatorAdd(iva2, kk)
+                                                Call IVAccumulatorAdd(iva1, n)
+                                                Call IVAccumulatorAdd(iva2, k)
                                             End If
                                         End Do
                                     End If
@@ -1447,6 +1493,7 @@ Contains
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
         If (Allocated(Iarr)) Deallocate(Iarr)
         If (Allocated(Scr)) Deallocate(Scr)
+        If (allocated(Barr)) Deallocate(Barr)
 
     End Subroutine DeAllocateFormHArrays
 

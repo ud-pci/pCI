@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(pci 
-        VERSION 1.1.1
+        VERSION 1.2.0
         DESCRIPTION "pCI software package"
         LANGUAGES Fortran)
 include(GNUInstallDirs)
@@ -72,7 +72,7 @@ endif()
 if (${CMAKE_Fortran_COMPILER} MATCHES "ifort")
     set(MKL_PARALLEL_FLAGS -qopenmp -mkl=parallel)
     set(MKL_PARALLEL_LINK_FLAGS -qopenmp -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
-    add_compile_options(-qopenmp -mkl=sequential)
+    add_compile_options(-DUSE_DP_INTEGRALS -qopenmp -mkl=sequential)
     add_link_options(-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
 elseif (${CMAKE_Fortran_COMPILER} MATCHES "ifx")
     set(MKL_PARALLEL_FLAGS -qopenmp -qmkl=parallel)
