@@ -33,7 +33,7 @@ Contains
         Integer, intent(Out) :: lrec
         Logical, intent(Out) :: success
 
-        Integer :: irecl, err_stat
+        Integer :: irecl, nbytes, err_stat
         Character(Len=8) :: test_data, read_data
 
         test_data = 'abcdefgh'
@@ -60,7 +60,8 @@ Contains
             Close(unit=10, status='DELETE')
             If (err_stat == 0 .and. read_data == test_data) Then
                 success = .true.
-                lrec = irecl
+                nbytes = 8/irecl
+                lrec = 4/nbytes
                 Exit
             End If
         End Do
