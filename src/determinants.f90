@@ -889,7 +889,7 @@ Module determinants
                 ! count zero bits after first occupancy
                 If (.not. bt1 .and. .not. bt2) Then
                     if (first_found) num_zero_bits = num_zero_bits + 1
-                Else If (bt1 /= bt2) Then
+                Else If (bt1 .neqv. bt2) Then
                     bit_position = (32 * (i-1)) + j + 1
 
                     If (bt1) Then
