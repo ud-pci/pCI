@@ -1875,7 +1875,7 @@ Contains
                                     G=G+g1
                                 End If
                                 If (l1 == 3 .and. iabs(jl-jk) <= 4 .and. (jl+jk) >= 4) Then
-                                    AE2= AE2 + AmpE2(tme, nol,xjl,lll, nok,xjk,lk)
+                                    AE2= AE2 - AmpE2(tme, nol,xjl,lll, nok,xjk,lk)
                                 End If
                                 If (l1 == 4) Then
                                     If (iabs(jl-jk) <= 6.and.(jl+jk) >= 6) Then
