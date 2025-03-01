@@ -1,15 +1,17 @@
 # Installation
-The pCI software package was designed to work primarily on 
+The pCI software package was designed to work primarily on HPC platforms running a Linux operating system.
+It has also been tested on smaller personal laptops running Microsoft Windows with WSL2. 
 
 ## Required libraries
 In order to compile pCI the following software libraries and tools are required: 
 
-* Intel Fortran compiler 2020u4+
+* A Fortran compiler, such as GNU Fortran "gfortran" v12.2+, Intel Fortran Classic "ifort" v2020u4+, or LLVM-based Intel Fortran "ifx"
 * CMake v3.13+ 
 * OpenMPI v4.1+ 
-* Python v3.x 
+* Python v3.9+
+* LAPACK and BLAS, or Intel Math Kernal Library (MKL)
 
-*Older versions of each library may be usable, but the listed versions have been tested.*
+*Older versions of each compiler and library may be usable, but the listed versions have been tested.*
 
 ## On HPC clusters
 If working on an HPC cluster, environment modules may be available using ``module load <package>`` for each required library. Please check your cluster's documentations for more information. 
