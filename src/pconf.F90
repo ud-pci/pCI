@@ -144,8 +144,8 @@ Program pconf
             Call FormBarr
         Else
             use_bit_rep = .false.
-            if (Ne >= num_ints_bit_rep) &
-                print*, 'Memory check 1 failed: Ne > num_ints_bit_rep: ', Ne, '>', num_ints_bit_rep
+            if (Ne < num_ints_bit_rep) &
+                print*, 'Memory check 1 failed: Ne < num_ints_bit_rep: ', Ne, '<', num_ints_bit_rep
             if (.not. mem_check_passed) &
                 print*, 'Memory check 2 failed: Iarr + Barr > ArrB: ', (Ne+num_ints_bit_rep)*Nd, '>', IPlv*2*Nd
         End If
