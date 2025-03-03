@@ -21,6 +21,11 @@ def parse_final_res(filename):
 
     ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
     Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
+    
+    # Get 1st energy level
+    ht_to_cm = 219474.63
+    energy0_au = float([num for num in lines[1].split('  ') if '.' in num][0])
+    
     for line in lines[1:]:
         index = int(re.findall("\d+",line)[0])
         confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
@@ -34,7 +39,8 @@ def parse_final_res(filename):
         term = terms[0].replace(' ', '')
         
         energies_au = float(nums[0])
-        energies_cm = float(nums[1])
+        energies_cm = ht_to_cm*(energy0_au-energies_au)
+        
         s = float(nums[2])
         l = float(nums[3])
         j = int(float(nums[4]))
