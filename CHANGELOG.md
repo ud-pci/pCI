@@ -6,13 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.0] - 2025-01-31
+## [1.2.0] - 2025-03-24
 - pconf v7.0 - implemented bit representation for determinant comparisons (initial version uses both bitstring and integer representation for faster computations)
-- pconf.f90 - added logic to determine whether to use bitstring or integer representation for determinants
-- pconf.f90 - added preprocessor directives (-DFORCE_BIT_DET or -DFORCE_INT_DET) to force either bitstring or integer determinants
-- pconf.f90 - implement bitstring determinant comparison in comparison stage of FormH
+- pconf.F90 - added logic to determine whether to use bitstring or integer representation for determinants
+- pconf.F90 - added preprocessor directives (-DFORCE_BIT_DET or -DFORCE_INT_DET) to force either bitstring or integer determinants
+- pconf.F90 - implement bitstring determinant comparison in comparison stage of FormH
 - determinants.f90 - implemented bitstring determinants functions and subroutines (FormBarr, print_bits, convert_int_rep_to_bit_rep, convert_bit_rep_to_int_rep, compare_bit_dets, get_det_indexes)
 - conf_variables.f90 -> conf_variables.F90, use preprocessing directive to select single or double precision for two-electron integrals
+- pdtm v3.4 - added transition rates in E2, E3, M2, M3 -.RES files
 
 ## [1.1.1] - 2025-01-09
 - pdtm v4.2 - appended value of IPx parameter to end of DTM.INT to remove dependency on IPx parameter from rpa_dtm
