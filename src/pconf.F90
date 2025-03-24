@@ -71,7 +71,7 @@ Program pconf
 #endif
 
     Integer   :: n, i, ierr, mype, npes, mpierr, threadLevel
-    Integer(kind=int64) :: start_time
+    Integer(kind=int64) :: start_time, mem_int, mem_bit
     Character(Len=255)  :: strfmt
     Character(Len=16)   :: timeStr
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
@@ -138,7 +138,9 @@ Program pconf
         num_ints_bit_rep = ((Nst + bits_per_int - 1) / bits_per_int)
 
         ! 2. compare total memory of Iarr + Barr vs ArrB
-        mem_check_passed = (Ne+num_ints_bit_rep)*Nd <= IPlv*2*Nd
+        mem_int = 1_int64*(Ne+num_ints_bit_rep)*Nd
+        mem_bit = IPlv*2_int64*Nd
+        mem_check_passed = mem_int <= mem_bit 
         If (Ne >= num_ints_bit_rep .and. mem_check_passed) Then
             use_bit_rep = .true.
             Call FormBarr
@@ -147,15 +149,17 @@ Program pconf
             if (Ne < num_ints_bit_rep) &
                 print*, 'Memory check 1 failed: Ne < num_ints_bit_rep: ', Ne, '<', num_ints_bit_rep
             if (.not. mem_check_passed) &
-                print*, 'Memory check 2 failed: Iarr + Barr > ArrB: ', (Ne+num_ints_bit_rep)*Nd, '>', IPlv*2*Nd
+                print*, 'Memory check 2 failed: Iarr + Barr > ArrB: ', mem_int, '>', mem_bit
         End If
     End If
 
 #ifdef FORCE_BIT_DET
     use_bit_rep = .true.
+    print*, 'Forcing bit representation for determinants'
 #endif
 #ifdef FORCE_INT_DET
     use_bit_rep = .false.
+    print*, 'Forcing integer representation for determinants'
 #endif
 
     ! Allocate global arrays used in formation of Hamiltonian
