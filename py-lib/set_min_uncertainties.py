@@ -1,6 +1,7 @@
 import os 
 import sys
 import yaml
+import math
 
 def read_yaml(filename):
     """ 
@@ -52,15 +53,20 @@ def set_min_uncertainties(name, min_percentage):
         val = float(line[6]) # matrix element value
         try:
             unc = float(line[7]) # matrix element uncertainty
+            if line[7] == '0':
+                unc = 0.00001
+            new_unc = math.sqrt(unc**2 + (min_percentage/100)**2)
+            line[7] = '{:,.5f}'.format(new_unc)
+            cnt += 1
         except ValueError:
             continue
-        if val*min_percentage/100 >= unc: cnt += 1
-        line[7] = '{:,.5f}'.format(max(val*min_percentage/100, unc))
         
     new_filename = filename.split('.')[0] + '_adjusted.' + filename.split('.')[1]
     print('# of matrix element uncertainties adjusted:', cnt)
     f = open(new_filename, 'w')
     for line in matrix_res:
+        if line[7] == '-':
+            continue
         f.write(','.join(line) + '\n')
     f.close()
     print(new_filename + ' has been written')
@@ -99,8 +105,7 @@ if __name__ == '__main__':
     if name in min_percentages:
         min_percent = min_percentages[name]
     else:
-        #min_percent = float(input('Input minimum uncertainty to set in percentage: '))
-        min_percent = 1.5
+        min_percent = float(input('Input minimum uncertainty to set in percentage: '))
     print('A minimum uncertainty of ' + str(min_percent) + '% has been set for all matrix elements.')
         
     set_min_uncertainties(name, min_percent)

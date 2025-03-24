@@ -85,7 +85,6 @@ C     - - - - - - - - - - - - - - - - - - - - - - - - -
 
         NPh= IPh
 
-        Nx=IPx                  !### Nx is used for indexation of Rnt
         open (13,file='DTM.INT',status='OLD',form='UNFORMATTED',
      >        err=200)
         read (13,end=201,err=201) Ns,Nso,Z
@@ -98,6 +97,7 @@ C     - - - - - - - - - - - - - - - - - - - - - - - - -
         write (*,*) ' reading integrals...'
         read (13) (Rnt(i),Int(i),i=1,Nint)
         write (*, 5) Nint,(Alet(i),Blet(ki(i)),i=1,IPcs)
+        read (13) Nx
  5      format (/1X,'### Radial integrals from DTM.INT (',
      >             ' Nint =',I6,' ) ###',
      >             /(4X,A4,' calculated by ',A4))

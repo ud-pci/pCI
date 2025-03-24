@@ -108,7 +108,7 @@ def parse_dtm_res():
         add_res_to_dict('M3', m33_res, expt_dict, matrix_elements)
 
     # Calculate lifetimes and branching ratios
-    ignore_g = True
+    ignore_g = False
     lifetime_threshold = 1e10 # set lifetime threshold to 317.1 yrs
     lifetimes = []
     f = open('transitions.txt','w')
