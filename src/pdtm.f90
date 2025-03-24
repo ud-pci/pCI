@@ -2016,17 +2016,24 @@ Contains
                     tr = (1.11995e18/((2*tj2+1)*(wl*10)**5))*AE2**2
                 End If
                 If (n2 >= n1) Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
-                                Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE2, -e1, -e2, -delEcm, wl, tr
+                                Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE2, -e1, -e2, -delEcm, &
+                                wl, tr
             End If
         End If
         ! Print table for E3
         If (Keys%E3 == 1) Then
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| E3 ||",1X,A,2X,A,">",2X, &
-                        F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
+                        F12.5,2X,F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AE3 /= 0.d0) Then
+                If (e2 > e1) Then
+                    tr = (3.14441e17/((2*tj1+1)*(wl*10)**7))*AE3**2
+                Else
+                    tr = (3.14441e17/((2*tj2+1)*(wl*10)**7))*AE3**2
+                End If
                 Write(102,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
-                                    Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE3, -e1, -e2, -delEcm, wl
+                                    Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE3, &
+                                    -e1, -e2, -delEcm, wl, tr
             End If
         End If
         ! Print table for M1
@@ -2047,21 +2054,32 @@ Contains
         ! Print table for M2
         If (Keys%M2 == 1) Then
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| M2 ||",1X,A,2X,A,">",7X,F12.5,2X, &
-                        F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
+                        F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AM2 /= 0.d0) Then
+                If (e2 > e1) Then
+                    tr = (1.49097e13/((2*tj1+1)*(wl*10)**5))*AM2**2
+                Else
+                    tr = (1.49097e13/((2*tj2+1)*(wl*10)**5))*AM2**2
+                End If
                 Write(104,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
-                                    Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM2, -e1, -e2, -delEcm, wl
+                                    Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM2, &
+                                    -e1, -e2, -delEcm, wl, tr
             End If
         End If
         ! Print table for M3
         If (Keys%M3 == 1) Then
             strfmt = '(I3," -> ",I3,":",2X,"<",A,2X,A,1X,"|| M3 ||",1X,A,2X,A,">",7X,F12.5,2X, &
-                        F14.8,2X,F14.8,2X,F18.2,2X,F14.2)'
+                        F14.8,2X,F14.8,2X,F18.2,2X,F14.2,2X,E14.4)'
 
             If (AM3 /= 0.d0) Then
+                If (e2 > e1) Then
+                    tr = (4.1861e12/((2*tj1+1)*(wl*10)**7))*AM3**2
+                Else
+                    tr = (4.1861e12/((2*tj2+1)*(wl*10)**7))*AM3**2
+                End If
                 If (n2 >= n1) Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
-                                Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM3, -e1, -e2, -delEcm, wl
+                                Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM3, -e1, -e2, -delEcm, wl, tr
             End If
         End If
         ! Print table for EDM
@@ -2158,16 +2176,16 @@ Contains
                                                      E2-E1 (cm**-1)         WL (nm)   Tr. Rate (1/s)'
             If (Keys%E3 == 1) Write(102,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || E3 || conf2' // &
                                                 strsp(1:nspaces02) // 'trm2>    <J1||E3||J2>       E1 (a.u.)       E2 (a.u.) &
-                                                     E2-E1 (cm**-1)           WL (nm)'
+                                                     E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%M1 == 1) Write(103,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || M1 || conf2' // &
                                                 strsp(1:nspaces02) // 'trm2>    <J1||M1||J2> (μ_0)      E1 (a.u.)       E2 (a.u.) &
                                                      E2-E1 (cm**-1)         WL (nm)     Tr. Rate (s)'
             If (Keys%M2 == 1) Write(104,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || M2 || conf2' // &
                                                 strsp(1:nspaces02) // 'trm2>    <J1||M2||J2> (μ_0)      E1 (a.u.)       E2 (a.u.) &
-                                                     E2-E1 (cm**-1)           WL (nm)'
+                                                     E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%M3 == 1) Write(105,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || M3 || conf2' // &
                                                 strsp(1:nspaces02) // 'trm2>    <J1||M3||J2> (μ_0)      E1 (a.u.)       E2 (a.u.) &
-                                                     E2-E1 (cm**-1)           WL (nm)'
+                                                     E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%EDM == 1) Write(108,'(A)') 'N1  ->  N2:  <conf1' // strsp(1:nspaces01) // 'trm1 || EDM || conf2' // &
                                                 strsp(1:nspaces02) // 'trm2>     EDM (a.u.)  EDM (Hz/e/cm)       E1 (a.u.) &
                                                       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
@@ -2203,16 +2221,16 @@ Contains
                                                   E2 (a.u.)      E2-E1 (cm**-1)         WL (nm)   Tr. Rate (1/s)'
             If (Keys%E3 == 1) &
                 Write(102,'(A)') 'N1  ->  N2:  < J1      M1 || E3 ||  J2      M2>    <J1||E3||J2>       E1 (a.u.) &
-                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
+                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%M1 == 1) &
                 Write(103,'(A)') 'N1  ->  N2:  < J1      M1 || M1 ||  J2      M2>    <J1||M1||J2> (μ_0)      E1 (a.u.) &
                                                   E2 (a.u.)      E2-E1 (cm**-1)         WL (nm)     Tr. Rate (s)'
             If (Keys%M2 == 1) &
                 Write(104,'(A)') 'N1  ->  N2:  < J1      M1 || M2 ||  J2      M2>    <J1||M2||J2> (μ_0)      E1 (a.u.) &
-                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
+                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%M3 == 1) &
                 Write(105,'(A)') 'N1  ->  N2:  < J1      M1 || M3 ||  J2      M2>    <J1||M3||J2> (μ_0)      E1 (a.u.) &
-                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
+                                                  E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)   Tr. Rate (1/s)'
             If (Keys%EDM == 1) &
                 Write(108,'(A)') 'N1  ->  N2:  < J1      M1 || EDM ||  J2      M2>     EDM (a.u.)  EDM (Hz/e/cm) &
                                                   E1 (a.u.)       E2 (a.u.)      E2-E1 (cm**-1)           WL (nm)'
