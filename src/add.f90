@@ -1,5 +1,5 @@
 Program add
-    Use params, nlvl => Nlv, nnparam => Nn
+    Use params, only: dp, Ne, Nso, Nc, Ncpt, Kc, Z, Mj, Cut0
     Implicit None
 
     ! set initial size and growth size for storing max number of configurations in Ac, NOz
@@ -8,11 +8,11 @@ Program add
     Integer :: Ncor, NsvNR, Mult, l, keyPT, max_num_shells
     Character(Len=32) :: strfmt
     Real(dp), Allocatable, Dimension(:, :) :: Ac
-    Integer, Allocatable, Dimension(:) :: NOz, Knr
-    Real(dp), Allocatable, Dimension(:) :: V, Nqmin, Nqmax
+    Integer, Allocatable, Dimension(:) :: NOz, Knr, Nqmin, Nqmax, NLnew, Nn, Ll
+    Real(dp), Allocatable, Dimension(:) :: V
 
     ! Print program header
-    strfmt = '(/4X,"PROGRAM add v3.1"/)'
+    strfmt = '(/4X,"PROGRAM add v3.2"/)'
     Write(6, strfmt)
 
     ! Read inputs from ADD.INP
@@ -41,7 +41,7 @@ Contains
                     iskip, ics, ji, k, jk, idif, qqmax, nozmax
         Real(dp) :: x
         Integer, Allocatable, Dimension(:) :: nyi, myi, nyk, myk
-        Integer, Allocatable, Dimension(:) :: Nq1, Nq2, Nq3, Nn
+        Integer, Allocatable, Dimension(:) :: Nq1, Nq2, Nq3
         Real(dp), Allocatable, Dimension(:) :: Qnl
         Real(dp), Allocatable, Dimension(:,:) :: Ac0
         Character(Len=1), Allocatable, Dimension(:) :: let, chr
@@ -72,7 +72,7 @@ Contains
         ics=0       ! - basic non-rel. configurations 
 
         Allocate(Qnl(40)) ! max number of shells in a configuration
-        Allocate(Nn(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
+        Allocate(Nn(NsvNR), Ll(NsvNR), Nq1(NsvNR), Nq2(NsvNR), Nq3(NsvNR), let(NsvNR), chr(NsvNR))
         Allocate(NOz(growth_size))
         NOz=0
 
@@ -227,6 +227,8 @@ Contains
         End Do
 
         Nc=Ncor
+
+        Deallocate(Nq1, Nq2, Nq3, chr)
 
         Return
     End Subroutine Input
@@ -500,6 +502,7 @@ Contains
         Character(Len=128) :: strfmt
 
         If (.not. Allocated(Ac1)) Allocate(Ac1(max_num_shells))
+        Allocate(NLnew(size(Nqmin)))
         
         ! Loop over number of excitations
         Do l=1,Mult
@@ -556,7 +559,10 @@ Contains
             Write(*,*) ' number of NR conf-s after Constr: ',Nc
         End Do
 
+        Deallocate(NLnew)
         Deallocate(Ac1)
+        Deallocate(Nqmin, Nqmax, V)
+        Deallocate(Nn, Ll)
 
         Return
     End Subroutine Constr
@@ -647,9 +653,11 @@ Contains
         Real(dp), Allocatable, Dimension(:) :: Ac1
 
         New=.FALSE.
-  
-        Do j=1,noz1                  !### check of the Pauli principle:
-            i1=sign(1.01_dp,Ac1(j))     !#### nq.LE.(4*l+2)
+
+        NLnew=0
+
+        Do j=1,noz1                     !### check of the Pauli principle: nq.LE.(4*l+2)
+            i1=sign(1.01_dp,Ac1(j))     !#### and whether config. belongs to RAS
             d=abs(Ac1(j))+1.E-6
             d=10*d
             nnj=d
@@ -659,24 +667,22 @@ Contains
             d=100*(d-llj)
             nq=d
             If (nq.GT.4*llj+2) Return
-        End Do
-
-        Do j=1,noz1                  ! does this config.
-            i1=sign(1.01_dp,Ac1(j))     !  belong to RAS?
-            d=abs(Ac1(j))+1.E-6
-            d=10*d
-            nnj=d
-            d=10*(d-nnj)
-            llj=d
-            jlj=2*llj+i1
-            d=100*(d-llj)
-            nq=d
-
-            if (i1.LT.0) return
+            If (i1.LT.0) return
 
             nlj=10*nnj+llj
+            NLnew(nlj)=nq
+
             ! check that occupation numbers are within allowed limits
             If (nq.LT.Nqmin(nlj).OR.nq.GT.Nqmax(nlj)) Return 
+        End Do
+
+        ! check that occupation numbers are within allowed limits
+        ! for configs where all electrons are excited from a shell
+        ! (such shells are already removed from a config)
+        Do j=1,NsvNR              
+            nlj=10*Nn(j)+Ll(j)      
+            nq=NLnew(nlj)          
+            If (nq.LT.Nqmin(nlj)) Return
         End Do
 
         ! Check and see if configurations are new
