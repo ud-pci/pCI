@@ -1441,7 +1441,6 @@ Contains
         Integer*8 :: mem, memsum, count
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
         Integer, Allocatable, Dimension(:) :: idet1, idet2
-        Real(dp), Allocatable, Dimension(:) :: save_energies, save_J
         Character(Len=16)     :: memStr, npesStr, err_msg, err_msg2
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne))
@@ -1453,9 +1452,6 @@ Contains
         Allocate(ArrB2(Nd2,nlvs))
         Allocate(B1(Nd1),B2(Nd2))
         Allocate(Iarr2(Ne,Nd2))
-        Allocate(save_energies(nterm1f-nterm1+1), save_J(nterm1f-nterm1+1))
-        save_energies = 0_dp
-        save_J = 0_dp
 
         If (mype==0) Then
             ! Read in determinants of CONF1.DET
@@ -1572,8 +1568,7 @@ Contains
             lf=0
             iab2=0
             l2=0
-            save_energies(l1) = e1
-            save_J(l1) = tj1
+
             Do n2=n21,n22
                 l2=l2+1
                 lf=lf+1
@@ -1581,9 +1576,6 @@ Contains
                 B2(1:Nd2)=ArrB2(1:Nd2,iab2)
                 e2=e2s(iab2)
                 tj2=tj2s(iab2)
-
-                ! Skip transition if state2 == state1, or state2 <-> state1 has already been accounted for
-                If (any(save_energies == e2) .and. any(save_J == tj2)) Cycle
                 
                 If (dabs(tj2-tj1) < 3.1d0) Then
                     Ro=0.d0
@@ -2015,7 +2007,7 @@ Contains
                 Else
                     tr = (1.11995e18/((2*tj2+1)*(wl*10)**5))*AE2**2
                 End If
-                If (n2 >= n1) Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
+                Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE2, -e1, -e2, -delEcm, &
                                 wl, tr
             End If
@@ -2047,7 +2039,7 @@ Contains
                 Else
                     tr = (2.69735e13/((2*tj2+1)*(wl*10)**3))*G**2
                 End If
-                If (n2 >= n1) Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
+                Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), G, -e1, -e2, -delEcm, wl, tr
             End If
         End If
@@ -2078,7 +2070,7 @@ Contains
                 Else
                     tr = (4.1861e12/((2*tj2+1)*(wl*10)**7))*AM3**2
                 End If
-                If (n2 >= n1) Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
+                Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM3, -e1, -e2, -delEcm, wl, tr
             End If
         End If
