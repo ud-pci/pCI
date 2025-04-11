@@ -147,9 +147,9 @@ Program pconf
         Else
             use_bit_rep = .false.
             if (Ne < num_ints_bit_rep) &
-                print*, 'Memory check 1 failed: Ne < num_ints_bit_rep: ', Ne, '<', num_ints_bit_rep
+                print*, 'bitstring determinants not used: Ne < num_ints_bit_rep: ', Ne, '<', num_ints_bit_rep
             if (.not. mem_check_passed) &
-                print*, 'Memory check 2 failed: Iarr + Barr > ArrB: ', mem_int, '>', mem_bit
+                print*, 'bitstring determinants not used: Iarr + Barr > ArrB: ', mem_int, '>', mem_bit
         End If
     End If
 
