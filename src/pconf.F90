@@ -61,7 +61,7 @@ Program pconf
                             Barr, FormBarr, convert_int_rep_to_bit_rep, num_ints_bit_rep
     Use integrals, only : Rint
     use formj2, only : FormJ
-    Use str_fmt, Only : startTimer, stopTimer, FormattedTime
+    Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
     Use env_var
     
     Implicit None
@@ -73,7 +73,7 @@ Program pconf
     Integer   :: n, i, ierr, mype, npes, mpierr, threadLevel
     Integer(kind=int64) :: start_time, mem_int, mem_bit
     Character(Len=255)  :: strfmt
-    Character(Len=16)   :: timeStr
+    Character(Len=16)   :: timeStr, memStr1, memStr2
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
 
     Logical :: use_bit_rep = .false., mem_check_passed = .false., shouldForceBitDet
@@ -150,11 +150,25 @@ Program pconf
             Call FormBarr
         Else
             use_bit_rep = .false.
-            if (Ne < num_ints_bit_rep) &
-                print*, 'bitstring determinants not used: Ne < num_ints_bit_rep: ', Ne, '<', num_ints_bit_rep
-            if (.not. mem_check_passed) &
-                print*, 'bitstring determinants not used: Iarr + Barr > ArrB: ', mem_int, '>', mem_bit
+            
+            if (Ne < num_ints_bit_rep) Then
+                Write(memStr1, *) Ne
+                Write(memStr2, *) num_ints_bit_rep
+                print*, 'bitstring determinants not used: Ne < num_ints_bit_rep: ', Trim(memStr1), ' < ', Trim(memStr2)
+            End If
+            if (.not. mem_check_passed) Then
+                Call FormattedMemSize(mem_int, memStr1)
+                Call FormattedMemSize(mem_bit, memStr2)
+                print*, 'bitstring determinants not used: Iarr + Barr > ArrB: ', Trim(memStr1), ' > ', Trim(memStr2)
+            End If
         End If
+    End If
+
+    If (Kl == 4) Then
+        If (mype == 0) Call calcMemReqs
+        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Finalize(mpierr)
+        Stop
     End If
 
     If (shouldForceBitDet) Then
@@ -854,18 +868,6 @@ Contains
             If (.not. Allocated(IntOrdS)) Allocate(IntOrdS(nrd))
         End If
 
-        If (mype==0) Then
-            memFormH = 0_int64
-            memFormH = sizeof(Nvc)+sizeof(Nc0) &
-                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
-                + sizeof(IntOrd)
-            if (use_bit_rep) memFormH = memFormH + sizeof(Barr)
-            If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
-            If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
-                + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
-                + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
-        End If   
-
         Return
     End Subroutine AllocateFormHArrays
 
@@ -879,6 +881,24 @@ Contains
                         + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize
 
     End Subroutine calcMemStaticArrays
+
+    Subroutine calcMemFormHArrays
+        Implicit None
+
+        Integer :: mype
+
+        If (mype==0) Then
+            memFormH = 0_int64
+            memFormH = sizeof(Nvc)+sizeof(Nc0) &
+                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
+                + sizeof(IntOrd)
+            if (use_bit_rep) memFormH = memFormH + sizeof(Barr)
+            If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
+            If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
+                + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
+                + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
+        End If   
+    End Subroutine calcMemFormHArrays
 
     Subroutine calcMemReqs
         Use str_fmt, Only : FormattedMemSize
@@ -896,6 +916,7 @@ Contains
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr), &
                             ' of memory per core. (These will not be deallocated)' 
 
+        Call calcMemFormHArrays
         Call FormattedMemSize(memFormH, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr), &
                             ' of memory per core' 
@@ -914,6 +935,14 @@ Contains
         Call FormattedMemSize(mem, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
                             Trim(memStr),' of memory per core' 
+        
+        If (Kl == 4) Then
+            mem = memEstimate + memDvdsn
+            Call FormattedMemSize(mem, memStr)
+            Write(*,'(A,A,A)') 'calcMemReqs: Total memory required WITHOUT accounting for H and J^2 matrices is ', &
+                            Trim(memStr),' of memory per core'
+            Return
+        End If
     
         Call FormattedMemSize(memTotalPerCPU, memStr)
         If (memTotalPerCPU == 0) Then

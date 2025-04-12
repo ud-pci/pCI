@@ -171,6 +171,7 @@ Module conf_init
                     ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
                     ! Kl = 2 - new computation with MBPT
                     ! Kl = 3 - extending computation with new configurations (not implemented yet)
+                    ! Kl = 4 - compute minimum memory requirements for pconf
                     Read(val, *) Kl
                 Case('Ksig')
                     ! If starting new computation with MBPT
