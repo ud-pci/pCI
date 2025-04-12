@@ -76,7 +76,7 @@ Program pconf
     Character(Len=16)   :: timeStr
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
 
-    Logical :: use_bit_rep = .false., mem_check_passed = .false.
+    Logical :: use_bit_rep = .false., mem_check_passed = .false., shouldForceBitDet
 
     Type(MPI_Datatype) :: mpi_type_real
     Type(MPI_Datatype) :: mpi_type2_real
@@ -119,6 +119,10 @@ Program pconf
     End If
     memTotalPerCPU = GetEnvInteger64("CONF_MAX_BYTES_PER_CPU", 0_int64)
 
+    ! Read toggles from environment
+    ! Have to export CONF_USE_BIT_DET before job runs
+    shouldForceBitDet = GetEnvLogical("CONF_USE_BIT_DET", .false.)
+
     ! Initialization subroutines (core 0 will read input files and broadcast parameters and arrays to all others)
     If (mype == 0) Then
         ! Open the generic logging file:
@@ -153,14 +157,13 @@ Program pconf
         End If
     End If
 
-#ifdef FORCE_BIT_DET
-    use_bit_rep = .true.
-    print*, 'Forcing bit representation for determinants'
-#endif
-#ifdef FORCE_INT_DET
-    use_bit_rep = .false.
-    print*, 'Forcing integer representation for determinants'
-#endif
+    If (shouldForceBitDet) Then
+        use_bit_rep = .true.
+        print*, 'Forcing bit representation for determinants'
+    Else
+        use_bit_rep = .false.
+        print*, 'Forcing integer representation for determinants'
+    End If
 
     ! Allocate global arrays used in formation of Hamiltonian
     Call AllocateFormHArrays(mype)
