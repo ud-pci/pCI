@@ -2982,7 +2982,7 @@ Contains
 
         Open(99,file='FINAL.RES',status='UNKNOWN')
         Open(98,file='LEVELS.RES',status='UNKNOWN')
-        Open(97,file='CONFSTR.RES',status='UNKNOWN')
+        If (KLSJ == 1) Open(97,file='CONFSTR.RES',status='UNKNOWN')
 
         ! Form array of booleans of converged levels
         converged = .False.
@@ -3116,11 +3116,9 @@ Contains
                 End If
             End If
 
-            ! Writes main configurations to CONFSTR.RES
-            Write(97,'(A)') Trim(AdjustL(strcsave(1,j)))
-
-            ! If LSJ is calculated, also include terms in CONFSTR.RES
+            ! Writes main configurations and terms to CONFSTR.RES
             If (KLSJ == 1) Then
+                Write(97,'(A)') Trim(AdjustL(strcsave(1,j)))
                 strterm = term(Xl(j), Xs(j), Tj(j))
                 Write(97,'(A)') Trim(AdjustL(strterm))
             End If
@@ -3285,7 +3283,7 @@ Contains
             End If
         End Do
 
-        Close(97)
+        If (KLSJ == 1) Close(97)
         Close(98)
         Close(99)
         If (KWeights == 1) Close(88)
