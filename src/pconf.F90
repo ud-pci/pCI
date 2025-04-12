@@ -145,8 +145,9 @@ Program pconf
         mem_int = 1_int64*(Ne+num_ints_bit_rep)*Nd
         mem_bit = IPlv*2_int64*Nd
         mem_check_passed = mem_int <= mem_bit 
-        If (Ne >= num_ints_bit_rep .and. mem_check_passed) Then
+        If (shouldForceBitDet .or. (Ne >= num_ints_bit_rep .and. mem_check_passed)) Then
             use_bit_rep = .true.
+            print*, 'using bitstring determinants...'
             Call FormBarr
         Else
             use_bit_rep = .false.
@@ -169,14 +170,6 @@ Program pconf
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Finalize(mpierr)
         Stop
-    End If
-
-    If (shouldForceBitDet) Then
-        use_bit_rep = .true.
-        print*, 'Forcing bit representation for determinants'
-    Else
-        use_bit_rep = .false.
-        print*, 'Forcing integer representation for determinants'
     End If
 
     ! Allocate global arrays used in formation of Hamiltonian
@@ -1025,6 +1018,7 @@ Contains
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
 
+        Call MPI_Bcast(use_bit_rep, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
         If (use_bit_rep) Then
             Call MPI_Bcast(num_ints_bit_rep, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             If (.not. Allocated(Barr)) Allocate(Barr(num_ints_bit_rep, Nd))
