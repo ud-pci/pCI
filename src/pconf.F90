@@ -1053,7 +1053,7 @@ Contains
         Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2, &
                                     bits_per_int, bdet1, bdet2, Barr, print_bits, &
                                     convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, &
-                                    compare_bit_dets
+                                    compare_bit_dets, get_det_indexes
         Use matrix_io
         Use vaccumulator
 
@@ -1365,14 +1365,25 @@ Contains
                 Do n8=ih4+1,counter1
                     nn=Hamil%ind1(n8)
                     kk=Hamil%ind2(n8)
-                    Call Gdet(nn,idet1)
-                    Call Gdet(kk,idet2)
-                    Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    
+                    If (use_bit_rep) Then
+                        bdet1 = Barr(1:num_ints_bit_rep, nn)
+                        bdet2 = Barr(1:num_ints_bit_rep, kk)
+                        diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                        Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                        Call convert_bit_rep_to_int_rep(bdet1, idet1)
+                    Else
+                        Call Gdet(nn,idet1)
+                        Call Gdet(kk,idet2)
+                        Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                        Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    End If
+                    
                     If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
                     t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                     Hamil%val(n8)=t
-                    If (Kl /=3 .and. t == 0) numzero=numzero+1
+
+                    If (Kl /= 3 .and. t == 0) numzero=numzero+1
                     If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)

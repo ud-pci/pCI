@@ -760,6 +760,8 @@ Module determinants
             Barr(1:num_ints_bit_rep, i) = bdet
         End Do
 
+        print*, 'Barr formed...'
+
         Deallocate(bdet, idet)
 
     End Subroutine FormBarr
@@ -880,8 +882,8 @@ Module determinants
             If (bdet1(i) == 0 .and. bdet2(i) == 0) Cycle
 
             Do j=0,bits_per_int-1
-                bt1 = btest(bdet1(i), j)
-                bt2 = btest(bdet2(i), j)
+                bt1 = btest(bdet1(i), j) ! returns .true. if the j-th bit of bdet1(i) is set
+                bt2 = btest(bdet2(i), j) ! returns .true. if the j-th bit of bdet2(i) is set
 
                 ! mark first occupancy
                 If (bt1 .or. bt2) first_found = .true.
