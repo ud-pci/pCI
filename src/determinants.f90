@@ -9,7 +9,7 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC, FormBarr
+    Public :: Gdet, CompC, CompD, CompCD, CompNRC, FormBarr
     Public :: print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, get_det_indexes
 
     Integer, Parameter, Public :: bits_per_int = 32
@@ -641,40 +641,12 @@ Module determinants
         Implicit None
         Integer, Intent(Out)  :: icomp
         Integer, allocatable, dimension(:), Intent(In)  :: idet1, idet2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        
         iconf1(1:Ne)=Nh(idet1(1:Ne))   ! iconf1(i) = No of the orbital occupied by the electron i
         iconf2(1:Ne)=Nh(idet2(1:Ne))    
         Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompCD
-
-    Subroutine CompD2(id1,id2,nf)
-        ! this subroutine compares determinants and counts number of differences in orbitals
-        ! return the number of differences nf
-        Implicit None
-        Integer  :: nf, i, imax
-        Integer, allocatable, dimension(:)   :: id1, id2
-        Integer, dimension(Nsu) :: det1, det2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        det1=0
-        det2=0
-        det1(id1(1:Ne))=1
-        det2(id2(1:Ne))=1
-        nf = 0
-        imax=max(maxval(id1),maxval(id2))
-        !print*,imax
-        Do i=1,imax
-            nf = nf + popcnt(xor(det1(i),det1(i))) 
-        End Do
-        !Do i=1,Ne
-        !    nf = nf + popcnt(xor(id1(i),id2(i)))
-        !End Do
-        !print*,'before',id1(1:Ne),id2(1:Ne),nf
-        nf = ishft(nf,-1)
-        !print*,'after',id1(1:Ne),id2(1:Ne),nf
-        Return
-    End Subroutine CompD2
-
 
     Subroutine CompD(id1,id2,nf)
         ! this subroutine compares determinants and counts number of differences in orbitals
@@ -849,7 +821,10 @@ Module determinants
                 nf = nf + popcnt(ieor(bdet1(i), bdet2(i)))
 
                 ! we only care if the number of differences between determinants is < 3
-                If (nf >= 6) Exit
+                If (nf >= 6) Then
+                    ndiffs = 3
+                    Return
+                End If
             End If
         End Do
 
