@@ -1361,7 +1361,7 @@ Contains
             If (mype /= 0) Then
                 Allocate(Hamil%val(counter1))
                 Call startTimer(s2)
-                If (Kl==3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
+                If (Kl == 3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
                 Do n8=ih4+1,counter1
                     nn=Hamil%ind1(n8)
                     kk=Hamil%ind2(n8)
@@ -1371,7 +1371,7 @@ Contains
                         bdet2 = Barr(1:num_ints_bit_rep, kk)
                         diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
                         Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
-                        Call convert_bit_rep_to_int_rep(bdet1, idet1)
+                        Call Gdet(nn,idet1) ! more efficient to call Gdet here to get orbital positions
                     Else
                         Call Gdet(nn,idet1)
                         Call Gdet(kk,idet2)
@@ -1394,10 +1394,10 @@ Contains
             Else
                 print*, '========== Starting calculation stage of FormH =========='
             End If
-            If (Kl==3) numzero = count(Hamil%val==0)
+            If (Kl == 3) numzero = count(Hamil%val==0)
             Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-            If (mype==0) print*, '========== Formation of Hamiltonian matrix completed =========='
+            If (mype == 0) print*, '========== Formation of Hamiltonian matrix completed =========='
         End If
 
         ih8=size(Hamil%val, kind=int64)
@@ -1414,7 +1414,7 @@ Contains
         ! give all cores Hmin, the minimum matrix element value
         Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
-        If (mype==0) Then
+        If (mype == 0) Then
             ! Write number of non-zero matrix elements
             Write(counterStr,fmt='(I16)') NumH-numzero
             strfmt = '(4X,"NumH = ",A)'
