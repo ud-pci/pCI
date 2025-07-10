@@ -67,19 +67,19 @@ def reorder_levels(confs1, terms1, confs2, terms2, energies_au2, energies_cm2):
 
     return confs1, terms1, energies_au2, energies_cm2
 
-def create_mapping():
+def create_mapping(num_levels_even, num_levels_odd):
     '''
     This function reads Vipul's energy level table and creates the mapping between experimental and theory data
     Data to map: Config, Term, J, Energy(cm-1)
     '''
     filepath = "DATA_Output/"+name+"_Even.txt"
     f = open(filepath, 'r')
-    lines = f.readlines()
+    lines = f.readlines()[:num_levels_even + 1]
     f.close()
 
     filepath = "DATA_Output/"+name+"_Odd.txt"
     f = open(filepath, 'r')
-    lines = lines + f.readlines()
+    lines = lines + f.readlines()[:num_levels_odd + 1]
     f.close()
     
     mapping = []
@@ -365,11 +365,20 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         energy2 = line[7]
         wavelength = line[8]
 
+        # Set minimum matrix element value
+        if matrix_element_value == '0.00000':
+            matrix_element_value = '0.00001'
+            
         # Set minimum uncertainty
         try:
-            uncertainty = '{:,.5f}'.format(max(float(matrix_element_value)*min_unc_per/100, uncertainty))
+            uncertainty = '{:,.5f}'.format(math.sqrt(float(uncertainty)**2 + (min_unc_per/100)**2))
         except TypeError:
             uncertainty = '-'
+            print('Type Error for: ' + conf1 + ' ' + term1+J1 + ', ' + conf2 + ' ' + term2+J2)
+            continue
+        except ValueError as ve:
+            print('Uncertainty not found for: ' + conf1 + ' ' + term1+J1 + ', ' + conf2 + ' ' + term2+J2)
+            continue
         
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
@@ -378,16 +387,18 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             # mapping structure:
             # [expt=[conf, term, J, energy, unc], theory=[conf, term, J, energy, unc, final_conf, energy_au]]
             if line_theory[1][6] == '-': continue
-            if abs(float(line_theory[1][6]) - float(energy1)) < 1e-7:
+            if line_theory[1][6] == energy1:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 if ignore_g:
                     if 'g' in conf1 or 'G' in term1:
                         continue
                 J1 = line_theory[1][2]
-                # Check if NIST energy exists - if it does, overwrite theory energy
+                # Check if NIST energy exists - if it does, overwrite theory energy, configuration and term
                 if line_theory[0][3] != '-': 
                     conf1 = line_theory[0][0]
+                    term1 = line_theory[0][1]
+                    J1 = line_theory[0][2]
                     energy1cm = float(line_theory[0][3])
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(expt_shift)
@@ -397,7 +408,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                         energy1cm = energy1cm + float(theory_shift)
                 c1 = True
                 
-            if abs(float(line_theory[1][6]) - float(energy2)) < 1e-7:
+            if line_theory[1][6] == energy2:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 if ignore_g:
@@ -407,6 +418,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 # Check if NIST energy exists - if it does, overwrite theory energy
                 if line_theory[0][3] != '-': 
                     conf2 = line_theory[0][0]
+                    term2 = line_theory[0][1]
+                    J2 = line_theory[0][2]
                     energy2cm = float(line_theory[0][3])
                     if find_parity(conf2) != gs_parity:
                         energy2cm = energy2cm + float(expt_shift)
@@ -435,7 +448,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                    'wavelength(nm)': f"{wavelength:.2f}", 'transition_rate(s-1)': f"{trate:.4e}"}
             tr_df.loc[len(df.index)] = trrow
     
-    print('TOTAL MATRIX ELEMENTS:',len(df))
+    num_E1 = len(df)
+    print('TOTAL MATRIX ELEMENTS:', num_E1)
     
     df.to_csv(matrix_element_filename, index=False)
     print(matrix_element_filename + ' has been written')
@@ -443,7 +457,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     tr_df.to_csv(transition_rate_filename, index=False)
     print(transition_rate_filename + ' has been written')
 
-    return
+    return num_E1
 
 def nist_parity(term):
     ''' 
@@ -501,7 +515,7 @@ def find_ci_dirs(ci_path):
         use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(ci_path + ' directory was found - use data from this directory? ')))))
     
     if not use_path:
-        return None, None, None
+        return None, None, None, None
     
     if len(even_dirs) > 1:
         even_dir = input(str(len(even_dirs)) + ' even directories were found: (' + ', '.join(even_dirs) + ') - which one would you like to use data from? ')
@@ -512,13 +526,60 @@ def find_ci_dirs(ci_path):
     else:
         odd_dir = odd_dirs[0]
     if len(dtm_dirs) > 1:
-        dtm_dir = input(str(len(dtm_dirs)) + ' dtm directories were found: (' + ', '.join(dtm_dirs) + ') - which one would you like to use data from? ')
+        dtm_dir1 = input(str(len(dtm_dirs)) + ' dtm directories were found: (' + ', '.join(dtm_dirs) + ') - which one would you like to use data from? ')
+        dtm_dir2 = input('Select another dtm directory if desired: ')
+        if dtm_dir2 not in dtm_dirs:
+            if dtm_dir2 != '':
+                print(dtm_dir2 + ' was not found.')
+            dtm_dir2 = None
     else:
-        dtm_dir = dtm_dirs[0]
+        dtm_dir1 = dtm_dirs[0]
+        dtm_dir2 = None
         
     os.chdir('..')
         
-    return even_dir, odd_dir, dtm_dir
+    return even_dir, odd_dir, dtm_dir1, dtm_dir2
+
+def combine_tm(raw_path):
+    e1_res = []
+    
+    with open(raw_path + '/E1a.RES', 'r') as f:
+        lines = f.readlines()
+    with open(raw_path + '/E1.RES', 'w') as f:
+        for line in lines:
+            f.write(line)
+
+    for line in lines[1:]:
+        matrix_element = re.findall(r'\<.*?\>', line)[0]
+        e1_res.append(matrix_element)
+
+    with open(raw_path + '/E1b.RES', 'r') as f:
+        lines2 = f.readlines()
+    
+    with open(raw_path + '/E1.RES', 'a') as f:
+        for line in lines2[1:]:
+            matrix_element = re.findall(r'\<.*?\>', line)[0]
+            if (matrix_element) not in e1_res:
+                f.write(line)
+
+    with open(raw_path + '/E1MBPTa.RES', 'r') as f:
+        lines = f.readlines()
+    with open(raw_path + '/E1MBPT.RES', 'w') as f:
+        for line in lines:
+            f.write(line)
+
+    for line in lines[1:]:
+        matrix_element = re.findall(r'\<.*?\>', line)[0]
+        e1_res.append(matrix_element)
+
+    with open(raw_path + '/E1MBPTb.RES', 'r') as f:
+        lines2 = f.readlines()
+    
+    with open(raw_path + '/E1MBPT.RES', 'a') as f:
+        for line in lines2[1:]:
+            matrix_element = re.findall(r'\<.*?\>', line)[0]
+            if (matrix_element) not in e1_res:
+                f.write(line)
 
 if __name__ == "__main__":
     use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
@@ -562,6 +623,12 @@ if __name__ == "__main__":
         min_uncertainty = float(get_dict_value(portal, 'min_uncertainty')) if portal else 1.5
     else:
         atom = input('Input name of atom: ')
+        even_dir = None
+        odd_dir = None
+        tm_dir = None
+        tm_dir1 = None
+        tm_dir2 = None
+        ignore_g = True
     name = atom.replace(" ","_")
     
     ri = False # 
@@ -576,30 +643,41 @@ if __name__ == "__main__":
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
         if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir = find_ci_dirs(dir_path + '/' + all_order_path)
+            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + all_order_path)
         if even_dir and odd_dir:
             if os.path.isdir(all_order_path + '/' + even_dir):
                 run('cp ci+all-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
             if os.path.isdir(all_order_path + '/' + odd_dir):   
                 run('cp ci+all-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
-        if tm_dir:
-            if os.path.isdir(all_order_path + '/' + tm_dir):   
-                run('cp ci+all-order/' + tm_dir + '/E1.RES DATA_RAW/E1.RES', shell=True)
+        if tm_dir1 and os.path.isdir(all_order_path + '/' + tm_dir1):   
+            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1a.RES', shell=True)
+            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1.RES', shell=True)
+        if tm_dir2 and os.path.isdir(all_order_path + '/' + tm_dir2):   
+            run('cp ci+all-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1b.RES', shell=True)
+        if even_dir and odd_dir or tm_dir1 or tm_dir2:
             print('data from ' + all_order_path + ' moved to DATA_RAW directory')
+        os.chdir(dir_path)
     
     second_order_path = 'ci+second-order'
     if os.path.isdir(second_order_path):
         if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir = find_ci_dirs(dir_path + '/' + second_order_path)
+            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + second_order_path)
         if even_dir and odd_dir:
             if os.path.isdir(second_order_path + '/' + even_dir):
                 run('cp ci+second-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
             if os.path.isdir(second_order_path + '/' + odd_dir):   
                 run('cp ci+second-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
-        if tm_dir:
-            if os.path.isdir(second_order_path + '/' + tm_dir):   
-                run('cp ci+second-order/' + tm_dir + '/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+        if tm_dir1 and os.path.isdir(second_order_path + '/' + tm_dir1):   
+            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPTa.RES', shell=True)
+            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
+        if tm_dir2 and os.path.isdir(second_order_path + '/' + tm_dir2):   
+            run('cp ci+second-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1MBPTb.RES', shell=True)
+        if even_dir and odd_dir or tm_dir1 or tm_dir2:
             print('data from ' + second_order_path + ' moved to DATA_RAW directory')
+        os.chdir(dir_path)
+    
+    if tm_dir1 and tm_dir2:
+        combine_tm(data_raw_path)
         
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
@@ -607,7 +685,7 @@ if __name__ == "__main__":
     data_nist = generate_df_from_asd(url_nist)
     
     # Write new CONF.RES (CONFFINAL.csv) with uncertainties
-    raw_path = "DATA_RAW/"
+    raw_path = dir_path + "/DATA_RAW/"
     if os.path.isdir(raw_path):
         print('Reading raw files from ' + raw_path)
     else:
@@ -641,11 +719,34 @@ if __name__ == "__main__":
     path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
     path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
     
-    # TODO - automatically set the maximum number of levels based on last matching configuration between theory and NIST
-    # Set maximum number of levels to be read from NIST for each parity
-    nist_max_odd = 44
-    nist_max_even = 40
+    # Set maximum number of levels to be read from NIST equal to number of levels in CONFFINAL.RES
+    with open(raw_path + 'CONFFINALeven.RES','r') as f:
+        lines = f.readlines()
+        num_levels_theory_even = len(lines) - 1
+    nist_max_even = num_levels_theory_even
     
+    with open(raw_path + 'CONFFINALodd.RES','r') as f:
+        lines = f.readlines()
+        num_levels_theory_odd = len(lines) - 1
+    nist_max_odd = num_levels_theory_odd
+    
+    # Set maximum number of levels to be outputted in csv files
+    num_levels_output_even = 1 if uncertainties[0] == '-' else 0
+    for i in range(1, num_levels_theory_even):
+        if uncertainties[i] == '-':
+            break
+        else:
+            num_levels_output_even += 1
+        
+    num_levels_output_odd = 0
+    for i in range(num_levels_theory_even, num_levels_theory_even + num_levels_theory_odd):
+        num_levels_output_odd = i + 1 - num_levels_theory_even
+        if uncertainties[i] == '-':
+            break
+        
+    print('Number of even parity levels: ', num_levels_output_even)
+    print('Number of odd parity levels: ', num_levels_output_odd)
+
     # Export filtered data to output directory
     path_output = "DATA_Output/"
     os.makedirs(os.path.dirname(path_output), exist_ok=True)
@@ -669,7 +770,7 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_odd_missing, path)
     
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
-    mapping = create_mapping()
+    mapping = create_mapping(num_levels_output_even, num_levels_output_odd)
 
     # Reformat atom name to numerical value for filenames
     if name.split('_')[1].isalpha():
@@ -678,8 +779,31 @@ if __name__ == "__main__":
         name = name.split('_')[0] + name.split('_')[1]
         
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
+    
+    # Create a list of all possible transitions between states
+    print('even parity configurations:')
+    even_confs = []
+    for line in mapping[:num_levels_output_even]:
+        even_confs.append([line[0][0],line[0][1],line[0][2]])
+    print('odd parity configurations:')
+    odd_confs = []
+    for line in mapping[num_levels_output_even:]:
+        odd_confs.append([line[0][0],line[0][1],line[0][2]])
+    
+    possible_E1 = []
+    for conf_odd in odd_confs:
+        J_odd = int(conf_odd[2])
+        for conf_even in even_confs:
+            J_even = int(conf_even[2])
+            if J_even == 0 and J_odd == 0: continue
+            if abs(J_even - J_odd) <= 1:
+                possible_E1.append([conf_odd, conf_even])
+    num_possible_E1 = len(possible_E1)
+    print('Number of possible E1: ', len(possible_E1))
+    
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty)
+        num_E1 = write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty)
+        print(str(round(num_E1/num_possible_E1*100,2)) + "% of possible E1 accounted for")
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')

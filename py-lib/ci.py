@@ -40,7 +40,7 @@ def read_yaml(filename):
 
     return config
 
-def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parity):
+def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, C_is):
     """Write ADD.INP file for specified parity"""
 
     configurations = config['add']['ref_configs']
@@ -49,21 +49,6 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     if configurations[parity] == []:
         print(parity.capitalize(), 'parity configurations were not specified')
         return
-
-    if parity == 'odd':
-        parity_config = config['conf']['odd']
-    elif parity == 'even':
-        parity_config = config['conf']['even']
-    else:
-        print('parity ' + parity + ' is not valid')
-        return
-    
-    # Set number of energy levels
-    J = parity_config['J']
-    JM = parity_config['JM']
-    J_selection = parity_config['J_selection']
-    num_energy_levels = parity_config['num_energy_levels']
-    num_dvdsn_iterations = parity_config['num_dvdsn_iterations']
 
     # Define name of file to export
     filename = filename[0:-4] + parity + filename[-4:]
@@ -141,6 +126,9 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     else:
         kbrt = 0
     f.write('Kbrt= ' + str(kbrt) + '\n')
+    if K_is > 0:
+        f.write('K_is= ' + str(K_is) + '\n')
+        f.write('C_is= ' + str(C_is) + '\n')
     
     # Write core orbitals
     if num_core_orb != 0:
@@ -195,7 +183,7 @@ def format_orb_occ(orb, occ):
 
     return orb_occ_formatted
 
-def create_add_inp(config):
+def create_add_inp(config, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c):
     # Get atomic data
     atom = config['atom']
     
@@ -209,15 +197,15 @@ def create_add_inp(config):
     orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
     multiplicity = orb_lib.count_excitations(add['excitations'])
 
-    if add['ref_configs']['even']:
-        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'even')
+    if add['ref_configs'][parity]:
+        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c)
     else:
-        print('no even reference configurations specified')
+        print('no ' + parity + ' reference configurations specified')
         
-    if add['ref_configs']['odd']:
-        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd')
-    else:
-        print('no odd reference configurations specified')
+    #if add['ref_configs']['odd']:
+    #    write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd', J, JM, K_is, c)
+    #else:
+    #    print('no odd reference configurations specified')
 
 def form_conf_inp(parity, bin_dir):
     if bin_dir and bin_dir[-1] != '/':
@@ -231,15 +219,24 @@ def form_conf_inp(parity, bin_dir):
     run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij):
+def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij, K_is, C_is):
     if not os.path.isdir(conf_dir):
         run_shell("mkdir " + conf_dir)
     if os.path.isfile('basis/HFD.DAT'):
         run_shell("cp basis/HFD.DAT " + conf_dir)
+    else:
+        print('basis/HFD.DAT was not found.. try running basis.py first')
+        sys.exit()
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + conf_dir + "/CONF.INP")
+        if K_is > 0:
+            run_shell("cp " + root_dir + "/CONF" + parity + str(C_is) + ".INP " + conf_dir + "/CONF.INP")
+        else:
+            run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + conf_dir + "/CONF.INP")
     if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + conf_dir + "/ADD.INP")
+        if K_is > 0:
+            run_shell("cp " + root_dir + "/ADD" + parity + str(C_is) + ".INP " + conf_dir + "/ADD.INP")
+        else:
+            run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + conf_dir + "/ADD.INP")
     if os.path.isfile('basis/SGC.CON'):
         run_shell("cp basis/SGC.CON "  + conf_dir)
     if os.path.isfile('basis/SCRC.CON'):
@@ -319,6 +316,7 @@ if __name__ == "__main__":
     atom = get_dict_value(config, 'atom')
     code_method = get_dict_value(atom, 'code_method')
     conf = get_dict_value(config, 'conf')
+    for_dtm = get_dict_value(conf, 'for_dtm')
     
     include_lsj = get_dict_value(conf, 'include_lsj')
     write_hij = get_dict_value(conf, 'write_hij')
@@ -342,8 +340,12 @@ if __name__ == "__main__":
             if 'BASS.INP' in files:
                 bass_inp_paths.append(root)
     if not isinstance(code_method, list):
-        run_shell('cp ./basis/BASS.INP .')
-        print('BASS.INP taken from basis/')
+        if include_isotope_shifts and K_is > 0:
+            run_shell('cp ./' + K_is_dict[K_is] + '/0/basis/BASS.INP .')
+            code_method = ['']
+        else:
+            run_shell('cp ./basis/BASS.INP .')
+            print('BASS.INP taken from basis/')
     else:
         if os.path.isdir('ci+all-order'):
             run_shell('cp ./ci+all-order/basis/BASS.INP .')
@@ -353,27 +355,53 @@ if __name__ == "__main__":
             print('BASS.INP taken from ci+all-order/basis/')
 
     # Run script to generate ADD.INP for even and odd configurations
-    create_add_inp(config)
+    J_odd = conf['odd']['J']
+    JM_odd = conf['odd']['JM']
+    J_even = conf['even']['J']
+    JM_even = conf['even']['JM']
     
-    # Cleanup BASS.INP
-    if os.path.isfile('BASS.INP'):
-        run_shell('rm BASS.INP')
+    J_selection_odd = conf['odd']['J_selection']
+    num_energy_levels_odd = conf['odd']['num_energy_levels']
+    num_dvdsn_iterations_odd = conf['odd']['num_dvdsn_iterations']
     
-    # Check if ADDeven.INP and ADDodd.INP exist
-    even_exists = os.path.isfile('ADDeven.INP')
-    odd_exists = os.path.isfile('ADDodd.INP')
+    J_selection_even = conf['even']['J_selection']
+    num_energy_levels_even = conf['even']['num_energy_levels']
+    num_dvdsn_iterations_even = conf['even']['num_dvdsn_iterations']
     
-    # Run add and form CONF.INP from respective ADD.INP files
-    parities = []
-    if even_exists: 
-        form_conf_inp('even', bin_dir)
-        parities.append('even')
-    if odd_exists: 
-        form_conf_inp('odd', bin_dir)
-        parities.append('odd')
-    
-    # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
-    run_shell("rm add.in ADD.INP CONF.INP CONF_.INP")
+    if include_isotope_shifts:
+        for c in c_list:
+            create_add_inp(config, 'even', J_even, JM_even, J_selection_even, num_energy_levels_even, num_dvdsn_iterations_even, K_is, c)
+            create_add_inp(config, 'odd', J_odd, JM_odd, J_selection_odd, num_energy_levels_odd, num_dvdsn_iterations_odd, K_is, c)
+            even_exists = os.path.isfile('ADDeven.INP')
+            odd_exists = os.path.isfile('ADDodd.INP')
+            if even_exists:
+                run_shell('cp ADDeven.INP ADDeven' + str(c) + '.INP')
+            if odd_exists:
+                run_shell('cp ADDodd.INP ADDodd' + str(c) + '.INP')
+            # Run add and form CONF.INP from respective ADD.INP files
+            parities = []
+            if even_exists: 
+                form_conf_inp('even', bin_dir)
+                run_shell('cp CONFeven.INP CONFeven' + str(c) + '.INP')
+                parities.append('even')
+            if odd_exists: 
+                form_conf_inp('odd', bin_dir)
+                run_shell('cp CONFodd.INP CONFodd' + str(c) + '.INP')
+                parities.append('odd')
+    else:
+        create_add_inp(config, 'even', J_even, JM_even, J_selection_even, num_energy_levels_even, num_dvdsn_iterations_even, 0, 0)
+        create_add_inp(config, 'odd', J_odd, JM_odd, J_selection_odd, num_energy_levels_odd, num_dvdsn_iterations_odd, 0, 0)
+        # Check if ADDeven.INP and ADDodd.INP exist
+        even_exists = os.path.isfile('ADDeven.INP')
+        odd_exists = os.path.isfile('ADDodd.INP')
+        # Run add and form CONF.INP from respective ADD.INP files
+        parities = []
+        if even_exists: 
+            form_conf_inp('even', bin_dir)
+            parities.append('even')
+        if odd_exists: 
+            form_conf_inp('odd', bin_dir)
+            parities.append('odd')
     
     # Create a ci.qs job script if it doesn't exist yet
     if on_hpc:
@@ -400,11 +428,16 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run_shell('pwd')
+                    print(dir_name)
                     for parity in parities:
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = parity + str(J)[0]
-                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
+                        # check if run has already been completed
+                        if os.path.isfile(conf_path + '/FINAL.RES'):
+                            print('Completed run detected in ' + conf_path)
+                            print('Skipping..')
+                            continue
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, K_is, c)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
@@ -417,8 +450,6 @@ if __name__ == "__main__":
                             print("run_codes option is only available with HPC access")
                     os.chdir('../')
                 if K_is_dict[K_is]:
-                    os.chdir('../../')
-                else:
                     os.chdir('../')
         else:
             if isinstance(code_method, list):
@@ -430,7 +461,7 @@ if __name__ == "__main__":
                     for parity in parities:
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = parity + str(J)[0]
-                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
@@ -448,7 +479,7 @@ if __name__ == "__main__":
                 for parity in parities:
                     J = get_dict_value(conf[parity], 'J')
                     conf_path = parity + str(J)[0]
-                    move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
+                    move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0)
                     # Submit CI job if run_codes == True
                     if on_hpc and run_codes: 
                         os.chdir(conf_path)
@@ -460,5 +491,8 @@ if __name__ == "__main__":
                     else:
                         print("run_codes option is only available with HPC access - please run ci codes manually")
 
+    # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP from root directory
+    run_shell("rm add.in ADD*.INP CONF*.INP add*.out BASS.INP")
+    
     print('add script completed')
 

@@ -26,14 +26,18 @@ from utils import run_shell, get_dict_value, check_slurm_installed
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
-    """ 
-    This function reads a configuration file in YAML format and returns a dictionary of config parameters
-    """ 
-
+    """ Reads a configuration file in YAML format and returns a dictionary of config parameters """ 
     with open(filename,'r') as f:
         config = yaml.safe_load(f)
 
     return config
+
+def validate_config(config):
+    """ Validates the configuration file for required fields """
+    required_fields = ['system', 'atom', 'basis', 'optional']
+    for field in required_fields:
+        if field not in config:
+            raise ValueError(f"Missing required field '{field}' in configuration file.")
 
 def count_total_orbitals(core_orbitals, valence_orbitals):
     """ Counts the total number of orbitals given lists of core and valence shells """
@@ -569,7 +573,7 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
     return vorbs, norbs, nval, nvvorbs
 
 
-def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs):
+def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
     """ Writes BASS.INP """
     # Define default values
     basis = system['basis']
@@ -578,10 +582,6 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs):
     codename = atom['code_method']
     core = basis['orbitals']['core']
     valence = basis['orbitals']['valence']
-    
-    optional = system['optional']
-    K_is = optional['isotope_shifts']['K_is']
-    C_is = optional['isotope_shifts']['C_is']
     
     Nv = len(valence.split())
     Ksg = 1
@@ -713,8 +713,8 @@ def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies,
             f.write('   2.0\n')
         else:
             f.write('   1.0\n')
-        grid = 0.0002
-        f.write(str(grid).rjust(9, ' ') + '  0.03  500\n')
+        grid = '0.00004'
+        f.write(' ' + str(grid).rjust(9, ' ') + '  0.00  500\n')
         f.write('   1\n')
         f.write('   0.0000' + str(round(cfermi, 4)).rjust(10, ' ') + '    2.3\n')
         f.write('   0.0')
@@ -791,12 +791,12 @@ def write_spl_in(filename, radius, spl_params):
     f.close()
     print('spl.in has been written')
 
-def write_ao_inputs(system, C_is, kvw):
+def write_ao_inputs(system, K_is, C_is, kvw):
     # Write HFD.INP
     write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, system['optional']['isotope_shifts']['K_is'], C_is)
     
     # Write BASS.INP
-    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs)
+    write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, K_is, C_is)
 
     # Write bas_wj.in
     write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
@@ -1061,6 +1061,8 @@ if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
+    validate_config(config)
+    
     system = get_dict_value(config, 'system')
     atom = get_dict_value(config, 'atom')
     basis = get_dict_value(config, 'basis')
@@ -1170,7 +1172,7 @@ if __name__ == "__main__":
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
                     run_shell('pwd')
-                    write_ao_inputs(config,c,get_key_vw(method))
+                    write_ao_inputs(config, K_is, c, get_key_vw(method))
                     os.chdir('../../')
                 if K_is_dict[K_is]:
                     os.chdir('../../')
@@ -1183,14 +1185,14 @@ if __name__ == "__main__":
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method+'/basis')
                     run_shell('pwd')
-                    write_ao_inputs(config, 0, get_key_vw(method))
+                    write_ao_inputs(config, 0, 0, get_key_vw(method))
                     os.chdir('../../')
             else:
                 dir_path = os.getcwd()
                 Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
                 os.chdir('basis')
                 run_shell('pwd')
-                write_ao_inputs(config, 0, kvw)
+                write_ao_inputs(config, 0, 0, kvw)
                 os.chdir('../')
 
         # Construct basis set by running sequence of programs if desired
@@ -1255,26 +1257,56 @@ if __name__ == "__main__":
                         os.chdir('../')
             
     elif code_method == 'ci':
-        dir_path = os.getcwd()
-        Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
-        os.chdir('basis')
-        run_shell('pwd')
-        if include_isotope_shifts:
-            write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
-            vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
-            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
+        if include_isotope_shifts and K_is > 0:
+            dir_path = os.getcwd()
+            is_dir = K_is_dict[K_is]
+            Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
+            os.chdir(dir_path+'/'+is_dir)
+            for c in c_list:
+                dir_path = os.getcwd()
+                if c < 0:
+                    dir_prefix = 'minus' 
+                elif c > 0:
+                    dir_prefix = 'plus'
+                else:
+                    dir_prefix = ''
+                dir_name = dir_prefix+str(abs(c))+'/basis'
+                Path(dir_name).mkdir(parents=True, exist_ok=True)
+                os.chdir(dir_name)
+                print(dir_name)
+                write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, c)
+                vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method,   basis_nmax, basis_lmax)
+                write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, K_is, c)
+                
+                if run_codes:
+                    order = basis['orbitals']['order']
+                    try: 
+                        custom = basis['orbitals']['custom']
+                    except KeyError:
+                        custom = ""
+                    run_ci_executables(bin_dir, order, custom)
+                    
+                if K_is_dict[K_is]:
+                    os.chdir('../../')
+                else:
+                    os.chdir('../')
+                
         else:
+            dir_path = os.getcwd()
+            Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+            os.chdir('basis')
+            run_shell('pwd')
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
-            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs)
+            write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, 0, 0)
             
-        if run_codes:
-            order = basis['orbitals']['order']
-            try: 
-                custom = basis['orbitals']['custom']
-            except KeyError:
-                custom = ""
-            run_ci_executables(bin_dir, order, custom)
+            if run_codes:
+                order = basis['orbitals']['order']
+                try: 
+                    custom = basis['orbitals']['custom']
+                except KeyError:
+                    custom = ""
+                run_ci_executables(bin_dir, order, custom)
                         
         if include_qed:
             generate_batch_qed(bin_dir, include_qed, kbrt)
