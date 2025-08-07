@@ -14,6 +14,7 @@ Code documentation is hosted at [Read the Docs](https://pci.readthedocs.io/en/la
 
 ## Citation
 If you use pCI, please acknowledge it by citing the main publication listed here:
+
 C. Cheung, M. G. Kozlov, S. G. Porsev, M. S. Safronova, I. I. Tupitsyn, and A. I. Bondarev, pci: A parallel configuration interaction software package for high-precision atomic structure calculations, Computer Physics Communications 308, 109463 (2025).
 
 ```
