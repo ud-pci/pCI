@@ -1,6 +1,6 @@
 # System parameters
 system:
-    bin_directory: ""
+    bin_directory: "/lustre/safrono/users/1813/pCI-dev/bin"
     generate_directories: False
     run_codes: True
     on_hpc: True
@@ -82,6 +82,7 @@ conf:
         num_dvdsn_iterations: 50
     include_lsj: True
     write_hij: True
+    for_portal: True  # When True, runs CI for both J=0.0 and J=1.0 for both parities
 
 # Parameters used by dtm program
 dtm:
