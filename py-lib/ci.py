@@ -428,7 +428,7 @@ if __name__ == "__main__":
     atom = get_dict_value(config, 'atom')
     code_method = get_dict_value(atom, 'code_method')
     conf = get_dict_value(config, 'conf')
-    for_portal = get_dict_value(conf, 'for_portal')
+    for_portal = get_dict_value(system, 'for_portal')
     
     include_lsj = get_dict_value(conf, 'include_lsj')
     write_hij = get_dict_value(conf, 'write_hij')
