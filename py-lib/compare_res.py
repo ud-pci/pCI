@@ -139,9 +139,6 @@ def parse_final_res(filename):
                     if fix[0] == existing_ilvl+1:
                         fix[3] = conf_res[existing_ilvl][1]
                         fix[4] = conf_res[existing_ilvl][2]
-                    if [ilvl+1,conf_res[ilvl][1],confs_terms_old[ilvl][1],conf_res[ilvl][1],conf_res[ilvl][2]] not in fixes:
-                        fixes.append([existing_ilvl+1,confs_terms[ilvl][0],confs_terms[ilvl][1],conf_res[existing_ilvl][1],conf_res[existing_ilvl][2]])
-                        fixes.append([ilvl+1,conf_res[ilvl][1],old_term,conf_res[ilvl][1],conf_res[ilvl][2]])
                 
             print('     TERM OF LEVEL',existing_ilvl+1,'HAS BEEN UPDATED TO',conf_res[existing_ilvl][1],conf_res[existing_ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
             print('     TERM OF LEVEL',ilvl+1,'HAS BEEN UPDATED TO',conf_res[ilvl][1],conf_res[ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
