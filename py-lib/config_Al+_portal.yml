@@ -5,11 +5,12 @@ system:
     run_codes: True
     on_hpc: True
     pci_version: default
+    for_portal: True
 
 hpc:
     partition: safrono
-    nodes: 2
-    tasks_per_node: 40
+    nodes: 1
+    tasks_per_node: 36
     submit_job: False
 
 # Atomic information
