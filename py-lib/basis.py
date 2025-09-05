@@ -1063,7 +1063,7 @@ def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_met
             nTry += 1
         else:
             print("bass completed with no errors after", nTry, "attempts")
-    elif basis_method == 'recursive':
+    elif basis_method == 'dirac-fock':
         run_ci_executables(bin_dir, order, custom)
 
     if os.path.isfile('bass.in'):
