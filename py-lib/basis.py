@@ -866,21 +866,25 @@ def check_errors(filename):
     # This function checks output files for errors and returns the number of errors
     # Currently only supports output of program bass
     num_errors = 0
-    warning_msgs = ['failed', 'error', 'warning']
+    
     if filename == 'bass.out':
-        try:
-            f = open(filename, 'r')
-            lines = f.readlines()
-            f.close()
-            for line in lines:
-                if any(msg in line for msg in warning_msgs):
-                    num_errors += 1
-        except FileNotFoundError:
-            num_errors = 1   
-        
-        return num_errors
+        warning_msgs = ['failed', 'error', 'warning']
+    elif filename == 'HFD.RES':
+        warning_msgs = ['NaN']
     else:
         print(filename + "not currently supported")
+
+    try:
+        f = open(filename, 'r')
+        lines = f.readlines()
+        f.close()
+        for line in lines:
+            if any(msg in line for msg in warning_msgs):
+                num_errors += 1
+    except FileNotFoundError:
+        num_errors = 1   
+
+    return num_errors
 
 def run_ci_executables(bin_dir, order, custom):
     # Remove old HFD.INP
@@ -961,6 +965,10 @@ def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_met
         # Run hfd
         run_shell(bin_dir + 'hfd > hfd.out')
         print("hfd complete")
+
+        if check_errors('HFD.RES'):
+            print("Error found in HFD.RES. Please check.")
+            sys.exit()
 
         if kbrt == 0:
             run_shell(bin_dir + 'tdhf < bas_wj.in > tdhf.out')
