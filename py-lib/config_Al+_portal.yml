@@ -1,0 +1,113 @@
+# System parameters
+system:
+    bin_directory: "/work/safrono/ccheung/pCI/bin"
+    generate_directories: False
+    run_codes: True
+    on_hpc: True
+    pci_version: default
+
+hpc:
+    partition: safrono
+    nodes: 2
+    tasks_per_node: 40
+    submit_job: False
+
+# Atomic information
+atom:
+    name: Al II
+    isotope: 27
+    include_breit: True
+    code_method: [ci+all-order, ci+second-order] 
+
+# Parameters used by basis programs
+basis:
+    method: dirac-fock
+    cavity_radius: 100
+    diagonalized: True
+    orbitals:
+        core: 1s 2s 2p
+        valence: 3s 3p 3d 4s 4p 4d 4f
+        order: 1s / 2s 2p / 3s 3p 3d 4s 4p 4d 4f
+        nmax: 27
+        lmax: 5
+        custom: [5g from 2p, 6h from 5g]
+    b_splines:
+        nmax: 40
+        lmax: 6
+        k: 7
+    val_aov:
+        s: 4
+        p: 4
+        d: 4
+        f: 3
+    val_energies:
+        kval: 1
+        energies: 
+            s: -0.28000
+            p: [-0.22000, -0.22000]
+            d: [-0.31000, -0.31000]
+            f: [-0.13000, -0.13000]
+
+# Parameters used by add program
+add:
+    # Lists of even and odd parity reference configurations
+    ref_configs:
+        odd: [3s1 3p1]
+        even: [3s2]
+    basis_set: 24spdfg
+    orbitals:
+        core: 1s 2s 2p 
+        active: [
+            3-7p:  0  4,
+            4-7d:  0  4,
+            4-7f:  0  4,
+            5-7g:  0  4,
+            ]    
+    excitations:
+        single: True
+        double: True
+        triple: False
+
+# Parameters used by conf program
+conf:
+    odd: # 
+        J: 0.0
+        JM: 0.0
+        J_selection: False
+        num_energy_levels: 50
+        num_dvdsn_iterations: 50
+    even:
+        J: 0.0
+        JM: 0.0
+        J_selection: False
+        num_energy_levels: 50
+        num_dvdsn_iterations: 50
+    include_lsj: True
+    write_hij: False
+
+# Parameters used by dtm program
+dtm:
+    include_rpa: True
+    DM: 
+        matrix_elements: 
+        level_range: 
+            odd: 
+            even: 
+    TM:
+        matrix_elements: M1, E2
+        from:
+            parity: odd
+            level_range: 1 28
+        to:
+            parity: odd
+            level_range: 1 24
+
+# Optional parameters
+optional:
+    qed:
+        include: False
+
+    isotope_shifts: 
+        include: False
+        K_is: 0
+        C_is: 0
