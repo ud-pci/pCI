@@ -673,7 +673,7 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
         # Write valence and virtual orbitals
         for i, orb in enumerate(vorbs):
             orb = orb[:-2] + '01'
-            if (i < nval) or method == 'recursive':
+            if (i < nval) or method == 'dirac-fock':
                 f.write(str(i+1).rjust(3," ") + orb.rjust(8," "))
                 # Check if orbital is in the list of custom virtual orbitals
                 if orb in list(custom_vorbs.keys()):
