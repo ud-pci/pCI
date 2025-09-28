@@ -532,8 +532,11 @@ def find_ci_dirs(ci_path):
             if dtm_dir2 != '':
                 print(dtm_dir2 + ' was not found.')
             dtm_dir2 = None
-    else:
+    elif len(dtm_dirs) == 1:
         dtm_dir1 = dtm_dirs[0]
+        dtm_dir2 = None
+    else:
+        dtm_dir1 = None
         dtm_dir2 = None
         
     os.chdir('..')
@@ -737,12 +740,12 @@ if __name__ == "__main__":
             break
         else:
             num_levels_output_even += 1
-        
-    num_levels_output_odd = 0
-    for i in range(num_levels_theory_even, num_levels_theory_even + num_levels_theory_odd):
-        num_levels_output_odd = i + 1 - num_levels_theory_even
-        if uncertainties[i] == '-':
-            break
+    num_levels_output_odd = num_levels_theory_odd
+    #num_levels_output_odd = 0
+    #for i in range(num_levels_theory_even, num_levels_theory_even + num_levels_theory_odd):
+    #    num_levels_output_odd = i + 1 - num_levels_theory_even
+    #    if uncertainties[i] == '-':
+    #        break
         
     print('Number of even parity levels: ', num_levels_output_even)
     print('Number of odd parity levels: ', num_levels_output_odd)
@@ -784,12 +787,16 @@ if __name__ == "__main__":
     print('even parity configurations:')
     even_confs = []
     for line in mapping[:num_levels_output_even]:
+        if line[0][0] == '-': 
+            continue
         even_confs.append([line[0][0],line[0][1],line[0][2]])
     print('odd parity configurations:')
     odd_confs = []
     for line in mapping[num_levels_output_even:]:
+        if line[0][0] == '-': 
+            continue
         odd_confs.append([line[0][0],line[0][1],line[0][2]])
-    
+
     possible_E1 = []
     for conf_odd in odd_confs:
         J_odd = int(conf_odd[2])
