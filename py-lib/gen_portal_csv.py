@@ -182,11 +182,15 @@ def write_new_conf_res(name, filepath, data_nist):
         term = terms[i].split(',')[0]
         J = terms[i].split(',')[1]
         
-        str_diff, num_diff = SubtractStr(nist_conf, conf)
-        if num_diff > 0:
-            if nist_conf.replace(str_diff, '') == conf and nist_term == term and nist_J == J:
+        if conf == nist_conf:
                 gs_exists = True
-                print('ground state found:', confs[i])
+                print('ground state found:', conf)
+        else:
+            str_diff, num_diff = SubtractStr(nist_conf, conf)
+            if num_diff > 0:
+                if nist_conf.replace(str_diff, '') == conf and nist_term == term and nist_J == J:
+                    gs_exists = True
+                    print('ground state found:', confs[i])
     
     # If ground state level not found in theory results, ask user for energy (a.u.) of ground state level
     if not gs_exists:
@@ -615,6 +619,8 @@ if __name__ == "__main__":
         even_dir = 'even' + str(even_J)[0] if even_J else None
         odd_dir = 'odd' + str(odd_J)[0] if odd_J else None
         tm_dir = 'tm' if even_J and odd_J else None
+        tm_dir1 = None
+        tm_dir2 = None
         
         # portal parameters
         portal = get_dict_value(config, 'portal')
