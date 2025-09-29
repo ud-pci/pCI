@@ -124,9 +124,9 @@ def parse_final_res(filename):
                 
             # If term is remains same, check duplicates of configuration
             if conf_res[existing_ilvl][2] == confs_terms[ilvl][1]:
-                if conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
+                if conf_res[existing_ilvl][11] and conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
                     # Check secondary config already in list
-                    if [conf_res[existing_ilvl][11],conf_res[existing_ilvl][2]] not in confs_terms[:ilvl-1]:
+                    if [conf_res[existing_ilvl][11], conf_res[existing_ilvl][2]] not in confs_terms[:ilvl-1]:
                         main_conf = conf_res[existing_ilvl][1]
                         conf_res[existing_ilvl][1] = conf_res[existing_ilvl][11]
                         conf_res[existing_ilvl][11] = main_conf
