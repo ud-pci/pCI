@@ -111,6 +111,22 @@ def create_mapping(num_levels_even, num_levels_odd):
     
     return mapping
 
+def normalize_config(config):
+    '''
+    Normalize an electronic configuration string by sorting the subshells.
+    Example: "5s.4d" -> "4d.5s
+    '''
+    if not isinstance(config, str):
+        return config
+    
+    parts = [part.strip() for part in config.split('.') if part.strip()]
+    parts.sort(key=lambda x: (
+        int(re.match(r'(\d+)', x).group(1)) if re.match(r'(\d+)', x) else 0,
+        x
+    ))
+    
+    return ".".join(parts)
+
 def write_new_conf_res(name, filepath, data_nist):
     '''
     This function creates a new CONF.RES file with theory uncertainties
@@ -148,18 +164,17 @@ def write_new_conf_res(name, filepath, data_nist):
     gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd, second_order_exists)
 
     confs, terms, energies_au, energies_cm, energies_au_MBPT, energies_cm_MBPT, uncertainties = [], [], [], [], [], [], []
-    f = open('final_res.csv','w')
-    f.write('conf,term,J,energy(a.u.),energy(cm-1),energy_MBPT(a.u.),energy_MBPT(cm-1),uncertainty\n')
-    for conf in merged_res:
-        confs.append(conf[0])
-        terms.append(conf[1])
-        energies_au.append(conf[2])
-        energies_cm.append(conf[3])
-        energies_au_MBPT.append(conf[4])
-        energies_cm_MBPT.append(conf[5])
-        uncertainties.append(conf[6])
-        f.write(','.join(str(i) for i in conf) + '\n')
-    f.close()
+    with open('final_res.csv','w') as f:
+        f.write('conf,term,J,energy(a.u.),energy(cm-1),energy_MBPT(a.u.),energy_MBPT(cm-1),uncertainty\n')
+        for conf in merged_res:
+            confs.append(conf[0])
+            terms.append(conf[1])
+            energies_au.append(conf[2])
+            energies_cm.append(conf[3])
+            energies_au_MBPT.append(conf[4])
+            energies_cm_MBPT.append(conf[5])
+            uncertainties.append(conf[6])
+            f.write(','.join(str(i) for i in conf) + '\n')
     
     even_res = [conf for conf in merged_res if find_parity(conf[0]) == 'even']
     odd_res = [conf for conf in merged_res if find_parity(conf[0]) == 'odd']
@@ -182,7 +197,7 @@ def write_new_conf_res(name, filepath, data_nist):
         term = terms[i].split(',')[0]
         J = terms[i].split(',')[1]
         
-        if conf == nist_conf:
+        if normalize_config(conf) == normalize_config(nist_conf):
                 gs_exists = True
                 print('ground state found:', conf)
         else:
@@ -199,6 +214,7 @@ def write_new_conf_res(name, filepath, data_nist):
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
 
     # TODO - reimplement shift by user-inputted ground state
+    
     
     # Determine energy shift between odd and even parity lowest energy levels
     ht_to_cm = 219474.63 # hartree to cm-1
