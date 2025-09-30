@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import sys
 import re
+from collections import Counter
 
 pd.options.mode.chained_assignment = None
 
@@ -86,6 +87,28 @@ def generate_df_from_asd(url):
     asd_df = pd.read_table(StringIO(r.text), delimiter = ',')
     new_df = asd_df[['Configuration','Term','J','Level (cm-1)', 'Uncertainty (cm-1)', 'Reference']].replace({'=','"'},'', regex=True)
 
+    # remove rows indicating ionization limit
+    new_df = new_df[~new_df['Term'].str.contains("Limit", regex=True, na=False)]
+    
+    # find all orbitals with fully filled orbitals
+    pattern = r"\d+[spdfg](?:2|6|10|14)"
+    all_orbitals = new_df['Configuration'].str.findall(pattern)
+    
+    # Count frequencies
+    counts = Counter([orb for sublist in all_orbitals for orb in sublist])
+    
+    # Keep only those that appear in all rows
+    nrows = len(new_df)
+    common_full_orbitals = {orb for orb, count in counts.items() if count == nrows}
+    
+    def strip_common(config):
+        for orb in common_full_orbitals:
+            config = re.sub(rf"{orb}\.?", "", config)
+        config = re.sub(r"\.{2,}", ".", config).strip(".")
+        return config
+    
+    new_df['Configuration'] = new_df['Configuration'].apply(strip_common)
+    
     return new_df
 
 def reformat_df_to_atomdb(asd_df, theory_J): # Modified
