@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from get_atomic_term import scrape_term
 import os
+import atomic_term_symbol
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 
@@ -647,7 +648,7 @@ def Missing_Levels(data):
     for i in range(len(config_nist)):
         config = config_nist[i]
         if (i in lst)==True or ("0" in config)==True: continue
-        terms_expected = scrape_term(config)
+        terms_expected = atomic_term_symbol.calc_term_symbols(config)
         for j in range(len(terms_expected)):
             term_str = terms_expected[j][:2]+str(Convert_Type(terms_expected[j][2:]))
             idx = np.where((config_nist==config) & (terms_all==term_str))[0]
