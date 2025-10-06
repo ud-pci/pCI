@@ -809,22 +809,33 @@ if __name__ == "__main__":
     # Create a list of all possible transitions between states
     print('even parity configurations:')
     even_confs = []
-    for line in mapping[:num_levels_output_even]:
-        if line[0][0] == '-': 
-            continue
-        even_confs.append([line[0][0],line[0][1],line[0][2]])
-    print('odd parity configurations:')
     odd_confs = []
-    for line in mapping[num_levels_output_even:]:
-        if line[0][0] == '-': 
+    for line in mapping:
+        configuration = line[0][0]
+        term = line[0][1]
+        J = line[0][2]
+        if configuration == '-':
             continue
-        odd_confs.append([line[0][0],line[0][1],line[0][2]])
+        if find_parity(configuration) == 'even':
+            even_confs.append([configuration, term, J])
+        elif find_parity(configuration) == 'odd':
+            odd_confs.append([configuration, term, J])
+        else:
+            raise ValueError(f'Configuration {configuration} is not valid.')
 
     possible_E1 = []
     for conf_odd in odd_confs:
-        J_odd = int(conf_odd[2])
+        try:
+            float(conf_odd[2])
+            J_odd = int(conf_odd[2])
+        except ValueError:
+            J_odd = int(conf_odd[1])
         for conf_even in even_confs:
-            J_even = int(conf_even[2])
+            try:
+                float(conf_even[2])
+                J_even = int(conf_even[2])
+            except ValueError:
+                J_even = int(conf_even[1])
             if J_even == 0 and J_odd == 0: continue
             if abs(J_even - J_odd) <= 1:
                 possible_E1.append([conf_odd, conf_even])
