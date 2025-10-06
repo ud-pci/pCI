@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from get_atomic_term import scrape_term
 import os
 import atomic_term_symbol
 
@@ -394,7 +393,7 @@ def StartingConfigs(df_nist):
         conf=Sep_Config(config)
         dummy_config = Dummy_Config(config)
         idx_dummy = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==mul))[0]
-        
+
         n = int(conf[-2])-1
         # Store term and config for comparison
         if len(idx_dummy)==0:
@@ -645,8 +644,13 @@ def Missing_Levels(data):
 
     lst = np.array([])
     config_exp,term_exp,J_exp=[],[],[]
+    terms_calculated=set()
     for i in range(len(config_nist)):
         config = config_nist[i]
+        if config in terms_calculated: 
+            continue
+        else:
+            terms_calculated.add(config)
         if (i in lst)==True or ("0" in config)==True: continue
         terms_expected = atomic_term_symbol.calc_term_symbols(config)
         for j in range(len(terms_expected)):
