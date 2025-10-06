@@ -200,6 +200,7 @@ def write_new_conf_res(name, filepath, data_nist):
         if normalize_config(conf) == normalize_config(nist_conf):
                 gs_exists = True
                 print('ground state found:', conf)
+                break
         else:
             str_diff, num_diff = SubtractStr(nist_conf, conf)
             if num_diff > 0:
