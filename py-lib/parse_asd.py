@@ -1,4 +1,5 @@
 from io import StringIO
+import numpy as np
 import pandas as pd
 import requests
 import sys
@@ -130,7 +131,9 @@ def reformat_df_to_atomdb(asd_df, theory_J): # Modified
                     (((asd_df['state_J'].isin(theory_J['odd'])) & (asd_df['state_term'].str[-1] == '*')))]
 
     # Fill in empty cells 
+    asd_df['state_configuration'].replace(r'^\s*$', np.nan, regex=True, inplace=True)
     asd_df['state_configuration'].fillna(method='ffill', inplace=True)
+    asd_df['state_term'].replace(r'^\s*$', np.nan, regex=True, inplace=True)
     asd_df['state_term'].fillna(method='ffill', inplace=True)
     asd_df['energy'].fillna('N/A', inplace=True)
     asd_df['energy_uncertainty'].fillna(0, inplace=True)
