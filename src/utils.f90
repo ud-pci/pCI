@@ -5,7 +5,7 @@ Module utils
 
     Private
 
-    Public :: CountSubstr, DetermineRecordLength
+    Public :: CountSubstr, DetermineRecordLength, ToUpperString
 
 Contains
 
@@ -71,5 +71,21 @@ Contains
         End If
 
     End Subroutine DetermineRecordLength
+
+    Pure Function ToUpperString(str) Result(upper)
+        ! Converts every lowercase letter (a-z) in a string to uppercase (A-Z)
+        Character(*), Intent(In) :: str
+        Character(len(str)) :: upper
+        Integer :: i, c
+        
+        Do i = 1, Len(str)
+            c = IChar(str(i:i))
+            If (c >= IChar('a') .and. c <= IChar('z')) Then
+                upper(i:i) = Char(c - 32)
+            Else
+                upper(i:i) = str(i:i)
+            End If
+        End Do
+    End Function ToUpperString
 
 End Module utils

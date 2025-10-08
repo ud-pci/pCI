@@ -1,6 +1,7 @@
 Module conf_init
 
     Use conf_variables
+    Use utils, Only : ToUpperString
 
     Implicit None
 
@@ -38,7 +39,7 @@ Module conf_init
         Implicit None
 
         integer :: index_equals, index_hashtag
-        character(len=4) :: key
+        character(len=4) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
         logical :: equals_in_str
@@ -61,65 +62,69 @@ Module conf_init
                 val = trim(adjustl(line(index_equals+1:len(line))))
                 index_hashtag = index(string=val, substring="#") ! account for comments
                 If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
-                Select Case(key)
+
+                ! normalize key to uppercase
+                key_upper = ToUpperString(key)
+                
+                Select Case(key_upper)
                 Case('Z')
                     Read(val, *) Z
-                Case('Am')
+                Case('AM')
                     Read(val, *) Am
                 Case('J')
                     Read(val, *) XJ_av
-                Case('Jm')
+                Case('JM')
                     Read(val, *) Jm
-                Case('Nso')
+                Case('NSO')
                     Read(val, *) Nso
-                Case('Nc')
+                Case('NC')
                     Read(val, *) Nc
-                Case('Kv')
+                Case('KV')
                     Read(val, *) Kv
-                Case('Nlv')
+                Case('NLV')
                     Read(val, *) Nlv
-                Case('Ne')
+                Case('NE')
                     Read(val, *) Ne
-                Case('Kl4')
+                Case('KL4')
                     Read(val, *) Kl4
                     Call PrintParamI(key, Kl4)
-                Case('Nc4')
+                Case('NC4')
                     Read(val, *) Nc4
                     Call PrintParamI(key, Nc4)
-                Case('Gj')
+                Case('GJ')
                     Read(val, *) Gj
                     Call PrintParamR(key, Gj, '(A5,F6.3)')
-                Case('Crt4')
+                Case('CRT4')
                     Read(val, *) Crt4
                     Call PrintParamR(key, Crt4, '(A5,F8.5)')
-                Case('kout')
+                Case('KOUT')
                     Read(val, *) Kout
                     Call PrintParamI(key, Kout)
-                Case('Ncpt')
+                Case('NCPT')
                     Read(val, *) Ncpt
                     Call PrintParamI(key, Ncpt)
-                Case('Cut0')
+                Case('CUT0')
                     Read(val, *) Cut0
                     Call PrintParamR(key, Cut0, '(A5,F8.5)')
-                Case('N_it')
+                Case('N_IT')
                     Read(val, *) N_it
                     Call PrintParamI(key, N_it)
-                Case('Kbrt')
+                Case('KBRT')
                     Read(val, *) Kbrt
                     Call PrintParamI(key, Kbrt)
-                Case('K_is')
+                Case('K_IS')
                     Read(val, *) K_is
                     Call PrintParamI(key, K_is)
-                Case('C_is')
+                Case('C_IS')
                     Read(val, *) C_is
                     Call PrintParamR(key, C_is, '(A5,F7.4)')
-                Case('Klow')
+                Case('KLOW')
                     Read(val, *) Klow
                     Call PrintParamI(key, Klow)
-                Case('Gnuc')
+                Case('GNUC')
                     Read(val, *) Gnuc
                     Call PrintParamR(key, Gnuc, '(A5,F8.5)')
-                Case('Qnuc')
+                Case('QNUC')
                     Read(val, *) Qnuc
                     Call PrintParamR(key, Qnuc, '(A5,F8.5)')
                 End Select
