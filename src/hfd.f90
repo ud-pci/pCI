@@ -2676,13 +2676,18 @@ Contains
         call Sint1(e_breit)
         eadd(na)=e_breit
         
-        cp1=CP(1)/cp1
-        cq1=CQ(1)/cq1
-        
-        do i=ii+1,ii+10
-            CP(i)=CP(i)*cp1
-            CQ(i)=CQ(i)*cq1
-        end do
+        if (cp1 /= 0.d0) then
+            cp1=CP(1)/cp1
+            do i=ii+1,ii+10
+                CP(i)=CP(i)*cp1
+            end do
+        end if
+        if (cq1 /= 0.d0) then
+            cq1=CQ(1)/cq1
+            do i=ii+1,ii+10
+                CQ(i)=CQ(i)*cq1
+            end do
+        end if
 
         ch1=let(la+1)
         strfmt = '(2X,"E_breit(",I2,A1,"_",I1,"/2 ) = ",E14.7)'
