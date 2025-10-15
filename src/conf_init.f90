@@ -152,7 +152,7 @@ Module conf_init
         Kdsig = 0
         Kw = 0
         KLSJ = 0
-        K_sms = 0
+        K_sms = 3
         KWeights = 0
         KXIJ = 10
         MaxNd0 = 3000
