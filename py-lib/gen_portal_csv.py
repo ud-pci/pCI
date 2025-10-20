@@ -385,21 +385,12 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         energy1 = line[6]
         energy2 = line[7]
         wavelength = line[8]
-
-        # Set minimum matrix element value
-        if matrix_element_value == '0.00000':
-            matrix_element_value = '0.00001'
-            
+        
         # Set minimum uncertainty
-        try:
-            uncertainty = '{:,.5f}'.format(math.sqrt(float(uncertainty)**2 + (min_unc_per/100)**2))
-        except TypeError:
-            uncertainty = '-'
-            print('Type Error for: ' + conf1 + ' ' + term1+J1 + ', ' + conf2 + ' ' + term2+J2)
-            continue
-        except ValueError as ve:
-            print('Uncertainty not found for: ' + conf1 + ' ' + term1+J1 + ', ' + conf2 + ' ' + term2+J2)
-            continue
+        extra_uncertainty = float(matrix_element_value) * min_unc_per / 100
+        uncertainty = np.sqrt(uncertainty**2 + extra_uncertainty**2)
+        if uncertainty == 0:
+            uncertainty = 0.00001
         
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
