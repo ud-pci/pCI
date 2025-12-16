@@ -416,7 +416,7 @@ def merge_res(res_even, res_odd, second_order_exists):
             energy_cm1_shifted = round((res_odd[0][2]-conf[2])*ht_to_cm, 2)
             if second_order_exists:
                 energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*ht_to_cm, 2)
-                uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
+                uncertainty = round(abs(energy_cm1_shifted2-energy_cm1_shifted))
             if conf[4] == 0:
                 merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],0,0])
             else:
