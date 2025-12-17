@@ -337,7 +337,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, energy_cutoff):
     '''
     This function writes the matrix element csv file
     '''
@@ -372,6 +372,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         min_unc_per = default_min_uncertainties[element]
         print('DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR', element + ':', str(min_unc_per) + '%')
 
+    print('ENERGY CUTOFF FOR NIST-THEORY DIFFERENCE:', str(energy_cutoff) + '%')
+
     for line in e1_res:
         # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
         conf1 = line[0]
@@ -380,14 +382,17 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         term2 = line[3][0:2]
         J1 = line[1][2]
         J2 = line[3][2]
-        matrix_element_value = line[4]
-        uncertainty = line[5]
+        try:
+            matrix_element_value = float(line[4])
+            uncertainty = float(line[5])
+        except (ValueError, TypeError):
+            continue
         energy1 = line[6]
         energy2 = line[7]
         wavelength = line[8]
         
         # Set minimum uncertainty
-        extra_uncertainty = float(matrix_element_value) * min_unc_per / 100
+        extra_uncertainty = matrix_element_value * min_unc_per / 100
         uncertainty = np.sqrt(uncertainty**2 + extra_uncertainty**2)
         if uncertainty == 0:
             uncertainty = 0.00001
@@ -407,11 +412,25 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                         continue
                 J1 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy, configuration and term
-                if line_theory[0][3] != '-': 
+                if line_theory[0][3] != '-':
+                    # Check energy difference between NIST and theory
+                    nist_energy = float(line_theory[0][3])
+                    theory_energy = float(line_theory[1][3])
+
+                    # Calculate percentage difference
+                    if nist_energy != 0:
+                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
+                    else:
+                        energy_diff_percent = 0.0
+
+                    # Skip if energy difference exceeds cutoff
+                    if energy_diff_percent > energy_cutoff:
+                        continue
+
                     conf1 = line_theory[0][0]
                     term1 = line_theory[0][1]
                     J1 = line_theory[0][2]
-                    energy1cm = float(line_theory[0][3])
+                    energy1cm = nist_energy
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(expt_shift)
                 else:
@@ -428,11 +447,25 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                         continue
                 J2 = line_theory[1][2]
                 # Check if NIST energy exists - if it does, overwrite theory energy
-                if line_theory[0][3] != '-': 
+                if line_theory[0][3] != '-':
+                    # Check energy difference between NIST and theory
+                    nist_energy = float(line_theory[0][3])
+                    theory_energy = float(line_theory[1][3])
+
+                    # Calculate percentage difference
+                    if nist_energy != 0:
+                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
+                    else:
+                        energy_diff_percent = 0.0
+
+                    # Skip if energy difference exceeds cutoff
+                    if energy_diff_percent > energy_cutoff:
+                        continue
+
                     conf2 = line_theory[0][0]
                     term2 = line_theory[0][1]
                     J2 = line_theory[0][2]
-                    energy2cm = float(line_theory[0][3])
+                    energy2cm = nist_energy
                     if find_parity(conf2) != gs_parity:
                         energy2cm = energy2cm + float(expt_shift)
                 else:
@@ -488,12 +521,15 @@ def find_energy_shift(df):
     '''
     ground_parity = nist_parity(df['state_term'].values[:1][0])
 
+    energy_shift = 0.0
     for index, row in df.iterrows():
         parity = nist_parity(row['state_term'])
         if parity != ground_parity:
-            energy_shift = row['energy']
-            break
-    
+            # Skip if energy is missing (marked as '-')
+            if row['energy'] != '-':
+                energy_shift = float(row['energy'])
+                break
+
     return energy_shift
 
 def convert_roman_to_num(roman):
@@ -638,6 +674,9 @@ if __name__ == "__main__":
         
         # set default minimum uncertainty as percentage of value to 1.5
         min_uncertainty = float(get_dict_value(portal, 'min_uncertainty')) if portal else 1.5
+
+        # set default energy cutoff as percentage difference between NIST and theory to 1.0
+        energy_cutoff = float(get_dict_value(portal, 'energy_cutoff')) if portal else 1.0
     else:
         atom = input('Input name of atom: ')
         even_dir = None
@@ -646,6 +685,8 @@ if __name__ == "__main__":
         tm_dir1 = None
         tm_dir2 = None
         ignore_g = True
+        min_uncertainty = 1.5
+        energy_cutoff = 1.0
     name = atom.replace(" ","_")
     
     ri = False # 
@@ -767,10 +808,24 @@ if __name__ == "__main__":
     # Export filtered data to output directory
     path_output = "DATA_Output/"
     os.makedirs(os.path.dirname(path_output), exist_ok=True)
-    
+
+    # Calculate energy offsets to reference all energies from ground state
+    # NIST energies use NIST_shift, theory energies use theory_shift
+    # The parity opposite to ground state needs to be shifted
+    nist_even_offset = 0.0 if gs_parity == 'even' else NIST_shift
+    nist_odd_offset = 0.0 if gs_parity == 'odd' else NIST_shift
+    theory_even_offset = 0.0 if gs_parity == 'even' else theory_shift
+    theory_odd_offset = 0.0 if gs_parity == 'odd' else theory_shift
+
+    print(f'Ground state parity: {gs_parity}')
+    print(f'NIST energy offset for even parity: {nist_even_offset} cm^-1')
+    print(f'NIST energy offset for odd parity: {nist_odd_offset} cm^-1')
+    print(f'Theory energy offset for even parity: {theory_even_offset} cm^-1')
+    print(f'Theory energy offset for odd parity: {theory_odd_offset} cm^-1')
+
     # Use Vipul's code to correct misidentified configurations
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists)
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists, nist_offset=nist_even_offset, theory_offset=theory_even_offset)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists, nist_offset=nist_odd_offset, theory_offset=theory_odd_offset)
     
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
@@ -835,7 +890,7 @@ if __name__ == "__main__":
     
     if matrix_file_exists: 
         print('Writing matrix elements...')
-        num_E1 = write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty)
+        num_E1 = write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
         print(str(round(num_E1/num_possible_E1*100,2)) + "% of possible E1 accounted for")
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')

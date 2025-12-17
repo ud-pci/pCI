@@ -552,7 +552,7 @@ def ESort(i,data_final):
 
 
 # j,df_nist,df_ud,corr_config=[],OutAll=False
-def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E"):
+def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,theory_offset=0.0):
 
     df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,gs_exists,nist_max)
     ManualCorrection=True if ("Sr_I" in path_nist.split("/")[-1])==True else False
@@ -563,12 +563,11 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E"):
     roundd = 3
 
     print("Finding Correspondance")
-    ref_E = 0
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
         term_org=term_org.replace(' ','.')
-        data_nist = [config_nist, term_org, j_nist, round(level_nist+ref_E,roundd),uncer_nist]
+        data_nist = [config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist]
 
         nist_used = 0
         jth,jf,de = FindJth(i,df_nist,df_ud,corr_config=new_config,which_j=True)
@@ -578,17 +577,20 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E"):
             nist_used = 1
             config1_ao, config2_ao, term_ao, j_ao, level_ao,level_au, per1,per2,uncer_ud = Data_UD(jth,df_ud)
             final_config = config2_ao if jf==2 else config1_ao # final config
-            Ediff = round(abs(level_nist-level_ao),1)
-            Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
+            # Calculate energy difference after applying offsets (relative to ground state)
+            nist_energy_offset = level_nist + nist_offset
+            theory_energy_offset = level_ao + theory_offset
+            Ediff = round(abs(nist_energy_offset - theory_energy_offset),1)
+            Eperc = round(100*Ediff/nist_energy_offset,2) if nist_energy_offset!=0 else 0
             EpercStr = str(Eperc)+"%"
             if config2_ao=='': config2_ao='-'
             term_ao=Unmark_Term(term_ao)
-            data_csv.append(data_nist+[new_config[jth],config1_ao,config2_ao, term_ao, j_ao, round(level_ao+ref_E,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
+            data_csv.append(data_nist+[new_config[jth],config1_ao,config2_ao, term_ao, j_ao, round(theory_energy_offset,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
 
 
         ## remaining nist states
         if nist_used==0:
-            data_csv.append([config_nist, term_org, j_nist, round(level_nist+ref_E,roundd),uncer_nist,"-","-","-","-","-",round(level_nist+ref_E,roundd),"-","-","-","-","","-"])
+            data_csv.append([config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist,"-","-","-","-","-",round(level_nist+nist_offset,roundd),"-","-","-","-","","-"])
 
     ## remaining ao states
     for j in range(len(df_ud)):
@@ -596,7 +598,7 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E"):
         term_ao=Unmark_Term(term_ao)
         if config2_ao=='': config2_ao='-'
         if (j in ao_used)==False:
-            data_csv.append(["-","-","-",round(level_ao+ref_E,roundd),"-",new_config[j],config1_ao, config2_ao, term_ao, j_ao, round(level_ao+ref_E,roundd),uncer_ud,level_au,"-","-", per1,per2])
+            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",new_config[j],config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
 
 
     header = [" Config","  Term","  J","  Level (cm⁻¹)","Uncertainty (cm-1)","Final Config","  Config1","  Config2","  Term","  J","  Level (cm⁻¹)","  Uncertainty (cm⁻¹)","  Level (au)","    \u0394E","    \u0394E%","  I","  II"]
