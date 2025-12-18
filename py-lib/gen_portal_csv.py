@@ -772,8 +772,8 @@ if __name__ == "__main__":
         # set default minimum uncertainty as percentage of value to 1.5
         min_uncertainty = float(get_dict_value(portal, 'min_uncertainty')) if portal else 1.5
 
-        # set default energy cutoff as percentage difference between NIST and theory to 1.0
-        energy_cutoff = float(get_dict_value(portal, 'energy_cutoff')) if portal else 1.0
+        # set default energy cutoff as percentage difference between NIST and theory to 3.0
+        energy_cutoff = float(get_dict_value(portal, 'energy_cutoff')) if portal else 3.0
     else:
         atom = input('Input name of atom: ')
         even_dir = None
