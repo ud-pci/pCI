@@ -439,13 +439,17 @@ def Correct_Config(jth,config,mul,new_config,list_config,list_term,list_number,c
             
         return new_config,list_config,list_term,list_number,count
 
-    else: return new_config
+    else: 
+        return new_config
 
 
 def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
     print("Correcting ud configurations")
     new_config = np.full(len(df_ud),"",dtype=object)
     list_config,list_term,list_number,count = StartingConfigs(df_nist)
+
+    # Track assigned (config, term, J) combinations to prevent duplicates
+    assigned_states = set()
 
     for j in range(len(df_ud)):
         nf,jf,de = IsBeingUsed(j,df_nist,df_ud)
@@ -472,6 +476,18 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             if jf==1 and config=="5s.8p" and mul==1:config="4d.5p"
 
         new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
+
+        # Check if (config, term, J) combination is already assigned
+        # If so, revert to original configuration to avoid duplicates
+        state_key = (new_config[j], term_ao, j_ao)
+        if state_key in assigned_states:
+            print(f"Duplicate state detected: {new_config[j]} {term_ao} {j_ao}, keeping original: {config}")
+            new_config[j] = config
+            state_key = (config, term_ao, j_ao)
+
+        # Add this state to the set of assigned states
+        assigned_states.add(state_key)
+
     print("Correcting ud configurations : Complete..!")
     return new_config
 
