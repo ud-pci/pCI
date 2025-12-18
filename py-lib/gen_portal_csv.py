@@ -584,15 +584,25 @@ def find_ci_dirs(ci_path):
         
     return even_dir, odd_dir, dtm_dir1, dtm_dir2
 
-def combine_tm(raw_path):
+def combine_tm(raw_path, filtered_path):
+    """
+    Combine E1a/E1b and E1MBPTa/E1MBPTb files into E1.RES and E1MBPT.RES
+
+    Args:
+        raw_path: Path to raw data (E1a.RES, E1b.RES, etc.)
+        filtered_path: Path to filtered data (output E1.RES, E1MBPT.RES)
+    """
     # Track E1 matrix elements separately from E1MBPT
     e1_res = []
     e1_mbpt_res = []
 
+    # Ensure filtered path exists
+    os.makedirs(filtered_path, exist_ok=True)
+
     # Combine E1a.RES and E1b.RES into E1.RES
     with open(raw_path + '/E1a.RES', 'r') as f:
         lines = f.readlines()
-    with open(raw_path + '/E1.RES', 'w') as f:
+    with open(filtered_path + '/E1.RES', 'w') as f:
         for line in lines:
             f.write(line)
 
@@ -603,7 +613,7 @@ def combine_tm(raw_path):
     with open(raw_path + '/E1b.RES', 'r') as f:
         lines2 = f.readlines()
 
-    with open(raw_path + '/E1.RES', 'a') as f:
+    with open(filtered_path + '/E1.RES', 'a') as f:
         for line in lines2[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
             if (matrix_element) not in e1_res:
@@ -613,7 +623,7 @@ def combine_tm(raw_path):
     # Use separate list to avoid mixing with E1 data
     with open(raw_path + '/E1MBPTa.RES', 'r') as f:
         lines = f.readlines()
-    with open(raw_path + '/E1MBPT.RES', 'w') as f:
+    with open(filtered_path + '/E1MBPT.RES', 'w') as f:
         for line in lines:
             f.write(line)
 
@@ -624,11 +634,13 @@ def combine_tm(raw_path):
     with open(raw_path + '/E1MBPTb.RES', 'r') as f:
         lines2 = f.readlines()
 
-    with open(raw_path + '/E1MBPT.RES', 'a') as f:
+    with open(filtered_path + '/E1MBPT.RES', 'a') as f:
         for line in lines2[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
             if (matrix_element) not in e1_mbpt_res:
                 f.write(line)
+
+    print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
 
 if __name__ == "__main__":
     use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
@@ -693,8 +705,11 @@ if __name__ == "__main__":
     # Find input files from directories if they exist and put into DATA_RAW directory
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
+    data_filtered_path = 'DATA_Filtered/UD/'
     if not os.path.isdir(data_raw_path):
         Path(data_raw_path).mkdir(parents=True, exist_ok=True)
+    if not os.path.isdir(data_filtered_path):
+        Path(data_filtered_path).mkdir(parents=True, exist_ok=True)
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
@@ -731,9 +746,9 @@ if __name__ == "__main__":
         if even_dir and odd_dir or tm_dir1 or tm_dir2:
             print('data from ' + second_order_path + ' moved to DATA_RAW directory')
         os.chdir(dir_path)
-    
+
     if tm_dir1 and tm_dir2:
-        combine_tm(data_raw_path)
+        combine_tm(data_raw_path, data_filtered_path)
         
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
@@ -747,7 +762,8 @@ if __name__ == "__main__":
     else:
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
         print('Please put raw files in ' + raw_path)
-        print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1.RES, E1MBPT.RES')
+        print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1a.RES, E1b.RES, E1MBPTa.RES, E1MBPTb.RES')
+        print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_filtered_path)
         sys.exit()
     confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes = write_new_conf_res(name, raw_path, data_nist)
 
@@ -893,7 +909,7 @@ if __name__ == "__main__":
 
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1 = write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
+        num_E1 = write_matrix_csv(name, path_filtered_theory, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
         coverage = round(num_E1/num_possible_E1*100, 2)
         print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:
