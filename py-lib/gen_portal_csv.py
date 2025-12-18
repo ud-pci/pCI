@@ -783,7 +783,7 @@ if __name__ == "__main__":
         tm_dir2 = None
         ignore_g = True
         min_uncertainty = 1.5
-        energy_cutoff = 1.0
+        energy_cutoff = 3.0
     name = atom_name_to_filename(atom)
     
     ri = False # 
