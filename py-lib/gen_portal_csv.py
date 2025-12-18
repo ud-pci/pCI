@@ -312,20 +312,14 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
             state_config = level[1][5]
             state_term = level[1][1]
             state_J = level[1][2]
-            if find_parity(state_config) != gs_parity:
-                state_energy = "{:.1f}".format(float(level[1][3]) + float(theory_shift))
-            else:
-                state_energy = level[1][3]
+            state_energy = level[1][3]
             state_uncertainty = level[1][4]
         else:
             is_from_theory = False
             state_config = level[0][0]
             state_term = level[0][1]
             state_J = level[0][2]
-            if find_parity(state_config) != gs_parity:
-                state_energy = "{:.3f}".format(float(level[0][3]) + float(NIST_shift))
-            else:
-                state_energy = level[0][3]
+            state_energy = level[0][3]
             state_uncertainty = level[0][4]
         row = {'state_configuration': state_config, 'state_term': state_term, 'state_J': state_J, 
                'energy': state_energy, 'energy_uncertainty': state_uncertainty,'is_from_theory': is_from_theory}
@@ -340,22 +334,19 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, energy_cutoff):
     '''
     This function writes the matrix element csv file
+    Note: Transition rates are now calculated separately using generate_transition_rates.py
     '''
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
-    transition_rate_filename = element + '_Transition_Rates.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
     e1_res = cmp_matrix_res(filepath + 'E1.RES', filepath + 'E1MBPT.RES', swaps, fixes)
-    
+
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
                                'matrix_element', 'matrix_element_uncertainty'])
     
-    tr_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
-                               'state_two_configuration', 'state_two_term', 'state_two_J',
-                               'matrix_element', 'matrix_element_uncertainty', 
-                               'energy1(cm-1)', 'energy2(cm-1)',
-                               'wavelength(nm)','transition_rate(s-1)'])
+    # Track added transitions to avoid duplicates (E1.RES contains both A->B and B->A)
+    added_transitions = set()
 
     if ignore_g:
         print('IGNORING G STATES')
@@ -400,11 +391,18 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
         energy1cm, energy2cm = 0.0, 0.0
+        energy1_float = float(energy1)
+        energy2_float = float(energy2)
+        energy_tolerance = 1e-6  # Tolerance for floating point comparison (in a.u.)
+
         for line_theory in mapping:
             # mapping structure:
             # [expt=[conf, term, J, energy, unc], theory=[conf, term, J, energy, unc, final_conf, energy_au]]
             if line_theory[1][6] == '-': continue
-            if line_theory[1][6] == energy1:
+
+            # Compare energies as floats with tolerance instead of exact string match
+            theory_energy_au = float(line_theory[1][6])
+            if abs(theory_energy_au - energy1_float) < energy_tolerance:
                 conf1 = line_theory[1][5]
                 term1 = line_theory[1][1]
                 if ignore_g:
@@ -438,8 +436,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(theory_shift)
                 c1 = True
-                
-            if line_theory[1][6] == energy2:
+
+            if abs(theory_energy_au - energy2_float) < energy_tolerance:
                 conf2 = line_theory[1][5]
                 term2 = line_theory[1][1]
                 if ignore_g:
@@ -475,32 +473,27 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 c2 = True
 
         if c1 and c2:
-            wavelength = 1e7/abs(energy2cm-energy1cm)
-            if energy2 > energy1:
-                trate = (2.02613*10**18)/((2*int(J1)+1)*(abs(wavelength)*10)**3)*float(matrix_element_value)**2
-            else:
-                trate = (2.02613*10**18)/((2*int(J2)+1)*(abs(wavelength)*10)**3)*float(matrix_element_value)**2
-                
+            # Create unique transition identifier to avoid duplicates (both A->B and B->A)
+            state1 = f"{conf1} {term1}{J1}"
+            state2 = f"{conf2} {term2}{J2}"
+            trans_id = tuple(sorted([state1, state2]))
+
+            # Skip if we've already added this transition
+            if trans_id in added_transitions:
+                continue
+
+            added_transitions.add(trans_id)
+
             row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
                    'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
                    'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
             df.loc[len(df.index)] = row
-            
-            trrow = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
-                   'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
-                   'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty,
-                   'energy1(cm-1)': f"{energy1cm:.2f}", 'energy2(cm-1)': f"{energy2cm:.2f}",
-                   'wavelength(nm)': f"{wavelength:.2f}", 'transition_rate(s-1)': f"{trate:.4e}"}
-            tr_df.loc[len(df.index)] = trrow
     
     num_E1 = len(df)
-    print('TOTAL MATRIX ELEMENTS:', num_E1)
-    
+    print(f'TOTAL MATRIX ELEMENTS: {num_E1}')
+
     df.to_csv(matrix_element_filename, index=False)
     print(matrix_element_filename + ' has been written')
-    
-    tr_df.to_csv(transition_rate_filename, index=False)
-    print(transition_rate_filename + ' has been written')
 
     return num_E1
 
@@ -592,8 +585,11 @@ def find_ci_dirs(ci_path):
     return even_dir, odd_dir, dtm_dir1, dtm_dir2
 
 def combine_tm(raw_path):
+    # Track E1 matrix elements separately from E1MBPT
     e1_res = []
-    
+    e1_mbpt_res = []
+
+    # Combine E1a.RES and E1b.RES into E1.RES
     with open(raw_path + '/E1a.RES', 'r') as f:
         lines = f.readlines()
     with open(raw_path + '/E1.RES', 'w') as f:
@@ -606,13 +602,15 @@ def combine_tm(raw_path):
 
     with open(raw_path + '/E1b.RES', 'r') as f:
         lines2 = f.readlines()
-    
+
     with open(raw_path + '/E1.RES', 'a') as f:
         for line in lines2[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
             if (matrix_element) not in e1_res:
                 f.write(line)
 
+    # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES
+    # Use separate list to avoid mixing with E1 data
     with open(raw_path + '/E1MBPTa.RES', 'r') as f:
         lines = f.readlines()
     with open(raw_path + '/E1MBPT.RES', 'w') as f:
@@ -621,15 +619,15 @@ def combine_tm(raw_path):
 
     for line in lines[1:]:
         matrix_element = re.findall(r'\<.*?\>', line)[0]
-        e1_res.append(matrix_element)
+        e1_mbpt_res.append(matrix_element)
 
     with open(raw_path + '/E1MBPTb.RES', 'r') as f:
         lines2 = f.readlines()
-    
+
     with open(raw_path + '/E1MBPT.RES', 'a') as f:
         for line in lines2[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
-            if (matrix_element) not in e1_res:
+            if (matrix_element) not in e1_mbpt_res:
                 f.write(line)
 
 if __name__ == "__main__":
@@ -857,11 +855,16 @@ if __name__ == "__main__":
     even_confs = []
     odd_confs = []
     for line in mapping:
-        configuration = line[0][0]
-        term = line[0][1]
-        J = line[0][2]
-        if configuration == '-':
-            continue
+        # Use NIST config if available, otherwise use theory config
+        if line[0][0] != '-':
+            configuration = line[0][0]
+            term = line[0][1]
+            J = line[0][2]
+        else:
+            configuration = line[1][5]
+            term = line[1][1]
+            J = line[1][2]
+
         if find_parity(configuration) == 'even':
             even_confs.append([configuration, term, J])
         elif find_parity(configuration) == 'odd':
@@ -887,10 +890,11 @@ if __name__ == "__main__":
                 possible_E1.append([conf_odd, conf_even])
     num_possible_E1 = len(possible_E1)
     print('Number of possible E1: ', len(possible_E1))
-    
-    if matrix_file_exists: 
+
+    if matrix_file_exists:
         print('Writing matrix elements...')
         num_E1 = write_matrix_csv(name, raw_path, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
-        print(str(round(num_E1/num_possible_E1*100,2)) + "% of possible E1 accounted for")
+        coverage = round(num_E1/num_possible_E1*100, 2)
+        print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
