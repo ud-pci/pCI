@@ -525,8 +525,48 @@ def find_energy_shift(df):
 
     return energy_shift
 
+def convert_num_to_roman(num):
+    """
+    Convert an integer to Roman numerals.
+
+    Args:
+        num: Integer to convert (1-3999)
+
+    Returns:
+        Roman numeral string
+    """
+    val = [
+        100, 90, 50, 40,
+        10, 9, 5, 4,
+        1
+    ]
+    syms = [
+        "C", "XC", "L", "XL",
+        "X", "IX", "V", "IV",
+        "I"
+    ]
+    roman_num = ''
+    i = 0
+    while num > 0:
+        for _ in range(num // val[i]):
+            roman_num += syms[i]
+            num -= val[i]
+        i += 1
+    return roman_num
+
 def convert_roman_to_num(roman):
-    roman_val = {'I':1, 'V':5, 'X':10, 'L':50}
+    """
+    Convert Roman numerals to an integer.
+
+    Args:
+        roman: Roman numeral string
+
+    Returns:
+        Integer value
+    """
+    roman_val = {
+        'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100
+    }
     num = 0
     i = 0
     while (i < len(roman)):
@@ -542,8 +582,43 @@ def convert_roman_to_num(roman):
         else:
             num = num + c1
             i = i + 1
-    
+
     return num
+
+def atom_name_to_filename(atom):
+    """
+    Convert atom name to filename format.
+
+    Examples:
+    - Ba I → Ba1 (neutral)
+    - Ba II or Ba+ → Ba2 (singly ionized)
+    - Ba III or Ba++ → Ba3 (doubly ionized)
+
+    Args:
+        atom: Atom name in format "Element Roman" or "Element Charge"
+
+    Returns:
+        Filename format (e.g., "Ba1", "Ba2")
+    """
+    parts = atom.split()
+    if len(parts) == 1:
+        # Just element, assume neutral (I)
+        return parts[0] + '1'
+
+    element = parts[0]
+    suffix = parts[1]
+
+    if '+' in suffix:
+        # Count number of + signs and add 1 (e.g., Ba+ → Ba2, Ba++ → Ba3)
+        ionization = suffix.count('+') + 1
+        return element + str(ionization)
+    elif suffix.isnumeric():
+        # Already in numeric format
+        return atom.replace(' ', '')
+    else:
+        # Roman numeral (e.g., Ba I → Ba1, Ba II → Ba2)
+        ionization = convert_roman_to_num(suffix)
+        return element + str(ionization)
 
 def find_ci_dirs(ci_path):
     os.chdir(ci_path)
@@ -650,16 +725,28 @@ if __name__ == "__main__":
         config = read_yaml(config_yml)
         atom_name = get_dict_value(config['atom'],'name')
         
-        # Parse atom name
+        # Parse atom name - keep in Roman numeral format for NIST
+        # NIST uses: Ba I (neutral), Ba II (singly ionized), etc.
         if len(atom_name.split()) == 1:
+            # Just element symbol, assume neutral (I)
             atom = atom_name + ' I'
         elif len(atom_name.split()) == 2:
-            if '+' in atom_name.split()[1]: 
-                atom = atom_name
-            elif atom_name.split()[1].isnumeric():
-                atom = atom_name.split()[0] + ' ' + str(int(atom_name.split()[1])-1) + '+'
+            element = atom_name.split()[0]
+            suffix = atom_name.split()[1]
+
+            if '+' in suffix:
+                # Convert + notation to Roman numerals for NIST
+                # Ba+ → Ba II, Ba++ → Ba III
+                ionization = suffix.count('+') + 1
+                atom = element + ' ' + convert_num_to_roman(ionization)
+            elif suffix.isnumeric():
+                # Convert numeric to Roman numerals for NIST
+                # Ba1 → Ba I, Ba2 → Ba II
+                ionization = int(suffix)
+                atom = element + ' ' + convert_num_to_roman(ionization)
             else:
-                atom = atom_name.split()[0] + ' ' + str(convert_roman_to_num(atom_name.split()[1])-1) + '+'
+                # Already in Roman numeral format, keep as-is
+                atom = atom_name
         else:
             print('ERROR: atom name not supported')
             sys.exit()
@@ -697,7 +784,7 @@ if __name__ == "__main__":
         ignore_g = True
         min_uncertainty = 1.5
         energy_cutoff = 1.0
-    name = atom.replace(" ","_")
+    name = atom_name_to_filename(atom)
     
     ri = False # 
     fac = 2 # maximum energy difference (in percent) for comparison
@@ -780,9 +867,9 @@ if __name__ == "__main__":
     os.makedirs(os.path.dirname(path_filtered_nist), exist_ok=True)
     os.makedirs(os.path.dirname(path_filtered_theory), exist_ok=True)
 
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'odd')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom,'even')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+atom)
+    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
+    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'even')
+    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name)
     
     # Filter NIST and UD data
     path_nist_even = "DATA_Filtered/NIST/"+name+"_NIST_Even.csv"
@@ -857,13 +944,7 @@ if __name__ == "__main__":
     
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping(num_levels_output_even, num_levels_output_odd)
-
-    # Reformat atom name to numerical value for filenames
-    if name.split('_')[1].isalpha():
-        name = name.split('_')[0] + str(convert_roman_to_num(name.split('_')[1]))
-    else:
-        name = name.split('_')[0] + name.split('_')[1]
-        
+    
     write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
     
     # Create a list of all possible transitions between states
