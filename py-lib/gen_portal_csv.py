@@ -102,12 +102,18 @@ def create_mapping(num_levels_even, num_levels_odd):
         theory_uncertainty = line.split()[11]
         theory_energy_au = line.split()[12]
         #theory_delta_cm = line.split()[13]
-        #theory_delta = line.split()[14]
+        try:
+            # Extract energy difference percentage (last column, remove '%' sign)
+            energy_diff_pct = float(line.split()[14].rstrip('%'))
+        except:
+            # If parsing fails, set to 0 (perfect match)
+            energy_diff_pct = 0.0
 
-        # select relevant data for portal database 
+        # select relevant data for portal database
         if NIST_config != 'Config':
             mapping.append([[NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
-                    [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au]])
+                    [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
+                    energy_diff_pct])
     
     return mapping
 
@@ -296,14 +302,15 @@ def find_parity(configuration):
         
     return parity
 
-def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
+def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, energy_cutoff):
     '''
     This function writes the energy csv file
+    Mapping should already be filtered to only include levels within energy_cutoff
     '''
     filename = name + '_Energies.csv'
 
     # select columns for portal dataframe
-    portal_df = pd.DataFrame(columns = ['state_configuration', 'state_term', 'state_J', 'energy', 
+    portal_df = pd.DataFrame(columns = ['state_configuration', 'state_term', 'state_J', 'energy',
                                      'energy_uncertainty', 'is_from_theory'])
 
     for level in mapping:
@@ -328,7 +335,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity):
 
     portal_df.to_csv(filename, index=False)
 
-    print(filename + ' has been written')
+    print(f'{filename} has been written with {len(portal_df)} levels (energy cutoff: {energy_cutoff}%)')
 
     return
 
@@ -767,8 +774,9 @@ if __name__ == "__main__":
         # portal parameters
         portal = get_dict_value(config, 'portal')
         
-        # set default ignore configurations with 'g' and terms with 'G'
-        ignore_g = get_dict_value(portal, 'ignore_g') if portal else True
+        # set default ignore configurations with 'g' and terms with 'G' to True
+        ignore_g_value = get_dict_value(portal, 'ignore_g') if portal else None
+        ignore_g = ignore_g_value if ignore_g_value is not None else True
         
         # set default minimum uncertainty as percentage of value to 1.5
         min_unc_value = get_dict_value(portal, 'min_uncertainty') if portal else None
@@ -948,13 +956,40 @@ if __name__ == "__main__":
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping(num_levels_output_even, num_levels_output_odd)
     
-    write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity)
-    
+    # Filter mapping: truncate at first level exceeding energy cutoff
+    # Apply separately to even and odd parity since they're ordered independently
+    even_mapping = mapping[:num_levels_output_even]
+    odd_mapping = mapping[num_levels_output_even:]
+
+    # Find truncation point for even parity
+    even_truncate_idx = len(even_mapping)
+    for i, level in enumerate(even_mapping):
+        if level[2] > energy_cutoff:
+            even_truncate_idx = i
+            print(f'Even parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {energy_cutoff}%)')
+            break
+
+    # Find truncation point for odd parity
+    odd_truncate_idx = len(odd_mapping)
+    for i, level in enumerate(odd_mapping):
+        if level[2] > energy_cutoff:
+            odd_truncate_idx = i
+            print(f'Odd parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {energy_cutoff}%)')
+            break
+
+    # Create filtered mapping with truncated levels
+    filtered_mapping = even_mapping[:even_truncate_idx] + odd_mapping[:odd_truncate_idx]
+    print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels using {energy_cutoff}% energy cutoff')
+    print(f'  Even parity: {len(even_mapping)} -> {even_truncate_idx}')
+    print(f'  Odd parity: {len(odd_mapping)} -> {odd_truncate_idx}')
+
+    write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, energy_cutoff)
+
     # Create a list of all possible transitions between states
     print('even parity configurations:')
     even_confs = []
     odd_confs = []
-    for line in mapping:
+    for line in filtered_mapping:
         # Use NIST config if available, otherwise use theory config
         if line[0][0] != '-':
             configuration = line[0][0]
@@ -993,7 +1028,7 @@ if __name__ == "__main__":
 
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1 = write_matrix_csv(name, path_filtered_theory, mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
+        num_E1 = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
         coverage = round(num_E1/num_possible_E1*100, 2)
         print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:
