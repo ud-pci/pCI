@@ -147,11 +147,12 @@ def write_new_conf_res(name, filepath, data_nist):
     if not os.path.exists(filepath + 'CONFFINALoddMBPT.RES'):
         print('CONFFINALoddMBPT.RES not found in', filepath)
         second_order_exists = False
-    if not os.path.exists(filepath + 'E1.RES'):
-        print('E1.RES not found in', filepath)
+    # E1.RES and E1MBPT.RES are now in DATA_Filtered/UD/, check there instead
+    if not os.path.exists('DATA_Filtered/UD/E1.RES'):
+        print('E1.RES not found in DATA_Filtered/UD/')
         matrix_file_exists = False
-    if not os.path.exists(filepath + 'E1MBPT.RES'):
-        print('E1MBPT.RES not found in', filepath)
+    if not os.path.exists('DATA_Filtered/UD/E1MBPT.RES'):
+        print('E1MBPT.RES not found in DATA_Filtered/UD/')
         second_order_exists = False
 
     # Read CONF.RES files
@@ -339,7 +340,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res = cmp_matrix_res(filepath + 'E1.RES', filepath + 'E1MBPT.RES', swaps, fixes)
+    e1_res = cmp_matrix_res('DATA_Filtered/UD/E1.RES', 'DATA_Filtered/UD/E1MBPT.RES', swaps, fixes)
 
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -770,10 +771,12 @@ if __name__ == "__main__":
         ignore_g = get_dict_value(portal, 'ignore_g') if portal else True
         
         # set default minimum uncertainty as percentage of value to 1.5
-        min_uncertainty = float(get_dict_value(portal, 'min_uncertainty')) if portal else 1.5
+        min_unc_value = get_dict_value(portal, 'min_uncertainty') if portal else None
+        min_uncertainty = float(min_unc_value) if min_unc_value is not None else 1.5
 
         # set default energy cutoff as percentage difference between NIST and theory to 3.0
-        energy_cutoff = float(get_dict_value(portal, 'energy_cutoff')) if portal else 3.0
+        cutoff_value = get_dict_value(portal, 'energy_cutoff') if portal else None
+        energy_cutoff = float(cutoff_value) if cutoff_value is not None else 3.0
     else:
         atom = input('Input name of atom: ')
         even_dir = None
