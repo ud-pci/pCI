@@ -270,8 +270,7 @@ def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding t
             if term_nist==term_ao:
                 # Third Pass :
                 if config_nist==config1_ao or inv_config==config1_ao:j1.append(j),Eperc1.append(Eperc)
-                if corr==0:
-                    if config_nist==config2_ao or inv_config==config2_ao:j2.append(j),Eperc2.append(Eperc)
+                if config_nist==config2_ao or inv_config==config2_ao:j2.append(j),Eperc2.append(Eperc)
             
             # Fourth Pass : If Term_NIST != Term_AO --> Check using term correction by +-1
             if term_nist!=term_ao: # correction to terms in ao results
@@ -279,10 +278,9 @@ def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding t
                     if term_nist==Term_Correct(term_ao,1):j1.append(j),Eperc1.append(Eperc)
                     if term_nist==Term_Correct(term_ao,-1):j1.append(j),Eperc1.append(Eperc)
 
-                if corr==0:
-                    if config_nist==config2_ao or inv_config==config2_ao:
-                        if term_nist==Term_Correct(term_ao,1):j2.append(j),Eperc2.append(Eperc)
-                        if term_nist==Term_Correct(term_ao,-1):j2.append(j),Eperc2.append(Eperc)
+                if config_nist==config2_ao or inv_config==config2_ao:
+                    if term_nist==Term_Correct(term_ao,1):j2.append(j),Eperc2.append(Eperc)
+                    if term_nist==Term_Correct(term_ao,-1):j2.append(j),Eperc2.append(Eperc)
     
     return j1,j2,Eperc1,Eperc2 # j1,j2 is the index of ud configurations 1 and 2 corresponding to NIST
 
@@ -336,10 +334,11 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
     if J1==[] and J2!=[]:
         for i in range(len(df_nist)):
             jj1,jj2,EEperc1,EEperc2=FindJthAll(i,df_nist,df_ud,corr_config)
-            if jj1!=-1 and jj1==j2:
-                JJ1,EEEperc1=jj1,EEperc1
-        
-        if EEEperc1<Eperc2:j_final=-1
+            if j2 in jj1:  # Check if any other NIST level wants this theory level as primary
+                idx_match = jj1.index(j2)
+                JJ1,EEEperc1=j2,EEperc1[idx_match]
+
+        if JJ1!=0 and EEEperc1<Eperc2:j_final=-1
         else: j_final,jf,dE=j2,2,Eperc2
         if JJ1==0: j_final,jf,dE=j2,2,Eperc2
         
@@ -576,21 +575,49 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
 
     data_csv = []
     ao_used = []
+    nist_used_dict = {}
     roundd = 3
 
     print("Finding Correspondance")
+
+    # Build all possible (NIST, theory) matches with their scores
+    all_matches = []
+    for i in range(len(df_nist)):
+        j1,j2,Eperc1,Eperc2 = FindJthAll(i,df_nist,df_ud,corr_config=new_config)
+        config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
+
+        # Add primary matches (prefer these)
+        for idx, j in enumerate(j1):
+            all_matches.append((i, j, 1, Eperc1[idx], level_nist))  # (nist_idx, theory_idx, match_type, energy_perc, nist_level)
+
+        # Add secondary matches
+        for idx, j in enumerate(j2):
+            all_matches.append((i, j, 2, Eperc2[idx], level_nist))
+
+    # Sort by: 
+    # 1. energy percentage difference, 
+    # 2. match type (primary first as tiebreaker)
+    all_matches.sort(key=lambda x: (x[3], x[2]))  # Sort by energy_perc first, then match_type
+
+    # Assign matches greedily from sorted list
+    for nist_idx, theory_idx, match_type, energy_perc, _ in all_matches:
+        # Skip if either NIST or theory level already assigned
+        if nist_idx in nist_used_dict or theory_idx in ao_used:
+            continue
+
+        # Make the assignment
+        nist_used_dict[nist_idx] = (theory_idx, match_type, energy_perc)
+        ao_used.append(theory_idx)
+
+    # Now build the output data_csv using the assignments
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
         term_org=term_org.replace(' ','.')
         data_nist = [config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist]
 
-        nist_used = 0
-        jth,jf,de = FindJth(i,df_nist,df_ud,corr_config=new_config,which_j=True)
-        if (jth in ao_used)==True:jth=-1 # avoiding duplicates
-        if jth!=-1:
-            ao_used.append(jth)
-            nist_used = 1
+        if i in nist_used_dict:
+            jth, jf, de = nist_used_dict[i]
             config1_ao, config2_ao, term_ao, j_ao, level_ao,level_au, per1,per2,uncer_ud = Data_UD(jth,df_ud)
             final_config = config2_ao if jf==2 else config1_ao # final config
             # Calculate energy difference after applying offsets (relative to ground state)
@@ -601,12 +628,8 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
             EpercStr = str(Eperc)+"%"
             if config2_ao=='': config2_ao='-'
             term_ao=Unmark_Term(term_ao)
-            data_csv.append(data_nist+[new_config[jth],config1_ao,config2_ao, term_ao, j_ao, round(theory_energy_offset,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
-
-
-        ## remaining nist states
-        if nist_used==0:
-            data_csv.append([config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist,"-","-","-","-","-",round(level_nist+nist_offset,roundd),"-","-","-","-","","-"])
+            # Use NIST config as final config (experimental designation), not theory's corrected config
+            data_csv.append(data_nist+[config_nist,config1_ao,config2_ao, term_ao, j_ao, round(theory_energy_offset,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
 
     ## remaining ao states
     for j in range(len(df_ud)):
