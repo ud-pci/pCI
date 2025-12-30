@@ -992,6 +992,26 @@ if __name__ == "__main__":
     print(f'  Even parity: {len(even_mapping)} -> {even_truncate_idx}')
     print(f'  Odd parity: {len(odd_mapping)} -> {odd_truncate_idx}')
 
+    # Filter out states with 'g' in configuration or 'G' in term if ignore_g is True
+    if ignore_g:
+        before_g_filter = len(filtered_mapping)
+        filtered_mapping_no_g = []
+        for level in filtered_mapping:
+            # Check both NIST and theory configurations/terms
+            nist_config = level[0][0]
+            nist_term = level[0][1]
+            theory_config = level[1][5]  # corrected config
+            theory_term = level[1][1]
+
+            # Skip if 'g' in any configuration or 'G' in any term
+            if 'g' in nist_config or 'g' in theory_config or 'G' in nist_term or 'G' in theory_term:
+                continue
+            filtered_mapping_no_g.append(level)
+
+        filtered_mapping = filtered_mapping_no_g
+        print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g/G (ignore_g=True)')
+        print(f'Final mapping has {len(filtered_mapping)} levels')
+
     write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, energy_cutoff)
 
     # Create a list of all possible transitions between states
