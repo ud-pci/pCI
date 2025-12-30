@@ -153,12 +153,12 @@ def write_new_conf_res(name, filepath, data_nist):
     if not os.path.exists(filepath + 'CONFFINALoddMBPT.RES'):
         print('CONFFINALoddMBPT.RES not found in', filepath)
         second_order_exists = False
-    # E1.RES and E1MBPT.RES are now in DATA_Filtered/UD/, check there instead
-    if not os.path.exists('DATA_Filtered/UD/E1.RES'):
-        print('E1.RES not found in DATA_Filtered/UD/')
+    # E1.RES and E1MBPT.RES are in DATA_Processed/, check there
+    if not os.path.exists('DATA_Processed/E1.RES'):
+        print('E1.RES not found in DATA_Processed/')
         matrix_file_exists = False
-    if not os.path.exists('DATA_Filtered/UD/E1MBPT.RES'):
-        print('E1MBPT.RES not found in DATA_Filtered/UD/')
+    if not os.path.exists('DATA_Processed/E1MBPT.RES'):
+        print('E1MBPT.RES not found in DATA_Processed/')
         second_order_exists = False
 
     # Read CONF.RES files
@@ -347,7 +347,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res = cmp_matrix_res('DATA_Filtered/UD/E1.RES', 'DATA_Filtered/UD/E1MBPT.RES', swaps, fixes)
+    e1_res = cmp_matrix_res('DATA_Processed/E1.RES', 'DATA_Processed/E1MBPT.RES', swaps, fixes)
 
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -702,28 +702,31 @@ def combine_tm(raw_path, filtered_path):
             if (matrix_element) not in e1_res:
                 f.write(line)
 
-    # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES
+    # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES (if they exist)
     # Use separate list to avoid mixing with E1 data
-    with open(raw_path + '/E1MBPTa.RES', 'r') as f:
-        lines = f.readlines()
-    with open(filtered_path + '/E1MBPT.RES', 'w') as f:
-        for line in lines:
-            f.write(line)
-
-    for line in lines[1:]:
-        matrix_element = re.findall(r'\<.*?\>', line)[0]
-        e1_mbpt_res.append(matrix_element)
-
-    with open(raw_path + '/E1MBPTb.RES', 'r') as f:
-        lines2 = f.readlines()
-
-    with open(filtered_path + '/E1MBPT.RES', 'a') as f:
-        for line in lines2[1:]:
-            matrix_element = re.findall(r'\<.*?\>', line)[0]
-            if (matrix_element) not in e1_mbpt_res:
+    if os.path.exists(raw_path + '/E1MBPTa.RES') and os.path.exists(raw_path + '/E1MBPTb.RES'):
+        with open(raw_path + '/E1MBPTa.RES', 'r') as f:
+            lines = f.readlines()
+        with open(filtered_path + '/E1MBPT.RES', 'w') as f:
+            for line in lines:
                 f.write(line)
 
-    print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
+        for line in lines[1:]:
+            matrix_element = re.findall(r'\<.*?\>', line)[0]
+            e1_mbpt_res.append(matrix_element)
+
+        with open(raw_path + '/E1MBPTb.RES', 'r') as f:
+            lines2 = f.readlines()
+
+        with open(filtered_path + '/E1MBPT.RES', 'a') as f:
+            for line in lines2[1:]:
+                matrix_element = re.findall(r'\<.*?\>', line)[0]
+                if (matrix_element) not in e1_mbpt_res:
+                    f.write(line)
+        print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
+    else:
+        print(f'E1.RES written to {filtered_path}')
+        print('E1MBPTa.RES and/or E1MBPTb.RES not found, skipping E1MBPT.RES creation')
 
 if __name__ == "__main__":
     use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
@@ -804,10 +807,13 @@ if __name__ == "__main__":
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
     data_filtered_path = 'DATA_Filtered/UD/'
+    data_processed_path = 'DATA_Processed/'
     if not os.path.isdir(data_raw_path):
         Path(data_raw_path).mkdir(parents=True, exist_ok=True)
     if not os.path.isdir(data_filtered_path):
         Path(data_filtered_path).mkdir(parents=True, exist_ok=True)
+    if not os.path.isdir(data_processed_path):
+        Path(data_processed_path).mkdir(parents=True, exist_ok=True)
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
@@ -845,8 +851,11 @@ if __name__ == "__main__":
             print('data from ' + second_order_path + ' moved to DATA_RAW directory')
         os.chdir(dir_path)
 
-    if tm_dir1 and tm_dir2:
-        combine_tm(data_raw_path, data_filtered_path)
+    # Combine E1a/E1b and E1MBPTa/E1MBPTb files if they exist in DATA_RAW/
+    if os.path.exists(data_raw_path + '/E1a.RES') and os.path.exists(data_raw_path + '/E1b.RES'):
+        combine_tm(data_raw_path, data_processed_path)
+    else:
+        print('E1a.RES and/or E1b.RES not found in DATA_RAW/, skipping combine_tm')
         
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
@@ -861,7 +870,7 @@ if __name__ == "__main__":
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
         print('Please put raw files in ' + raw_path)
         print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1a.RES, E1b.RES, E1MBPTa.RES, E1MBPTb.RES')
-        print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_filtered_path)
+        print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_processed_path)
         sys.exit()
     confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes = write_new_conf_res(name, raw_path, data_nist)
 
