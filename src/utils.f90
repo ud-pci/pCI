@@ -61,7 +61,7 @@ Contains
             If (err_stat == 0 .and. read_data == test_data) Then
                 success = .true.
                 nbytes = 8/irecl
-                lrec = 4/nbytes
+                lrec = 8/nbytes
                 Exit
             End If
         End Do
