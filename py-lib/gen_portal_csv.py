@@ -379,8 +379,10 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         conf2 = line[2]
         term1 = line[1][0:2]
         term2 = line[3][0:2]
-        J1 = line[1][2]
-        J2 = line[3][2]
+        J1_e1res = line[1][2]  # J from E1.RES (for matching)
+        J2_e1res = line[3][2]
+        J1 = J1_e1res  # Will be updated with matched state's J
+        J2 = J2_e1res
         try:
             matrix_element_value = float(line[4])
             uncertainty = float(line[5])
@@ -415,7 +417,19 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             # Compare energies as floats with tolerance instead of exact string match
             theory_energy_au = abs(float(line_theory[1][6]))  # Use absolute value for comparison
             energy_diff1 = abs(theory_energy_au - energy1_float)
-            if energy_diff1 < energy_tolerance and energy_diff1 < best_match1_diff:
+
+            # Check if this is a better match than previous best
+            # Prefer exact energy matches, and use J as tiebreaker for equal energies
+            is_better_match1 = False
+            if energy_diff1 < energy_tolerance:
+                if energy_diff1 < best_match1_diff:
+                    is_better_match1 = True
+                elif abs(energy_diff1 - best_match1_diff) < 1e-12:
+                    # Same energy (within numerical precision) - prefer J match as tiebreaker
+                    if line_theory[1][2] == J1_e1res:
+                        is_better_match1 = True
+
+            if is_better_match1:
                 conf1 = line_theory[1][5]  # corrected_config for output
                 term1 = line_theory[1][1]
                 
@@ -453,7 +467,18 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 best_match1_diff = energy_diff1
 
             energy_diff2 = abs(theory_energy_au - energy2_float)
-            if energy_diff2 < energy_tolerance and energy_diff2 < best_match2_diff:
+
+            # Check if this is a better match than previous best for state 2
+            is_better_match2 = False
+            if energy_diff2 < energy_tolerance:
+                if energy_diff2 < best_match2_diff:
+                    is_better_match2 = True
+                elif abs(energy_diff2 - best_match2_diff) < 1e-12:
+                    # Same energy (within numerical precision) - prefer J match as tiebreaker
+                    if line_theory[1][2] == J2_e1res:
+                        is_better_match2 = True
+
+            if is_better_match2:
                 conf2 = line_theory[1][5]  # corrected_config for output
                 term2 = line_theory[1][1]
 
