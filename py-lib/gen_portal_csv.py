@@ -399,9 +399,13 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         # Use mapping to correct confs and terms and use experimental energies
         c1, c2 = False, False
         energy1cm, energy2cm = 0.0, 0.0
-        energy1_float = float(energy1)
-        energy2_float = float(energy2)
+        energy1_float = abs(float(energy1))  # Use absolute value (E1.RES uses negative binding energies)
+        energy2_float = abs(float(energy2))
         energy_tolerance = 1e-6  # Tolerance for floating point comparison (in a.u.)
+
+        # Track best matches (smallest energy difference)
+        best_match1_diff = float('inf')
+        best_match2_diff = float('inf')
 
         for line_theory in mapping:
             # mapping structure:
@@ -409,10 +413,12 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
             if line_theory[1][6] == '-': continue
 
             # Compare energies as floats with tolerance instead of exact string match
-            theory_energy_au = float(line_theory[1][6])
-            if abs(theory_energy_au - energy1_float) < energy_tolerance:
-                conf1 = line_theory[1][5]
+            theory_energy_au = abs(float(line_theory[1][6]))  # Use absolute value for comparison
+            energy_diff1 = abs(theory_energy_au - energy1_float)
+            if energy_diff1 < energy_tolerance and energy_diff1 < best_match1_diff:
+                conf1 = line_theory[1][5]  # corrected_config for output
                 term1 = line_theory[1][1]
+                
                 if ignore_g:
                     if 'g' in conf1 or 'G' in term1:
                         continue
@@ -444,10 +450,13 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     if find_parity(conf1) != gs_parity:
                         energy1cm = energy1cm + float(theory_shift)
                 c1 = True
+                best_match1_diff = energy_diff1
 
-            if abs(theory_energy_au - energy2_float) < energy_tolerance:
-                conf2 = line_theory[1][5]
+            energy_diff2 = abs(theory_energy_au - energy2_float)
+            if energy_diff2 < energy_tolerance and energy_diff2 < best_match2_diff:
+                conf2 = line_theory[1][5]  # corrected_config for output
                 term2 = line_theory[1][1]
+
                 if ignore_g:
                     if 'g' in conf2 or 'G' in term2:
                         continue
@@ -479,6 +488,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     if find_parity(conf2) != gs_parity:
                         energy2cm = energy2cm + float(theory_shift)
                 c2 = True
+                best_match2_diff = energy_diff2
 
         if c1 and c2:
             # Create unique transition identifier to avoid duplicates (both A->B and B->A)
