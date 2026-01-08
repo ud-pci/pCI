@@ -516,6 +516,18 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                 best_match2_diff = energy_diff2
 
         if c1 and c2:
+            # Apply E1 selection rules
+            try:
+                J1_float = float(J1) if '/' not in str(J1) else float(eval(J1))
+                J2_float = float(J2) if '/' not in str(J2) else float(eval(J2))
+                delta_J = abs(J1_float - J2_float)
+
+                # Skip forbidden transitions
+                if (J1_float == 0 and J2_float == 0) or delta_J > 1:
+                    continue
+            except:
+                continue
+
             # Create unique transition identifier to avoid duplicates (both A->B and B->A)
             state1 = f"{conf1} {term1}{J1}"
             state2 = f"{conf2} {term2}{J2}"
