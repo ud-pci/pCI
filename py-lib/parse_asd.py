@@ -123,8 +123,22 @@ def reformat_df_to_atomdb(asd_df, theory_J): # Modified
                             'J':'state_J',
                             'Level (cm-1)':'energy',
                             'Uncertainty (cm-1)':'energy_uncertainty',
-                            'Reference':'is_from_theory'}, 
+                            'Reference':'is_from_theory'},
                             inplace=True)
+
+    # Expand rows with multiple J values
+    # Filter out rows with missing J first
+    asd_df = asd_df[asd_df['state_J'] != ""]
+    expanded_rows = []
+    for idx, row in asd_df.iterrows():
+        j_values = str(row['state_J']).split(',')
+        for j_val in j_values:
+            new_row = row.copy()
+            # Keep J as string for now (theory_J contains strings)
+            new_row['state_J'] = j_val.strip()
+            expanded_rows.append(new_row)
+
+    asd_df = pd.DataFrame(expanded_rows).reset_index(drop=True)
 
     # Only keep configurations where J is in theory results
     asd_df = asd_df[(((asd_df['state_J'].isin(theory_J['even'])) & (asd_df['state_term'].str[-1] != '*'))) |
@@ -152,8 +166,6 @@ def NIST_Discrepancies(asd_df,ri=False):
 
     # missing J
     asd_df["term_original"] = asd_df["state_term"]
-    asd_df = asd_df[asd_df['state_J'] != ""]
-    asd_df["state_J"] = asd_df["state_J"].str.split(',').str[0]
     asd_df["state_J"] = asd_df["state_J"].apply(lambda x: Convert_Type(x))
     asd_df["state_term"] = asd_df["state_term"].str.replace('[a-z]', '',regex=True) # replace x,y,z from the terms
     asd_df["state_term"] = asd_df["state_term"].str.replace(' ', '',regex=True) # replace spaces from the terms
