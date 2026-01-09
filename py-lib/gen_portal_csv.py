@@ -302,10 +302,10 @@ def find_parity(configuration):
         
     return parity
 
-def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, energy_cutoff):
+def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent):
     '''
     This function writes the energy csv file
-    Mapping should already be filtered to only include levels within energy_cutoff
+    Mapping should already be filtered to only include levels within min_energy_diff_percent
     '''
     filename = name + '_Energies.csv'
 
@@ -335,11 +335,11 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, energy_
 
     portal_df.to_csv(filename, index=False)
 
-    print(f'{filename} has been written with {len(portal_df)} levels (energy cutoff: {energy_cutoff}%)')
+    print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, energy_cutoff):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent):
     '''
     This function writes the matrix element csv file
     Note: Transition rates are now calculated separately using generate_transition_rates.py
@@ -371,7 +371,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
         min_unc_per = default_min_uncertainties[element]
         print('DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR', element + ':', str(min_unc_per) + '%')
 
-    print('ENERGY CUTOFF FOR NIST-THEORY DIFFERENCE:', str(energy_cutoff) + '%')
+    print('MIN ENERGY DIFF PERCENT FOR NIST-THEORY:', str(min_energy_diff_percent) + '%')
 
     for line in e1_res:
         # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
@@ -449,8 +449,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     else:
                         energy_diff_percent = 0.0
 
-                    # Skip if energy difference exceeds cutoff
-                    if energy_diff_percent > energy_cutoff:
+                    # Skip if energy difference exceeds minimum threshold
+                    if energy_diff_percent > min_energy_diff_percent:
                         continue
 
                     conf1 = line_theory[0][0]
@@ -498,8 +498,8 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
                     else:
                         energy_diff_percent = 0.0
 
-                    # Skip if energy difference exceeds cutoff
-                    if energy_diff_percent > energy_cutoff:
+                    # Skip if energy difference exceeds minimum threshold
+                    if energy_diff_percent > min_energy_diff_percent:
                         continue
 
                     conf2 = line_theory[0][0]
@@ -832,9 +832,13 @@ if __name__ == "__main__":
         min_unc_value = get_dict_value(portal, 'min_uncertainty') if portal else None
         min_uncertainty = float(min_unc_value) if min_unc_value is not None else 1.5
 
-        # set default energy cutoff as percentage difference between NIST and theory to 3.0
+        # set default minimum energy difference percentage between NIST and theory to 3.0
+        min_diff_value = get_dict_value(portal, 'min_energy_diff_percent') if portal else None
+        min_energy_diff_percent = float(min_diff_value) if min_diff_value is not None else 3.0
+
+        # optional global energy cutoff in cm^-1 (if not specified, use min_energy_diff_percent logic)
         cutoff_value = get_dict_value(portal, 'energy_cutoff') if portal else None
-        energy_cutoff = float(cutoff_value) if cutoff_value is not None else 3.0
+        energy_cutoff = float(cutoff_value) if cutoff_value is not None else None
     else:
         atom = input('Input name of atom: ')
         even_dir = None
@@ -844,7 +848,8 @@ if __name__ == "__main__":
         tm_dir2 = None
         ignore_g = True
         min_uncertainty = 1.5
-        energy_cutoff = 3.0
+        min_energy_diff_percent = 3.0
+        energy_cutoff = None
     name = atom_name_to_filename(atom)
     
     ri = False # 
@@ -1017,25 +1022,82 @@ if __name__ == "__main__":
     even_mapping = mapping[:num_levels_output_even]
     odd_mapping = mapping[num_levels_output_even:]
 
-    # Find truncation point for even parity
-    even_truncate_idx = len(even_mapping)
-    for i, level in enumerate(even_mapping):
-        if level[2] > energy_cutoff:
-            even_truncate_idx = i
-            print(f'Even parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {energy_cutoff}%)')
-            break
+    # Determine global cutoff energy
+    if energy_cutoff is not None:
+        # User specified an explicit energy cutoff in cm^-1
+        global_cutoff_energy = energy_cutoff
+        print(f'Using user-specified global energy cutoff: {global_cutoff_energy:.2f} cm^-1')
+    else:
+        # Calculate cutoff from min_energy_diff_percent
+        # Find truncation point for even parity
+        even_truncate_idx = len(even_mapping)
+        even_cutoff_energy = float('inf')
+        for i, level in enumerate(even_mapping):
+            if level[2] > min_energy_diff_percent:
+                even_truncate_idx = i
+                # Get the energy at this cutoff point (use NIST if available, otherwise theory)
+                if level[0][3] != '-':
+                    even_cutoff_energy = float(level[0][3])
+                else:
+                    even_cutoff_energy = float(level[1][3])
+                print(f'Even parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, energy: {even_cutoff_energy:.2f} cm^-1)')
+                break
 
-    # Find truncation point for odd parity
-    odd_truncate_idx = len(odd_mapping)
-    for i, level in enumerate(odd_mapping):
-        if level[2] > energy_cutoff:
-            odd_truncate_idx = i
-            print(f'Odd parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {energy_cutoff}%)')
-            break
+        # Find truncation point for odd parity
+        odd_truncate_idx = len(odd_mapping)
+        odd_cutoff_energy = float('inf')
+        for i, level in enumerate(odd_mapping):
+            if level[2] > min_energy_diff_percent:
+                odd_truncate_idx = i
+                # Get the energy at this cutoff point (use NIST if available, otherwise theory)
+                if level[0][3] != '-':
+                    odd_cutoff_energy = float(level[0][3])
+                else:
+                    odd_cutoff_energy = float(level[1][3])
+                print(f'Odd parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, energy: {odd_cutoff_energy:.2f} cm^-1)')
+                break
+
+        # Apply global cutoff: use the lower of the two cutoff energies to prevent gaps
+        global_cutoff_energy = min(even_cutoff_energy, odd_cutoff_energy)
+
+    if global_cutoff_energy < float('inf'):
+        if energy_cutoff is None:
+            print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1 (lower of even/odd cutoffs)')
+        else:
+            print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1')
+
+        # Re-truncate even parity based on global cutoff
+        even_truncate_idx = len(even_mapping)
+        for i, level in enumerate(even_mapping):
+            if level[0][3] != '-':
+                energy = float(level[0][3])
+            else:
+                energy = float(level[1][3])
+
+            if energy > global_cutoff_energy:
+                even_truncate_idx = i
+                print(f'  Even parity: truncating at level {i} (energy {energy:.2f} > {global_cutoff_energy:.2f} cm^-1)')
+                break
+
+        # Re-truncate odd parity based on global cutoff
+        odd_truncate_idx = len(odd_mapping)
+        for i, level in enumerate(odd_mapping):
+            if level[0][3] != '-':
+                energy = float(level[0][3])
+            else:
+                energy = float(level[1][3])
+
+            if energy > global_cutoff_energy:
+                odd_truncate_idx = i
+                print(f'  Odd parity: truncating at level {i} (energy {energy:.2f} > {global_cutoff_energy:.2f} cm^-1)')
+                break
 
     # Create filtered mapping with truncated levels
     filtered_mapping = even_mapping[:even_truncate_idx] + odd_mapping[:odd_truncate_idx]
-    print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels using {energy_cutoff}% energy cutoff')
+    if energy_cutoff is not None:
+        print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels using energy cutoff: {energy_cutoff:.2f} cm^-1')
+    else:
+        print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels using min energy diff: {min_energy_diff_percent}%')
     print(f'  Even parity: {len(even_mapping)} -> {even_truncate_idx}')
     print(f'  Odd parity: {len(odd_mapping)} -> {odd_truncate_idx}')
 
@@ -1059,7 +1121,7 @@ if __name__ == "__main__":
         print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g/G (ignore_g=True)')
         print(f'Final mapping has {len(filtered_mapping)} levels')
 
-    write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, energy_cutoff)
+    write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
 
     # Create a list of all possible transitions between states
     print('even parity configurations:')
@@ -1104,7 +1166,7 @@ if __name__ == "__main__":
 
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1 = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, energy_cutoff)
+        num_E1 = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent)
         coverage = round(num_E1/num_possible_E1*100, 2)
         print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:
