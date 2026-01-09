@@ -329,9 +329,13 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
             state_J = level[0][2]
             state_energy = level[0][3]
             state_uncertainty = level[0][4]
-        row = {'state_configuration': state_config, 'state_term': state_term, 'state_J': state_J, 
+        row = {'state_configuration': state_config, 'state_term': state_term, 'state_J': state_J,
                'energy': state_energy, 'energy_uncertainty': state_uncertainty,'is_from_theory': is_from_theory}
         portal_df.loc[len(portal_df.index)] = row
+
+    # Sort by energy
+    portal_df['energy'] = portal_df['energy'].astype(float)
+    portal_df = portal_df.sort_values(by='energy').reset_index(drop=True)
 
     portal_df.to_csv(filename, index=False)
 

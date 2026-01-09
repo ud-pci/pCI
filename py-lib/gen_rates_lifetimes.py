@@ -237,6 +237,27 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
         }
         lifetimes_df.loc[len(lifetimes_df.index)] = row
 
+    # Sort lifetimes by energy (read from Energies.csv)
+    energies_file = atom + '_Energies.csv'
+    try:
+        energies_df = pd.read_csv(energies_file)
+        # Convert state_J to string in both dataframes to ensure they match
+        lifetimes_df['state_J'] = lifetimes_df['state_J'].astype(str)
+        energies_df['state_J'] = energies_df['state_J'].astype(str)
+        # Merge lifetimes with energies to get energy values for sorting
+        lifetimes_df = lifetimes_df.merge(
+            energies_df[['state_configuration', 'state_term', 'state_J', 'energy']],
+            on=['state_configuration', 'state_term', 'state_J'],
+            how='left'
+        )
+        # Sort by energy
+        lifetimes_df['energy'] = lifetimes_df['energy'].astype(float)
+        lifetimes_df = lifetimes_df.sort_values(by='energy').reset_index(drop=True)
+        # Drop energy column before saving
+        lifetimes_df = lifetimes_df.drop(columns=['energy'])
+    except FileNotFoundError:
+        print(f"Warning: {energies_file} not found, skipping energy sorting for lifetimes")
+
     # Save output files
     br_ratios_df.to_csv(filename_br_ratios, index=False)
     print(f"{filename_br_ratios} has been written with {len(br_ratios_df)} transitions")
