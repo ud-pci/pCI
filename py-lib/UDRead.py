@@ -225,29 +225,47 @@ def Dataframe(path_nist,path_ud,gs_exists,nist_max=0):
 
 def BlankTerms(df_nist,df_ud): # Filling in blank terms (terms for states with terms (1/2,3/2) in Fe16+) in nist data
     ddf_nist=np.copy(df_nist)
+    assigned_theory_states = set()  # Track which theory states have been assigned
+
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
-        if term_nist!="": continue
 
-        Emin=np.inf
-        term=""
+        # Check for both empty string and "nan" string
+        if term_nist != "" and str(term_nist).lower() != "nan":
+            continue
+
+        # Build list of candidate theory states with their energy percentages
+        candidates = []
+
         for j in range(len(df_ud)):
+            if j in assigned_theory_states:
+                continue
+
             config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
 
             Ediff = round(abs(level_nist-level_ao),1)
             Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
-                
+            
             inv_config = Inverse_Config(config_nist)
 
+            # Check if this theory state matches NIST config and J
             if config_nist==config1_ao or inv_config==config1_ao:
                 if j_nist==j_ao:
-                    if Eperc<Emin: Emin,term = Eperc,term_ao
+                    candidates.append((j, term_ao, Ediff, Eperc))
 
             if config_nist==config2_ao or inv_config==config2_ao:
                 if j_nist==j_ao:
-                    if Eperc<Emin: Emin,term = Eperc,term_ao
+                    candidates.append((j, term_ao, Ediff, Eperc))
 
-        ddf_nist[i][1]=term
+        # Select best candidate (smallest energy percentage difference)
+        if candidates:
+            # Sort by energy percentage
+            candidates.sort(key=lambda x: x[3])
+            best_theory_idx, best_term, best_energy_diff, best_energy_percent = candidates[0]
+
+            # Assign this term and mark theory state as used
+            ddf_nist[i][1] = best_term
+            assigned_theory_states.add(best_theory_idx)
 
     return ddf_nist
 
