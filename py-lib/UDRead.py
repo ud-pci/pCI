@@ -43,8 +43,9 @@ def Combine_Config(conf):
     # combine list of seprated configuration
     config=""
     for i in range(len(conf)):
-        config+="."if i%2==0 and i>0 else ""
-        # config+=" "if i%2==0 and i>0 else ""
+        if conf[i] == "":  # Skip empty entries
+            continue
+        config+="."if i%2==0 and i>0 and config!="" else ""
         config+=conf[i]
     return config
 
@@ -59,8 +60,9 @@ def Inverse_Config(config):
     else:  return config
 
 
-def Correct_Config(config,val,pos):
+def Adjust_Config_Principal(config,val,pos):
     # correction to configuraion by value "val", ex: '5s4d' --> '5s5d' if val = 1 and pos=2
+    # Used for adjusting principal quantum number (e.g., 2s.7p -> 2s.6p when val=-1, pos=2)
     conf=Sep_Config(config)
     conf[2*(pos-1)] = str(int(conf[2*(pos-1)])+val)
     return Combine_Config(conf)
@@ -258,7 +260,7 @@ def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding t
     for j in range(len(df_ud)):
         config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
         if corr==1: config1_ao=corr_config[j]
-            
+
         Ediff = round(abs(level_nist-level_ao),1)
         Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
         
@@ -281,12 +283,49 @@ def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding t
                 if config_nist==config2_ao or inv_config==config2_ao:
                     if term_nist==Term_Correct(term_ao,1):j2.append(j),Eperc2.append(Eperc)
                     if term_nist==Term_Correct(term_ao,-1):j2.append(j),Eperc2.append(Eperc)
-    
+
+            # Fifth Pass : Check with principal quantum number -1 for theory
+            # Theory sometimes overestimates n by 1 (e.g., 2s.7p when it should be 2s.6p)
+            # So we need to adjust n of last orbital of theory config down by 1 and check if it matches NIST config
+            # Note: NIST configs may have core prefix (e.g., "1s2.2s.6p"), so we need to check both
+            if term_nist==term_ao:
+                try:
+                    # Try adjusting theory config1's principal quantum number down by 1
+                    # For configs like "2s.7p", we need to adjust the LAST orbital (7p)
+                    # pos = number of parts (separated by dots)
+                    if config1_ao and config1_ao != "":  # Skip empty configs
+                        num_parts1 = config1_ao.count('.') + 1
+                        config1_ao_n_minus = Adjust_Config_Principal(config1_ao, -1, num_parts1)
+                        
+                        # Check if adjusted theory matches NIST (with or without core prefix)
+                        # For "2s.6p" to match "1s2.2s.6p", check if NIST ends with ".2s.6p"
+                        if (config_nist==config1_ao_n_minus or inv_config==config1_ao_n_minus or
+                            config_nist.endswith('.' + config1_ao_n_minus) or
+                            inv_config.endswith('.' + config1_ao_n_minus)):
+                            j1.append(j),Eperc1.append(Eperc)
+
+                    # Try adjusting theory config2's principal quantum number down by 1
+                    if config2_ao and config2_ao != "":  # Skip empty configs
+                        num_parts2 = config2_ao.count('.') + 1
+                        config2_ao_n_minus = Adjust_Config_Principal(config2_ao, -1, num_parts2)
+
+                        # Check if adjusted theory matches NIST (with or without core prefix)
+                        if (config_nist==config2_ao_n_minus or inv_config==config2_ao_n_minus or
+                            config_nist.endswith('.' + config2_ao_n_minus) or
+                            inv_config.endswith('.' + config2_ao_n_minus)):
+                            j2.append(j),Eperc2.append(Eperc)
+
+                except Exception as e:
+                    print(f"  Fifth Pass: Exception caught: {e}")
+                    pass
+
     return j1,j2,Eperc1,Eperc2 # j1,j2 is the index of ud configurations 1 and 2 corresponding to NIST
 
 
 # Fifth Pass : to choose between j1 and j2 if both present to find the best correspondance
 def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
+    config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(ith,df_nist)
+
     JJ1=0
     EEEperc1=0
     j_final,jf,dE=-1,0,0 # jf is "which config selected" : jf=0 --> no config, jf=1 --> 1st Config, jf=2 --> 2nd Config
@@ -302,7 +341,7 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
                     Eperc1.remove(Eperc1[i])
                     break
 
-        idx = np.argmin(J1)
+        idx = np.argmin(Eperc1)  # Find index of minimum energy percentage difference, not minimum J1
         j1,Eperc1 = J1[idx],Eperc1[idx]
 
     if J2!=[]:
@@ -315,7 +354,7 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
                     Eperc2.remove(Eperc2[i])
                     break
 
-        idx = np.argmin(J2)
+        idx = np.argmin(Eperc2)  # Find index of minimum energy percentage difference, not minimum J2
         j2,Eperc2 = J2[idx],Eperc2[idx]
 
     
