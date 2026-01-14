@@ -41,7 +41,7 @@ def convert_res_to_csv(filename): # Modified convert .RES to csv
     f.write('n, conf, , term, E_n (a.u.), DEL (cm^-1), S, L, , gf, conf%, conf2, , conf2% \n')
 
     for line in lines[1:]:
-        newline = re.sub('\s{3,}', '  ', line).replace('  ', ',') + '\n'
+        newline = re.sub(r'\s{3,}', '  ', line).replace('  ', ',') + '\n'
         if newline[0] == ',':
             newline = newline[1:]
         
