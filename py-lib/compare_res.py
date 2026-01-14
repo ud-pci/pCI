@@ -27,7 +27,7 @@ def parse_final_res(filename):
     energy0_au = float([num for num in lines[1].split('  ') if '.' in num][0])
     
     for line in lines[1:]:
-        index = int(re.findall("\d+",line)[0])
+        index = int(re.findall(r"\d+",line)[0])
         confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
         confs = [conf.strip() for conf in confs]
         confs = [conf.replace(' ', '.') for conf in confs]
@@ -49,9 +49,9 @@ def parse_final_res(filename):
         else:
             gf = float(nums[5])
         
-        cntrb1 = re.findall("\d+.\d+%",line)[0]
+        cntrb1 = re.findall(r"\d+.\d+%",line)[0]
         try:
-            cntrb2 = re.findall("\d+.\d+%",line)[1]
+            cntrb2 = re.findall(r"\d+.\d+%",line)[1]
         except:
             cntrb2 = ''
         
@@ -175,18 +175,18 @@ def parse_matrix_res(filename):
         J1 = state1.split()[-1][-1]
         J2 = state2.split()[-1][-1]
         
-        if Tk == 'E1': 
-            energy1 = re.findall("\d+\.\d+", line)[2:4][1]
-            energy2 = re.findall("\d+\.\d+", line)[2:4][0]
-            wavelength = float(re.findall("\d+\.\d+", line)[5])
+        if Tk == 'E1':
+            energy1 = re.findall(r"\d+\.\d+", line)[2:4][1]
+            energy2 = re.findall(r"\d+\.\d+", line)[2:4][0]
+            wavelength = float(re.findall(r"\d+\.\d+", line)[5])
         else:
-            energy1 = re.findall("\d+\.\d+", line)[1:3][1]
-            energy2 = re.findall("\d+\.\d+", line)[1:3][0]
-            wavelength = float(re.findall("\d+\.\d+", line)[4])
-        index1 = int(re.findall("\d+",line)[0])
-        index2 = int(re.findall("\d+",line)[1])
+            energy1 = re.findall(r"\d+\.\d+", line)[1:3][1]
+            energy2 = re.findall(r"\d+\.\d+", line)[1:3][0]
+            wavelength = float(re.findall(r"\d+\.\d+", line)[4])
+        index1 = int(re.findall(r"\d+",line)[0])
+        index2 = int(re.findall(r"\d+",line)[1])
 
-        matrix_element_value = re.findall("\d+\.\d+", line)[:1]
+        matrix_element_value = re.findall(r"\d+\.\d+", line)[:1]
         matrix_element_value = matrix_element_value[0] if matrix_element_value else None
         
         matrix_res.append([conf1, term1, J1, conf2, term2, J2, matrix_element_value, energy1, energy2, wavelength, index1, index2])
