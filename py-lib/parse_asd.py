@@ -144,13 +144,13 @@ def reformat_df_to_atomdb(asd_df, theory_J): # Modified
     asd_df = asd_df[(((asd_df['state_J'].isin(theory_J['even'])) & (asd_df['state_term'].str[-1] != '*'))) |
                     (((asd_df['state_J'].isin(theory_J['odd'])) & (asd_df['state_term'].str[-1] == '*')))]
 
-    # Fill in empty cells 
-    asd_df['state_configuration'].replace(r'^\s*$', np.nan, regex=True, inplace=True)
-    asd_df['state_configuration'].fillna(method='ffill', inplace=True)
-    asd_df['state_term'].replace(r'^\s*$', np.nan, regex=True, inplace=True)
-    asd_df['state_term'].fillna(method='ffill', inplace=True)
-    asd_df['energy'].fillna('N/A', inplace=True)
-    asd_df['energy_uncertainty'].fillna(0, inplace=True)
+    # Fill in empty cells
+    asd_df['state_configuration'] = asd_df['state_configuration'].replace(r'^\s*$', np.nan, regex=True)
+    asd_df['state_configuration'] = asd_df['state_configuration'].ffill()
+    asd_df['state_term'] = asd_df['state_term'].replace(r'^\s*$', np.nan, regex=True)
+    asd_df['state_term'] = asd_df['state_term'].ffill()
+    asd_df['energy'] = asd_df['energy'].fillna('N/A')
+    asd_df['energy_uncertainty'] = asd_df['energy_uncertainty'].fillna(0)
 
     # Replace reference ID column to 'FALSE' as a value of is_from_theory
     asd_df['is_from_theory'] = 'FALSE'
