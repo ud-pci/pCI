@@ -321,6 +321,9 @@ def cmp_res(res1, res2):
         for ilvl in range(len(confs2)):
             matched = False
             for ilvl2 in range(len(conf_res)):
+                # Skip all-order states that have already been matched (have MBPT energies appended)
+                if len(conf_res[ilvl2]) > 4:
+                    continue
                 if confs2[ilvl] == conf_res[ilvl2][0] and terms2[ilvl] == conf_res[ilvl2][1]:
                     conf_res[ilvl2].append(energies_au2[ilvl])
                     conf_res[ilvl2].append(energies_cm2[ilvl])
@@ -328,15 +331,32 @@ def cmp_res(res1, res2):
                     continue
             # If primary configurations were not matched, check secondary configurations
             if not matched:
+                # Check if MBPT primary matches all-order secondary
                 for ilvl2 in range(len(sec_confs1)):
+                    # Skip all-order states that have already been matched
+                    if len(conf_res[ilvl2]) > 4:
+                        continue
                     if confs2[ilvl] == sec_confs1[ilvl2] and terms2[ilvl] == conf_res[ilvl2][1]:
-                        conf_res[ilvl2].append(energies_au2[ilvl2])
-                        conf_res[ilvl2].append(energies_cm2[ilvl2])
+                        conf_res[ilvl2].append(energies_au2[ilvl])
+                        conf_res[ilvl2].append(energies_cm2[ilvl])
                         matched_with_sec_confs.append([conf_res[ilvl2][0],confs2[ilvl],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
                         matched = True
-                # Add res2 data that were not matched to array not_matched2
-                if not matched:
-                    not_matched2.append([ilvl+1,confs2[ilvl], terms2[ilvl]])
+                        break
+            # If still not matched, check if MBPT secondary matches all-order primary
+            if not matched:
+                for ilvl2 in range(len(conf_res)):
+                    # Skip all-order states that have already been matched
+                    if len(conf_res[ilvl2]) > 4:
+                        continue
+                    if sec_confs2[ilvl] and sec_confs2[ilvl] == conf_res[ilvl2][0] and terms2[ilvl] == conf_res[ilvl2][1]:
+                        conf_res[ilvl2].append(energies_au2[ilvl])
+                        conf_res[ilvl2].append(energies_cm2[ilvl])
+                        matched_with_sec_confs.append([sec_confs2[ilvl],conf_res[ilvl2][0],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
+                        matched = True
+                        break
+            # Add res2 data that were not matched to array not_matched2
+            if not matched:
+                not_matched2.append([ilvl+1,confs2[ilvl], terms2[ilvl]])
 
         # Add res1 data that were not matched to array not_matched1
         for ilvl in range(len(confs1)):
