@@ -7,6 +7,129 @@ import sys
 This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt results
 '''
 
+def fix_skipped_config_levels(conf_res):
+    """
+    Fix configuration labels when theory skips a principal quantum number.
+
+    For example, if theory has:
+      - 4s.5g (primary), 4s.6g (secondary)
+      - 4s.7g (primary), 4s.6g (secondary)  <- should be relabeled as 4s.6g
+      - 4s.8g (primary)                     <- should be relabeled as 4s.7g
+
+    This happens because the secondary config has higher percentage than expected,
+    indicating the levels are mislabeled. This can occur for any orbital type,
+    typically with higher principal quantum numbers.
+
+    Configurations can have 2 or more orbitals, e.g., '4s.7g' or '4s.4p.7g'.
+    The last orbital is the one we check for skipped levels.
+    """
+    # Group levels by orbital type (last character of config, e.g., 'g' in '4s.7g')
+    # and by the inner orbitals (e.g., '4s' in '4s.7g' or '4s.4p' in '4s.4p.7g')
+    orbital_groups = {}
+
+    for idx, level in enumerate(conf_res):
+        config = level[1]  # primary configuration
+        sec_config = level[11] if level[11] else ''  # secondary configuration
+
+        # Parse the configuration and split into parts
+        parts = config.split('.')
+        if len(parts) < 2:
+            continue
+
+        # Inner orbitals are all orbitals up to the last, outer orbital is the last
+        inner_orbitals = '.'.join(parts[:-1])
+        outer_orbital = parts[-1]
+
+        # Extract the principal quantum number and orbital type from outer orbital
+        match = re.match(r'(\d+)([a-z])', outer_orbital)
+        if not match:
+            continue
+
+        n = int(match.group(1))
+        orbital_type = match.group(2)
+
+        key = (inner_orbitals, orbital_type)
+        if key not in orbital_groups:
+            orbital_groups[key] = []
+
+        # Parse secondary config if present - check if it has same inner orbitals and orbital type
+        sec_n = None
+        if sec_config:
+            sec_parts = sec_config.split('.')
+            if len(sec_parts) >= 2:
+                sec_inner = '.'.join(sec_parts[:-1])
+                sec_outer = sec_parts[-1]
+                sec_match = re.match(r'(\d+)([a-z])', sec_outer)
+                if sec_match and sec_inner == inner_orbitals and sec_match.group(2) == orbital_type:
+                    sec_n = int(sec_match.group(1))
+
+        orbital_groups[key].append({
+            'idx': idx,
+            'n': n,
+            'sec_n': sec_n,
+            'config': config,
+            'sec_config': sec_config
+        })
+
+    # For each orbital group, detect and fix skipped levels
+    for (inner_orbitals, orbital_type), levels in orbital_groups.items():
+        # Sort by principal quantum number
+        levels.sort(key=lambda x: x['n'])
+
+        if not levels:
+            continue
+
+        # Get unique n values in sorted order
+        n_values = sorted(set(level['n'] for level in levels))
+
+        # Check for gaps where a level's secondary config fills it
+        skip_detected = False
+        skip_at_n = None
+
+        for i in range(len(n_values) - 1):
+            current_n = n_values[i]
+            next_n = n_values[i + 1]
+
+            # If there's a gap (next_n > current_n + 1)
+            if next_n > current_n + 1:
+                gap_n = current_n + 1  # The skipped n value
+
+                # Check if any level with next_n has secondary config at gap_n
+                for level_info in levels:
+                    if level_info['n'] == next_n and level_info['sec_n'] == gap_n:
+                        skip_detected = True
+                        skip_at_n = gap_n
+                        break
+
+                if skip_detected:
+                    break
+
+        if not skip_detected:
+            continue
+
+        # Calculate how much to shift each level
+        # All levels with n > skip_at_n should be decremented by 1
+        for level_info in levels:
+            if level_info['n'] > skip_at_n:
+                idx = level_info['idx']
+                old_n = level_info['n']
+                new_n = old_n - 1
+                old_config = conf_res[idx][1]
+                term = conf_res[idx][2].replace(',', '')
+                new_config = inner_orbitals + '.' + str(new_n) + orbital_type
+
+                print(f'SKIPPED LEVEL FIX: Level {idx+1} {old_config} {term} -> {new_config} {term}')
+
+                # Update the configuration
+                old_sec = conf_res[idx][11]
+                conf_res[idx][1] = new_config
+
+                # If the old secondary matches the new primary, swap
+                if old_sec == new_config:
+                    conf_res[idx][11] = old_config
+
+    return conf_res
+
 def parse_final_res(filename):
     try:
         f = open(filename, 'r')
@@ -148,6 +271,9 @@ def parse_final_res(filename):
         print('FIXES for', filename + ':')
         for fix in fixes:
             print('#' + str(fix[0]) + ':',fix[1],fix[2],'->',fix[3],fix[4])
+
+    # Fix skipped configuration levels (e.g., 5g, 7g -> 5g, 6g when 6g is secondary)
+    conf_res = fix_skipped_config_levels(conf_res)
 
     return conf_res, fixes
 
