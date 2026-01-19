@@ -7,7 +7,7 @@ import sys
 This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt results
 '''
 
-def fix_skipped_config_levels(conf_res):
+def fix_skipped_config_levels(conf_res, confs_terms_old=None):
     """
     Fix configuration labels when theory skips a principal quantum number.
 
@@ -22,7 +22,12 @@ def fix_skipped_config_levels(conf_res):
 
     Configurations can have 2 or more orbitals, e.g., '4s.7g' or '4s.4p.7g'.
     The last orbital is the one we check for skipped levels.
+
+    Returns:
+        tuple: (conf_res, skipped_fixes) where skipped_fixes is a list of
+               [old_conf, old_term, energy, new_conf, new_term] for fixing matrix elements
     """
+    skipped_fixes = []
     # Group levels by orbital type (last character of config, e.g., 'g' in '4s.7g')
     # and by the inner orbitals (e.g., '4s' in '4s.7g' or '4s.4p' in '4s.4p.7g')
     orbital_groups = {}
@@ -115,10 +120,22 @@ def fix_skipped_config_levels(conf_res):
                 old_n = level_info['n']
                 new_n = old_n - 1
                 old_config = conf_res[idx][1]
-                term = conf_res[idx][2].replace(',', '')
+                term_with_comma = conf_res[idx][2]
                 new_config = inner_orbitals + '.' + str(new_n) + orbital_type
 
-                print(f'SKIPPED LEVEL FIX: Level {idx+1} {old_config} {term} -> {new_config} {term}')
+                # Use original term for matrix element matching (E1.RES has original terms)
+                if confs_terms_old and idx < len(confs_terms_old):
+                    original_term = confs_terms_old[idx][1]  # Original term before fixes
+                else:
+                    original_term = term_with_comma
+
+                # Get energy for exact matching
+                energy = conf_res[idx][3]
+
+                # Add to fixes list for matrix element correction
+                # Format: [old_conf, old_term, energy, new_conf, new_term]
+                # old_term uses original term to match E1.RES, new_term also uses original since term doesn't change
+                skipped_fixes.append([old_config, original_term, energy, new_config, original_term])
 
                 # Update the configuration
                 old_sec = conf_res[idx][11]
@@ -128,7 +145,7 @@ def fix_skipped_config_levels(conf_res):
                 if old_sec == new_config:
                     conf_res[idx][11] = old_config
 
-    return conf_res
+    return conf_res, skipped_fixes
 
 def parse_final_res(filename):
     try:
@@ -211,6 +228,7 @@ def parse_final_res(filename):
         # Fix term if 2 appears for even number of electrons
         conf = level[1]
         term = level[2]
+        energy = level[3]
         s = level[5]
         old_term = term[0:2] + ',' + term[2]
         if even and term[0] == '2':
@@ -219,11 +237,11 @@ def parse_final_res(filename):
             else:
                 new_s = '1'
             new_term = new_s + term[1] + ',' + term[2:]
-            
-            fixes.append([i,conf,old_term,conf,new_term])
+
+            fixes.append([conf, old_term, energy, conf, new_term])
         else:
             new_term = term[0:2] + ',' + term[2:]
-            
+
         level[2] = new_term
         i += 1
 
@@ -256,24 +274,43 @@ def parse_final_res(filename):
                                     
             # Check if there's currently a list of fixes
             if fixes:
-                # Check if duplicate is in list of fixes
+                # Check if duplicate is in list of fixes, update if found
                 for fix in fixes:
-                    # If index to fix is in list of fixes, update the configuration and term in fixes
-                    if fix[0] == existing_ilvl+1:
-                        fix[3] = conf_res[existing_ilvl][1]
-                        fix[4] = conf_res[existing_ilvl][2]
-                
-            print('     TERM OF LEVEL',existing_ilvl+1,'HAS BEEN UPDATED TO',conf_res[existing_ilvl][1],conf_res[existing_ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
-            print('     TERM OF LEVEL',ilvl+1,'HAS BEEN UPDATED TO',conf_res[ilvl][1],conf_res[ilvl][2],'(WAS PREVIOUSLY',confs_terms[ilvl][0],confs_terms[ilvl][1] + ')')
+                    # Match by (old_conf, old_term)
+                    if fix[0] == confs_terms[ilvl][0] and fix[1] == confs_terms[ilvl][1]:
+                        fix[3] = conf_res[existing_ilvl][1]  # new_conf
+                        fix[4] = conf_res[existing_ilvl][2]  # new_term
 
-    # Print fixes
+    # Fix skipped configuration levels (e.g., 5g, 7g -> 5g, 6g when 6g is secondary)
+    # Pass original terms so fixes can match against matrix element file (which has original terms)
+    conf_res, skipped_fixes = fix_skipped_config_levels(conf_res, confs_terms_old)
+
+    # Merge term fixes and skipped fixes by (old_conf, old_term, energy)
+    # If both exist for the same original state, combine config change and term change
+    # Fix format: [old_conf, old_term, energy, new_conf, new_term]
+    merged_fixes = {}
+    for fix in fixes:  # term fixes: [old_conf, old_term, energy, conf, new_term]
+        key = (fix[0], fix[1], fix[2])  # (old_conf, old_term, energy)
+        merged_fixes[key] = [fix[0], fix[1], fix[2], fix[3], fix[4]]
+
+    for fix in skipped_fixes:  # config fixes: [old_conf, old_term, energy, new_conf, new_term]
+        key = (fix[0], fix[1], fix[2])  # (old_conf, old_term, energy)
+        if key in merged_fixes:
+            # Combine: keep new_term from term fix, use new_conf from skipped fix
+            merged_fixes[key][3] = fix[3]  # update new_conf
+        else:
+            merged_fixes[key] = [fix[0], fix[1], fix[2], fix[3], fix[4]]
+
+    fixes = list(merged_fixes.values())
+
+    # Print merged fixes
     if fixes:
         print('FIXES for', filename + ':')
         for fix in fixes:
-            print('#' + str(fix[0]) + ':',fix[1],fix[2],'->',fix[3],fix[4])
-
-    # Fix skipped configuration levels (e.g., 5g, 7g -> 5g, 6g when 6g is secondary)
-    conf_res = fix_skipped_config_levels(conf_res)
+            old_conf, old_term, energy, new_conf, new_term = fix
+            old_term_print = old_term.replace(',', '')
+            new_term_print = new_term.replace(',', '')
+            print(f'  {old_conf} {old_term_print} -> {new_conf} {new_term_print}')
 
     return conf_res, fixes
 
@@ -320,31 +357,68 @@ def parse_matrix_res(filename):
     return matrix_res
 
 def fix_matrix_res(fixes, res):
+    """
+    Apply fixes to matrix element results.
+    fixes is a list of [old_conf, old_term, energy, new_conf, new_term].
+    Uses energy to disambiguate when multiple fixes exist for the same (config, term).
+    """
+    # Group fixes by (config, term) for initial lookup
+    # Then use energy to find the best match
+    fix_groups = {}
+    for fix in fixes:
+        key = (fix[0], fix[1])  # (old_conf, old_term)
+        if key not in fix_groups:
+            fix_groups[key] = []
+        fix_groups[key].append(fix)
+
+    def find_best_fix(conf, term, energy):
+        """Find the fix that best matches the given state by energy."""
+        key = (conf, term)
+        if key not in fix_groups:
+            return None
+        candidates = fix_groups[key]
+        if len(candidates) == 1:
+            return candidates[0]
+        # Multiple candidates - find closest energy match
+        # Energy in E1.RES is negative, in CONFFINAL is positive
+        energy_abs = abs(float(energy))
+        best_fix = None
+        best_diff = float('inf')
+        for fix in candidates:
+            fix_energy = abs(float(fix[2]))
+            diff = abs(energy_abs - fix_energy)
+            if diff < best_diff:
+                best_diff = diff
+                best_fix = fix
+        return best_fix
+
     for row in res:
-        index1 = row[11]
-        index2 = row[10]
-        conf1 = row[3]
-        term1 = row[4] + ',' + row[5]
-        conf2 = row[0]
-        term2 = row[1] + ',' + row[2]
-        for fix in fixes:
-            fix_index = fix[0]
-            old_conf = fix[1]
-            old_term = fix[2]
-            new_conf = fix[3]
-            new_term = fix[4]
-            if index1 == fix_index and conf2 == old_conf and term2 == old_term:
-                term = new_term.split(',')[0]
-                J = new_term.split(',')[1]
-                row[0] = new_conf
-                row[1] = term
-                row[2] = J
-            if index2 == fix_index and conf1 == old_conf and term1 == old_term:
-                term = fix[4].split(',')[0]
-                J = fix[4].split(',')[1]
-                row[3] = new_conf
-                row[4] = term
-                row[5] = J
+        orig_conf1 = row[0]
+        orig_term1 = row[1] + ',' + row[2]
+        energy1 = row[7]
+        orig_conf2 = row[3]
+        orig_term2 = row[4] + ',' + row[5]
+        energy2 = row[8]
+
+        # Check if conf1 needs fix
+        fix1 = find_best_fix(orig_conf1, orig_term1, energy1)
+        if fix1:
+            new_conf, new_term = fix1[3], fix1[4]
+            term = new_term.split(',')[0]
+            J = new_term.split(',')[1]
+            row[0] = new_conf
+            row[1] = term
+            row[2] = J
+
+        # Check if conf2 needs fix
+        fix2 = find_best_fix(orig_conf2, orig_term2, energy2)
+        if fix2:
+            new_conf, new_term = fix2[3], fix2[4]
+            term = new_term.split(',')[0]
+            J = new_term.split(',')[1]
+            row[3] = new_conf
+            row[4] = term
+            row[5] = J
 
     return res
 
@@ -379,6 +453,7 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
 
     # Make a E1.RES array starting with results from res1
     matrix_res = []
+    unmatched_matrix = []
     num_matches = 0
     for row1 in matrix_res1:
         matched = False
@@ -404,14 +479,14 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
                     num_matches += 1
                     break
             if not matched:
-                print('NOT MATCHED:', row1)
+                unmatched_matrix.append(row1)
                 matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
         else:
             matrix_res.append([conf11, term11, conf12, term12, me1, '-', energy1, energy2, wavelength])
-    
+
     print(num_matches,'/',len(matrix_res), 'MATRIX ELEMENTS MATCHED')
-    
-    return matrix_res
+
+    return matrix_res, unmatched_matrix
 
 def cmp_res(res1, res2):
     conf_res1, fixes1 = parse_final_res(res1)
@@ -493,11 +568,13 @@ def cmp_res(res1, res2):
         for match in matched_with_sec_confs:
             print('SECONDARY MATCH FOUND: ', match)
 
-        # Print unmatched configurations from each CONFFINAL.RES file
-        if not_matched1 or not_matched2:
-            print('UNMATCHED CONFIGURATIONS FOUND:')
-            print('from ' + res1 + ': ', not_matched1)
-            print('from ' + res2 + ': ', not_matched2)
+        # Store unmatched configurations for external file output
+        unmatched_energies = {
+            'res1': res1,
+            'res2': res2,
+            'not_matched1': not_matched1,
+            'not_matched2': not_matched2
+        }
     
         # Assign uncertainty of 0 if no match was found
         for row in conf_res:
@@ -522,8 +599,9 @@ def cmp_res(res1, res2):
             level.append('-')
         fixes = fixes1
         matched_with_sec_confs = []
-        
-    return conf_res, conf_res1, matched_with_sec_confs, fixes
+        unmatched_energies = {}
+
+    return conf_res, conf_res1, matched_with_sec_confs, fixes, unmatched_energies
     
 def add_uncertainties(combined_conf_res):
     
@@ -571,11 +649,58 @@ def merge_res(res_even, res_odd, second_order_exists):
     return gs_parity, merged_res
 
 if __name__ == "__main__":
-    conf_res_odd, full_res_odd, swaps_odd, fixes_odd = cmp_res('DATA_RAW/CONFFINALodd.RES','DATA_RAW/CONFFINALoddMBPT.RES')
-    conf_res_even, full_res_even, swaps_even, fixes_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
-        
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd = cmp_res('DATA_RAW/CONFFINALodd.RES','DATA_RAW/CONFFINALoddMBPT.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
+
     swaps = swaps_odd + swaps_even
     fixes = fixes_odd + fixes_even
 
-    e1_res = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
+    e1_res, unmatched_matrix = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
+
+    # Write unmatched items to file if any exist
+    has_unmatched = False
+
+    # Check for unmatched energies
+    unmatched_energy_list = []
+    for label, unmatched in [('ODD PARITY', unmatched_odd), ('EVEN PARITY', unmatched_even)]:
+        if unmatched and (unmatched.get('not_matched1') or unmatched.get('not_matched2')):
+            has_unmatched = True
+            unmatched_energy_list.append((label, unmatched))
+
+    # Check for unmatched matrix elements
+    if unmatched_matrix:
+        has_unmatched = True
+
+    # Write to file if there are unmatched items
+    if has_unmatched:
+        with open('unmatched.txt', 'w') as f:
+            # Write unmatched energy levels
+            if unmatched_energy_list:
+                f.write('='*60 + '\n')
+                f.write('UNMATCHED ENERGY LEVELS\n')
+                f.write('='*60 + '\n\n')
+                for label, unmatched in unmatched_energy_list:
+                    f.write(f'--- {label} ---\n')
+                    if unmatched.get('not_matched1'):
+                        f.write(f"From {unmatched['res1']}:\n")
+                        for item in unmatched['not_matched1']:
+                            f.write(f"  Level {item[0]}: {item[1]} {item[2]}\n")
+                    if unmatched.get('not_matched2'):
+                        f.write(f"From {unmatched['res2']}:\n")
+                        for item in unmatched['not_matched2']:
+                            f.write(f"  Level {item[0]}: {item[1]} {item[2]}\n")
+                    f.write('\n')
+
+            # Write unmatched matrix elements
+            if unmatched_matrix:
+                f.write('='*60 + '\n')
+                f.write('UNMATCHED MATRIX ELEMENTS\n')
+                f.write('='*60 + '\n\n')
+                f.write(f"Total: {len(unmatched_matrix)} unmatched\n\n")
+                for row in unmatched_matrix:
+                    # row format: [conf1, term1, J1, conf2, term2, J2, me, energy1, energy2, wavelength, idx1, idx2]
+                    conf1, term1, J1, conf2, term2, J2 = row[0], row[1], row[2], row[3], row[4], row[5]
+                    f.write(f"  <{conf2} {term2}{J2} || E1 || {conf1} {term1}{J1}>\n")
+
+        print(f"Unmatched items written to unmatched.txt")
     
