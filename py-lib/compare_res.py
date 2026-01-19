@@ -248,38 +248,46 @@ def parse_final_res(filename):
     # Check for duplicates
     confs_terms = [[level[1],level[2]] for level in conf_res]
     for ilvl in range(1, len(confs_terms)):
-        if confs_terms[ilvl] in confs_terms[:ilvl-1]:
-            print('DUPLICATE FOUND:', confs_terms[ilvl], 'AT INDICES', confs_terms[:ilvl-1].index(confs_terms[ilvl])+1, 'AND', ilvl+1)
-            existing_ilvl = confs_terms[:ilvl-1].index(confs_terms[ilvl])
-            
+        if confs_terms[ilvl] in confs_terms[:ilvl]:
+            existing_ilvl = confs_terms[:ilvl].index(confs_terms[ilvl])
+
             # Check duplicates of term
             old_term = conf_res[ilvl][2]
             s = conf_res[ilvl][5]
             existing_s = conf_res[existing_ilvl][5]
             if s > existing_s:
-                conf_res[existing_ilvl][2] = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
-                conf_res[ilvl][2] = str(round(2*math.ceil(float(s))+1)) + conf_res[ilvl][2][1:]
+                new_term_existing = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                new_term_current = str(round(2*math.ceil(float(s))+1)) + conf_res[ilvl][2][1:]
+                conf_res[existing_ilvl][2] = new_term_existing
+                conf_res[ilvl][2] = new_term_current
             else:
-                conf_res[existing_ilvl][2] = str(round(2*math.ceil(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
-                conf_res[ilvl][2] = str(round(2*math.floor(float(s))+1)) + conf_res[ilvl][2][1:]
+                new_term_existing = str(round(2*math.ceil(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                new_term_current = str(round(2*math.floor(float(s))+1)) + conf_res[ilvl][2][1:]
+                conf_res[existing_ilvl][2] = new_term_existing
+                conf_res[ilvl][2] = new_term_current
+
+            # Print warning about duplicates to alert user to check results
+            print(f'WARNING: DUPLICATE {confs_terms[ilvl][0]} {confs_terms[ilvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
+            print(f'  Level {existing_ilvl+1}: S={existing_s:.2f} -> {new_term_existing.replace(",","")}')
+            print(f'  Level {ilvl+1}: S={s:.2f} -> {new_term_current.replace(",","")}')
+            print(f'  Please verify these levels in the original calculation.')
                 
             # If term is remains same, check duplicates of configuration
             if conf_res[existing_ilvl][2] == confs_terms[ilvl][1]:
                 if conf_res[existing_ilvl][11] and conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
                     # Check secondary config already in list
-                    if [conf_res[existing_ilvl][11], conf_res[existing_ilvl][2]] not in confs_terms[:ilvl-1]:
+                    if [conf_res[existing_ilvl][11], conf_res[existing_ilvl][2]] not in confs_terms[:ilvl]:
                         main_conf = conf_res[existing_ilvl][1]
                         conf_res[existing_ilvl][1] = conf_res[existing_ilvl][11]
                         conf_res[existing_ilvl][11] = main_conf
                                     
-            # Check if there's currently a list of fixes
+            # Check if there's currently a list of fixes, update the one for existing_ilvl
             if fixes:
-                # Check if duplicate is in list of fixes, update if found
+                # Match by energy to find the correct fix for the existing level
+                existing_energy = conf_res[existing_ilvl][3]
                 for fix in fixes:
-                    # Match by (old_conf, old_term)
-                    if fix[0] == confs_terms[ilvl][0] and fix[1] == confs_terms[ilvl][1]:
-                        fix[3] = conf_res[existing_ilvl][1]  # new_conf
-                        fix[4] = conf_res[existing_ilvl][2]  # new_term
+                    if fix[2] == existing_energy:  # Match by energy
+                        fix[4] = conf_res[existing_ilvl][2]  # Update new_term
 
     # Fix skipped configuration levels (e.g., 5g, 7g -> 5g, 6g when 6g is secondary)
     # Pass original terms so fixes can match against matrix element file (which has original terms)
@@ -587,8 +595,17 @@ def cmp_res(res1, res2):
         for i in range(len(conf_res1)):
             conf_res1[i].append(conf_res[i][-1])
         
-        # Combine list of fixes
-        fixes = fixes1 + fixes2
+        # Combine list of fixes and deduplicate
+        # Keep all fixes (with different energies) for matching, but deduplicate identical ones
+        combined_fixes = fixes1 + fixes2
+        seen = set()
+        fixes = []
+        for fix in combined_fixes:
+            # Deduplicate based on full fix (including energy) to avoid exact duplicates
+            fix_key = (fix[0], fix[1], fix[2], fix[3], fix[4])
+            if fix_key not in seen:
+                seen.add(fix_key)
+                fixes.append(fix)
         
     else:
         for level in conf_res:
@@ -648,21 +665,25 @@ def merge_res(res_even, res_odd, second_order_exists):
     
     return gs_parity, merged_res
 
-if __name__ == "__main__":
-    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd = cmp_res('DATA_RAW/CONFFINALodd.RES','DATA_RAW/CONFFINALoddMBPT.RES')
-    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
+def write_unmatched_file(unmatched_energies, unmatched_matrix, filename='unmatched.txt'):
+    """
+    Write unmatched energy levels and matrix elements to a file.
 
-    swaps = swaps_odd + swaps_even
-    fixes = fixes_odd + fixes_even
+    Args:
+        unmatched_energies: dict with 'odd' and 'even' keys, each containing
+                           {'res1': filename, 'res2': filename, 'not_matched1': [...], 'not_matched2': [...]}
+        unmatched_matrix: list of unmatched matrix element rows
+        filename: output filename (default: 'unmatched.txt')
 
-    e1_res, unmatched_matrix = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
-
-    # Write unmatched items to file if any exist
+    Returns:
+        True if file was written, False if no unmatched items
+    """
     has_unmatched = False
 
     # Check for unmatched energies
     unmatched_energy_list = []
-    for label, unmatched in [('ODD PARITY', unmatched_odd), ('EVEN PARITY', unmatched_even)]:
+    for label, key in [('ODD PARITY', 'odd'), ('EVEN PARITY', 'even')]:
+        unmatched = unmatched_energies.get(key, {})
         if unmatched and (unmatched.get('not_matched1') or unmatched.get('not_matched2')):
             has_unmatched = True
             unmatched_energy_list.append((label, unmatched))
@@ -673,7 +694,7 @@ if __name__ == "__main__":
 
     # Write to file if there are unmatched items
     if has_unmatched:
-        with open('unmatched.txt', 'w') as f:
+        with open(filename, 'w') as f:
             # Write unmatched energy levels
             if unmatched_energy_list:
                 f.write('='*60 + '\n')
@@ -702,5 +723,21 @@ if __name__ == "__main__":
                     conf1, term1, J1, conf2, term2, J2 = row[0], row[1], row[2], row[3], row[4], row[5]
                     f.write(f"  <{conf2} {term2}{J2} || E1 || {conf1} {term1}{J1}>\n")
 
-        print(f"Unmatched items written to unmatched.txt")
+        print(f"Unmatched items written to {filename}")
+        return True
+
+    return False
+
+if __name__ == "__main__":
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd = cmp_res('DATA_RAW/CONFFINALodd.RES','DATA_RAW/CONFFINALoddMBPT.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
+
+    swaps = swaps_odd + swaps_even
+    fixes = fixes_odd + fixes_even
+
+    e1_res, unmatched_matrix = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
+
+    # Write unmatched items to file
+    unmatched_energies = {'odd': unmatched_odd, 'even': unmatched_even}
+    write_unmatched_file(unmatched_energies, unmatched_matrix)
     
