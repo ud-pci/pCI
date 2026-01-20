@@ -832,10 +832,13 @@ if __name__ == "__main__":
         # set default ignore configurations with 'g' and terms with 'G' to True
         ignore_g_value = get_dict_value(portal, 'ignore_g') if portal else None
         ignore_g = ignore_g_value if ignore_g_value is not None else True
-        
-        # set default minimum uncertainty as percentage of value to 1.5
+
+        # minimum uncertainty as percentage of value
         min_unc_value = get_dict_value(portal, 'min_uncertainty') if portal else None
-        min_uncertainty = float(min_unc_value) if min_unc_value is not None else 1.5
+        if min_unc_value is not None:
+            min_uncertainty = float(min_unc_value)
+        else:
+            min_uncertainty = float(input('min_uncertainty not found in config.yml. Enter minimum uncertainty (as % of value): '))
 
         # set default minimum energy difference percentage between NIST and theory to 3.0
         min_diff_value = get_dict_value(portal, 'min_energy_diff_percent') if portal else None
@@ -852,7 +855,7 @@ if __name__ == "__main__":
         tm_dir1 = None
         tm_dir2 = None
         ignore_g = True
-        min_uncertainty = 1.5
+        min_uncertainty = float(input('Enter minimum uncertainty for matrix elements (as % of value): '))
         min_energy_diff_percent = 3.0
         energy_cutoff = None
     name = atom_name_to_filename(atom)
