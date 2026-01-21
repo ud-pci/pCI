@@ -16,6 +16,40 @@ import sys
 import os
 
 
+def parse_termJ(termJ):
+    """
+    Parse a combined termJ string into separate term and J values.
+
+    Handles both standard terms like "3P1" -> ("3P", "1")
+    and parenthetical terms like "(1/2,7/2)3" -> ("(1/2,7/2)", "3")
+
+    Parameters:
+    -----------
+    termJ : str
+        Combined term and J string
+
+    Returns:
+    --------
+    tuple : (term, J)
+    """
+    if termJ.startswith('('):
+        # Find the matching closing parenthesis
+        close_paren = termJ.rfind(')')
+        if close_paren != -1:
+            term = termJ[:close_paren + 1]
+            J = termJ[close_paren + 1:]
+        else:
+            # Fallback if no closing parenthesis found
+            term = termJ[:-1]
+            J = termJ[-1]
+    else:
+        # Standard term like "3P1" - term is everything except last char
+        term = termJ[:-1]
+        J = termJ[-1]
+
+    return term, J
+
+
 def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
     """
     Calculate transition rates from energies and matrix elements.
@@ -187,8 +221,8 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     with open('transitions.txt', 'w') as f:
         for config, rates in tr_rates.items():
             configuration = config.split(' ')[0]
-            term = config.split(' ')[1][0:2]
-            J = config.split(' ')[1][-1]
+            termJ = config.split(' ')[1]
+            term, J = parse_termJ(termJ)
 
             # Calculate total decay rate
             total_rates = sum(rate[1] for rate in rates)
@@ -204,8 +238,8 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
 
                 # Add to branching ratios dataframe
                 configuration2 = rate[0].split(' ')[0]
-                term2 = rate[0].split(' ')[1][0:2]
-                J2 = rate[0].split(' ')[1][-1]
+                termJ2 = rate[0].split(' ')[1]
+                term2, J2 = parse_termJ(termJ2)
                 matrix_element = rate[2]
                 wavelength = rate[3]
                 tr_rate = rate[1]
