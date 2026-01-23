@@ -272,15 +272,21 @@ def parse_final_res(filename):
             print(f'  Level {ilvl+1}: S={s:.2f} -> {new_term_current.replace(",","")}')
             print(f'  Please verify these levels in the original calculation.')
                 
-            # If term is remains same, check duplicates of configuration
+            # If term remains same, check duplicates of configuration
             if conf_res[existing_ilvl][2] == confs_terms[ilvl][1]:
                 if conf_res[existing_ilvl][11] and conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
                     # Check secondary config already in list
                     if [conf_res[existing_ilvl][11], conf_res[existing_ilvl][2]] not in confs_terms[:ilvl]:
                         main_conf = conf_res[existing_ilvl][1]
-                        conf_res[existing_ilvl][1] = conf_res[existing_ilvl][11]
+                        new_conf = conf_res[existing_ilvl][11]
+                        conf_res[existing_ilvl][1] = new_conf
                         conf_res[existing_ilvl][11] = main_conf
-                                    
+                        # Generate fix for E1.RES: change primary to secondary config
+                        # Format: [old_conf, old_term, energy, new_conf, new_term]
+                        # Use original term (from confs_terms_old) for matching E1.RES
+                        original_term = confs_terms_old[existing_ilvl][1] if existing_ilvl < len(confs_terms_old) else conf_res[existing_ilvl][2]
+                        fixes.append([main_conf, original_term, conf_res[existing_ilvl][3], new_conf, original_term])
+
             # Check if there's currently a list of fixes, update the one for existing_ilvl
             if fixes:
                 # Match by energy to find the correct fix for the existing level
@@ -431,38 +437,58 @@ def fix_matrix_res(fixes, res):
     return res
 
 def cmp_matrix_res(res1, res2, swaps, fixes):
+    # fixes is a tuple (fixes1, fixes2) where:
+    # - fixes1: fixes for CI+all-order: E1.RES (res1)
+    # - fixes2: fixes for CI+MBPT: E1MBPT.RES (res2)
+    fixes1, fixes2 = fixes
+
     matrix_res1 = parse_matrix_res(res1)
     matrix_res2 = parse_matrix_res(res2)
     second_order_exists = True
     if not matrix_res2:
         second_order_exists = False
-    
+
+    # Build a set of (config, term) that have fixes2 - these should not be swapped
+    # Fixes take precedence over swaps to ensure NIST-matched labels are preserved
+    fix2_keys = set()
+    if fixes2:
+        for fix in fixes2:
+            fix2_keys.add((fix[0], fix[1]))  # (old_conf, old_term)
+
     # Check if a swap has to be made in res2 (second-order)
+    # Skip swaps when there's a fix for the same (config, term) - fixes take precedence
     if swaps:
         for row in matrix_res2:
             for swap in swaps:
                 # Check state 1
                 term = row[1] + ',' + row[2]
                 if row[0] == swap[1] and term == swap[2]:
-                    #print('SWAP FOUND:', row[0], '-->', swap[0])
+                    # Skip if there's a fix for this (config, term)
+                    if (row[0], term) in fix2_keys:
+                        continue
                     row[0] = swap[0]
-                                       
+
                 # Check state 2
                 term = row[4] + ',' + row[5]
                 if row[3] == swap[1] and term == swap[2]:
-                    #print('SWAP FOUND:', row[3], '-->', swap[0])
+                    # Skip if there's a fix for this (config, term)
+                    if (row[3], term) in fix2_keys:
+                        continue
                     row[3] = swap[0]
-    
-    # Check if any levels have to be fixed
-    if fixes:
-        matrix_res1 = fix_matrix_res(fixes, matrix_res1)
-        if second_order_exists: 
-            matrix_res2 = fix_matrix_res(fixes, matrix_res2)
+
+    # Apply fixes to the correct E1.RES files
+    # fixes1 (from all-order CONFFINAL) -> E1.RES (matrix_res1)
+    # fixes2 (from MBPT CONFFINAL) -> E1MBPT.RES (matrix_res2)
+    if fixes1:
+        matrix_res1 = fix_matrix_res(fixes1, matrix_res1)
+    if second_order_exists and fixes2:
+        matrix_res2 = fix_matrix_res(fixes2, matrix_res2)
 
     # Make a E1.RES array starting with results from res1
     matrix_res = []
     unmatched_matrix = []
     num_matches = 0
+
     for row1 in matrix_res1:
         matched = False
         conf11 = row1[0]
@@ -595,18 +621,20 @@ def cmp_res(res1, res2):
         for i in range(len(conf_res1)):
             conf_res1[i].append(conf_res[i][-1])
         
-        # Combine list of fixes and deduplicate
-        # Keep all fixes (with different energies) for matching, but deduplicate identical ones
-        combined_fixes = fixes1 + fixes2
-        seen = set()
-        fixes = []
-        for fix in combined_fixes:
-            # Deduplicate based on full fix (including energy) to avoid exact duplicates
-            fix_key = (fix[0], fix[1], fix[2], fix[3], fix[4])
-            if fix_key not in seen:
-                seen.add(fix_key)
-                fixes.append(fix)
-        
+        # Deduplicate fixes1 and fixes2 separately
+        def deduplicate_fixes(fix_list):
+            seen = set()
+            result = []
+            for fix in fix_list:
+                fix_key = (fix[0], fix[1], fix[2], fix[3], fix[4])
+                if fix_key not in seen:
+                    seen.add(fix_key)
+                    result.append(fix)
+            return result
+
+        fixes1 = deduplicate_fixes(fixes1)
+        fixes2 = deduplicate_fixes(fixes2)
+
     else:
         for level in conf_res:
             level.append('-')
@@ -614,11 +642,11 @@ def cmp_res(res1, res2):
             level.append('-')
         for level in conf_res1:
             level.append('-')
-        fixes = fixes1
+        fixes2 = []
         matched_with_sec_confs = []
         unmatched_energies = {}
 
-    return conf_res, conf_res1, matched_with_sec_confs, fixes, unmatched_energies
+    return conf_res, conf_res1, matched_with_sec_confs, (fixes1, fixes2), unmatched_energies
     
 def add_uncertainties(combined_conf_res):
     
@@ -733,7 +761,11 @@ if __name__ == "__main__":
     conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res('DATA_RAW/CONFFINALeven.RES','DATA_RAW/CONFFINALevenMBPT.RES')
 
     swaps = swaps_odd + swaps_even
-    fixes = fixes_odd + fixes_even
+    # fixes_odd and fixes_even are tuples (fixes1, fixes2)
+    # Combine all-order fixes together and MBPT fixes together
+    fixes1_odd, fixes2_odd = fixes_odd
+    fixes1_even, fixes2_even = fixes_even
+    fixes = (fixes1_odd + fixes1_even, fixes2_odd + fixes2_even)
 
     e1_res, unmatched_matrix = cmp_matrix_res('DATA_RAW/E1.RES','DATA_RAW/E1MBPT.RES',swaps,fixes)
 

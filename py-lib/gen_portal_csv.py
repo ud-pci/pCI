@@ -117,6 +117,52 @@ def create_mapping(num_levels_even, num_levels_odd):
     
     return mapping
 
+def generate_mapping_fixes(mapping):
+    """
+    Generate fixes for E1.RES based on differences between theory_config and corrected_config.
+
+    When NIST matching determines a different label (corrected_config) than the original theory label (theory_config), we need to fix E1.RES to use the corrected label.
+
+    Args:
+        mapping: list of [[NIST_data], [theory_data], energy_diff_pct] where theory_data = [theory_config, theory_term, theory_J, energy_cm, uncertainty, corrected_config, energy_au]
+
+    Returns:
+        list of fixes: [[old_conf, old_term, energy, new_conf, new_term], ...]
+    """
+    fixes = []
+    seen = set()
+
+    for entry in mapping:
+        theory_data = entry[1]
+
+        if theory_data[0] == '-':
+            continue
+
+        theory_config = theory_data[0]
+        theory_term = theory_data[1]
+        theory_J = theory_data[2]
+        corrected_config = theory_data[5]
+        theory_energy_au = theory_data[6]
+
+        # If configs differ, generate a fix
+        if theory_config != corrected_config and theory_config != '-' and corrected_config != '-':
+            # Format term with comma for fix format
+            term_with_comma = theory_term + ',' + str(theory_J)
+
+            # Create fix key to avoid duplicates
+            fix_key = (theory_config, term_with_comma, theory_energy_au)
+            if fix_key not in seen:
+                seen.add(fix_key)
+                # Fix format: [old_conf, old_term, energy, new_conf, new_term]
+                fixes.append([theory_config, term_with_comma, theory_energy_au, corrected_config, term_with_comma])
+
+    if fixes:
+        print(f'Generated {len(fixes)} mapping-based fixes:')
+        for fix in fixes:
+            print(f'  {fix[0]} {fix[1].replace(",","")} -> {fix[3]} {fix[4].replace(",","")}')
+
+    return fixes
+
 def normalize_config(config):
     '''
     Normalize an electronic configuration string by sorting the subshells.
@@ -165,7 +211,11 @@ def write_new_conf_res(name, filepath, data_nist):
     conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
     conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
     swaps = swaps_odd + swaps_even
-    fixes = fixes_odd + fixes_even
+    # fixes_odd and fixes_even are tuples (fixes1, fixes2)
+    # Combine all-order fixes together and MBPT fixes together
+    fixes1_odd, fixes2_odd = fixes_odd
+    fixes1_even, fixes2_even = fixes_even
+    fixes = (fixes1_odd + fixes1_even, fixes2_odd + fixes2_even)
     unmatched_energies = {'odd': unmatched_odd, 'even': unmatched_even}
     
     # Merge even and odd parity CONF.RES files and obtain uncertainties
@@ -1140,6 +1190,14 @@ if __name__ == "__main__":
         filtered_mapping = filtered_mapping_no_g
         print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g/G (ignore_g=True)')
         print(f'Final mapping has {len(filtered_mapping)} levels')
+
+    # Generate mapping-based fixes: when theory_config differs from corrected_config
+    # These fixes change E1.RES entries to match the NIST-determined labels
+    mapping_fixes = generate_mapping_fixes(filtered_mapping)
+    if mapping_fixes:
+        # Add mapping fixes to both fixes1 (for E1.RES) and fixes2 (for E1MBPT.RES)
+        fixes1, fixes2 = fixes
+        fixes = (fixes1 + mapping_fixes, fixes2 + mapping_fixes)
 
     write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
 
