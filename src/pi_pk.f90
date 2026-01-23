@@ -43,6 +43,7 @@ Module pi_pk
         z00=0.0d0
         xja=z12*ja
         Do nc=1,Nso
+            xja=z12*ja ! ab-fix: xja might be modified by Peff inside the cycle provided klow == 2
             jc=Jj(nc)
             lc=Ll(nc)
             If (iabs(ja-jc).GT.2.OR.iabs(la-lc).NE.1) Cycle
