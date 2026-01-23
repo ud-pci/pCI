@@ -43,7 +43,6 @@ Module pi_pk
         z00=0.0d0
         xja=z12*ja
         Do nc=1,Nso
-            xja=z12*ja ! ab-fix: xja might be modified by Peff inside the cycle provided klow == 2
             jc=Jj(nc)
             lc=Ll(nc)
             If (iabs(ja-jc).GT.2.OR.iabs(la-lc).NE.1) Cycle
@@ -78,7 +77,7 @@ Module pi_pk
         Implicit None
 
         Integer :: la, lc, ila, ja, ilc, jc, lmax, ilmax, ih, i
-        Real(dp) :: ga, half, xjx, xjn, s0, s1, ss, s2, ds
+        Real(dp) :: ga, half, xjx, xjn, s0, s1, ss, s2, ds, xja, xjc, xla, xlc, yla, ylc
         Real(dp), Dimension(IP6) :: Pa,Pc,Qa,Qc,Da
 
         P_eff=0.d0
