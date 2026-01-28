@@ -208,9 +208,12 @@ def write_new_conf_res(name, filepath, data_nist):
         second_order_exists = False
 
     # Read CONF.RES files
-    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
-    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
+    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd, allorder_e2l_odd, mbpt_e2l_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
+    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even, allorder_e2l_even, mbpt_e2l_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
     swaps = swaps_odd + swaps_even
+    # Combine energy to level mappings from both parities (all-order mapping for fixes, MBPT mapping for swaps)
+    energy_to_level = {**allorder_e2l_odd, **allorder_e2l_even}
+    mbpt_energy_to_level = {**mbpt_e2l_odd, **mbpt_e2l_even}
     # fixes_odd and fixes_even are tuples (fixes1, fixes2)
     # Combine all-order fixes together and MBPT fixes together
     fixes1_odd, fixes2_odd = fixes_odd
@@ -290,7 +293,7 @@ def write_new_conf_res(name, filepath, data_nist):
     convert_res_to_csv(filepath + 'CONFFINALeven.RES', full_res_even, gs_exists, name)
     convert_res_to_csv(filepath + 'CONFFINALodd.RES', full_res_odd, gs_exists, name)
 
-    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies
+    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -394,7 +397,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
 
     return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent):
+def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level):
     '''
     This function writes the matrix element csv file
     Note: Transition rates are now calculated separately using generate_transition_rates.py
@@ -402,7 +405,7 @@ def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_s
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
     # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res, unmatched_matrix = cmp_matrix_res('DATA_Processed/E1.RES', 'DATA_Processed/E1MBPT.RES', swaps, fixes)
+    e1_res, unmatched_matrix = cmp_matrix_res('DATA_Processed/E1.RES', 'DATA_Processed/E1MBPT.RES', swaps, fixes, energy_to_level, mbpt_energy_to_level)
 
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
@@ -982,7 +985,7 @@ if __name__ == "__main__":
         print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1a.RES, E1b.RES, E1MBPTa.RES, E1MBPTb.RES')
         print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_processed_path)
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies = write_new_conf_res(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level = write_new_conf_res(name, raw_path, data_nist)
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
     if gs_exists:
@@ -1245,7 +1248,7 @@ if __name__ == "__main__":
     unmatched_matrix = []
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1, unmatched_matrix = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent)
+        num_E1, unmatched_matrix = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
         coverage = round(num_E1/num_possible_E1*100, 2)
         print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:

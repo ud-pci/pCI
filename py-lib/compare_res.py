@@ -436,7 +436,7 @@ def fix_matrix_res(fixes, res):
 
     return res
 
-def cmp_matrix_res(res1, res2, swaps, fixes):
+def cmp_matrix_res(res1, res2, swaps, fixes, energy_to_level=None, mbpt_energy_to_level=None):
     # fixes is a tuple (fixes1, fixes2) where:
     # - fixes1: fixes for CI+all-order: E1.RES (res1)
     # - fixes2: fixes for CI+MBPT: E1MBPT.RES (res2)
@@ -448,37 +448,48 @@ def cmp_matrix_res(res1, res2, swaps, fixes):
     if not matrix_res2:
         second_order_exists = False
 
-    # Build a set of (config, term) that have fixes2 - these should not be swapped
-    # Fixes take precedence over swaps to ensure NIST-matched labels are preserved
-    fix2_keys = set()
-    if fixes2:
-        for fix in fixes2:
-            fix2_keys.add((fix[0], fix[1]))  # (old_conf, old_term)
+    def find_conffinal_level(energy, energy_map, tolerance=0.0001):
+        """Find the CONFFINAL level index for a given E1.RES energy."""
+        if not energy_map:
+            return None
+        energy_abs = abs(float(energy))
+        for conf_energy, level_idx in energy_map.items():
+            if abs(abs(float(conf_energy)) - energy_abs) < tolerance:
+                return level_idx
+        return None
 
-    # Check if a swap has to be made in res2 (second-order)
-    # Skip swaps when there's a fix for the same (config, term) - fixes take precedence
+    # Check if a swap has to be made in res2 (E1MBPT.RES)
+    # Swap format: [target_config, source_config, term, mbpt_conffinal_level_index]
+    # Use energy matching to identify which CONFFINALMBPT.RES level each E1MBPT.RES entry belongs to
     if swaps:
         for row in matrix_res2:
             for swap in swaps:
-                # Check state 1
-                term = row[1] + ',' + row[2]
-                if row[0] == swap[1] and term == swap[2]:
-                    # Skip if there's a fix for this (config, term)
-                    if (row[0], term) in fix2_keys:
-                        continue
-                    row[0] = swap[0]
+                swap_target = swap[0]
+                swap_source = swap[1]
+                swap_term = swap[2]
+                swap_level = swap[3] if len(swap) > 3 else None
 
-                # Check state 2
+                # Check state 1 - use energy to find CONFFINALMBPT.RES level
+                term = row[1] + ',' + row[2]
+                energy1 = row[7]
+                mbpt_level1 = find_conffinal_level(energy1, mbpt_energy_to_level)
+                if row[0] == swap_source and term == swap_term:
+                    # Only apply if CONFFINALMBPT.RES level matches
+                    if swap_level is None or mbpt_level1 == swap_level:
+                        row[0] = swap_target
+
+                # Check state 2 - use energy to find CONFFINALMBPT.RES level
                 term = row[4] + ',' + row[5]
-                if row[3] == swap[1] and term == swap[2]:
-                    # Skip if there's a fix for this (config, term)
-                    if (row[3], term) in fix2_keys:
-                        continue
-                    row[3] = swap[0]
+                energy2 = row[8]
+                mbpt_level2 = find_conffinal_level(energy2, mbpt_energy_to_level)
+                if row[3] == swap_source and term == swap_term:
+                    # Only apply if CONFFINALMBPT.RES level matches
+                    if swap_level is None or mbpt_level2 == swap_level:
+                        row[3] = swap_target
 
     # Apply fixes to the correct E1.RES files
-    # fixes1 (from all-order CONFFINAL) -> E1.RES (matrix_res1)
-    # fixes2 (from MBPT CONFFINAL) -> E1MBPT.RES (matrix_res2)
+    # fixes1 (from CONFFINAL.RES) -> E1.RES (matrix_res1)
+    # fixes2 (from CONFFINALMBPT.RES) -> E1MBPT.RES (matrix_res2)
     if fixes1:
         matrix_res1 = fix_matrix_res(fixes1, matrix_res1)
     if second_order_exists and fixes2:
@@ -574,7 +585,9 @@ def cmp_res(res1, res2):
                     if confs2[ilvl] == sec_confs1[ilvl2] and terms2[ilvl] == conf_res[ilvl2][1]:
                         conf_res[ilvl2].append(energies_au2[ilvl])
                         conf_res[ilvl2].append(energies_cm2[ilvl])
-                        matched_with_sec_confs.append([conf_res[ilvl2][0],confs2[ilvl],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
+                        # Swap format: [target_config, source_config, term, mbpt_level_index]
+                        # target = all-order primary, source = MBPT primary, level = MBPT level (1-based)
+                        matched_with_sec_confs.append([conf_res[ilvl2][0], confs2[ilvl], conf_res[ilvl2][1], ilvl+1])
                         matched = True
                         break
             # If still not matched, check if MBPT secondary matches all-order primary
@@ -586,7 +599,9 @@ def cmp_res(res1, res2):
                     if sec_confs2[ilvl] and sec_confs2[ilvl] == conf_res[ilvl2][0] and terms2[ilvl] == conf_res[ilvl2][1]:
                         conf_res[ilvl2].append(energies_au2[ilvl])
                         conf_res[ilvl2].append(energies_cm2[ilvl])
-                        matched_with_sec_confs.append([sec_confs2[ilvl],conf_res[ilvl2][0],conf_res[ilvl2][1]]) # ind1 = res2, ind2 = res1
+                        # Swap format: [target_config, source_config, term, mbpt_level_index]
+                        # target = MBPT secondary (= all-order primary), source = MBPT primary, level = MBPT level (1-based)
+                        matched_with_sec_confs.append([sec_confs2[ilvl], confs2[ilvl], conf_res[ilvl2][1], ilvl+1])
                         matched = True
                         break
             # Add res2 data that were not matched to array not_matched2
@@ -635,6 +650,15 @@ def cmp_res(res1, res2):
         fixes1 = deduplicate_fixes(fixes1)
         fixes2 = deduplicate_fixes(fixes2)
 
+        # Build energy to level index mappings for E1.RES matching (all-order mapping for fixes, MBPT mapping for swaps)
+        allorder_energy_to_level = {}
+        for ilvl, energy in enumerate(energies_au1):
+            allorder_energy_to_level[energy] = ilvl + 1  # 1-based level index
+
+        mbpt_energy_to_level = {}
+        for ilvl, energy in enumerate(energies_au2):
+            mbpt_energy_to_level[energy] = ilvl + 1  # 1-based level index
+
     else:
         for level in conf_res:
             level.append('-')
@@ -645,8 +669,10 @@ def cmp_res(res1, res2):
         fixes2 = []
         matched_with_sec_confs = []
         unmatched_energies = {}
+        allorder_energy_to_level = {}
+        mbpt_energy_to_level = {}
 
-    return conf_res, conf_res1, matched_with_sec_confs, (fixes1, fixes2), unmatched_energies
+    return conf_res, conf_res1, matched_with_sec_confs, (fixes1, fixes2), unmatched_energies, allorder_energy_to_level, mbpt_energy_to_level
     
 def add_uncertainties(combined_conf_res):
     
