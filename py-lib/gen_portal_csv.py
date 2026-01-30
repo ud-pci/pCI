@@ -1096,18 +1096,13 @@ if __name__ == "__main__":
         for i, level in enumerate(even_mapping):
             if level[2] > min_energy_diff_percent:
                 even_truncate_idx = i
-                # Get the energy from the LAST GOOD level (i-1), not the first bad one
-                if i > 0:
-                    last_good_level = even_mapping[i-1]
-                    if last_good_level[0][3] != '-':
-                        even_cutoff_energy = float(last_good_level[0][3])
-                    else:
-                        even_cutoff_energy = float(last_good_level[1][3])
-                    print(f'Even parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, last good energy: {even_cutoff_energy:.2f} cm^-1)')
+                # Set cutoff to 1 cm-1 below the first bad level's energy
+                if level[0][3] != '-':
+                    bad_level_energy = float(level[0][3])
                 else:
-                    # First level already exceeds threshold
-                    even_cutoff_energy = 0.0
-                    print(f'Even parity: first level already exceeds threshold (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%)')
+                    bad_level_energy = float(level[1][3])
+                even_cutoff_energy = bad_level_energy - 1.0
+                print(f'Even parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {even_cutoff_energy:.2f} cm^-1)')
                 break
 
         # Find truncation point for odd parity
@@ -1116,18 +1111,13 @@ if __name__ == "__main__":
         for i, level in enumerate(odd_mapping):
             if level[2] > min_energy_diff_percent:
                 odd_truncate_idx = i
-                # Get the energy from the LAST GOOD level (i-1), not the first bad one
-                if i > 0:
-                    last_good_level = odd_mapping[i-1]
-                    if last_good_level[0][3] != '-':
-                        odd_cutoff_energy = float(last_good_level[0][3])
-                    else:
-                        odd_cutoff_energy = float(last_good_level[1][3])
-                    print(f'Odd parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, last good energy: {odd_cutoff_energy:.2f} cm^-1)')
+                # Set cutoff to 1 cm-1 below the first bad level's energy
+                if level[0][3] != '-':
+                    bad_level_energy = float(level[0][3])
                 else:
-                    # First level already exceeds threshold
-                    odd_cutoff_energy = 0.0
-                    print(f'Odd parity: first level already exceeds threshold (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%)')
+                    bad_level_energy = float(level[1][3])
+                odd_cutoff_energy = bad_level_energy - 1.0
+                print(f'Odd parity: truncating at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {odd_cutoff_energy:.2f} cm^-1)')
                 break
 
         # Apply global cutoff: use the lower of the two cutoff energies to prevent gaps
