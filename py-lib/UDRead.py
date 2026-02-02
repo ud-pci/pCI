@@ -508,13 +508,15 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
     assigned_states = set()
 
     for j in range(len(df_ud)):
-        nf,jf,de = IsBeingUsed(j,df_nist,df_ud)
+        nf,jf,de = IsBeingUsed(j,df_nist,df_ud) # jf = (0 - no match, 1 - matched with config1, 2 - matched with config2)
         config1_ao, config2_ao, term_ao, j_ao, level_ao,Levelau, per1,per2,uncer_ud = Data_UD(j,df_ud)
         # mul = int(term_ao[0]) if jf==0 else int(df_nist[nf][1][0])
         mul = Extract_Multiplicity(term_ao) if jf==0 else Extract_Multiplicity(df_nist[nf][1])
 
-        if jf==1: config = config1_ao
-        if jf==0 or jf==2:
+        if jf==1:
+            config = config1_ao
+            new_config[j] = config
+        elif jf==0 or jf==2:
             config = config1_ao
             new_config_check = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=False)
             nf1,jf1,de1 = IsBeingUsed(j,df_nist,df_ud,corr_config=new_config_check)
@@ -527,11 +529,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             elif de1!=0 and de2!=0: config=config1_ao if de1<=de2 else config2_ao
             else: config=config1_ao
 
-        # Manual Corrections
-        if ManCorr==True:
-            if jf==1 and config=="5s.8p" and mul==1:config="4d.5p"
-
-        new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
+            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
 
         # Check if (config, term, J) combination is already assigned
         # If so, revert to original configuration to avoid duplicates
@@ -694,7 +692,7 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
         term_ao=Unmark_Term(term_ao)
         if config2_ao=='': config2_ao='-'
         if (j in ao_used)==False:
-            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",new_config[j],config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
+            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",config1_ao,config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
 
 
     header = [" Config","  Term","  J","  Level (cm⁻¹)","Uncertainty (cm-1)","Final Config","  Config1","  Config2","  Term","  J","  Level (cm⁻¹)","  Uncertainty (cm⁻¹)","  Level (au)","    \u0394E","    \u0394E%","  I","  II"]
