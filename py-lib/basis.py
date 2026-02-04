@@ -434,16 +434,28 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
                 J.pop()
                 break
             
-            # Finding when to remove an electron distinguishes core and valence shells  
+            # For HFD files after the first, handle frozen and new orbitals differently
+            # Skip electron counting logic for these orbitals
+            if index > 1 and (NL[i] in frozen_shells or NL[i] in shells_found.keys()):
+                if NL[i] in frozen_shells:
+                    # Frozen orbitals: always QQ=0
+                    QQ.append(f"{0:.4f}")
+                else:
+                    # New orbitals: QQ=1 for first j-value, QQ=0 for second j-value
+                    if i == 0 or NL[i] != NL[i-1]:
+                        QQ.append(f"{1:.4f}")
+                    else:
+                        QQ.append(f"{0:.4f}")
+            # Finding when to remove an electron distinguishes core and valence shells
             # If an electron hasn't been removed yet, check if the electron count has surpassed the N-1 threshold
-            if not electron_removed:
+            elif not electron_removed:
                 # If it has, remove an electron from QQ
                 if electron_cnt > num_electrons - 1:
                     QQ.append(f"{QQ_num - 1:.4f}")
                     electron_removed = True
                 else:
                     QQ.append(f"{QQ_num:.4f}")
-                    
+
             # If an electron has already been removed, set QQ to 0.0000 if any of the following conditions match:
             # 1. if the current shell is frozen
             # 2. current shell is the same shell as last iteration
