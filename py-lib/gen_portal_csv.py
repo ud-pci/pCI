@@ -293,6 +293,11 @@ def write_new_conf_res(name, filepath, data_nist):
     convert_res_to_csv(filepath + 'CONFFINALeven.RES', full_res_even, gs_exists, name)
     convert_res_to_csv(filepath + 'CONFFINALodd.RES', full_res_odd, gs_exists, name)
 
+    # Write FINAL.RES files with uncertainties in CONFFINAL.RES format
+    os.makedirs('DATA_Processed', exist_ok=True)
+    write_final_res(full_res_even, 'DATA_Processed/FINALeven.RES')
+    write_final_res(full_res_odd, 'DATA_Processed/FINALodd.RES')
+
     return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
@@ -305,6 +310,44 @@ def convert_type(s): # detect and correct the 'type' of object to 'float', 'inte
     except ValueError:
         return s 
     
+def write_final_res(full_res, outfile):
+    '''
+    Write FINAL.RES file with an additional uncertainty column calculated between CI+all-order and CI+MBPT.
+    '''
+    ht_to_cm = 219474.63
+    energy0_au = full_res[0][3]
+
+    with open(outfile, 'w') as f:
+        header = f'{"n":>3s}  {"conf":>8s}   {"term":<4s}  {"E_n (a.u.)":>14s}  {"DEL (cm^-1)":>13s}  {"S":>4s}  {"L":>4s}  {"J":>4s}  {"gf":>5s}  {"conf%":>8s}  {"converged":>9s}  {"conf2":>8s}  {"conf2%":>7s}  uncertainty\n'
+        f.write(header)
+        for row in full_res:
+            idx = row[0]
+            conf = row[1].replace('.', ' ')
+            term = row[2].replace(',', '')
+            energy_au = row[3]
+            energy_cm = ht_to_cm * (energy0_au - energy_au)
+            s = row[5]
+            l = row[6]
+            j = row[7]
+            gf = row[8]
+            cntrb1 = row[9]
+            converged = row[10]
+            sec_conf = row[11].replace('.', ' ') if row[11] else ''
+            cntrb2 = row[12] if row[12] else ''
+            uncertainty = row[13] if len(row) > 13 else '-'
+
+            # Format gf
+            if gf == '-----' or gf == 0:
+                gf_str = '-----'
+            else:
+                gf_str = f'{float(gf):.3f}'
+
+            # Build line - always pad conf2/conf2% columns to fixed width
+            line = f'{idx:3d}  {conf:>8s}   {term:<4s}  {energy_au:14.8f}  {energy_cm:13.1f}  {float(s):.2f}  {float(l):.2f}  {float(j):.2f}  {gf_str:>5s}  {cntrb1:>8s}  {str(converged):>9s}  {sec_conf:>8s}  {cntrb2:>7s}  {uncertainty}'
+            f.write(line + '\n')
+
+    print(f'{outfile} has been written')
+
 def convert_res_to_csv(filename, full_res, gs_exists, name):
 
     f = open(filename, 'r')
@@ -742,7 +785,9 @@ def find_ci_dirs(ci_path):
     
     if even_dirs and odd_dirs:
         use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(ci_path + ' directory was found - use data from this directory? ')))))
-    
+    else:
+        use_path = None
+        
     if not use_path:
         return None, None, None, None
     
