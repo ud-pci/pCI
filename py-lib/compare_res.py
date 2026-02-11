@@ -84,66 +84,169 @@ def fix_skipped_config_levels(conf_res, confs_terms_old=None):
         if not levels:
             continue
 
-        # Get unique n values in sorted order
+        # === PASS 1: Gap detection and shifting ===
+        # Scan n-values for gaps (e.g., n=5,7 means n=6 is missing).
+        # A gap is confirmed when the level above the gap has sec_n == gap_n, indicating the CI results skipped a principal quantum number.
+        # Gaps must be fixed first so that cross-pair detection (next phase) sees a clean, sequential n-sequence.
         n_values = sorted(set(level['n'] for level in levels))
-
-        # Check for gaps where a level's secondary config fills it
-        skip_detected = False
-        skip_at_n = None
-
+        gaps = []
         for i in range(len(n_values) - 1):
             current_n = n_values[i]
             next_n = n_values[i + 1]
-
-            # If there's a gap (next_n > current_n + 1)
             if next_n > current_n + 1:
-                gap_n = current_n + 1  # The skipped n value
-
-                # Check if any level with next_n has secondary config at gap_n
+                gap_n = current_n + 1
                 for level_info in levels:
                     if level_info['n'] == next_n and level_info['sec_n'] == gap_n:
-                        skip_detected = True
-                        skip_at_n = gap_n
+                        gaps.append(gap_n)
                         break
 
-                if skip_detected:
-                    break
+        if gaps:
+            # Shift each level down by the number of gaps below it.
+            # e.g., with gap at n=6: n=7→6, n=8→7, n=9→8, etc.
+            for level_info in levels:
+                n = level_info['n']
+                shift = sum(1 for g in gaps if g < n)
+                if shift > 0:
+                    idx = level_info['idx']
+                    new_n = n - shift
+                    old_config = conf_res[idx][1]
+                    term_with_comma = conf_res[idx][2]
+                    new_config = inner_orbitals + '.' + str(new_n) + orbital_type
+                    # Keep original term (before any fixes) for E1.RES matching
+                    if confs_terms_old and idx < len(confs_terms_old):
+                        original_term = confs_terms_old[idx][1]
+                    else:
+                        original_term = term_with_comma
+                    energy = conf_res[idx][3]
+                    skipped_fixes.append([old_config, original_term, energy, new_config, original_term])
+                    old_sec = conf_res[idx][11]
+                    conf_res[idx][1] = new_config
+                    # If the old secondary matches the new primary (e.g., sec was 2s.8p and we just shifted Config1 to 2s.8p), swap to avoid Config1==Config2
+                    if old_sec == new_config:
+                        conf_res[idx][11] = old_config
+                    level_info['n'] = new_n
+                    level_info['config'] = new_config
 
-        if not skip_detected:
+            # Refresh sec_n/sec_config from conf_res after gap shifting, since secondary configs may have been swapped above
+            for level_info in levels:
+                idx = level_info['idx']
+                sec_config = conf_res[idx][11] if conf_res[idx][11] else ''
+                sec_n = None
+                if sec_config:
+                    sec_parts = sec_config.split('.')
+                    if len(sec_parts) >= 2:
+                        sec_inner = '.'.join(sec_parts[:-1])
+                        sec_outer = sec_parts[-1]
+                        sec_match = re.match(r'(\d+)([a-z])', sec_outer)
+                        if sec_match and sec_inner == inner_orbitals and sec_match.group(2) == orbital_type:
+                            sec_n = int(sec_match.group(1))
+                level_info['sec_n'] = sec_n
+                level_info['sec_config'] = sec_config
+
+            levels.sort(key=lambda x: x['n'])
+
+        # === Cross-pair swap detection ===
+        # After gaps are fixed, look for cross-pair patterns: a level at n, whose secondary is n-1, paired with a level at n-1 whose secondary is n. 
+        # This indicates ~50/50 configuration mixing where the CI results assigned the higher-n orbital as primary for both levels.
+        # Example: 3p(sec=4p) + 4p(sec=3p) → swap the 4p level to 3p.
+        n_to_levels = {}
+        for level in levels:
+            n = level['n']
+            if n not in n_to_levels:
+                n_to_levels[n] = []
+            n_to_levels[n].append(level)
+
+        # expected_count = typical number of levels per n (e.g., 4 for f-orbitals: 3F2,3F3,3F4,1F3)
+        n_counts = {n: len(lvls) for n, lvls in n_to_levels.items()}
+        count_values = list(n_counts.values())
+        expected_count = max(set(count_values), key=count_values.count)
+
+        for level in list(levels):
+            n = level['n']
+            sec_n = level['sec_n']
+            if sec_n is not None and sec_n == n - 1 and sec_n in n_to_levels:
+                # Safety: only swap if count(n-1) + count(n) == expected_count.
+                # This prevents false swaps for isolated levels that happen to
+                # have sec_n == n-1 but aren't part of a true cross-pair.
+                if n_counts.get(sec_n, 0) + n_counts.get(n, 0) != expected_count:
+                    continue
+                # Confirm cross-pair: there must be a partner at n-1 with sec_n == n
+                if any(other['sec_n'] == n for other in n_to_levels[sec_n]):
+                    # Swap primary ↔ secondary config for this level
+                    idx = level['idx']
+                    old_config = conf_res[idx][1]
+                    new_config = conf_res[idx][11]
+                    if confs_terms_old and idx < len(confs_terms_old):
+                        original_term = confs_terms_old[idx][1]
+                    else:
+                        original_term = conf_res[idx][2]
+                    energy = conf_res[idx][3]
+                    skipped_fixes.append([old_config, original_term, energy, new_config, original_term])
+                    conf_res[idx][1] = new_config
+                    conf_res[idx][11] = old_config
+                    # Update bookkeeping: move this level from n to sec_n
+                    old_n = n
+                    level['n'] = sec_n
+                    level['config'] = new_config
+                    level['sec_n'] = old_n
+                    level['sec_config'] = old_config
+                    n_to_levels[old_n].remove(level)
+                    n_to_levels.setdefault(sec_n, []).append(level)
+                    n_counts[sec_n] = n_counts.get(sec_n, 0) + 1
+                    n_counts[old_n] -= 1
+
+        # Track n-values emptied by cross-pair swaps (count dropped to 0).
+        # These are confirmed gaps that don't need sec_n verification in Pass 2.
+        swap_emptied_n = {n for n, count in n_counts.items() if count == 0}
+
+        levels.sort(key=lambda x: x['n'])
+
+        # === PASS 2: Gap detection after cross-pair swaps ===
+        # Cross-pair swaps can create new gaps. Example:
+        #   Before swap: n=3(1 level), n=4(1 level) -> swap moves n=4 to n=3
+        #   After swap:  n=3(2 levels), n=5(next) -> gap at n=4
+        # This pass runs the same gap-detection-and-shift logic as Pass 1.
+        # Gaps created by cross-pair swaps (swap_emptied_n) are auto-confirmed;
+        # other gaps still require sec_n confirmation from the level above.
+        n_values = sorted(set(level['n'] for level in levels))
+        gaps = []
+        for i in range(len(n_values) - 1):
+            current_n = n_values[i]
+            next_n = n_values[i + 1]
+            if next_n > current_n + 1:
+                gap_n = current_n + 1
+                if gap_n in swap_emptied_n:
+                    gaps.append(gap_n)
+                else:
+                    for level_info in levels:
+                        if level_info['n'] == next_n and level_info['sec_n'] == gap_n:
+                            gaps.append(gap_n)
+                            break
+
+        if not gaps:
             continue
 
-        # Calculate how much to shift each level
-        # All levels with n > skip_at_n should be decremented by 1
         for level_info in levels:
-            if level_info['n'] > skip_at_n:
+            n = level_info['n']
+            shift = sum(1 for g in gaps if g < n)
+            if shift > 0:
                 idx = level_info['idx']
-                old_n = level_info['n']
-                new_n = old_n - 1
+                new_n = n - shift
                 old_config = conf_res[idx][1]
                 term_with_comma = conf_res[idx][2]
                 new_config = inner_orbitals + '.' + str(new_n) + orbital_type
-
-                # Use original term for matrix element matching (E1.RES has original terms)
                 if confs_terms_old and idx < len(confs_terms_old):
-                    original_term = confs_terms_old[idx][1]  # Original term before fixes
+                    original_term = confs_terms_old[idx][1]
                 else:
                     original_term = term_with_comma
-
-                # Get energy for exact matching
                 energy = conf_res[idx][3]
-
-                # Add to fixes list for matrix element correction
-                # Format: [old_conf, old_term, energy, new_conf, new_term]
-                # old_term uses original term to match E1.RES, new_term also uses original since term doesn't change
                 skipped_fixes.append([old_config, original_term, energy, new_config, original_term])
-
-                # Update the configuration
                 old_sec = conf_res[idx][11]
                 conf_res[idx][1] = new_config
-
-                # If the old secondary matches the new primary, swap
                 if old_sec == new_config:
                     conf_res[idx][11] = old_config
+                level_info['n'] = new_n
+                level_info['config'] = new_config
 
     return conf_res, skipped_fixes
 
@@ -245,55 +348,95 @@ def parse_final_res(filename):
         level[2] = new_term
         i += 1
 
-    # Check for duplicates
+    # Check for duplicate (config, term) pairs and resolve them.
+    # Two resolution strategies are tried in order:
+    #   1. Term relabeling: split multiplicity using floor(S)/ceil(S) when the two duplicates have different spin character (e.g., S~0 vs S~1).
+    #   2. Config swap: promote secondary config to primary for one of the levels.
     confs_terms = [[level[1],level[2]] for level in conf_res]
     for ilvl in range(1, len(confs_terms)):
         if confs_terms[ilvl] in confs_terms[:ilvl]:
             existing_ilvl = confs_terms[:ilvl].index(confs_terms[ilvl])
 
-            # Check duplicates of term
             old_term = conf_res[ilvl][2]
             s = conf_res[ilvl][5]
             existing_s = conf_res[existing_ilvl][5]
-            if s > existing_s:
-                new_term_existing = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
-                new_term_current = str(round(2*math.ceil(float(s))+1)) + conf_res[ilvl][2][1:]
-                conf_res[existing_ilvl][2] = new_term_existing
-                conf_res[ilvl][2] = new_term_current
-            else:
-                new_term_existing = str(round(2*math.ceil(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
-                new_term_current = str(round(2*math.floor(float(s))+1)) + conf_res[ilvl][2][1:]
-                conf_res[existing_ilvl][2] = new_term_existing
-                conf_res[ilvl][2] = new_term_current
+            # Guard: if both S values are near zero (both singlets), floor/ceil would produce a nonsensical triplet label. Skip term relabeling.
+            same_multiplicity = max(s, existing_s) < 0.3
+            term_changed = False
 
-            # Print warning about duplicates to alert user to check results
-            print(f'WARNING: DUPLICATE {confs_terms[ilvl][0]} {confs_terms[ilvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
-            print(f'  Level {existing_ilvl+1}: S={existing_s:.2f} -> {new_term_existing.replace(",","")}')
-            print(f'  Level {ilvl+1}: S={s:.2f} -> {new_term_current.replace(",","")}')
-            print(f'  Please verify these levels in the original calculation.')
-                
-            # If term remains same, check duplicates of configuration
-            if conf_res[existing_ilvl][2] == confs_terms[ilvl][1]:
-                if conf_res[existing_ilvl][11] and conf_res[existing_ilvl][1] == confs_terms[ilvl][0]:
-                    # Check secondary config already in list
-                    if [conf_res[existing_ilvl][11], conf_res[existing_ilvl][2]] not in confs_terms[:ilvl]:
-                        main_conf = conf_res[existing_ilvl][1]
-                        new_conf = conf_res[existing_ilvl][11]
-                        conf_res[existing_ilvl][1] = new_conf
-                        conf_res[existing_ilvl][11] = main_conf
-                        # Generate fix for E1.RES: change primary to secondary config
-                        # Format: [old_conf, old_term, energy, new_conf, new_term]
-                        # Use original term (from confs_terms_old) for matching E1.RES
-                        original_term = confs_terms_old[existing_ilvl][1] if existing_ilvl < len(confs_terms_old) else conf_res[existing_ilvl][2]
-                        fixes.append([main_conf, original_term, conf_res[existing_ilvl][3], new_conf, original_term])
+            # Only relabel terms if the two S values indicate different multiplicities
+            if not same_multiplicity:
+                if s > existing_s:
+                    new_term_existing = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                    new_term_current = str(round(2*math.ceil(float(s))+1)) + conf_res[ilvl][2][1:]
+                    conf_res[existing_ilvl][2] = new_term_existing
+                    conf_res[ilvl][2] = new_term_current
+                else:
+                    new_term_existing = str(round(2*math.ceil(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
+                    new_term_current = str(round(2*math.floor(float(s))+1)) + conf_res[ilvl][2][1:]
+                    conf_res[existing_ilvl][2] = new_term_existing
+                    conf_res[ilvl][2] = new_term_current
+                term_changed = conf_res[ilvl][2] != conf_res[existing_ilvl][2]
+
+                print(f'WARNING: DUPLICATE {confs_terms[ilvl][0]} {confs_terms[ilvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
+                print(f'  Level {existing_ilvl+1}: S={existing_s:.2f} -> {new_term_existing.replace(",","")}')
+                print(f'  Level {ilvl+1}: S={s:.2f} -> {new_term_current.replace(",","")}')
+                print(f'  Please verify these levels in the original calculation.')
+
+            # If term relabeling didn't resolve the duplicate (either because it was skipped for same_multiplicity, or because floor/ceil gave the same result), try resolving by swapping primary <-> secondary config.
+            if not term_changed:
+                swapped = False
+
+                def _sec_has_lower_n(primary, secondary):
+                    """Check if secondary config has a lower principal quantum number than primary for the outer orbital."""
+                    p_parts = primary.split('.')
+                    s_parts = secondary.split('.')
+                    if len(p_parts) < 2 or len(s_parts) < 2:
+                        return False
+                    p_match = re.match(r'(\d+)([a-z])', p_parts[-1])
+                    s_match = re.match(r'(\d+)([a-z])', s_parts[-1])
+                    if p_match and s_match and p_match.group(2) == s_match.group(2):
+                        return int(s_match.group(1)) < int(p_match.group(1))
+                    return False
+
+                # Decide which level to swap first:
+                # - If both share the same secondary config, swap the later (higher-energy) level to preserve the lower-energy level's primary config for NIST matching.
+                # - Otherwise try the earlier level first (original behavior).
+                same_secondary = conf_res[ilvl][11] == conf_res[existing_ilvl][11]
+                first_lvl = ilvl if same_secondary else existing_ilvl
+                second_lvl = existing_ilvl if same_secondary else ilvl
+
+                for swap_lvl in [first_lvl, second_lvl]:
+                    if swapped:
+                        break
+                    if conf_res[swap_lvl][11] and conf_res[swap_lvl][1] == confs_terms[ilvl][0]:
+                        # Block swaps that would give the later level a lower-n config, which would conflict with fix_skipped_config_levels' gap filling
+                        if swap_lvl != ilvl or not _sec_has_lower_n(conf_res[swap_lvl][1], conf_res[swap_lvl][11]):
+                            # Only swap if the new (config, term) doesn't already exist
+                            new_entry = [conf_res[swap_lvl][11], conf_res[swap_lvl][2]]
+                            if new_entry not in confs_terms[:ilvl] and new_entry != confs_terms[ilvl]:
+                                main_conf = conf_res[swap_lvl][1]
+                                new_conf = conf_res[swap_lvl][11]
+                                conf_res[swap_lvl][1] = new_conf
+                                conf_res[swap_lvl][11] = main_conf
+                                confs_terms[swap_lvl][0] = new_conf
+                                original_term = confs_terms_old[swap_lvl][1] if swap_lvl < len(confs_terms_old) else conf_res[swap_lvl][2]
+                                fixes.append([main_conf, original_term, conf_res[swap_lvl][3], new_conf, original_term])
+                                swapped = True
+                                other_lvl = existing_ilvl if swap_lvl == ilvl else ilvl
+                                print(f'WARNING: DUPLICATE {confs_terms[other_lvl][0]} {confs_terms[other_lvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
+                                print(f'  Level {swap_lvl+1}: config swapped {main_conf} -> {new_conf}')
+                if not swapped and same_multiplicity:
+                    print(f'WARNING: DUPLICATE {confs_terms[ilvl][0]} {confs_terms[ilvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
+                    print(f'  Both levels have S≈{s:.2f} (same multiplicity) — no term relabeling applied')
+                    print(f'  Could not resolve by config swap. Please verify these levels.')
 
             # Check if there's currently a list of fixes, update the one for existing_ilvl
             if fixes:
-                # Match by energy to find the correct fix for the existing level
                 existing_energy = conf_res[existing_ilvl][3]
                 for fix in fixes:
-                    if fix[2] == existing_energy:  # Match by energy
-                        fix[4] = conf_res[existing_ilvl][2]  # Update new_term
+                    if fix[2] == existing_energy:
+                        fix[4] = conf_res[existing_ilvl][2]
 
     # Fix skipped configuration levels (e.g., 5g, 7g -> 5g, 6g when 6g is secondary)
     # Pass original terms so fixes can match against matrix element file (which has original terms)
@@ -535,9 +678,10 @@ def cmp_matrix_res(res1, res2, swaps, fixes, energy_to_level=None, mbpt_energy_t
 
 def cmp_res(res1, res2):
     conf_res1, fixes1 = parse_final_res(res1)
-    second_order_exists = True
+    
     try:
         conf_res2, fixes2 = parse_final_res(res2)
+        second_order_exists = True
     except:
         second_order_exists = False
     

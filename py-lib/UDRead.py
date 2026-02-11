@@ -516,6 +516,15 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
         if jf==1:
             config = config1_ao
             new_config[j] = config
+            # Update n-tracking in Correct_Config so that subsequent unmatched
+            # levels see the correct n_prev for gap detection. Without this,
+            # jf==1 levels are invisible to the tracker and later levels
+            # over-correct (e.g., 4s.6p corrects to 4s.5p when 4s.5p already
+            # exists as a jf==1 match).
+            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
+            # Restore original config — Correct_Config may have shifted n,
+            # but new_config must keep the original for FindJthAll matching.
+            new_config[j] = config
         elif jf==0 or jf==2:
             config = config1_ao
             new_config_check = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=False)
@@ -532,15 +541,16 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
 
         # Check if (config, term, J) combination is already assigned
-        # If so, revert to original configuration to avoid duplicates
-        state_key = (new_config[j], term_ao, j_ao)
-        if state_key in assigned_states:
-            print(f"Duplicate state detected: {new_config[j]} {term_ao} {j_ao}, keeping original: {config}")
-            new_config[j] = config
-            state_key = (config, term_ao, j_ao)
-
-        # Add this state to the set of assigned states
-        assigned_states.add(state_key)
+        # If so, revert to original configuration to avoid duplicates.
+        # Skip for jf==1: matched levels use NIST config in the output,
+        # so their theory config doesn't occupy a slot in the corrected namespace.
+        if jf != 1:
+            state_key = (new_config[j], term_ao, j_ao)
+            if state_key in assigned_states:
+                print(f"Duplicate state detected: {new_config[j]} {term_ao} {j_ao}, keeping original: {config}")
+                new_config[j] = config
+                state_key = (config, term_ao, j_ao)
+            assigned_states.add(state_key)
 
     print("Correcting ud configurations : Complete..!")
     return new_config
@@ -635,36 +645,41 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
 
     print("Finding Correspondance")
 
-    # Build all possible (NIST, theory) matches with their scores
+    # Build all possible (NIST, theory) match candidates.
+    # Each candidate is a tuple: (nist_idx, theory_idx, match_type, energy_perc, nist_level)
+    #   match_type=1: matched via Config1 (primary configuration)
+    #   match_type=2: matched via Config2 (secondary configuration)
     all_matches = []
     for i in range(len(df_nist)):
         j1,j2,Eperc1,Eperc2 = FindJthAll(i,df_nist,df_ud,corr_config=new_config)
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
 
-        # Add primary matches (prefer these)
         for idx, j in enumerate(j1):
-            all_matches.append((i, j, 1, Eperc1[idx], level_nist))  # (nist_idx, theory_idx, match_type, energy_perc, nist_level)
+            all_matches.append((i, j, 1, Eperc1[idx], level_nist))
 
-        # Add secondary matches
         for idx, j in enumerate(j2):
             all_matches.append((i, j, 2, Eperc2[idx], level_nist))
 
-    # Sort by: 
-    # 1. energy percentage difference, 
-    # 2. match type (primary first as tiebreaker)
-    all_matches.sort(key=lambda x: (x[3], x[2]))  # Sort by energy_perc first, then match_type
+    # Greedy assignment: sort candidates by effective energy score, then assign
+    # each (NIST, theory) pair in order, skipping already-used levels.
+    #
+    # Config2 matches get an additive penalty (2%) so that Config1 is preferred
+    # for typical well-matched levels (ΔE < 2%). Config2 can still win for
+    # strongly-mixed states where Config1 has very poor energy agreement (ΔE >> 2%),
+    # e.g., Ga2 4p2/4s.4d 1D2 where Config1 gives ~15% error but Config2 gives ~0.2%.
+    config2_penalty = 2.0
+    all_matches.sort(key=lambda x: (x[3] + config2_penalty * (x[2] - 1), x[2]))
 
-    # Assign matches greedily from sorted list
     for nist_idx, theory_idx, match_type, energy_perc, _ in all_matches:
-        # Skip if either NIST or theory level already assigned
         if nist_idx in nist_used_dict or theory_idx in ao_used:
             continue
-
-        # Make the assignment
         nist_used_dict[nist_idx] = (theory_idx, match_type, energy_perc)
         ao_used.append(theory_idx)
 
     # Now build the output data_csv using the assignments
+    # Track matched NIST (config, term, J) to prevent unmatched levels from
+    # using a corrected config that conflicts with a matched NIST level.
+    matched_nist_states = set()
     for i in range(len(df_nist)):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
@@ -672,6 +687,7 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
         data_nist = [config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist]
 
         if i in nist_used_dict:
+            matched_nist_states.add((config_nist, term_org, j_nist))
             jth, jf, de = nist_used_dict[i]
             config1_ao, config2_ao, term_ao, j_ao, level_ao,level_au, per1,per2,uncer_ud = Data_UD(jth,df_ud)
             final_config = config2_ao if jf==2 else config1_ao # final config
@@ -692,7 +708,15 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
         term_ao=Unmark_Term(term_ao)
         if config2_ao=='': config2_ao='-'
         if (j in ao_used)==False:
-            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",config1_ao,config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
+            # Use corrected config for unmatched levels, unless it would
+            # conflict with a NIST config already matched to a different level.
+            # E.g., Sc2 3d.5s corrects to 3d.4s, but 3d.4s is the ground state.
+            final_cfg = config1_ao
+            if new_config is not None and new_config[j] != config1_ao:
+                corrected_state = (new_config[j], Unmark_Term(term_ao), j_ao)
+                if corrected_state not in matched_nist_states:
+                    final_cfg = new_config[j]
+            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",final_cfg,config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
 
 
     header = [" Config","  Term","  J","  Level (cm⁻¹)","Uncertainty (cm-1)","Final Config","  Config1","  Config2","  Term","  J","  Level (cm⁻¹)","  Uncertainty (cm⁻¹)","  Level (au)","    \u0394E","    \u0394E%","  I","  II"]
