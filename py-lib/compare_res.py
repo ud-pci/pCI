@@ -349,9 +349,10 @@ def parse_final_res(filename):
         i += 1
 
     # Check for duplicate (config, term) pairs and resolve them.
-    # Two resolution strategies are tried in order:
-    #   1. Term relabeling: split multiplicity using floor(S)/ceil(S) when the two duplicates have different spin character (e.g., S~0 vs S~1).
-    #   2. Config swap: promote secondary config to primary for one of the levels.
+    # Three resolution strategies are tried in order:
+    #   1. S-based term relabeling: split multiplicity using floor(S)/ceil(S) when the two duplicates have different spin character (e.g., S~0 vs S~1).
+    #   2. L-value relabeling: when one level has an ambiguous L (far from the term's integer L), relabel it using the nearest alternative L letter.
+    #   3. Config swap: promote secondary config to primary for one of the levels.
     confs_terms = [[level[1],level[2]] for level in conf_res]
     for ilvl in range(1, len(confs_terms)):
         if confs_terms[ilvl] in confs_terms[:ilvl]:
@@ -360,11 +361,15 @@ def parse_final_res(filename):
             old_term = conf_res[ilvl][2]
             s = conf_res[ilvl][5]
             existing_s = conf_res[existing_ilvl][5]
-            # Guard: if both S values are near zero (both singlets), floor/ceil would produce a nonsensical triplet label. Skip term relabeling.
-            same_multiplicity = max(s, existing_s) < 0.3
+            # Guard: skip S-based term relabeling when both levels share the same multiplicity.
+            # Both singlets (max S < 0.3): floor/ceil would incorrectly promote one to triplet.
+            # Both triplets (min S > 0.7): floor would incorrectly demote one to singlet.
+            # e.g., Y2 4d.5d 3F3 with S=0.90 and S=1.00 are both triplet — splitting by S would wrongly produce 1F3 for the S=0.90 level.
+            same_multiplicity = max(s, existing_s) < 0.3 or min(s, existing_s) > 0.7
             term_changed = False
 
-            # Only relabel terms if the two S values indicate different multiplicities
+            # Strategy 1: S-based term relabeling.
+            # Split multiplicity using floor(S)/ceil(S) when the two duplicates have different spin character.
             if not same_multiplicity:
                 if s > existing_s:
                     new_term_existing = str(round(2*math.floor(float(existing_s))+1)) + conf_res[existing_ilvl][2][1:]
@@ -383,7 +388,55 @@ def parse_final_res(filename):
                 print(f'  Level {ilvl+1}: S={s:.2f} -> {new_term_current.replace(",","")}')
                 print(f'  Please verify these levels in the original calculation.')
 
-            # If term relabeling didn't resolve the duplicate (either because it was skipped for same_multiplicity, or because floor/ceil gave the same result), try resolving by swapping primary <-> secondary config.
+            # Strategy 2: L-value relabeling when S-based relabeling didn't resolve the duplicate.
+            # If one level has an ambiguous L value (far from the term's integer L), relabel it
+            # using the nearest alternative L letter.
+            if not term_changed:
+                l_current = conf_res[ilvl][6]
+                l_existing = conf_res[existing_ilvl][6]
+                # The current term letter's integer L value
+                term_letter_current = conf_res[ilvl][2][1]  # e.g., 'F' from '3F,3'
+                term_letter_existing = conf_res[existing_ilvl][2][1]
+                term_L_current = Ls.index(term_letter_current) if term_letter_current in Ls else -1
+                term_L_existing = Ls.index(term_letter_existing) if term_letter_existing in Ls else -1
+
+                dist_current = abs(l_current - term_L_current) if term_L_current >= 0 else 0
+                dist_existing = abs(l_existing - term_L_existing) if term_L_existing >= 0 else 0
+
+                # Target the level with higher distance from its term's L
+                if max(dist_current, dist_existing) > 0.3:
+                    if dist_existing >= dist_current:
+                        target_lvl = existing_ilvl
+                        target_l = l_existing
+                        target_term_L = term_L_existing
+                    else:
+                        target_lvl = ilvl
+                        target_l = l_current
+                        target_term_L = term_L_current
+
+                    # Compute alternative L: prefer floor, fall back to ceil if floor equals current
+                    alt_L_int = math.floor(target_l) if math.floor(target_l) != target_term_L else math.ceil(target_l)
+
+                    if 0 <= alt_L_int < len(Ls):
+                        old_term_target = conf_res[target_lvl][2]
+                        new_term_target = old_term_target[0] + Ls[alt_L_int] + old_term_target[2:]
+                        new_conf_term = [conf_res[target_lvl][1], new_term_target]
+
+                        if new_conf_term not in confs_terms:
+                            conf_res[target_lvl][2] = new_term_target
+                            confs_terms[target_lvl] = new_conf_term
+                            original_term = confs_terms_old[target_lvl][1]
+                            fixes.append([conf_res[target_lvl][1], original_term, conf_res[target_lvl][3], conf_res[target_lvl][1], new_term_target])
+                            term_changed = True
+
+                            other_lvl = existing_ilvl if target_lvl == ilvl else ilvl
+                            print(f'WARNING: DUPLICATE {confs_terms[other_lvl][0]} {confs_terms[other_lvl][1].replace(",","")} found at levels {existing_ilvl+1} and {ilvl+1}')
+                            print(f'  Level {target_lvl+1}: L={target_l:.2f} -> {new_term_target.replace(",","")} (L-value relabeling)')
+                            print(f'  Please verify these levels in the original calculation.')
+
+            # Strategy 3: Config swap.
+            # Promote secondary config to primary for one of the levels.
+            # Tried when term relabeling (strategies 1 & 2) didn't resolve the duplicate.
             if not term_changed:
                 swapped = False
 
