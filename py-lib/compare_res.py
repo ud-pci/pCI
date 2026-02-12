@@ -7,6 +7,13 @@ import sys
 This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt results
 '''
 
+# Orbital angular momentum labels
+ORBITAL_LABELS_LOWER = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
+ORBITAL_LABELS_UPPER = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
+
+# Hartree to cm^-1 conversion factor
+HARTREE_TO_CM = 219474.63
+
 def fix_skipped_config_levels(conf_res, confs_terms_old=None):
     """
     Fix configuration labels when theory skips a principal quantum number.
@@ -262,27 +269,23 @@ def parse_final_res(filename):
     print('========== PARSING', filename,'==========')
     conf_res = []
 
-    ls = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
-    Ls = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
-    
     # Get 1st energy level
-    ht_to_cm = 219474.63
     energy0_au = float([num for num in lines[1].split('  ') if '.' in num][0])
-    
+
     for line in lines[1:]:
         index = int(re.findall(r"\d+",line)[0])
-        confs = [conf for conf in line.split('  ') if any(l in conf for l in ls)]
+        confs = [conf for conf in line.split('  ') if any(l in conf for l in ORBITAL_LABELS_LOWER)]
         confs = [conf.strip() for conf in confs]
         confs = [conf.replace(' ', '.') for conf in confs]
-        
-        terms = [term for term in line.split('  ') if any(L in term for L in Ls)]
+
+        terms = [term for term in line.split('  ') if any(L in term for L in ORBITAL_LABELS_UPPER)]
         nums = [num for num in line.split('  ') if '.' in num]
 
         main_conf = confs[0]
         term = terms[0].replace(' ', '')
         
         energies_au = float(nums[0])
-        energies_cm = ht_to_cm*(energy0_au-energies_au)
+        energies_cm = HARTREE_TO_CM*(energy0_au-energies_au)
         
         s = float(nums[2])
         l = float(nums[3])
@@ -397,8 +400,8 @@ def parse_final_res(filename):
                 # The current term letter's integer L value
                 term_letter_current = conf_res[ilvl][2][1]  # e.g., 'F' from '3F,3'
                 term_letter_existing = conf_res[existing_ilvl][2][1]
-                term_L_current = Ls.index(term_letter_current) if term_letter_current in Ls else -1
-                term_L_existing = Ls.index(term_letter_existing) if term_letter_existing in Ls else -1
+                term_L_current = ORBITAL_LABELS_UPPER.index(term_letter_current) if term_letter_current in ORBITAL_LABELS_UPPER else -1
+                term_L_existing = ORBITAL_LABELS_UPPER.index(term_letter_existing) if term_letter_existing in ORBITAL_LABELS_UPPER else -1
 
                 dist_current = abs(l_current - term_L_current) if term_L_current >= 0 else 0
                 dist_existing = abs(l_existing - term_L_existing) if term_L_existing >= 0 else 0
@@ -417,9 +420,9 @@ def parse_final_res(filename):
                     # Compute alternative L: prefer floor, fall back to ceil if floor equals current
                     alt_L_int = math.floor(target_l) if math.floor(target_l) != target_term_L else math.ceil(target_l)
 
-                    if 0 <= alt_L_int < len(Ls):
+                    if 0 <= alt_L_int < len(ORBITAL_LABELS_UPPER):
                         old_term_target = conf_res[target_lvl][2]
-                        new_term_target = old_term_target[0] + Ls[alt_L_int] + old_term_target[2:]
+                        new_term_target = old_term_target[0] + ORBITAL_LABELS_UPPER[alt_L_int] + old_term_target[2:]
                         new_conf_term = [conf_res[target_lvl][1], new_term_target]
 
                         if new_conf_term not in confs_terms:
@@ -883,7 +886,6 @@ def add_uncertainties(combined_conf_res):
     return combined_conf_res
 
 def merge_res(res_even, res_odd, second_order_exists):
-    ht_to_cm = 219474.63 # hartree to cm-1
     gs_parity = ''
     merged_res = []
     energy_cm1_shifted2 = '-'
@@ -893,9 +895,9 @@ def merge_res(res_even, res_odd, second_order_exists):
         gs_parity = 'even'
         merged_res = res_even
         for conf in res_odd:
-            energy_cm2_shifted = round((res_even[0][2]-conf[2])*ht_to_cm, 2)
-            if second_order_exists: 
-                energy_cm2_shifted2 = round((res_even[0][4]-conf[4])*ht_to_cm, 2)
+            energy_cm2_shifted = round((res_even[0][2]-conf[2])*HARTREE_TO_CM, 2)
+            if second_order_exists:
+                energy_cm2_shifted2 = round((res_even[0][4]-conf[4])*HARTREE_TO_CM, 2)
                 uncertainty = round(abs(energy_cm2_shifted2-energy_cm2_shifted))
             if conf[4] == 0:
                 merged_res.append([conf[0],conf[1],conf[2],energy_cm2_shifted,conf[4],0,0])
@@ -905,9 +907,9 @@ def merge_res(res_even, res_odd, second_order_exists):
         gs_parity = 'odd'
         merged_res = res_odd
         for conf in res_even:
-            energy_cm1_shifted = round((res_odd[0][2]-conf[2])*ht_to_cm, 2)
+            energy_cm1_shifted = round((res_odd[0][2]-conf[2])*HARTREE_TO_CM, 2)
             if second_order_exists:
-                energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*ht_to_cm, 2)
+                energy_cm1_shifted2 = round((res_odd[0][4]-conf[4])*HARTREE_TO_CM, 2)
                 uncertainty = round(abs(energy_cm1_shifted2-energy_cm1_shifted))
             if conf[4] == 0:
                 merged_res.append([conf[0],conf[1],conf[2],energy_cm1_shifted,conf[4],0,0])
