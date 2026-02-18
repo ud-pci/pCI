@@ -1225,7 +1225,7 @@ if __name__ == "__main__":
     print(f'  Even parity: {len(even_mapping)} -> {len(filtered_even)} (excluded {excluded_even})')
     print(f'  Odd parity: {len(odd_mapping)} -> {len(filtered_odd)} (excluded {excluded_odd})')
 
-    # Filter out states with 'g' in configuration or 'G' in term if ignore_g is True
+    # Filter out states with 'g' in configuration if ignore_g is True
     if ignore_g:
         before_g_filter = len(filtered_mapping)
         filtered_mapping_no_g = []
@@ -1237,12 +1237,12 @@ if __name__ == "__main__":
             theory_term = level[1][1]
 
             # Skip if 'g' in any configuration or 'G' in any term
-            if 'g' in nist_config or 'g' in theory_config or 'G' in nist_term or 'G' in theory_term:
+            if 'g' in nist_config or 'g' in theory_config:
                 continue
             filtered_mapping_no_g.append(level)
 
         filtered_mapping = filtered_mapping_no_g
-        print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g/G (ignore_g=True)')
+        print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g orbital (ignore_g=True)')
         print(f'Final mapping has {len(filtered_mapping)} levels')
 
     # Generate mapping-based fixes: when theory_config differs from corrected_config
