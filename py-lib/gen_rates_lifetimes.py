@@ -596,6 +596,7 @@ def add_display_formats(atom_name):
     tr_file        = f"{atom_name}_Transition_Rates.csv"
     props_file     = f"{atom_name}_Transition_Properties.csv"
     lifetimes_file = f"{atom_name}_Lifetimes.csv"
+    lifetimes_exp  = f"{atom_name}_Lifetimes_Exp.csv"
     energies_file  = f"{atom_name}_Energies.csv"
     tr_check_out   = f"{atom_name}_Transition_Rates_Error_Check.csv"
     lifetimes_out  = f"{atom_name}_Lifetimes_Error_Check.csv"
@@ -744,7 +745,25 @@ def add_display_formats(atom_name):
     print(f"Reading {lifetimes_file}...")
     lifetimes_df = pd.read_csv(lifetimes_file)
 
+    # Load experimental lifetimes if the file exists
+    exp_lifetime_lookup = {}   # (conf, term, J) -> {'lifetime_display': ..., 'lifetime_ref': ...}
+    if os.path.exists(lifetimes_exp):
+        print(f"Reading {lifetimes_exp}...")
+        lifetimes_exp_df = pd.read_csv(lifetimes_exp)
+        for _, erow in lifetimes_exp_df.iterrows():
+            key = (str(erow['state_configuration']).strip(),
+                   str(erow['state_term']).strip(),
+                   str(erow['state_J']).strip())
+            exp_lifetime_lookup[key] = {
+                'lifetime_display': str(erow['lifetime_display']),
+                'lifetime_ref': str(erow['lifetime_ref']) if pd.notna(erow['lifetime_ref']) else ''
+            }
+        print(f"  {len(exp_lifetime_lookup)} experimental lifetimes loaded")
+    else:
+        print(f"  {lifetimes_exp} not found, using theory lifetimes only")
+
     lt_disp = []
+    lt_refs = []
 
     for _, row in lifetimes_df.iterrows():
         upper = (str(row['state_configuration']).strip(),
@@ -753,19 +772,25 @@ def add_display_formats(atom_name):
 
         lt_ns = float(row['lifetime'])
 
-        if upper in upper_trans:
+        if upper in exp_lifetime_lookup:
+            exp = exp_lifetime_lookup[upper]
+            lt_disp.append(exp['lifetime_display'])
+            lt_refs.append(exp['lifetime_ref'])
+        elif upper in upper_trans:
             rate_uncs      = [u for _, u in upper_trans[upper]]
             total_rate_unc = math.sqrt(sum(u ** 2 for u in rate_uncs))
             lt_unc         = (lt_ns ** 2 / 1e9) * total_rate_unc
             lt_disp.append(format_lifetime(lt_ns, lt_unc))
+            lt_refs.append('')
         else:
             print(f"  Warning: no transition data for lifetime state {upper}, keeping old value")
             lt_disp.append(str(lt_ns))
+            lt_refs.append('')
 
     lt_check_df = lifetimes_df.copy()
     lt_check_df['lifetime_display'] = lt_disp
     lt_check_df = lt_check_df.drop(columns=['lifetime', 'lifetime_uncertainty'])
-    lt_check_df['lifetime_ref'] = ''
+    lt_check_df['lifetime_ref'] = lt_refs
     lt_check_df.to_csv(lifetimes_out, index=False)
     print(f"{lifetimes_out} written with {len(lt_check_df)} states")
 
@@ -779,10 +804,12 @@ def main():
         print("\nThis script expects the following files to exist:")
         print("  - {atom_name}_Energies.csv")
         print("  - {atom_name}_Matrix_Elements_Theory.csv")
+        print("\nOptionally, to replace theory lifetimes with experimental values:")
+        print("  - {atom_name}_Lifetimes_Exp.csv")
         print("\nIt will generate:")
-        print("  - {atom_name}_Transition_Rates.csv              (Step 1)")
-        print("  - {atom_name}_Transition_Properties.csv         (Step 2)")
-        print("  - {atom_name}_Lifetimes.csv                     (Step 2)")
+        print("  - {atom_name}_Transition_Rates.csv          (Step 1)")
+        print("  - {atom_name}_Transition_Properties.csv     (Step 2)")
+        print("  - {atom_name}_Lifetimes.csv                 (Step 2)")
         print("  - {atom_name}_Transition_Rates_Error_Check.csv  (Step 3)")
         print("  - {atom_name}_Lifetimes_Error_Check.csv         (Step 3)")
         print("  - transitions.txt")
