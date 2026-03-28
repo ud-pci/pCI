@@ -545,8 +545,7 @@ Contains
         P(19)=Hcore
         Call WriteF(12,1,P,Q,2)
         strfmt='(/4X,"one-el. and total core energy:",F17.7,4X,F17.7, &
-              /6X "including Breit core energy:",F17.7)'
-        ! strfmt='(/4X,"one-el., Coulomb & Breit core energy:",F17.7,2(4X,F17.7))'
+              /6X, "including Breit core energy:",F17.7)'
         Write( *,strfmt) Hcore,Ecore,Ebcore
         Write(11,strfmt) Hcore,Ecore,Ebcore
 
