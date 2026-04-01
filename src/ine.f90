@@ -344,10 +344,9 @@ Contains
         Read (*,*) N2
         Write(*,'(A,I2)')' N2=',N2
 
-        Read (*,*) nrange
-
         W0= 0.d0
-        If (Kli.EQ.2 .AND. Klf.EQ.2 .OR. Kli.EQ.5) Then
+        If ((Kli.EQ.2 .AND. (Klf.EQ.2 .OR. Klf.EQ.4)) .OR. Kli.EQ.5) Then
+            Read (*,*) nrange
             allocate(xlamb1s(nrange),xlamb2s(nrange),xlambsteps(nrange))
             Write(*,'(A)')' Give a list of ranges of wavelengths (nm) followed by step size (e.g. 535 537 0.5):'
             Write(*,'(A)')' (for static polarizability give 0 0 0)'
@@ -355,6 +354,12 @@ Contains
                 Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
                 Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
             End Do
+        Else
+            nrange = 1
+            allocate(xlamb1s(1),xlamb2s(1),xlambsteps(1))
+            xlamb1s(1) = 0.d0
+            xlamb2s(1) = 0.d0
+            xlambsteps(1) = 0.d0
         End If
 
         If (Kli.EQ.5 .AND. W0.EQ.0.d0) Then
@@ -635,6 +640,7 @@ Contains
         Close(16)
 
         Tj0=Anint(Tj0*100.0)/100.0
+        Tj2=Anint(Tj2*100.0)/100.0
 
         Open(unit=18,file='CONF0.JJJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat == 0) Then
@@ -1416,7 +1422,6 @@ Contains
         ds=dabs(sum/sn-1.d0)
         if (ds.GT.trsd) then
            write (*,*) ' Prj warning: normalization has changed by',ds
-           read(*,*)
         end if
         smin=dmin1(sm/sum,sj/sum,sp/sum)
         !if (smin.LT.trsd) then                   !### Small components of
