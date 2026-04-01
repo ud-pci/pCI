@@ -77,7 +77,7 @@ Contains
         Character(*), Intent(In) :: str
         Character(len(str)) :: upper
         Integer :: i, c
-        
+
         Do i = 1, Len(str)
             c = IChar(str(i:i))
             If (c >= IChar('a') .and. c <= IChar('z')) Then
