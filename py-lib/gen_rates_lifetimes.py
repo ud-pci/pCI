@@ -375,8 +375,8 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
             'state_two_J': J2,
             'matrix_element': matrix_element,
             'matrix_element_uncertainty': matrix_element_unc,
-            'energy1(cm-1)': f"{energy1:.2f}",
-            'energy2(cm-1)': f"{energy2:.2f}",
+            'energy1(cm-1)': f"{energy1:.3f}",
+            'energy2(cm-1)': f"{energy2:.3f}",
             'wavelength(nm)': f"{wavelength:.2f}",
             'transition_rate(s-1)': f"{transition_rate:.4e}"
         })
