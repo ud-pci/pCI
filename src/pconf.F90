@@ -601,7 +601,8 @@ Contains
         ! Reading of files SGC.CON and SCRC.CON with the self-energy and screening radial integrals.
         Implicit None
         Integer :: na, nb, ierr, k, nsh, khot, la, lb, ja, jb, na1, nb1, ind, &
-                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, idummy, err_stat, Nmax1, Lmax1
+                   nso1, khot1, k1, nsx1, nsx2, nav, kbox, i, ns1, err_stat, Nmax1, Lmax1
+        Character(len=4) :: idummy
         Real :: x, y
         Character(Len=256) :: strfmt, err_msg
         Character(Len=3) :: key1, key2
