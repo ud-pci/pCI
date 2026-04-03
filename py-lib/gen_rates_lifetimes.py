@@ -414,7 +414,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                          'state_two_configuration', 'state_two_term', 'state_two_J',
                                          'wavelength_display', 'matrix_element_display',
-                                         'branching_ratio_display', 'transition_rate_display'])
+                                         'branching_ratio_display', 'transition_rate_display', 'transition_rate', 'transition_rate_uncertainty'])
 
     # Load energies early for uncertainty lookup and energy-based sorting
     energies_file = atom + '_Energies.csv'
@@ -533,7 +533,9 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                     'wavelength_display': f"{wavelength:.2f}",
                     'matrix_element_display': matrix_element,
                     'branching_ratio_display': f"{branching_ratio:.3e}",
-                    'transition_rate_display': f"{tr_rate:.3e}"
+                    'transition_rate_display': '',
+                    'transition_rate': f"{tr_rate:.3e}",
+                    'transition_rate_uncertainty': ''
                 }
                 br_ratios_df.loc[len(br_ratios_df.index)] = row_data
 
@@ -693,7 +695,7 @@ def add_display_formats(atom_name):
     print(f"Reading {props_file}...")
     props_df = pd.read_csv(props_file)
 
-    wl_disp, me_disp, br_disp, rate_disp = [], [], [], []
+    wl_disp, me_disp, br_disp, rate_disp, rate_unc_list = [], [], [], [], []
 
     for _, row in props_df.iterrows():
         upper = (str(row['state_one_configuration']).strip(),
@@ -709,6 +711,7 @@ def add_display_formats(atom_name):
             wl_disp.append(format_wavelength(t['wl'],      t['wl_unc']))
             me_disp.append(format_matrix_element(t['me'],  t['me_unc']))
             rate_disp.append(format_rate_scientific(t['rate'], t['rate_unc']))
+            rate_unc_list.append(f"{t['rate_unc']:.3e}")
 
             # Branching ratio and its uncertainty via error propagation
             # B_i = A_i / A_total
@@ -729,13 +732,22 @@ def add_display_formats(atom_name):
             wl_disp.append(str(row['wavelength_display']))
             me_disp.append(str(row['matrix_element_display']))
             br_disp.append(str(row['branching_ratio_display']))
-            rate_disp.append(str(row['transition_rate_display']))
+            rate_disp.append(str(row.get('transition_rate_display', '')))
+            rate_unc_list.append('')
 
     tr_check_df = props_df.copy()
-    tr_check_df['wavelength_display']       = wl_disp
-    tr_check_df['matrix_element_display']   = me_disp
-    tr_check_df['branching_ratio_display']  = br_disp
-    tr_check_df['transition_rate_display']  = rate_disp
+    tr_check_df['wavelength_display']          = wl_disp
+    tr_check_df['matrix_element_display']      = me_disp
+    tr_check_df['branching_ratio_display']     = br_disp
+    tr_check_df['transition_rate_display']     = rate_disp
+    tr_check_df['transition_rate_uncertainty'] = rate_unc_list
+
+    # Write Transition_Properties.csv with plain rate values and uncertainty (no parenthetical format)
+    tr_check_df.to_csv(props_file, index=False)
+    print(f"{props_file} updated with transition_rate_uncertainty")
+
+    # Write Error_Check with parenthetical display format for transition_rate
+    tr_check_df['transition_rate'] = rate_disp
     tr_check_df.to_csv(tr_check_out, index=False)
     print(f"{tr_check_out} written with {len(tr_check_df)} transitions")
 
