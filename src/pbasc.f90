@@ -1264,10 +1264,17 @@ Contains
                                     strfmt = '(1X,I11,1X,I2,2X,I3,A1,I2,"/2",1X,I3,A1,I2, &
                                             "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
-                                        write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
-                                        write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                        If (l_br) Then
+                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                        Else
+                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                        End If
                                     End If
                                 End Do
                                 If (n1 == n2.OR.n3 == n4) Exit
