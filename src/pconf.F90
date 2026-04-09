@@ -1028,7 +1028,7 @@ Contains
             Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         If (Ksig /= 0) Then
-            Call MPI_Bcast(Scr, 10, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(Scr, 10, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Rsig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Dsig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Esig, NhintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
