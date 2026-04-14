@@ -14,10 +14,23 @@ Output files:
 """
 
 import math
+import decimal
 
 import pandas as pd
 import sys
 import os
+
+
+def _round_half_up(value, n_dec):
+    """Round to n_dec decimal places using round-half-up."""
+    d = decimal.Decimal(str(value))
+    if n_dec >= 1:
+        q = decimal.Decimal('0.' + '0' * n_dec)
+    elif n_dec == 0:
+        q = decimal.Decimal('1')
+    else:
+        q = decimal.Decimal('1E' + str(-n_dec))
+    return d.quantize(q, rounding=decimal.ROUND_HALF_UP)
 
 
 def parse_termJ(termJ):
@@ -73,24 +86,24 @@ def format_with_uncertainty(value, unc, n_sig_figs=2):
     if value == 0:
         return "0"
     if unc <= 0:
-        return f"{value:.4f}"
+        return str(_round_half_up(value, 4))
 
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - (n_sig_figs - 1))
 
     if n_dec <= 0:
         scale = 10 ** (-n_dec)
-        v = int(round(value / scale)) * scale
-        u = int(round(unc   / scale)) * scale
+        v = int(_round_half_up(value / scale, 0)) * scale
+        u = int(_round_half_up(unc   / scale, 0)) * scale
         return f"{v}({u})"
 
     n_dec   = min(n_dec, 12)
-    val_str = f"{value:.{n_dec}f}"
+    val_str = str(_round_half_up(value, n_dec))
     unit    = 10.0 ** (-n_dec)
-    u_int   = round(unc / unit)
+    u_int   = int(_round_half_up(unc / unit, 0))
 
     if u_int == 0:
-        return f"{value:.{n_dec}f}"
+        return str(_round_half_up(value, n_dec))
 
     return f"{val_str}({u_int})"
 
@@ -101,8 +114,8 @@ def format_with_uncertainty(value, unc, n_sig_figs=2):
 def _fmt_plain(value, n_dec):
     if n_dec <= 0:
         scale = 10 ** (-n_dec)
-        return str(int(round(value / scale)) * scale)
-    return f"{value:.{min(n_dec, 15)}f}"
+        return str(int(_round_half_up(value / scale, 0)) * scale)
+    return str(_round_half_up(value, min(n_dec, 15)))
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +131,7 @@ def format_wavelength(wl, unc):
       - Version 3: unc > wl  ->  <(wl + unc)
     """
     if unc <= 0:
-        return f"{wl:.4f}"
+        return str(_round_half_up(wl, 4))
 
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp)        # 1 sig fig: last digit at unc_exp
@@ -150,7 +163,7 @@ def format_matrix_element(me, unc):
       - Version 3: unc > me  ->  <(me + unc)
     """
     if unc <= 0:
-        return f"{me:.4f}"
+        return str(_round_half_up(me, 4))
 
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - 1)    # 2 sig figs
@@ -175,7 +188,7 @@ def format_rate_scientific(value, unc):
         if unc > 0:
             upper_exp = math.floor(math.log10(abs(unc)))
             sign = "+" if upper_exp >= 0 else "-"
-            return f"<{unc / 10**upper_exp:.2f}E{sign}{abs(upper_exp):02d}"
+            return f"<{_round_half_up(unc / 10**upper_exp, 1)}E{sign}{abs(upper_exp):02d}"
         return "0"
 
     # Version 3: uncertainty exceeds value — always full scientific, E+00 kept
@@ -183,12 +196,12 @@ def format_rate_scientific(value, unc):
         upper     = value + unc
         upper_exp = math.floor(math.log10(abs(upper)))
         sign      = "+" if upper_exp >= 0 else "-"
-        return f"<{upper / 10**upper_exp:.2f}E{sign}{abs(upper_exp):02d}"
+        return f"<{_round_half_up(upper / 10**upper_exp, 1)}E{sign}{abs(upper_exp):02d}"
 
     exp      = math.floor(math.log10(abs(value)))
     mantissa = value / (10.0 ** exp)
     m_str    = format_with_uncertainty(mantissa, unc / (10.0 ** exp)) if unc > 0 \
-               else f"{mantissa:.4f}"
+               else str(_round_half_up(mantissa, 4))
 
     # Omit E+00 in normal display
     if exp == 0:
@@ -211,17 +224,17 @@ def format_branching_ratio(B, unc):
             upper = unc
             if upper >= 1.0:
                 return "<1"
-            n_sig_z   = 1 if unc < 1e-10 else 2
-            upper_exp = math.floor(math.log10(abs(upper)))
+            n_sig_z     = 1 if unc < 1e-10 else 2
+            upper_exp   = math.floor(math.log10(abs(upper)))
             upper_n_dec = -(upper_exp - (n_sig_z - 1))
-            return f"<{upper:.{upper_n_dec}f}"
+            return f"<{format(_round_half_up(upper, upper_n_dec), 'f').rstrip('0').rstrip('.')}"
         return "0.0"
 
     if unc <= 0:
         if abs(B - 1.0) < 1e-12:
             return "1.0"
         val_exp = math.floor(math.log10(abs(B)))
-        return f"{B:.{min(-(val_exp - 1), 15)}f}"
+        return format(_round_half_up(B, min(-(val_exp - 1), 15)), 'f')
 
     n_sig   = 1 if unc < 1e-10 else 2
     unc_exp = math.floor(math.log10(abs(unc)))
@@ -232,21 +245,20 @@ def format_branching_ratio(B, unc):
         upper = B + unc
         if upper >= 1.0:
             return "<1"
-        # Compute n_dec from the upper limit so the last digit is non-zero
         upper_exp   = math.floor(math.log10(abs(upper))) if upper > 0 else 0
         upper_n_dec = -(upper_exp - (n_sig - 1))
-        return f"<{upper:.{upper_n_dec}f}"
+        return f"<{format(_round_half_up(upper, upper_n_dec), 'f').rstrip('0').rstrip('.')}"
 
     if n_dec <= 0:
         scale = 10 ** (-n_dec)
-        v = int(round(B   / scale)) * scale
-        u = int(round(unc / scale)) * scale
+        v = int(_round_half_up(B   / scale, 0)) * scale
+        u = int(_round_half_up(unc / scale, 0)) * scale
         return f"{v}({u})"
 
     n_dec   = min(n_dec, 15)
-    val_str = f"{B:.{n_dec}f}"
+    val_str = format(_round_half_up(B, n_dec), 'f')
     unit    = 10.0 ** (-n_dec)
-    u_int   = round(unc / unit)
+    u_int   = int(_round_half_up(unc / unit, 0))
 
     if u_int == 0:
         return f"{val_str}(0)"
@@ -266,8 +278,8 @@ def format_lifetime(lt_ns, unc):
         if lt_ns > 1e5:
             exp  = math.floor(math.log10(abs(lt_ns)))
             sign = "+" if exp >= 0 else "-"
-            return f"{lt_ns / 10**exp:.2f}E{sign}{abs(exp):02d}"
-        return f"{lt_ns:.4f}"
+            return f"{_round_half_up(lt_ns / 10**exp, 2)}E{sign}{abs(exp):02d}"
+        return str(_round_half_up(lt_ns, 4))
 
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - 1)    # 2 sig figs
@@ -278,7 +290,7 @@ def format_lifetime(lt_ns, unc):
         if upper > 1e5:
             exp  = math.floor(math.log10(abs(upper)))
             sign = "+" if exp >= 0 else "-"
-            return f"<{upper / 10**exp:.2f}E{sign}{abs(exp):02d}"
+            return f"<{_round_half_up(upper / 10**exp, 1)}E{sign}{abs(exp):02d}"
         return f"<{_fmt_plain(upper, n_dec)}"
 
     # Scientific for large lifetimes
@@ -532,7 +544,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                     'state_two_J': J2,
                     'wavelength_display': f"{wavelength:.2f}",
                     'matrix_element_display': matrix_element,
-                    'branching_ratio_display': f"{branching_ratio:.3e}",
+                    'branching_ratio_display': format(_round_half_up(branching_ratio, (-math.floor(math.log10(branching_ratio)) + 2) if branching_ratio > 0 else 3), 'f'),
                     'transition_rate_display': '',
                     'transition_rate': f"{tr_rate:.3e}",
                     'transition_rate_uncertainty': ''
@@ -735,19 +747,20 @@ def add_display_formats(atom_name):
             rate_disp.append(str(row.get('transition_rate_display', '')))
             rate_unc_list.append('')
 
-    tr_check_df = props_df.copy()
-    tr_check_df['wavelength_display']          = wl_disp
-    tr_check_df['matrix_element_display']      = me_disp
-    tr_check_df['branching_ratio_display']     = br_disp
-    tr_check_df['transition_rate_display']     = rate_disp
-    tr_check_df['transition_rate_uncertainty'] = rate_unc_list
-
-    # Write Transition_Properties.csv with plain rate values and uncertainty (no parenthetical format)
-    tr_check_df.to_csv(props_file, index=False)
+    # Write Transition_Properties.csv with plain rate and uncertainty columns
+    props_df['transition_rate_display']     = rate_disp
+    props_df['transition_rate_uncertainty'] = rate_unc_list
+    props_df.to_csv(props_file, index=False)
     print(f"{props_file} updated with transition_rate_uncertainty")
 
-    # Write Error_Check with parenthetical display format for transition_rate
-    tr_check_df['transition_rate'] = rate_disp
+    # Build Error_Check df — only display format columns
+    error_check_cols = [c for c in props_df.columns
+                        if c not in ('transition_rate', 'transition_rate_uncertainty')]
+    tr_check_df = props_df[error_check_cols].copy()
+    tr_check_df['wavelength_display']      = wl_disp
+    tr_check_df['matrix_element_display']  = me_disp
+    tr_check_df['branching_ratio_display'] = br_disp
+    tr_check_df['transition_rate_display'] = rate_disp
     tr_check_df.to_csv(tr_check_out, index=False)
     print(f"{tr_check_out} written with {len(tr_check_df)} transitions")
 
