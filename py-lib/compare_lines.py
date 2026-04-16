@@ -60,9 +60,20 @@ def compare_lines(nist_path, theory_path, atom):
     for col in ['conf_lower', 'conf_upper']:
         nist[col] = nist[col].apply(lambda c: _strip_to_theory(c, theory_confs))
 
+    def _normalize_J(val):
+        """Normalize J to a string: integer J as '0','1','2'; half-integer as '1/2','3/2'."""
+        s = str(val).strip()
+        if '/' in s:
+            return s  # already a fraction string, keep as-is
+        try:
+            f = float(s)
+            return str(int(f)) if f == int(f) else s
+        except (ValueError, TypeError):
+            return s
+
     for col in ['J_lower', 'J_upper']:
-        theory[col] = theory[col].astype(str)
-        nist[col]   = nist[col].astype(str)
+        theory[col] = theory[col].apply(_normalize_J)
+        nist[col]   = nist[col].apply(_normalize_J)
 
     props_path = f"{atom}_Transition_Properties.csv"
     if Path(props_path).exists():
