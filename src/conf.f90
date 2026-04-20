@@ -790,29 +790,13 @@ Contains
         If (kCSF > 0) Then
             Nd = ncsf
 
-            ! Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(nccj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(max_ndcs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-
             If (.not. Allocated(ni_conf)) Allocate(ni_conf(Nc))
             If (.not. Allocated(nf_conf)) Allocate(nf_conf(Nc))
-            ! If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
-            ! If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
-            ! If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
-            ! If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
-            ! If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
             If (.not. allocated(Nip)) Allocate(Nip(Nsp))
             If (.not. allocated(Nq)) Allocate(Nq(Nsp))
-            ! If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
 
             Call MPI_Bcast(ni_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(nf_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(iplace_cj, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(mdcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(ndcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            ! Call MPI_Bcast(ndc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Nip, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Nq, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If

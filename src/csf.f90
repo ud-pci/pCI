@@ -158,20 +158,27 @@ Contains
             call write_ccj(npes)
         endif
 
-        ncsf=0
         nccj=0
+        do iconf_neq = 1, nconf_neq
+            ncsfi = ndcs(iconf_neq)
+            ndi = ndc_neq(iconf_neq)
+            nccj=nccj+ncsfi*ndi
+        enddo
+
+        ncsf=0
         max_ndcs=0
         mdcs(1)=0
         do iconf = 1, nconf
             iconf_neq = nc_neq(iconf)
             ncsfi = ndcs(iconf_neq)
+            ncsf=ncsf+ncsfi
+
+            if (ncsfi > max_ndcs) max_ndcs=ncsfi
+
             if (iconf > 1) then
                 ic1 = nc_neq(iconf-1)
                 mdcs(iconf) = mdcs(iconf-1)+ndcs(ic1)
             endif
-            ncsf=ncsf+ncsfi
-            nccj=nccj+(ncsfi*ndc(iconf))
-            if (ncsfi > max_ndcs) max_ndcs=ncsfi
         end do
 
         iplace_cj(1) = 0
@@ -181,18 +188,8 @@ Contains
         end do
 
         if (mype == 0) then
-            write( *,'(/2x,a,i7,2(/2x,a,i8))') 'Nconf=',nconf,'Ncsf=',ncsf,'nccj=',nccj
-            write(11,'(/2x,a,i7,2(/2x,a,i8))') 'Nconf=',nconf,'Ncsf=',ncsf,'nccj=',nccj
-
-            write(*,*)'iconf_neq, iplace_cj(iconf_neq),ndcs(iconf_neq)'
-            do iconf_neq = 1, nconf_neq
-                write(*,*)iconf_neq, iplace_cj(iconf_neq),ndcs(iconf_neq)
-            enddo
-
-            write(*,*)'iconf,mdcs(iconf)'
-            do iconf = 1, nconf
-                write(*,*)iconf,mdcs(iconf)
-            enddo
+            write( *,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+            write(11,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
 
             if (ncsf.eq.0) then
                 write( *,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
@@ -762,7 +759,6 @@ Contains
         end do
 
         do iconf_neq = 1, nconf_neq
-            write(*,*)'writing ccj for iconf_neq =',iconf_neq
             rank_idx = mod(iconf_neq-1,npes)
             ndi = ndc_neq(iconf_neq)
             allocate(buffer(ndi))
