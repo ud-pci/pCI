@@ -24,8 +24,8 @@ Module conf_variables
     Integer(Kind=Int64) :: memTotalPerCPU=0_int64, memDvdsn=0_int64, memFormH=0_int64, memStaticArrays=0_int64, memEstimate=0_int64
     Real(dp)            :: Ecore=0_dp, XJ_av, dR_N, E_k, xscr=0_dp, K_gnt, E_0
 
-    Integer :: nconf, nconf_neq
-    Integer, Allocatable, Dimension(:)     :: Ndcs, Mdc, Mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
+    Integer :: nconf_neq
+    Integer, Allocatable, Dimension(:)     :: ndcs, mdc, mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
     Integer,  Allocatable, Dimension(:)    :: IntOrd, IntOrdS, Iconverge, iconf1, iconf2, In, Nrnrc
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Real,     Allocatable, Dimension(:)    :: Rsig, Dsig, Esig, Rint2S, Dint2S, Eint2S, R_is, Scr

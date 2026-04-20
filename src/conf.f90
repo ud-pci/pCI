@@ -44,7 +44,7 @@ Program conf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     Use conf_variables
     Use mpi_f08
-    Use csf, Only : jbasis, nonequiv_conf, formh_sym, unsym, reorder_det
+    Use csf, Only : jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det
     use determinants, only : Wdet, calcNd0, Dinit, Det_Number, Det_List, Jterm, Rdet
     Use integrals, only : Rint
     use formj2, only : FormJ
@@ -104,7 +104,16 @@ Program conf
         Call Det_Number             ! counts number of determinants
         Call Det_List(idt)               ! generates list of determinants
         Call Jterm                  ! prints table with numbers of levels with given J
-        If (kCSF > 0) call jbasis(Nc,ncsf,nccj,max_ndcs) ! List of configuration state functions (CSF)
+    End If
+
+     Call MPI_Bcast(kCSF, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+     If (kCSF > 0) then
+        Call jbasis_init ! broadcasting/allocating for jbasis
+        call jbasis(Nc,ncsf,nccj,max_ndcs,mype,npes) ! List of configuration state functions (CSF)
+    End If    
+    Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
+    If (mype == 0) Then
         Call Wdet(Nd, Ne, idt, 'CONF.DET')       ! writes determinants to file CONF.DET
         Call FormD
     End If
@@ -781,29 +790,29 @@ Contains
         If (kCSF > 0) Then
             Nd = ncsf
 
-            Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(nccj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(max_ndcs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(nccj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(max_ndcs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
             If (.not. Allocated(ni_conf)) Allocate(ni_conf(Nc))
             If (.not. Allocated(nf_conf)) Allocate(nf_conf(Nc))
-            If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
-            If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
-            If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
-            If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
-            If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
+            ! If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
+            ! If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
+            ! If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
+            ! If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
+            ! If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
             If (.not. allocated(Nip)) Allocate(Nip(Nsp))
             If (.not. allocated(Nq)) Allocate(Nq(Nsp))
-            If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
+            ! If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
 
             Call MPI_Bcast(ni_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(nf_conf, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(iplace_cj, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(mdcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(ndcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(ndc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(iplace_cj, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(mdcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(ndcs, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            ! Call MPI_Bcast(ndc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Nip, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Nq, Nsp, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If

@@ -9,72 +9,75 @@ Module csf
 
     Private
 
-    Public :: jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, read_ccj, idif
+    Public :: jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, read_ccj, idif
 
 
 Contains
 
-    Subroutine jbasis(nconf,ncsf,nccj,max_ndcs)
+    Subroutine jbasis(nconf,ncsf,nccj,max_ndcs,mype,npes)
+        Use mpi_f08
         Implicit None
+
+        Integer :: mype, npes, ierr
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
+        Integer, Allocatable, Dimension(:) ::  ind_conf, idet1, idet2
+
         Real(dp) :: t, tj
 
-        Integer, Allocatable, Dimension(:) ::  ind_conf, idet1, idet2
         real(dp), dimension(:,:), allocatable :: zz
         real(dp), dimension(:), allocatable :: de
         real(dp), dimension(:), allocatable :: dd
         Character(Len=256) :: strfmt
+        Character(Len=32) :: fname
 
-        If (.not. allocated(iplace_cj)) Allocate(iplace_cj(Nc))
-        If (.not. allocated(ind_conf)) Allocate(ind_conf(Nc))
-        If (.not. allocated(mdcs)) Allocate(mdcs(Nc))
-        If (.not. allocated(ndcs)) Allocate(ndcs(Nc))
-        If (.not. allocated(ndc_neq)) Allocate(ndc_neq(Nc))
+        If (.not. allocated(mdcs)) Allocate(mdcs(nconf))
+        If (.not. allocated(ndcs)) Allocate(ndcs(nconf_neq))
+        If (.not. allocated(ndc_neq)) Allocate(ndc_neq(nconf_neq))
+        If (.not. allocated(iplace_cj)) Allocate(iplace_cj(nconf_neq))
+        If (.not. allocated(ind_conf)) Allocate(ind_conf(nconf_neq))
         If (.not. allocated(idet1)) Allocate(idet1(Ne))
         If (.not. allocated(idet2)) Allocate(idet2(Ne))
 
-        ncsf=0
-        nccj=0
-        max_ndcs=0
-        mdcs(1)=0
-        iplace_cj(1)=0
-        ind_conf(1:nconf_neq)=0
 
-        strfmt = '(/4x,"Calculating matrix J**2")'
-        write( *,strfmt)
-        write(11,strfmt)
+        If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
+        If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
+        If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
+        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Nh)) Allocate(Nh(Nst))
+        If (.not. allocated(Jz)) Allocate(Jz(Nst))
 
-        strfmt = '(6x,"Iconf",8x,"Ndi",5x,"Ncsfi",5x,"Ncsf")'
-        write( *,strfmt)
-        write(11,strfmt)
+        ind_conf = 0
+        ndcs = 0
+        ndc_neq = 0
 
-        open(unit=18,file='conb.ccj',status='unknown',form='unformatted')
+        if (mype == 0) then
+            strfmt = '(/4x,"Calculating matrix J**2")'
+            write( *,strfmt)
+            write(11,strfmt)
 
-        do iconf=1,nconf
+            strfmt = '(8x,"Iconf",6x,"Ndi",4x,"Ncsfi",5x,"Rank")'
+            write( *,strfmt)
+            ! write(11,strfmt)
+        end if
+
+        write(fname, '("tmp_j_",I4.4)') mype
+        open(unit=18,file=fname,status='replace',form='unformatted')
+
+        do iconf = 1, nconf
+            iconf_neq=nc_neq(iconf)
+            if (mod(iconf_neq-1,npes) /= mype) cycle
+
             ndi=ndc(iconf)
             allocate(zz(ndi,ndi))
             allocate(de(ndi))
             allocate(dd(ndi))
-            ncsfi=0
-            iconf_neq=nc_neq(iconf)
+
             if (ind_conf(iconf_neq).gt.0) then
                 if (ndc(iconf).ne.ndc_neq(iconf_neq)) then
                     write( *,'(/2x,a)') 'Error in jbasis.'
-                    write(11,'(/2x,a)') 'Error in jbasis.'
-                    stop
+                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 endif
-                ncsf=ncsf+ndcs(iconf_neq)
-                ncsfi=ndcs(iconf_neq)
-                if (iconf.gt.1) then
-                    ic1=nc_neq(iconf-1)
-                    mdcs(iconf)=mdcs(iconf-1)+ndcs(ic1)
-                endif
-                if (iconf.eq.nconf) then
-                    strfmt = '(i9,i12,2i9,i15)'
-                    write( *,strfmt) iconf,ndi,ncsfi,ncsf
-                    write(11,strfmt) iconf,ndi,ncsfi,ncsf
-                end if
                 deallocate(dd)
                 deallocate(de)
                 deallocate(zz)
@@ -121,54 +124,86 @@ Contains
             end do
             if (ndi.gt.2500) then
                 write( *,'(2x,a,i6)') 'Warning: Ndi=',ndi
-                write(11,'(2x,a,i6)') 'Warning: Ndi=',ndi
             end if
             ! Diagonalization
             if (ndi.gt.0) call hould(ndi,dd,de,zz,ifail)
-            ndcs(iconf_neq)=0
+            ncsfi=0
             do i1=1,ndi
                 tj=0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
                 jtt=2*tj+0.0001
                 if (dabs(2*tj-jtt).gt.1.d-7) then
-                    write( *,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
-                    write(11,'(/2x,a/2x,a,f16.8,/2x,a,i3)') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf
-                    stop
+                    write( *,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf, 'Rank', mype
+                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 end if
                 if (jtt.eq.mj) then
-                    ncsf=ncsf+1
-                    ncsfi=ncsfi+1
-                    ndcs(iconf_neq)=ndcs(iconf_neq)+1
-                    nccj=nccj+ndi
+                    ncsfi = ncsfi+1
                     write(18) (zz(j,i1),j=1,ndi)
                 end if
             end do
-            if (iconf_neq.gt.1) then
-                ic1=iconf_neq-1
-                iplace_cj(iconf_neq)=iplace_cj(ic1)+ndcs(ic1)*ndc_neq(ic1)
-            end if
-            if (iconf.gt.1) then
-                ic1=nc_neq(iconf-1)
-                mdcs(iconf)=mdcs(iconf-1)+ndcs(ic1)
-            end if
-            if (ndcs(iconf_neq).gt.max_ndcs) max_ndcs=ndcs(iconf_neq)
+            ndcs(iconf_neq) = ncsfi
             ind_conf(iconf_neq)=1
-            strfmt = '(i9,i12,2i9,i15)'
-            write( *,strfmt) iconf,ndi,ncsfi,ncsf
-            write(11,strfmt) iconf,ndi,ncsfi,ncsf
+            strfmt = '(6x,i7,4x,i5,3(4x,i5))'
+            write( *,strfmt) iconf, ndi, ncsfi, mype
             deallocate(dd)
             deallocate(de)
             deallocate(zz)
         end do
         close(unit=18)
 
-        write( *,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
-        write(11,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+        call MPI_ALLREDUCE(MPI_IN_PLACE, ndcs, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(MPI_IN_PLACE, ndc_neq, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
-        if (ncsf.eq.0) then
-            write( *,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
-            write(11,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
-            stop
+        if (mype == 0) then
+            call write_ccj(npes)
+        endif
+
+        ncsf=0
+        nccj=0
+        max_ndcs=0
+        mdcs(1)=0
+        do iconf = 1, nconf
+            iconf_neq = nc_neq(iconf)
+            ncsfi = ndcs(iconf_neq)
+            if (iconf > 1) then
+                ic1 = nc_neq(iconf-1)
+                mdcs(iconf) = mdcs(iconf-1)+ndcs(ic1)
+            endif
+            ncsf=ncsf+ncsfi
+            nccj=nccj+(ncsfi*ndc(iconf))
+            if (ncsfi > max_ndcs) max_ndcs=ncsfi
+        end do
+
+        iplace_cj(1) = 0
+        do iconf_neq = 2, nconf_neq
+            ic1=iconf_neq-1
+            iplace_cj(iconf_neq)=iplace_cj(ic1)+ndcs(ic1)*ndc_neq(ic1)
+        end do
+
+        if (mype == 0) then
+            write( *,'(/2x,a,i7,2(/2x,a,i8))') 'Nconf=',nconf,'Ncsf=',ncsf,'nccj=',nccj
+            write(11,'(/2x,a,i7,2(/2x,a,i8))') 'Nconf=',nconf,'Ncsf=',ncsf,'nccj=',nccj
+
+            write(*,*)'iconf_neq, iplace_cj(iconf_neq),ndcs(iconf_neq)'
+            do iconf_neq = 1, nconf_neq
+                write(*,*)iconf_neq, iplace_cj(iconf_neq),ndcs(iconf_neq)
+            enddo
+
+            write(*,*)'iconf,mdcs(iconf)'
+            do iconf = 1, nconf
+                write(*,*)iconf,mdcs(iconf)
+            enddo
+
+            if (ncsf.eq.0) then
+                write( *,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
+                write(11,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
+                stop
+            end if
         end if
+
+        Deallocate(ind_conf)
+        Deallocate(idet1)
+        Deallocate(idet2)
 
     End Subroutine jbasis
 
@@ -182,7 +217,7 @@ Contains
 
         write( *,'(/4x,a)') 'Creating list of nonequivalent  configurations...'
 
-        Allocate(ni_conf(nconf), nf_conf(nconf), nc_neq(Nc), ind_nj(Ns))
+        Allocate(ni_conf(nconf), nf_conf(nconf), nc_neq(nconf), ind_nj(Ns))
 
         do iconf=1,nconf
           ni_conf(iconf)=nc0(iconf)+1
@@ -248,8 +283,10 @@ Contains
             nc_neq(iconf)=iconf_neq
         end do conf1
 
+        Deallocate(ind_nj)
+
         nconf_neq=iconf_neq
-        strfmt = '(4x,"Number of nonequivalent configurations:",i7)'
+        strfmt = '(4x,"Number of nonequivalent configurations:",i7,/)'
         write( *,strfmt) nconf_neq
         write(11,strfmt) nconf_neq
     End Subroutine nonequiv_conf
@@ -710,5 +747,70 @@ Contains
         id=i1
         idif=id
     End Function idif
+
+    Subroutine write_ccj(npes)
+        Integer, Intent(In) :: npes
+        Integer :: iconf_neq, rank_idx, ndi, k
+        Real(dp), Allocatable, Dimension(:)  :: buffer
+        Character(Len=32) :: fname
+        
+        open(unit=19, file='conb.ccj', status='replace', form='unformatted')
+        
+        do rank_idx = 0, npes-1
+            write(fname, '("tmp_j_",I4.4)') rank_idx
+            open(unit=100+rank_idx, file=fname, status='old', form='unformatted')
+        end do
+
+        do iconf_neq = 1, nconf_neq
+            write(*,*)'writing ccj for iconf_neq =',iconf_neq
+            rank_idx = mod(iconf_neq-1,npes)
+            ndi = ndc_neq(iconf_neq)
+            allocate(buffer(ndi))
+
+            do k = 1, ndcs(iconf_neq)
+                read(100+rank_idx) buffer
+                write(19) buffer
+            end do
+            
+            deallocate(buffer)
+        end do
+
+        do rank_idx = 0, npes-1
+            close(unit=100+rank_idx, status='delete') 
+        end do
+
+        close(unit=19)
+    End Subroutine write_ccj
+
+    Subroutine jbasis_init
+        Use mpi_f08
+        Implicit None
+
+        Integer :: mpierr
+
+        Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+
+        If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
+        If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
+        If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
+        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Nh)) Allocate(Nh(Nst))
+        If (.not. allocated(Jz)) Allocate(Jz(Nst))
+
+        Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)   
+        Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(idt, Nd*Ne, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+ 
+        Return
+    End Subroutine jbasis_init
 
 End Module
