@@ -3,7 +3,7 @@ Module csf
     Use conf_variables
     Use determinants, Only : Rspq
     Use formj2, Only : Plj
-    Use davidson, Only : Hould
+    ! Use davidson, Only : Hould
 
     Implicit None
 
@@ -16,9 +16,11 @@ Contains
 
     Subroutine jbasis(nconf,ncsf,nccj,max_ndcs,mype,npes)
         Use mpi_f08
+        Use str_fmt, Only : startTimer, stopTimer
         Implicit None
+        External :: DSYEV
 
-        Integer :: mype, npes, ierr
+        Integer :: mype, npes, ierr, lwork
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
         Integer, Allocatable, Dimension(:) ::  ind_conf, idet1, idet2
@@ -28,17 +30,20 @@ Contains
         real(dp), dimension(:,:), allocatable :: zz
         real(dp), dimension(:), allocatable :: de
         real(dp), dimension(:), allocatable :: dd
+        Real(dp), Dimension(4) :: realtmp
         Character(Len=256) :: strfmt
         Character(Len=32) :: fname
+        Integer(Kind=int64) :: start_time
+        Character(Len=16) :: timeStr
 
         If (.not. allocated(mdcs)) Allocate(mdcs(nconf))
         If (.not. allocated(ndcs)) Allocate(ndcs(nconf_neq))
         If (.not. allocated(ndc_neq)) Allocate(ndc_neq(nconf_neq))
         If (.not. allocated(iplace_cj)) Allocate(iplace_cj(nconf_neq))
         If (.not. allocated(ind_conf)) Allocate(ind_conf(nconf_neq))
+
         If (.not. allocated(idet1)) Allocate(idet1(Ne))
         If (.not. allocated(idet2)) Allocate(idet2(Ne))
-
 
         If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -52,18 +57,16 @@ Contains
         ndc_neq = 0
 
         if (mype == 0) then
+            Call startTimer(start_time)
             strfmt = '(/4x,"Calculating matrix J**2")'
             write( *,strfmt)
             write(11,strfmt)
-
-            strfmt = '(8x,"Iconf",6x,"Ndi",4x,"Ncsfi",5x,"Rank")'
+            strfmt = '(6x,"Iconf_neq",3x,"Iconf",4x,"Ndi",5x,"Ncsfi",5x,"Rank")'
             write( *,strfmt)
-            ! write(11,strfmt)
         end if
 
         write(fname, '("tmp_j_",I4.4)') mype
         open(unit=18,file=fname,status='replace',form='unformatted')
-
         do iconf = 1, nconf
             iconf_neq=nc_neq(iconf)
             if (mod(iconf_neq-1,npes) /= mype) cycle
@@ -71,14 +74,14 @@ Contains
             ndi=ndc(iconf)
             allocate(zz(ndi,ndi))
             allocate(de(ndi))
-            allocate(dd(ndi))
+            ! allocate(dd(ndi))
 
             if (ind_conf(iconf_neq).gt.0) then
                 if (ndc(iconf).ne.ndc_neq(iconf_neq)) then
                     write( *,'(/2x,a)') 'Error in jbasis.'
                     call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                 endif
-                deallocate(dd)
+                ! deallocate(dd)
                 deallocate(de)
                 deallocate(zz)
                 cycle
@@ -122,11 +125,24 @@ Contains
                     zz(i2,i1)=t
                 end do
             end do
-            if (ndi.gt.2500) then
-                write( *,'(2x,a,i6)') 'Warning: Ndi=',ndi
-            end if
+           
             ! Diagonalization
-            if (ndi.gt.0) call hould(ndi,dd,de,zz,ifail)
+            if (ndi.gt.0) then 
+                ! if (ndi.gt.15000) then
+                !     write( *,'(2x,i3,a,i6,a,2x,i12)') mype," rank -- warning: Ndi=",ndi,", allocated array size:",lwork
+                ! end if
+                ! call hould(ndi,dd,de,zz,ifail)
+                Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                lwork = Nint(realtmp(1))
+                Allocate(dd(lwork))
+
+                Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                if (ifail /= 0) then
+                     write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
+                end if
+                Deallocate(dd)
+            endif
+
             ncsfi=0
             do i1=1,ndi
                 tj=0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
@@ -142,11 +158,11 @@ Contains
             end do
             ndcs(iconf_neq) = ncsfi
             ind_conf(iconf_neq)=1
-            strfmt = '(6x,i7,4x,i5,3(4x,i5))'
-            write( *,strfmt) iconf, ndi, ncsfi, mype
-            deallocate(dd)
+            strfmt = '(6x,i5,3x,i7,4x,i5,3(4x,i5))'
+            write( *,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
             deallocate(de)
             deallocate(zz)
+            ! deallocate(dd)
         end do
         close(unit=18)
 
@@ -188,8 +204,17 @@ Contains
         end do
 
         if (mype == 0) then
-            write( *,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
-            write(11,'(/2x,a,i7,/2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+            ! debug output
+            ! write(*,*)nccj, max_ndcs
+            ! do iconf_neq = 1, nconf_neq
+            !     write(*,*)iconf_neq, iplace_cj(iconf_neq)
+            ! enddo 
+            ! do iconf = 1, nconf
+            !     write(*,*)iconf, mdcs(iconf)
+            ! end do   
+
+            write( *,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+            write(11,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
 
             if (ncsf.eq.0) then
                 write( *,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
@@ -201,6 +226,11 @@ Contains
         Deallocate(ind_conf)
         Deallocate(idet1)
         Deallocate(idet2)
+
+        If (mype == 0) Then
+            Call stopTimer(start_time, timeStr)
+            Write(*,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
+        End If
 
     End Subroutine jbasis
 
@@ -790,6 +820,8 @@ Contains
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nconf_neq, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Mj, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
