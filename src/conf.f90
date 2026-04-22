@@ -1853,13 +1853,17 @@ Contains
                         If (mod(it, kXIJ) == 0) Then 
                             ! Calculate J for each energy level
                             Do n=1,Nlv
-                                Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                                !If (mype == 0) Then
-                                !    Jsq%ind1=Jn
-                                !    Jsq%ind2=Jk
-                                !    Jsq%val=Jt
-                                !End If
-                                Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+                                If (kCSF == 0) Then
+                                    Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
+                                    !If (mype == 0) Then
+                                    !    Jsq%ind1=Jn
+                                    !    Jsq%ind2=Jk
+                                    !    Jsq%val=Jt
+                                    !End If
+                                    Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+                                Else
+                                    Tj(n) = Jm
+                                End If
                             End Do
                             If (mype == 0) Then
                                 Call FormB
@@ -2237,8 +2241,12 @@ Contains
         End If
         
         Do n=1,Nlv
-            Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-            Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+            If (kCSF == 0) Then
+                Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
+                Call J_av(ArrB(1,n),Nd,Tj(n),ierr)  ! calculates expectation values for J^2
+            Else
+                Tj(n) = Jm
+            End If
             If (mype==0) Then
                 write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
             End If
