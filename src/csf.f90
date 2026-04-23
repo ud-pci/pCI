@@ -204,15 +204,6 @@ Contains
         end do
 
         if (mype == 0) then
-            ! debug output
-            ! write(*,*)nccj, max_ndcs
-            ! do iconf_neq = 1, nconf_neq
-            !     write(*,*)iconf_neq, iplace_cj(iconf_neq)
-            ! enddo 
-            ! do iconf = 1, nconf
-            !     write(*,*)iconf, mdcs(iconf)
-            ! end do   
-
             write( *,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
             write(11,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
 
@@ -229,7 +220,8 @@ Contains
 
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
+            Write(* ,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
+            Write(11,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
         End If
 
     End Subroutine jbasis

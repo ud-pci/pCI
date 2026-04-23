@@ -111,7 +111,6 @@ Program conf
         Call jbasis_init ! broadcasting/allocating for jbasis
         call jbasis(Nc,ncsf,nccj,max_ndcs,mype,npes) ! List of configuration state functions (CSF)
     End If    
-    Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
     If (mype == 0) Then
         Call Wdet(Nd, Ne, idt, 'CONF.DET')       ! writes determinants to file CONF.DET
@@ -767,7 +766,6 @@ Contains
         Integer :: mpierr, mype
 
         vaBinSize = 10000000
-        Call MPI_Bcast(kCSF, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(ncsf, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1460,7 +1458,7 @@ Contains
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
-        If (.not. Allocated(E)) Allocate(E(Nlv))
+        If (.not. Allocated(E)) Allocate(E(2*Nlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(Nlv))
         If (.not. Allocated(B1)) Allocate(B1(Nd))
         If (.not. Allocated(B2)) Allocate(B2(Nd))
