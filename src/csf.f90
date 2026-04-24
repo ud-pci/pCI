@@ -320,6 +320,7 @@ Contains
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
         Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
+        Integer(Kind=int64) :: ih8_max
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
         Type(IVAccumulator)   :: iva1, iva2
@@ -499,6 +500,7 @@ Contains
         End If
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(ih8, ih8_max, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
 
         Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
         Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
@@ -508,7 +510,7 @@ Contains
         Call IVAccumulatorReset(iva2)
         Call RVAccumulatorReset(rva1)
 
-        memEstimate = memEstimate + NumH*16
+        memEstimate = memEstimate + ih8_max * 16
 
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
