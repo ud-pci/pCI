@@ -314,18 +314,23 @@ Contains
         Use mpi_f08
         Use vaccumulator
         Use determinants, Only : calcNd0
+        Use str_fmt, Only : startTimer, stopTimer
         Implicit None
 
         Integer :: mype, npes, mpierr
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
         Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
+        Integer :: j, mesplit, iconf_local_count
+        Integer :: an_id, nnd, num_done, sender, iconf_task
+        Integer :: cntarray(2)
         Integer(Kind=int64) :: ih8_max
         Type(MPI_STATUS) :: status
-        Integer, Allocatable, Dimension(:) :: idet1, idet2, cntarray
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer(Kind=int64)   :: s1, ih8_before
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
@@ -349,8 +354,6 @@ Contains
             print*, '========== Starting calculation stage of FormH =========='
         End If
 
-        cntarray=0
-        
         Call IVAccumulatorInit(iva1, vaGrowBy)
         Call IVAccumulatorInit(iva2, vaGrowBy)
         Call RVAccumulatorInit(rva1, vaGrowBy)
@@ -359,12 +362,18 @@ Contains
         If (mype == 0) call read_ccj(ccj)
         Call MPI_Bcast(ccj, nccj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
+        mesplit = max(1, nconf / 10)
+        j = 1
+        iconf_local_count = 0
+        Call startTimer(s1)
+
         NumH=0
         Kherr=0
         Kgerr=0
         numzero=0
         n0=1
         Hmin=0.d0
+        Hamil%minval = 0.d0
         if (Ksig.EQ.2) then
            iscr=0
            xscr=0
@@ -374,6 +383,12 @@ Contains
         ! calculation of the matrix elements
         If (npes == 1) Then
             do iconf=1,nconf
+                iconf_local_count = iconf_local_count + 1
+                If (mod(iconf_local_count, mesplit)==0 .and. j < 10) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                    j = j + 1
+                End If
                 iconf_neq=nc_neq(iconf)
                 nci=ndcs(iconf_neq)
                 if (nci.eq.0) cycle
@@ -435,68 +450,117 @@ Contains
                 end do
             end do
             NumH=ih8
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)
         Else
-            do iconf=mype+1,nconf,npes
-                iconf_neq=nc_neq(iconf)
-                nci=ndcs(iconf_neq)
-                if (nci.eq.0) cycle
-                ndi=ndc(iconf)
-                do jconf=1,iconf
-                    jconf_neq=nc_neq(jconf)
-                    ncj=ndcs(jconf_neq)
-                    if (ncj.eq.0) cycle
-                    ndj=ndc(jconf)
-                    idf=idif(iconf,jconf)
-                    if (idf.gt.2) cycle
-                    zzc(1:nci,1:ncj)=0.d0
-                    n1=mdc(iconf)+1
-                    n2=n1+ndc(iconf)-1
-                    do n=n1,n2
-                        id=n-n1+1
-                        idet1(1:Ne)=idt(n,1:Ne)
-                        k1=mdc(jconf)+1
-                        k2=k1+ndc(jconf)-1
-                        buf(1:ncj)=0.d0
-                        do k=k1,k2
-                            idet2(1:Ne)=idt(k,1:Ne)
-                            if (Kdsig.NE.0) E_k=Diag(k)
-                            call Hmatrix(idf,idet1,idet2,hij)
-                            if (dabs(hij).lt.1.d-20) cycle
-                            jd=k-k1+1
-                            do jc=1,ncj
-                                jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-                                buf(jc)=buf(jc)+hij*ccj(jccj)
+            If (mype == 0) Then
+                ! Master: distribute iconf rows dynamically to workers
+                nnd = 1
+                num_done = 0
+                Do an_id = 1, npes - 1
+                    If (nnd <= nconf) Then
+                        Call MPI_SEND(nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                        nnd = nnd + 1
+                    Else
+                        Call MPI_SEND(-1, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+                End Do
+
+                Do While (num_done < npes - 1)
+                    Call MPI_RECV(cntarray, 1, MPI_INTEGER, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, mpierr)
+                    sender = status%MPI_SOURCE
+
+                    iconf_local_count = iconf_local_count + 1
+                    If (mod(iconf_local_count, mesplit) == 0 .and. j < 10) Then
+                        Call stopTimer(s1, timeStr)
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                        j = j + 1
+                    End If
+
+                    If (nnd <= nconf) Then
+                        Call MPI_SEND(nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        nnd = nnd + 1
+                    Else
+                        Call MPI_SEND(-1, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+                End Do
+                Call stopTimer(s1, timeStr)
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)
+            Else
+                ! Workers: receive iconf rows and compute matrix elements
+                Do
+                    Call MPI_RECV(iconf_task, 1, MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    If (iconf_task == -1) Exit
+
+                    iconf = iconf_task
+                    ih8_before = ih8
+                    iconf_neq = nc_neq(iconf)
+                    nci = ndcs(iconf_neq)
+                    If (nci /= 0) Then
+                        ndi = ndc(iconf)
+                        do jconf=1,iconf
+                            jconf_neq=nc_neq(jconf)
+                            ncj=ndcs(jconf_neq)
+                            if (ncj.eq.0) cycle
+                            ndj=ndc(jconf)
+                            idf=idif(iconf,jconf)
+                            if (idf.gt.2) cycle
+                            zzc(1:nci,1:ncj)=0.d0
+                            n1=mdc(iconf)+1
+                            n2=n1+ndc(iconf)-1
+                            do n=n1,n2
+                                id=n-n1+1
+                                idet1(1:Ne)=idt(n,1:Ne)
+                                k1=mdc(jconf)+1
+                                k2=k1+ndc(jconf)-1
+                                buf(1:ncj)=0.d0
+                                do k=k1,k2
+                                    idet2(1:Ne)=idt(k,1:Ne)
+                                    if (Kdsig.NE.0) E_k=Diag(k)
+                                    call Hmatrix(idf,idet1,idet2,hij)
+                                    if (dabs(hij).lt.1.d-20) cycle
+                                    jd=k-k1+1
+                                    do jc=1,ncj
+                                        jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
+                                        buf(jc)=buf(jc)+hij*ccj(jccj)
+                                    end do
+                                end do
+                                do ic=1,nci
+                                    iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
+                                    do jc=1,ncj
+                                        zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
+                                    end do
+                                end do
+                            end do
+                            do ic=1,nci
+                                jc2=ncj
+                                if (iconf.eq.jconf) jc2=ic
+                                do jc=1,jc2
+                                    hij=zzc(ic,jc)
+                                    n=ic+mdcs(iconf)
+                                    k=jc+mdcs(jconf)
+                                    if (hij.NE.0.d0) then
+                                        ih8=ih8+1
+                                        if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                        if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                        Call IVAccumulatorAdd(iva1, n)
+                                        Call IVAccumulatorAdd(iva2, k)
+                                        Call RVAccumulatorAdd(rva1, hij)
+                                        Hamil%minval = Hmin
+                                    else
+                                        numzero=numzero+1
+                                    end if
+                                end do
                             end do
                         end do
-                        do ic=1,nci
-                            iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-                            do jc=1,ncj
-                                zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
-                            end do
-                        end do
-                    end do
-                    do ic=1,nci
-                        jc2=ncj
-                        if (iconf.eq.jconf) jc2=ic
-                        do jc=1,jc2
-                            hij=zzc(ic,jc)
-                            n=ic+mdcs(iconf)
-                            k=jc+mdcs(jconf)
-                            if (hij.NE.0.d0) then
-                                ih8=ih8+1
-                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
-                                Call IVAccumulatorAdd(iva1, n)
-                                Call IVAccumulatorAdd(iva2, k)
-                                Call RVAccumulatorAdd(rva1, hij)
-                                Hamil%minval = Hmin
-                            else
-                                numzero=numzero+1
-                            end if
-                        end do
-                    end do
-                end do
-            end do
+                    End If
+
+                    cntarray(1) = int(ih8 - ih8_before)
+                    Call MPI_SEND(cntarray, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                End Do
+            End If
         End If
         
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
