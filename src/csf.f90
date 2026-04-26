@@ -869,9 +869,11 @@ Contains
 
     Subroutine jbasis_init
         Use mpi_f08
+        Use mpi_utils, Only : BroadcastI
         Implicit None
 
         Integer :: mpierr
+        Integer(Kind=int64) :: count
 
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -892,7 +894,8 @@ Contains
         Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)   
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(idt, Nd*Ne, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        count = Ne*Int(Nd, kind=int64)
+        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
