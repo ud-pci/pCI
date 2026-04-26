@@ -324,13 +324,13 @@ Contains
         Integer :: j, mesplit, iconf_local_count
         Integer :: an_id, nnd, num_done, sender, iconf_task
         Integer :: cntarray(2)
-        Integer(Kind=int64) :: ih8_max
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
-        Integer(Kind=int64)   :: s1, ih8_before
+        Integer(Kind=int64)   :: ih8_max, ih8_before, s1
+        Integer(Kind=int64)   :: i_start, chunk_size, current_chunk
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
@@ -360,7 +360,15 @@ Contains
 
         ! Reading the list of the symmetrized coefficients
         If (mype == 0) call read_ccj(ccj)
-        Call MPI_Bcast(ccj, nccj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        ! Call MPI_Bcast(ccj, nccj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
+        chunk_size = 250000000
+        i_start = 1
+        do while (i_start <= nccj)
+            current_chunk = min(chunk_size,nccj-i_start+1)
+            call MPI_Bcast(ccj(i_start), int(current_chunk), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            i_start = i_start + current_chunk
+        end do
 
         mesplit = max(1, nconf / 10)
         j = 1
