@@ -9,8 +9,9 @@ Module csf
 
     Private
 
-    Public :: jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, read_ccj, idif
+    Public :: jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, idif
 
+    Real(dp), Allocatable :: ccj_module(:)
 
 Contains
 
@@ -23,16 +24,21 @@ Contains
         Integer :: mype, npes, ierr, lwork
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
-        Integer, Allocatable, Dimension(:) ::  ind_conf, idet1, idet2
+        Integer :: mesplit, iconf_local_count, min_rank, n0_tasks
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq
+        Integer, Allocatable :: sort_order(:), task_rank(:)
+        Integer(Kind=int64), Allocatable :: task_load(:)
 
         Real(dp) :: t, tj
-
-        real(dp), dimension(:,:), allocatable :: zz
-        real(dp), dimension(:), allocatable :: de
-        real(dp), dimension(:), allocatable :: dd
+        Real(dp), Allocatable :: zz(:,:), de(:), dd(:), zz_buf(:,:)
         Real(dp), Dimension(4) :: realtmp
+
+        Type :: t_eigvec_buf
+            Real(dp), Allocatable :: data(:)
+        End Type
+        Type(t_eigvec_buf), Allocatable :: eigvec_bufs(:)
+
         Character(Len=256) :: strfmt
-        Character(Len=32) :: fname
         Integer(Kind=int64) :: start_time
         Character(Len=16) :: timeStr
 
@@ -40,11 +46,8 @@ Contains
         If (.not. allocated(ndcs)) Allocate(ndcs(nconf_neq))
         If (.not. allocated(ndc_neq)) Allocate(ndc_neq(nconf_neq))
         If (.not. allocated(iplace_cj)) Allocate(iplace_cj(nconf_neq))
-        If (.not. allocated(ind_conf)) Allocate(ind_conf(nconf_neq))
-
         If (.not. allocated(idet1)) Allocate(idet1(Ne))
         If (.not. allocated(idet2)) Allocate(idet2(Ne))
-
         If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
@@ -52,179 +55,233 @@ Contains
         If (.not. allocated(Nh)) Allocate(Nh(Nst))
         If (.not. allocated(Jz)) Allocate(Jz(Nst))
 
-        ind_conf = 0
         ndcs = 0
-        ndc_neq = 0
 
-        if (mype == 0) then
+        ! Pre-compute ndc_neq and the first representative iconf for each iconf_neq.
+        ! All ranks have ndc/nc_neq from jbasis_init, so no MPI needed.
+        ndc_neq = 0
+        Allocate(first_iconf_for_neq(nconf_neq))
+        first_iconf_for_neq = 0
+        Do iconf = 1, nconf
+            iconf_neq = nc_neq(iconf)
+            If (first_iconf_for_neq(iconf_neq) == 0) Then
+                first_iconf_for_neq(iconf_neq) = iconf
+                ndc_neq(iconf_neq) = ndc(iconf)
+            End If
+        End Do
+
+        If (mype == 0) Then
             Call startTimer(start_time)
             strfmt = '(/4x,"Calculating matrix J**2")'
-            write( *,strfmt)
-            write(11,strfmt)
+            Write(*,strfmt)
+            Write(11,strfmt)
             strfmt = '(6x,"Iconf_neq",3x,"Iconf",4x,"Ndi",5x,"Ncsfi",5x,"Rank")'
-            write( *,strfmt)
-        end if
+            Write(*,strfmt)
+        End If
 
-        write(fname, '("tmp_j_",I4.4)') mype
-        open(unit=18,file=fname,status='replace',form='unformatted')
-        do iconf = 1, nconf
-            iconf_neq=nc_neq(iconf)
-            if (mod(iconf_neq-1,npes) /= mype) cycle
+        strfmt = '(6x,i5,3x,i7,4x,i5,3(4x,i5))'
+        ! Load-balance assignment: sort by descending ndi**3, then greedily assign to least-loaded rank.
+        ! All ranks run this identically, so no communication is needed.
+        Allocate(sort_order(nconf_neq), task_rank(nconf_neq), task_load(0:npes-1))
+        task_load = 0_int64
+        Do i1 = 1, nconf_neq
+            sort_order(i1) = i1
+        End Do
+        Do i1 = 2, nconf_neq
+            j = sort_order(i1)
+            ndi = ndc_neq(j)
+            i2 = i1 - 1
+            Do While (i2 >= 1 .and. ndc_neq(sort_order(i2)) < ndi)
+                sort_order(i2+1) = sort_order(i2)
+                i2 = i2 - 1
+            End Do
+            sort_order(i2+1) = j
+        End Do
+        Do i1 = 1, nconf_neq
+            iconf_neq = sort_order(i1)
+            min_rank = 0
+            Do i2 = 1, npes-1
+                If (task_load(i2) < task_load(min_rank)) min_rank = i2
+            End Do
+            task_rank(iconf_neq) = min_rank
+            task_load(min_rank) = task_load(min_rank) + int(ndc_neq(iconf_neq), int64)**3
+        End Do
+        n0_tasks = count(task_rank == 0)
+        mesplit = max(1, (n0_tasks + 9) / 10)
+        iconf_local_count = 0
+        Deallocate(sort_order, task_load)
 
-            ndi=ndc(iconf)
-            allocate(zz(ndi,ndi))
-            allocate(de(ndi))
-            ! allocate(dd(ndi))
-
-            if (ind_conf(iconf_neq).gt.0) then
-                if (ndc(iconf).ne.ndc_neq(iconf_neq)) then
-                    write( *,'(/2x,a)') 'Error in jbasis.'
-                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                endif
-                ! deallocate(dd)
-                deallocate(de)
-                deallocate(zz)
-                cycle
-            endif
-            ndc_neq(iconf_neq)=ndi
-            zz(1:ndi,1:ndi)=0.d0
-            n1=mdc(iconf)+1
-            n2=n1+ndi-1
-            do n=n1,n2
-                idet1(1:ne)=idt(n,1:ne)
-                do k=n1,n
-                    idet2(1:ne)=idt(k,1:ne)
-                    t=0.d0
-                    if (k.ne.n) then
-                        call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
-                        if (nf.ne.2) cycle
-                        ! determinants differ by two functions
-                        t=plj(ia,ic)*plj(id,ib)+plj(ic,ia)*plj(ib,id)-plj(ia,id)*plj(ic,ib)-plj(id,ia)*plj(ib,ic)
-                        t=t*is
-                        if (t.eq.0.d0) cycle
-                    else
-                        t=mj*mj
-                        do iq=1,ne
-                            ia=idet1(iq)
-                            na=nh(ia)
-                            ja=jj(na)
-                            ma=jz(ia)
-                            t=t+ja*(ja+2)-ma**2
-                            jq0=iq+1
-                            if (jq0.gt.ne) cycle
-                            do jq=jq0,ne
-                                ib=idet1(jq)
-                                t=t-plj(ia,ib)**2-plj(ib,ia)**2
-                            end do
-                        end do
-                        if (t.eq.0.d0) cycle
-                    end if
-                    i1=n-n1+1
-                    i2=k-n1+1
-                    zz(i1,i2)=t
-                    zz(i2,i1)=t
-                end do
-            end do
-           
-            ! Diagonalization
-            if (ndi.gt.0) then 
-                ! if (ndi.gt.15000) then
-                !     write( *,'(2x,i3,a,i6,a,2x,i12)') mype," rank -- warning: Ndi=",ndi,", allocated array size:",lwork
-                ! end if
-                ! call hould(ndi,dd,de,zz,ifail)
+        ! All ranks compute their assigned tasks in parallel; no inter-rank communication in the loop
+        Allocate(eigvec_bufs(nconf_neq))
+        Do iconf_neq = 1, nconf_neq
+            If (task_rank(iconf_neq) /= mype) Cycle
+            iconf = first_iconf_for_neq(iconf_neq)
+            ndi   = ndc_neq(iconf_neq)
+            Allocate(zz(ndi,ndi), de(ndi))
+            zz = 0.d0
+            n1 = mdc(iconf)+1
+            n2 = n1+ndi-1
+            Call build_j2(n1, n2, ndi, idet1, idet2, zz)
+            If (ndi > 0) Then
                 Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
                 lwork = Nint(realtmp(1))
                 Allocate(dd(lwork))
-
                 Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                if (ifail /= 0) then
-                     write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
-                end if
+                If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
                 Deallocate(dd)
-            endif
-
-            ncsfi=0
-            do i1=1,ndi
-                tj=0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
-                jtt=2*tj+0.0001
-                if (dabs(2*tj-jtt).gt.1.d-7) then
-                    write( *,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf, 'Rank', mype
-                    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                end if
-                if (jtt.eq.mj) then
+            End If
+            ncsfi = 0
+            Allocate(zz_buf(ndi,ndi))
+            Do i1 = 1, ndi
+                tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
+                jtt = 2*tj+0.0001
+                If (dabs(2*tj-jtt) > 1.d-7) Then
+                    Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
+                        '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
+                    Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                End If
+                If (jtt == mj) Then
                     ncsfi = ncsfi+1
-                    write(18) (zz(j,i1),j=1,ndi)
-                end if
-            end do
+                    zz_buf(1:ndi,ncsfi) = zz(1:ndi,i1)
+                End If
+            End Do
             ndcs(iconf_neq) = ncsfi
-            ind_conf(iconf_neq)=1
-            strfmt = '(6x,i5,3x,i7,4x,i5,3(4x,i5))'
-            write( *,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
-            deallocate(de)
-            deallocate(zz)
-            ! deallocate(dd)
-        end do
-        close(unit=18)
+            If (ncsfi > 0) Then
+                Allocate(eigvec_bufs(iconf_neq)%data(ndi * ncsfi))
+                eigvec_bufs(iconf_neq)%data = reshape(zz_buf(1:ndi,1:ncsfi), [ndi*ncsfi])
+            End If
+            Deallocate(zz_buf, de, zz)
+            Write(*,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
+            If (mype == 0) Then
+                iconf_local_count = iconf_local_count + 1
+                If (mod(iconf_local_count, mesplit) == 0 .and. iconf_local_count < n0_tasks) Then
+                    Call stopTimer(start_time, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', &
+                        iconf_local_count * 100 / n0_tasks, '% done in '//trim(timeStr)
+                End If
+            End If
+        End Do
 
-        call MPI_ALLREDUCE(MPI_IN_PLACE, ndcs, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, ndc_neq, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        Call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        If (mype == 0) Then
+            Call stopTimer(start_time, timeStr)
+            Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', 100, '% done in '//trim(timeStr)
+        End If
 
-        if (mype == 0) then
-            call write_ccj(npes)
-        endif
+        ! Share ndcs across all ranks (each rank only set its own tasks)
+        Call MPI_Allreduce(MPI_IN_PLACE, ndcs, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
 
-        nccj=0
-        do iconf_neq = 1, nconf_neq
-            ncsfi = ndcs(iconf_neq)
-            ndi = ndc_neq(iconf_neq)
-            nccj=nccj+ncsfi*ndi
-        enddo
-
-        ncsf=0
-        max_ndcs=0
-        mdcs(1)=0
-        do iconf = 1, nconf
-            iconf_neq = nc_neq(iconf)
-            ncsfi = ndcs(iconf_neq)
-            ncsf=ncsf+ncsfi
-
-            if (ncsfi > max_ndcs) max_ndcs=ncsfi
-
-            if (iconf > 1) then
-                ic1 = nc_neq(iconf-1)
-                mdcs(iconf) = mdcs(iconf-1)+ndcs(ic1)
-            endif
-        end do
+        nccj = 0
+        Do iconf_neq = 1, nconf_neq
+            nccj = nccj + ndcs(iconf_neq) * ndc_neq(iconf_neq)
+        End Do
 
         iplace_cj(1) = 0
-        do iconf_neq = 2, nconf_neq
-            ic1=iconf_neq-1
-            iplace_cj(iconf_neq)=iplace_cj(ic1)+ndcs(ic1)*ndc_neq(ic1)
-        end do
+        Do iconf_neq = 2, nconf_neq
+            ic1 = iconf_neq-1
+            iplace_cj(iconf_neq) = iplace_cj(ic1) + ndcs(ic1)*ndc_neq(ic1)
+        End Do
 
-        if (mype == 0) then
-            write( *,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
-            write(11,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+        ! Each rank fills its own portion of ccj_module; Allreduce(SUM) assembles on all ranks
+        If (nccj > 0) Then
+            Allocate(ccj_module(nccj))
+            ccj_module = 0.d0
+            Do iconf_neq = 1, nconf_neq
+                If (task_rank(iconf_neq) /= mype) Cycle
+                ncsfi = ndcs(iconf_neq)
+                If (ncsfi > 0) Then
+                    ndi = ndc_neq(iconf_neq)
+                    i1 = iplace_cj(iconf_neq) + 1
+                    i2 = i1 + ndi*ncsfi - 1
+                    ccj_module(i1:i2) = eigvec_bufs(iconf_neq)%data
+                End If
+            End Do
+            Call MPI_Allreduce(MPI_IN_PLACE, ccj_module, nccj, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+        End If
 
-            if (ncsf.eq.0) then
-                write( *,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
-                write(11,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
-                stop
-            end if
-        end if
+        Do iconf_neq = 1, nconf_neq
+            If (Allocated(eigvec_bufs(iconf_neq)%data)) Deallocate(eigvec_bufs(iconf_neq)%data)
+        End Do
+        Deallocate(eigvec_bufs, task_rank)
 
-        Deallocate(ind_conf)
-        Deallocate(idet1)
-        Deallocate(idet2)
+        ncsf = 0
+        max_ndcs = 0
+        mdcs(1) = 0
+        Do iconf = 1, nconf
+            iconf_neq = nc_neq(iconf)
+            ncsfi = ndcs(iconf_neq)
+            ncsf = ncsf + ncsfi
+            If (ncsfi > max_ndcs) max_ndcs = ncsfi
+            If (iconf > 1) Then
+                ic1 = nc_neq(iconf-1)
+                mdcs(iconf) = mdcs(iconf-1) + ndcs(ic1)
+            End If
+        End Do
+
+        If (mype == 0) Then
+            Write(*,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+            Write(11,'(4x,a,i7,2x,a,i8)') 'Nconf=',nconf,'Ncsf=',ncsf
+            If (ncsf == 0) Then
+                Write(*,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
+                Write(11,'(/4x,a,f4.1,a)') 'Term ',jm,' is absent in all configurations'
+                Stop
+            End If
+        End If
+
+        Deallocate(first_iconf_for_neq, idet1, idet2)
 
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            Write(* ,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
-            Write(11,'(2X,A)'), 'TIMING >>> CSF basis construction took '// trim(timeStr) // ' to complete'
+            Write(*,'(2X,A)') 'TIMING >>> CSF basis construction took '//trim(timeStr)//' to complete'
+            Write(11,'(2X,A)') 'TIMING >>> CSF basis construction took '//trim(timeStr)//' to complete'
         End If
 
     End Subroutine jbasis
+
+    Subroutine build_j2(n1, n2, ndi, idet1, idet2, zz)
+        Implicit None
+        Integer, Intent(In)    :: n1, n2, ndi
+        Integer, Allocatable, Intent(InOut) :: idet1(:), idet2(:)
+        Real(dp), Intent(InOut) :: zz(ndi,ndi)
+
+        Integer :: n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2
+        Real(dp) :: t
+
+        Do n = n1, n2
+            idet1(1:Ne) = idt(n,1:Ne)
+            Do k = n1, n
+                idet2(1:Ne) = idt(k,1:Ne)
+                t = 0.d0
+                If (k /= n) Then
+                    Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
+                    If (nf /= 2) Cycle
+                    t = plj(ia,ic)*plj(id,ib)+plj(ic,ia)*plj(ib,id)-plj(ia,id)*plj(ic,ib)-plj(id,ia)*plj(ib,ic)
+                    t = t*is
+                    If (t == 0.d0) Cycle
+                Else
+                    t = mj*mj
+                    Do iq = 1, Ne
+                        ia = idet1(iq)
+                        na = nh(ia)
+                        ja = jj(na)
+                        ma = jz(ia)
+                        t  = t + ja*(ja+2) - ma**2
+                        jq0 = iq+1
+                        If (jq0 > Ne) Cycle
+                        Do jq = jq0, Ne
+                            ib = idet1(jq)
+                            t  = t - plj(ia,ib)**2 - plj(ib,ia)**2
+                        End Do
+                    End Do
+                    If (t == 0.d0) Cycle
+                End If
+                i1 = n-n1+1
+                i2 = k-n1+1
+                zz(i1,i2) = t
+                zz(i2,i1) = t
+            End Do
+        End Do
+    End Subroutine build_j2
 
     Subroutine nonequiv_conf(nconf)
         Implicit None
@@ -312,7 +369,6 @@ Contains
 
     Subroutine formh_sym(nconf,ncsf,nccj,max_ndcs,mype,npes)
         Use mpi_f08
-        Use mpi_utils, Only : BroadcastD
         Use vaccumulator
         Use determinants, Only : calcNd0
         Use str_fmt, Only : startTimer, stopTimer
@@ -360,8 +416,7 @@ Contains
         Call RVAccumulatorInit(rva1, vaGrowBy)
 
         ! Reading the list of the symmetrized coefficients
-        If (mype == 0) call read_ccj(ccj)
-        Call BroadcastD(ccj, int(nccj, int64), 0, 0, MPI_COMM_WORLD, mpierr)
+        ccj(1:nccj) = ccj_module(1:nccj)
 
         mesplit = max(1, nconf / 10)
         j = 1
@@ -634,7 +689,7 @@ Contains
                 end if
            end if
         end if
-    End Subroutine hmatrix
+    End Subroutine Hmatrix
 
     Real(type_real) Function F_J2(idet1, idet2) 
         Implicit None
@@ -683,7 +738,7 @@ Contains
         allocate(ccs(ncsf))
         allocate(cc(nd))
 
-        call read_ccj(ccj)
+        ccj(1:nccj) = ccj_module(1:nccj)
 
         open(unit=17,file='CONF.WFS',status='UNKNOWN',form='UNFORMATTED')
         jmax=nlv
@@ -715,6 +770,7 @@ Contains
         deallocate(cc)
         deallocate(ccs)
         deallocate(ccj)
+        If (Allocated(ccj_module)) Deallocate(ccj_module)
 
     End Subroutine unsym
 
@@ -771,29 +827,6 @@ Contains
 
     End Subroutine reorder_det
 
-    Subroutine read_ccj(ccj)
-        Implicit None
-
-        Real(dp), Allocatable, Dimension(:) :: ccj
-
-        Integer :: i1, i2, i, ndi, k, iconf_neq
-
-        open(unit=18,file='conb.ccj',status='old',form='unformatted')
-        ! Reading the list of the symmetrizied coefficients
-        rewind(18)
-        i1=1
-        do iconf_neq=1,nconf_neq
-            ndi=ndc_neq(iconf_neq)
-            do k=1,ndcs(iconf_neq)
-                i2=i1+ndi-1
-                read (18) (ccj(i),i=i1,i2)
-                i1=i2+1
-            end do
-        end do
-
-        close(unit=18)
-    End Subroutine read_ccj
-
     Integer Function idif(iconf,jconf)
         Implicit None
 
@@ -833,39 +866,6 @@ Contains
         id=i1
         idif=id
     End Function idif
-
-    Subroutine write_ccj(npes)
-        Integer, Intent(In) :: npes
-        Integer :: iconf_neq, rank_idx, ndi, k
-        Real(dp), Allocatable, Dimension(:)  :: buffer
-        Character(Len=32) :: fname
-        
-        open(unit=19, file='conb.ccj', status='replace', form='unformatted')
-        
-        do rank_idx = 0, npes-1
-            write(fname, '("tmp_j_",I4.4)') rank_idx
-            open(unit=100+rank_idx, file=fname, status='old', form='unformatted')
-        end do
-
-        do iconf_neq = 1, nconf_neq
-            rank_idx = mod(iconf_neq-1,npes)
-            ndi = ndc_neq(iconf_neq)
-            allocate(buffer(ndi))
-
-            do k = 1, ndcs(iconf_neq)
-                read(100+rank_idx) buffer
-                write(19) buffer
-            end do
-            
-            deallocate(buffer)
-        end do
-
-        do rank_idx = 0, npes-1
-            close(unit=100+rank_idx, status='delete') 
-        end do
-
-        close(unit=19)
-    End Subroutine write_ccj
 
     Subroutine jbasis_init
         Use mpi_f08
