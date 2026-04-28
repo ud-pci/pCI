@@ -1965,7 +1965,7 @@ Contains
         If (Ksig*Kdsig == 0) Then
             strfmt = '(4X,"Energy levels (",A7," Nc=",I6," Nd=",I9,"); Gj =",F7.4, &
                         /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write(81,strfmt) stecp(ist),nbas,Nd,Gj
+            Write(81,strfmt) stecp(ist),Nc,nbas,Gj
         ! If CI+all-order/CI+MBPT, print E_0, Kexn, Nc, Nd, Gj
         Else
             strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
