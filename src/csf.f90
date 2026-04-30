@@ -17,20 +17,23 @@ Contains
 
     Subroutine jbasis(nconf,ncsf,nccj,max_ndcs,mype,npes)
         Use mpi_f08
-        Use str_fmt, Only : startTimer, stopTimer
+        Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize
+        Use mpi_utils, Only : BroadcastD
         Implicit None
         External :: DSYEV
 
         Integer :: mype, npes, ierr, lwork
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
-        Integer :: mesplit, iconf_local_count, min_rank, n0_tasks
-        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq
-        Integer, Allocatable :: sort_order(:), task_rank(:)
-        Integer(Kind=int64), Allocatable :: task_load(:)
+        Integer :: jp
+        Integer :: an_id, nnd, num_done, sender, iconf_neq_task, iconf_neq_rcvd, ncsfi_rcvd, ndi_rcvd
+        Integer :: header(2)
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order
+        Integer, Parameter :: send_tag = 2001, return_tag = 2002, data_tag = 2003
+        Type(MPI_STATUS) :: status
 
         Real(dp) :: t, tj
-        Real(dp), Allocatable :: zz(:,:), de(:), dd(:), zz_buf(:,:)
+        Real(dp), Allocatable :: zz(:,:), de(:), dd(:), pack_buf(:)
         Real(dp), Dimension(4) :: realtmp
 
         Type :: t_eigvec_buf
@@ -39,8 +42,8 @@ Contains
         Type(t_eigvec_buf), Allocatable :: eigvec_bufs(:)
 
         Character(Len=256) :: strfmt
-        Integer(Kind=int64) :: start_time
-        Character(Len=16) :: timeStr
+        Integer(Kind=int64) :: start_time, mem_jbasis, total_work, work_done
+        Character(Len=16) :: timeStr, memStr
 
         If (.not. allocated(mdcs)) Allocate(mdcs(nconf))
         If (.not. allocated(ndcs)) Allocate(ndcs(nconf_neq))
@@ -75,106 +78,224 @@ Contains
             strfmt = '(/4x,"Calculating matrix J**2")'
             Write(*,strfmt)
             Write(11,strfmt)
+            Open(unit=18, file='CSF.LOG', status='UNKNOWN')
             strfmt = '(6x,"Iconf_neq",3x,"Iconf",4x,"Ndi",5x,"Ncsfi",5x,"Rank")'
-            Write(*,strfmt)
+            Write(18,strfmt)
         End If
 
         strfmt = '(6x,i5,3x,i7,4x,i5,3(4x,i5))'
-        ! Load-balance assignment: sort by descending ndi**3, then greedily assign to least-loaded rank.
-        ! All ranks run this identically, so no communication is needed.
-        Allocate(sort_order(nconf_neq), task_rank(nconf_neq), task_load(0:npes-1))
-        task_load = 0_int64
+        total_work = sum(int(ndc_neq(1:nconf_neq), int64)**3)
+        work_done  = 0_int64
+        jp = 1
+
+        ! Sort dispatch order by descending ndc_neq so the costliest tasks go out first
+        Allocate(dispatch_order(nconf_neq))
         Do i1 = 1, nconf_neq
-            sort_order(i1) = i1
+            dispatch_order(i1) = i1
         End Do
         Do i1 = 2, nconf_neq
-            j = sort_order(i1)
+            j = dispatch_order(i1)
             ndi = ndc_neq(j)
             i2 = i1 - 1
-            Do While (i2 >= 1 .and. ndc_neq(sort_order(i2)) < ndi)
-                sort_order(i2+1) = sort_order(i2)
+            Do While (i2 >= 1 .and. ndc_neq(dispatch_order(i2)) < ndi)
+                dispatch_order(i2+1) = dispatch_order(i2)
                 i2 = i2 - 1
             End Do
-            sort_order(i2+1) = j
-        End Do
-        Do i1 = 1, nconf_neq
-            iconf_neq = sort_order(i1)
-            min_rank = 0
-            Do i2 = 1, npes-1
-                If (task_load(i2) < task_load(min_rank)) min_rank = i2
-            End Do
-            task_rank(iconf_neq) = min_rank
-            task_load(min_rank) = task_load(min_rank) + int(ndc_neq(iconf_neq), int64)**3
-        End Do
-        n0_tasks = count(task_rank == 0)
-        mesplit = max(1, (n0_tasks + 9) / 10)
-        iconf_local_count = 0
-        Deallocate(sort_order, task_load)
-
-        ! All ranks compute their assigned tasks in parallel; no inter-rank communication in the loop
-        Allocate(eigvec_bufs(nconf_neq))
-        Do iconf_neq = 1, nconf_neq
-            If (task_rank(iconf_neq) /= mype) Cycle
-            iconf = first_iconf_for_neq(iconf_neq)
-            ndi   = ndc_neq(iconf_neq)
-            Allocate(zz(ndi,ndi), de(ndi))
-            zz = 0.d0
-            n1 = mdc(iconf)+1
-            n2 = n1+ndi-1
-            Call build_j2(n1, n2, ndi, idet1, idet2, zz)
-            If (ndi > 0) Then
-                Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
-                lwork = Nint(realtmp(1))
-                Allocate(dd(lwork))
-                Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
-                Deallocate(dd)
-            End If
-            ncsfi = 0
-            Allocate(zz_buf(ndi,ndi))
-            Do i1 = 1, ndi
-                tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
-                jtt = 2*tj+0.0001
-                If (dabs(2*tj-jtt) > 1.d-7) Then
-                    Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
-                        '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
-                    Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                End If
-                If (jtt == mj) Then
-                    ncsfi = ncsfi+1
-                    zz_buf(1:ndi,ncsfi) = zz(1:ndi,i1)
-                End If
-            End Do
-            ndcs(iconf_neq) = ncsfi
-            If (ncsfi > 0) Then
-                Allocate(eigvec_bufs(iconf_neq)%data(ndi * ncsfi))
-                eigvec_bufs(iconf_neq)%data = reshape(zz_buf(1:ndi,1:ncsfi), [ndi*ncsfi])
-            End If
-            Deallocate(zz_buf, de, zz)
-            Write(*,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
-            If (mype == 0) Then
-                iconf_local_count = iconf_local_count + 1
-                If (mod(iconf_local_count, mesplit) == 0 .and. iconf_local_count < n0_tasks) Then
-                    Call stopTimer(start_time, timeStr)
-                    Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', &
-                        iconf_local_count * 100 / n0_tasks, '% done in '//trim(timeStr)
-                End If
-            End If
+            dispatch_order(i2+1) = j
         End Do
 
-        Call MPI_Barrier(MPI_COMM_WORLD, ierr)
+        ! Report estimated memory requirements before dispatch
         If (mype == 0) Then
-            Call stopTimer(start_time, timeStr)
-            Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', 100, '% done in '//trim(timeStr)
+            ! Worker peak memory: ndi_max x ndi_max matrix (zz)
+            mem_jbasis = int(maxval(ndc_neq(1:nconf_neq)), int64)**2 * 8_int64
+            Call FormattedMemSize(mem_jbasis, memStr)
+            Write(*,'(4X,A,A)') 'jbasis: estimated peak memory per worker (zz): ', Trim(memStr)
+            Write(11,'(4X,A,A)') 'jbasis: estimated peak memory per worker (zz): ', Trim(memStr)
+            If (npes > 1 .and. total_work > 0_int64) Then
+                ndi = ndc_neq(dispatch_order(1))
+                mem_jbasis = int(ndi, int64)**3
+                If (mem_jbasis * int(npes-1, int64) > total_work) Then
+                    i1 = int(mem_jbasis * 100_int64 / total_work)
+                    Write(*,'(4X,A,I0,A,I0,A,I0,A)') &
+                        'WARNING: iconf_neq=', dispatch_order(1), ' (ndi=', ndi, &
+                        ') accounts for ', i1, '% of work — one worker will bottleneck'
+                End If
+            End If
         End If
 
-        ! Share ndcs across all ranks (each rank only set its own tasks)
-        Call MPI_Allreduce(MPI_IN_PLACE, ndcs, nconf_neq, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+        If (npes == 1) Then
+            Allocate(eigvec_bufs(nconf_neq))
+            Do i1 = 1, nconf_neq
+                iconf_neq = dispatch_order(i1)
+                iconf = first_iconf_for_neq(iconf_neq)
+                ndi   = ndc_neq(iconf_neq)
+                Allocate(zz(ndi,ndi), de(ndi))
+                zz = 0.d0
+                n1 = mdc(iconf)+1
+                n2 = n1+ndi-1
+                Call build_j2(n1, n2, ndi, idet1, idet2, zz)
+                If (ndi > 0) Then
+                    Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                    lwork = Nint(realtmp(1))
+                    Allocate(dd(lwork))
+                    Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                    If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
+                    Deallocate(dd)
+                End If
+                ncsfi = 0
+                Do i2 = 1, ndi
+                    tj  = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
+                    jtt = 2*tj+0.0001
+                    If (dabs(2*tj-jtt) > 1.d-7) Then
+                        Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
+                            '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
+                        Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                    End If
+                    If (jtt == mj) ncsfi = ncsfi + 1
+                End Do
+                ndcs(iconf_neq) = ncsfi
+                If (ncsfi > 0) Then
+                    Allocate(eigvec_bufs(iconf_neq)%data(ndi * ncsfi))
+                    k = 0
+                    Do i2 = 1, ndi
+                        tj  = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
+                        jtt = 2*tj+0.0001
+                        If (jtt == mj) Then
+                            k = k + 1
+                            eigvec_bufs(iconf_neq)%data((k-1)*ndi+1:k*ndi) = zz(1:ndi,i2)
+                        End If
+                    End Do
+                End If
+                Deallocate(de, zz)
+                Write(18,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
+                work_done = work_done + int(ndi, int64)**3
+                Do While (work_done * 10 >= jp * total_work .and. jp < 10)
+                    Call stopTimer(start_time, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', jp*10, '% done in '//trim(timeStr)
+                    jp = jp + 1
+                End Do
+            End Do
+            Call stopTimer(start_time, timeStr)
+            Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', 100, '% done in '//trim(timeStr)
+            Close(unit=18)
+        Else
+            If (mype == 0) Then
+                Allocate(eigvec_bufs(nconf_neq))
+                nnd = 1
+                num_done = 0
+                Do an_id = 1, npes-1
+                    If (nnd <= nconf_neq) Then
+                        Call MPI_SEND(dispatch_order(nnd), 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, ierr)
+                        nnd = nnd + 1
+                    Else
+                        Call MPI_SEND(-1, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, ierr)
+                        num_done = num_done + 1
+                    End If
+                End Do
+                Do While (num_done < npes-1)
+                    Call MPI_RECV(header, 2, MPI_INTEGER, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, ierr)
+                    sender         = status%MPI_SOURCE
+                    iconf_neq_rcvd = header(1)
+                    ncsfi_rcvd     = header(2)
+                    ndcs(iconf_neq_rcvd) = ncsfi_rcvd
+                    ndi_rcvd = ndc_neq(iconf_neq_rcvd)
+                    If (ncsfi_rcvd > 0) Then
+                        Allocate(eigvec_bufs(iconf_neq_rcvd)%data(ndi_rcvd * ncsfi_rcvd))
+                        Call MPI_RECV(eigvec_bufs(iconf_neq_rcvd)%data, ndi_rcvd * ncsfi_rcvd, &
+                                      MPI_DOUBLE_PRECISION, sender, data_tag, MPI_COMM_WORLD, status, ierr)
+                    End If
+                    Write(18,strfmt) iconf_neq_rcvd, first_iconf_for_neq(iconf_neq_rcvd), ndi_rcvd, ncsfi_rcvd, sender
+                    work_done = work_done + int(ndi_rcvd, int64)**3
+                    Do While (work_done * 10 >= jp * total_work .and. jp < 10)
+                        Call stopTimer(start_time, timeStr)
+                        Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', jp*10, '% done in '//trim(timeStr)
+                        jp = jp + 1
+                    End Do
+                    If (nnd <= nconf_neq) Then
+                        Call MPI_SEND(dispatch_order(nnd), 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, ierr)
+                        nnd = nnd + 1
+                    Else
+                        Call MPI_SEND(-1, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, ierr)
+                        num_done = num_done + 1
+                    End If
+                End Do
+                Call stopTimer(start_time, timeStr)
+                Write(*,'(2X,A,1X,I3,A)') 'J**2 calculation:', 100, '% done in '//trim(timeStr)
+                Close(unit=18)
+            Else
+                Do
+                    Call MPI_RECV(iconf_neq_task, 1, MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, ierr)
+                    If (iconf_neq_task == -1) Exit
+                    iconf = first_iconf_for_neq(iconf_neq_task)
+                    ndi   = ndc_neq(iconf_neq_task)
+                    Allocate(zz(ndi,ndi), de(ndi))
+                    zz = 0.d0
+                    n1 = mdc(iconf)+1
+                    n2 = n1+ndi-1
+                    Call build_j2(n1, n2, ndi, idet1, idet2, zz)
+                    If (ndi > 0) Then
+                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                        lwork = Nint(realtmp(1))
+                        Allocate(dd(lwork))
+                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                        If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
+                        Deallocate(dd)
+                    End If
+                    ncsfi = 0
+                    Do i1 = 1, ndi
+                        tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
+                        jtt = 2*tj+0.0001
+                        If (dabs(2*tj-jtt) > 1.d-7) Then
+                            Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
+                                '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
+                            Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                        End If
+                        If (jtt == mj) ncsfi = ncsfi + 1
+                    End Do
+                    header(1) = iconf_neq_task
+                    header(2) = ncsfi
+                    Call MPI_SEND(header, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, ierr)
+                    If (ncsfi > 0) Then
+                        Allocate(pack_buf(ndi * ncsfi))
+                        k = 0
+                        Do i1 = 1, ndi
+                            tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
+                            jtt = 2*tj+0.0001
+                            If (jtt == mj) Then
+                                k = k + 1
+                                pack_buf((k-1)*ndi+1:k*ndi) = zz(1:ndi,i1)
+                            End If
+                        End Do
+                        Call MPI_SEND(pack_buf, ndi*ncsfi, MPI_DOUBLE_PRECISION, 0, data_tag, MPI_COMM_WORLD, ierr)
+                        Deallocate(pack_buf)
+                    End If
+                    Deallocate(de, zz)
+                End Do
+            End If
+        End If
+
+        Deallocate(dispatch_order)
+
+        ! Broadcast ndcs from master to all ranks
+        Call MPI_Bcast(ndcs, nconf_neq, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
         nccj = 0
         Do iconf_neq = 1, nconf_neq
             nccj = nccj + ndcs(iconf_neq) * ndc_neq(iconf_neq)
         End Do
+
+        If (mype == 0) Then
+            ! Master peak: eigvec_bufs + ccj_module coexist briefly during assembly
+            mem_jbasis = 2_int64 * int(nccj, int64) * 8_int64
+            Call FormattedMemSize(mem_jbasis, memStr)
+            Write(*,'(4X,A,A)') 'jbasis: master peak memory during ccj assembly: ', Trim(memStr)
+            Write(11,'(4X,A,A)') 'jbasis: master peak memory during ccj assembly: ', Trim(memStr)
+            ! All ranks allocate ccj_module after broadcast
+            mem_jbasis = int(nccj, int64) * 8_int64
+            Call FormattedMemSize(mem_jbasis, memStr)
+            Write(*,'(4X,A,A)') 'jbasis: ccj_module memory per rank: ', Trim(memStr)
+            Write(11,'(4X,A,A)') 'jbasis: ccj_module memory per rank: ', Trim(memStr)
+        End If
 
         iplace_cj(1) = 0
         Do iconf_neq = 2, nconf_neq
@@ -182,12 +303,10 @@ Contains
             iplace_cj(iconf_neq) = iplace_cj(ic1) + ndcs(ic1)*ndc_neq(ic1)
         End Do
 
-        ! Each rank fills its own portion of ccj_module; Allreduce(SUM) assembles on all ranks
-        If (nccj > 0) Then
+        ! Master assembles ccj_module from eigvec_bufs, broadcasts to all ranks
+        If (mype == 0 .and. nccj > 0) Then
             Allocate(ccj_module(nccj))
-            ccj_module = 0.d0
             Do iconf_neq = 1, nconf_neq
-                If (task_rank(iconf_neq) /= mype) Cycle
                 ncsfi = ndcs(iconf_neq)
                 If (ncsfi > 0) Then
                     ndi = ndc_neq(iconf_neq)
@@ -196,13 +315,16 @@ Contains
                     ccj_module(i1:i2) = eigvec_bufs(iconf_neq)%data
                 End If
             End Do
-            Call MPI_Allreduce(MPI_IN_PLACE, ccj_module, nccj, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr)
+            Do iconf_neq = 1, nconf_neq
+                If (Allocated(eigvec_bufs(iconf_neq)%data)) Deallocate(eigvec_bufs(iconf_neq)%data)
+            End Do
+            Deallocate(eigvec_bufs)
         End If
 
-        Do iconf_neq = 1, nconf_neq
-            If (Allocated(eigvec_bufs(iconf_neq)%data)) Deallocate(eigvec_bufs(iconf_neq)%data)
-        End Do
-        Deallocate(eigvec_bufs, task_rank)
+        If (nccj > 0) Then
+            If (.not. Allocated(ccj_module)) Allocate(ccj_module(nccj))
+            Call BroadcastD(ccj_module, int(nccj, int64), 0, 0, MPI_COMM_WORLD, ierr)
+        End If
 
         ncsf = 0
         max_ndcs = 0
