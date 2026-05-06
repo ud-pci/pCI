@@ -165,7 +165,7 @@ Contains
         Ng  =PQ(10)+C1
         Rnuc=PQ(13)
 
-        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp),Kbas(Nso))
+        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
 
         strfmt = '(/4X,"Z   = ",F6.2,5X,"Kt  =",I3,  7X,"II =",I4,    &
                 /4X,"H   =",F7.4, 5X,"R2  =",F6.2,4X,"R1 =",E11.4, &
@@ -205,7 +205,6 @@ Contains
         End If
 
         Norb=0
-        Kfile=0
         nsb=Ns
         Do nj=1,Nsp
             i=dsign(1.d0,Qnl(nj))
@@ -234,8 +233,6 @@ Contains
             Kk(ni)=kkj
             Ll(ni)=llj
             Jj(ni)=jjj
-            If (Kbas(ni) == 3) Kfile=1
-            If (Kbas(ni) == 4) kfile=1
  210        Nip(nj)=ni
         End Do
         Write(*,*) Norb, ' new orbitals to be formed'
