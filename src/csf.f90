@@ -20,21 +20,19 @@ Contains
         Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize
         Use mpi_utils, Only : BroadcastD
         Implicit None
-        External :: DSYEV, DSYEVR, DSYEVX, DLAMCH
+        External :: DSYEV
 
-        Integer :: mype, npes, ierr, lwork, liwork
+        Integer :: mype, npes, ierr, lwork
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
         Integer :: jp
         Integer :: an_id, nnd, num_done, sender, iconf_neq_task, iconf_neq_rcvd, ncsfi_rcvd, ndi_rcvd
         Integer :: header(2)
         Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order
-        Integer, Allocatable :: isuppz(:), iwork(:)
         Integer, Parameter :: send_tag = 2001, return_tag = 2002, data_tag = 2003
         Type(MPI_STATUS) :: status
 
         Real(dp) :: t, tj
-        Real(dp) :: target_lambda, vl, vu, abstol, DLAMCH
         Real(dp), Allocatable :: zz(:,:), de(:), dd(:), pack_buf(:)
         Real(dp), Dimension(4) :: realtmp
 
@@ -59,11 +57,6 @@ Contains
         If (.not. allocated(idt)) allocate(idt(Nd,Ne))
         If (.not. allocated(Nh)) Allocate(Nh(Nst))
         If (.not. allocated(Jz)) Allocate(Jz(Nst))
-
-        target_lambda = real(mj*(mj+2), dp)
-        vl = target_lambda-1.d-8
-        vu = target_lambda+1.d-8
-        abstol = 2.0d0*DLAMCH('Safe minimum')
 
         ndcs = 0
 
@@ -136,42 +129,42 @@ Contains
                 iconf_neq = dispatch_order(i1)
                 iconf = first_iconf_for_neq(iconf_neq)
                 ndi   = ndc_neq(iconf_neq)
-                ncsfi = 0
                 Allocate(zz(ndi,ndi), de(ndi))
                 zz = 0.d0
                 n1 = mdc(iconf)+1
                 n2 = n1+ndi-1
                 Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                 If (ndi > 0) Then
-                    Allocate(isuppz(2*ndi), iwork(10*ndi))
-                    Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,realtmp,-1,iwork,-1,ifail)
+                    Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
                     lwork = Nint(realtmp(1))
-                    liwork = iwork(1)
-                    Deallocate(iwork)
-                    Allocate(dd(lwork), iwork(liwork))
-                    Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,dd,lwork,iwork,liwork,ifail)
-                    If (ifail /= 0) Write(*,*) mype, ' core: dsyevr failed with ifail =', ifail
-                    Deallocate(dd, iwork, isuppz)
-
+                    Allocate(dd(lwork))
+                    Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                    If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
+                    Deallocate(dd)
                 End If
-                Do i2 = 1, ncsfi
-                    tj = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
-                    jtt = nint(2*tj)                      
+                ncsfi = 0
+                Do i2 = 1, ndi
+                    tj  = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
+                    jtt = 2*tj+0.0001
                     If (dabs(2*tj-jtt) > 1.d-7) Then
                         Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
                             '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Core',mype
                         Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                    End If               
-                    If (jtt /= mj) Then
-                        Write(*,'(/2x,a/2x,a,f4.1,a,f4.1)') &
-                            '*** Value of j in jbasis is wrong ***','J=', tj, ' but target was ', real(mj)/2
-                        Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                     End If
+                    If (jtt == mj) ncsfi = ncsfi + 1
                 End Do
                 ndcs(iconf_neq) = ncsfi
                 If (ncsfi > 0) Then
                     Allocate(eigvec_bufs(iconf_neq)%data(ndi * ncsfi))
-                    eigvec_bufs(iconf_neq)%data(1:ndi*ncsfi) = reshape(zz(1:ndi,1:ncsfi), [ndi*ncsfi])
+                    k = 0
+                    Do i2 = 1, ndi
+                        tj  = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
+                        jtt = 2*tj+0.0001
+                        If (jtt == mj) Then
+                            k = k + 1
+                            eigvec_bufs(iconf_neq)%data((k-1)*ndi+1:k*ndi) = zz(1:ndi,i2)
+                        End If
+                    End Do
                 End If
                 Deallocate(de, zz)
                 Write(18,strfmt) iconf_neq, iconf, ndi, ncsfi, mype
@@ -235,42 +228,46 @@ Contains
                     If (iconf_neq_task == -1) Exit
                     iconf = first_iconf_for_neq(iconf_neq_task)
                     ndi   = ndc_neq(iconf_neq_task)
-                    ncsfi = 0
                     Allocate(zz(ndi,ndi), de(ndi))
                     zz = 0.d0
                     n1 = mdc(iconf)+1
                     n2 = n1+ndi-1
                     Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                     If (ndi > 0) Then
-                        Allocate(isuppz(2*ndi), iwork(10*ndi))
-                        Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,realtmp,-1,iwork,-1,ifail)
+                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
                         lwork = Nint(realtmp(1))
-                        liwork = iwork(1)
-                        Deallocate(iwork)
-                        Allocate(dd(lwork), iwork(liwork))
-                        Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,dd,lwork,iwork,liwork,ifail)
-                        If (ifail /= 0) Write(*,*) mype, ' core: dsyevr failed with ifail =', ifail
-                        Deallocate(dd, iwork, isuppz)
+                        Allocate(dd(lwork))
+                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                        If (ifail /= 0) Write(*,*) mype, ' core: dsyev failed with ifail =', ifail
+                        Deallocate(dd)
                     End If
-                    Do i2 = 1, ncsfi
-                        tj = 0.5d0*(dsqrt(1.d0+de(i2))-1.d0)
-                        jtt = nint(2*tj)                      
+                    ncsfi = 0
+                    Do i1 = 1, ndi
+                        tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
+                        jtt = 2*tj+0.0001
                         If (dabs(2*tj-jtt) > 1.d-7) Then
                             Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
                                 '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Core',mype
                             Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                        End If      
-                        If (jtt /= mj) Then
-                            Write(*,'(/2x,a/2x,a,f4.1,a,f4.1)') &
-                                '*** Value of j in jbasis is wrong ***','J=', tj, ' but target was ', real(mj)/2
-                            Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                         End If
+                        If (jtt == mj) ncsfi = ncsfi + 1
                     End Do
                     header(1) = iconf_neq_task
                     header(2) = ncsfi
                     Call MPI_SEND(header, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, ierr)
                     If (ncsfi > 0) Then
-                        Call MPI_SEND(zz(1:ndi, 1:ncsfi), ndi*ncsfi, MPI_DOUBLE_PRECISION, 0, data_tag, MPI_COMM_WORLD, ierr)
+                        Allocate(pack_buf(ndi * ncsfi))
+                        k = 0
+                        Do i1 = 1, ndi
+                            tj  = 0.5d0*(dsqrt(1.d0+de(i1))-1.d0)
+                            jtt = 2*tj+0.0001
+                            If (jtt == mj) Then
+                                k = k + 1
+                                pack_buf((k-1)*ndi+1:k*ndi) = zz(1:ndi,i1)
+                            End If
+                        End Do
+                        Call MPI_SEND(pack_buf, ndi*ncsfi, MPI_DOUBLE_PRECISION, 0, data_tag, MPI_COMM_WORLD, ierr)
+                        Deallocate(pack_buf)
                     End If
                     Deallocate(de, zz)
                 End Do
@@ -357,7 +354,7 @@ Contains
 
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
-            Write(* ,'(2X,A)') 'TIMING >>> CSF basis construction took '//trim(timeStr)//' to complete'
+            Write(*,'(2X,A)') 'TIMING >>> CSF basis construction took '//trim(timeStr)//' to complete'
             Write(11,'(2X,A)') 'TIMING >>> CSF basis construction took '//trim(timeStr)//' to complete'
         End If
 

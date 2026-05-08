@@ -13,7 +13,7 @@ dtm
 ine
 
 # CMake
-build/
+build*/
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
