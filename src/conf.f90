@@ -870,8 +870,12 @@ Contains
         Call FormattedMemSize(memStaticArrays, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr),' of memory per core. (These will not be deallocated)' 
 
-        Call FormattedMemSize(memFormH, memStr)
-        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr),' of memory per core' 
+        If (kCSF > 0) Then
+            Call FormattedMemSize(memFormH + int(nccj, int64) * 8_int64, memStr)
+        Else
+            Call FormattedMemSize(memFormH, memStr)
+        End If
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr),' of memory per core'
         
         memEstimate = memFormH + memStaticArrays
     

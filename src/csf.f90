@@ -86,7 +86,7 @@ Contains
             Write(*,strfmt)
             Write(11,strfmt)
             Open(unit=18, file='CSF.LOG', status='UNKNOWN')
-            strfmt = '(6x,"Iconf_neq",3x,"Iconf",4x,"Ndi",5x,"Ncsfi",5x,"Rank")'
+            strfmt = '(6x,"Iconf_neq",3x,"Iconf",4x,"Ndi",5x,"Ncsfi",5x,"Core")'
             Write(18,strfmt)
         End If
 
@@ -116,8 +116,8 @@ Contains
             ! Worker peak memory: ndi_max x ndi_max matrix (zz)
             mem_jbasis = int(maxval(ndc_neq(1:nconf_neq)), int64)**2 * 8_int64
             Call FormattedMemSize(mem_jbasis, memStr)
-            Write(*,'(4X,A,A)') 'jbasis: estimated peak memory per worker (zz): ', Trim(memStr)
-            Write(11,'(4X,A,A)') 'jbasis: estimated peak memory per worker (zz): ', Trim(memStr)
+            Write(*,'(4X,A,A)') 'jbasis: estimated peak memory per core (zz): ', Trim(memStr)
+            Write(11,'(4X,A,A)') 'jbasis: estimated peak memory per core (zz): ', Trim(memStr)
             If (npes > 1 .and. total_work > 0_int64) Then
                 ndi = ndc_neq(dispatch_order(1))
                 mem_jbasis = int(ndi, int64)**3
@@ -125,7 +125,7 @@ Contains
                     i1 = int(mem_jbasis * 100_int64 / total_work)
                     Write(*,'(4X,A,I0,A,I0,A,I0,A)') &
                         'WARNING: iconf_neq=', dispatch_order(1), ' (ndi=', ndi, &
-                        ') accounts for ', i1, '% of work — one worker will bottleneck'
+                        ') accounts for ', i1, '% of work — one core will bottleneck'
                 End If
             End If
         End If
@@ -150,7 +150,7 @@ Contains
                     Deallocate(iwork)
                     Allocate(dd(lwork), iwork(liwork))
                     Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,dd,lwork,iwork,liwork,ifail)
-                    If (ifail /= 0) Write(*,*) mype, ' rank: dsyevr failed with ifail =', ifail
+                    If (ifail /= 0) Write(*,*) mype, ' core: dsyevr failed with ifail =', ifail
                     Deallocate(dd, iwork, isuppz)
 
                 End If
@@ -159,7 +159,7 @@ Contains
                     jtt = nint(2*tj)                      
                     If (dabs(2*tj-jtt) > 1.d-7) Then
                         Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
-                            '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
+                            '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Core',mype
                         Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                     End If               
                     If (jtt /= mj) Then
@@ -249,7 +249,7 @@ Contains
                         Deallocate(iwork)
                         Allocate(dd(lwork), iwork(liwork))
                         Call DSYEVR('V','V','U',ndi,zz,ndi,vl,vu,0,0,abstol,ncsfi,de,zz,ndi,isuppz,dd,lwork,iwork,liwork,ifail)
-                        If (ifail /= 0) Write(*,*) mype, ' rank: dsyevr failed with ifail =', ifail
+                        If (ifail /= 0) Write(*,*) mype, ' core: dsyevr failed with ifail =', ifail
                         Deallocate(dd, iwork, isuppz)
                     End If
                     Do i2 = 1, ncsfi
@@ -257,7 +257,7 @@ Contains
                         jtt = nint(2*tj)                      
                         If (dabs(2*tj-jtt) > 1.d-7) Then
                             Write(*,'(/2x,a/2x,a,f16.8,/2x,2(2x,a,i3))') &
-                                '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Rank',mype
+                                '*** Value of j in jbasis is wrong ***','J=',tj,'Configuration:',iconf,'Core',mype
                             Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
                         End If      
                         If (jtt /= mj) Then
@@ -296,8 +296,8 @@ Contains
             ! All ranks allocate ccj_module after broadcast
             mem_jbasis = int(nccj, int64) * 8_int64
             Call FormattedMemSize(mem_jbasis, memStr)
-            Write(*,'(4X,A,A)') 'jbasis: ccj_module memory per rank: ', Trim(memStr)
-            Write(11,'(4X,A,A)') 'jbasis: ccj_module memory per rank: ', Trim(memStr)
+            Write(*,'(4X,A,A)') 'jbasis: ccj_module memory per core: ', Trim(memStr)
+            Write(11,'(4X,A,A)') 'jbasis: ccj_module memory per core: ', Trim(memStr)
         End If
 
         iplace_cj(1) = 0
@@ -496,7 +496,7 @@ Contains
         Use mpi_f08
         Use vaccumulator
         Use determinants, Only : calcNd0
-        Use str_fmt, Only : startTimer, stopTimer
+        Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize
         Implicit None
 
         Integer :: mype, npes, mpierr
@@ -513,6 +513,7 @@ Contains
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
         Integer(Kind=int64)   :: s1, ih8_before
+        Integer(Kind=int64)   :: mem, maxmem, statmem, NumH_running, maxme_running
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
@@ -547,6 +548,8 @@ Contains
         j = 1
         iconf_local_count = 0
         Call startTimer(s1)
+        NumH_running   = 0_int64
+        maxme_running  = 0_int64
 
         NumH=0
         Kherr=0
@@ -567,7 +570,21 @@ Contains
                 iconf_local_count = iconf_local_count + 1
                 If (mod(iconf_local_count, mesplit)==0 .and. j < 10) Then
                     Call stopTimer(s1, timeStr)
-                    Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                    maxmem  = ih8 * (8_int64 + int(type_real, int64))
+                    statmem = memEstimate + memDvdsn - memFormH + maxmem
+                    Call FormattedMemSize(maxmem, memStr3)
+                    Call FormattedMemSize(maxmem, memStr2)
+                    Call FormattedMemSize(statmem, memTotStr)
+                    Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                    Write(counterStr,fmt='(I16)') ih8
+                    Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)// '; '// &
+                                                Trim(AdjustL(counterStr)) // ' elements'
+                    Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+                    If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                        Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                                Trim(memTotStr2) ,' is available.'
+                        Stop
+                    End If
                     j = j + 1
                 End If
                 iconf_neq=nc_neq(iconf)
@@ -631,8 +648,36 @@ Contains
                 end do
             end do
             NumH=ih8
+            maxmem  = ih8 * (8_int64 + int(type_real, int64))
+            statmem = memEstimate + memDvdsn - memFormH + maxmem
+            memEstimate = memEstimate + maxmem
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)
+            Call FormattedMemSize(maxmem, memStr3)
+            Call FormattedMemSize(maxmem, memStr2)
+            Call FormattedMemSize(memStaticArrays, memStr4)
+            Call FormattedMemSize(memDvdsn, memStr5)
+            Call FormattedMemSize(statmem, memStr)
+            Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+            Write(counterStr,fmt='(I16)') ih8
+            Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)// '; '// &
+                                        Trim(AdjustL(counterStr)) // ' elements'
+            Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+            Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                                // ', davidson = ' // trim(memStr5) &
+                                // ', Hamiltonian = ' // trim(memStr2) // ')'
+            If (memTotalPerCPU /= 0) Then
+                If (statmem > memTotalPerCPU) Then
+                    Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, but only ', &
+                                            Trim(memTotStr2) ,' is available.'
+                    Stop
+                Else If (statmem < memTotalPerCPU) Then
+                    Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, and ' , &
+                                            Trim(memTotStr2) ,' is available.'
+                End If
+            Else
+                Write(*,'(2X,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, &
+                                        but available memory was not saved to environment'
+            End If
         Else
             If (mype == 0) Then
                 ! Master: distribute iconf rows dynamically to workers
@@ -649,13 +694,29 @@ Contains
                 End Do
 
                 Do While (num_done < npes - 1)
-                    Call MPI_RECV(cntarray, 1, MPI_INTEGER, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
+                    NumH_running  = NumH_running  + int(cntarray(1), int64)
+                    maxme_running = max(maxme_running, int(cntarray(2), int64))
 
                     iconf_local_count = iconf_local_count + 1
                     If (mod(iconf_local_count, mesplit) == 0 .and. j < 10) Then
                         Call stopTimer(s1, timeStr)
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                        maxmem  = maxme_running * (8_int64 + int(type_real, int64))
+                        statmem = memEstimate + memDvdsn - memFormH + maxmem
+                        Call FormattedMemSize(NumH_running*(8_int64+int(type_real,int64)), memStr3)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Call FormattedMemSize(statmem, memTotStr)
+                        Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                        Write(counterStr,fmt='(I16)') NumH_running
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)// '; '// &
+                                                    Trim(AdjustL(counterStr)) // ' elements'
+                        Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+                        If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                            Write(*,'(A,A,A,A)'), 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                                    Trim(memTotStr2) ,' is available.'
+                            Stop
+                        End If
                         j = j + 1
                     End If
 
@@ -667,8 +728,36 @@ Contains
                         num_done = num_done + 1
                     End If
                 End Do
+                maxmem  = maxme_running * (8_int64 + int(type_real, int64))
+                statmem = memEstimate + memDvdsn - memFormH + maxmem
+                memEstimate = memEstimate + maxmem
                 Call stopTimer(s1, timeStr)
-                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)
+                Call FormattedMemSize(NumH_running*(8_int64+int(type_real,int64)), memStr3)
+                Call FormattedMemSize(maxmem, memStr2)
+                Call FormattedMemSize(memStaticArrays, memStr4)
+                Call FormattedMemSize(memDvdsn, memStr5)
+                Call FormattedMemSize(statmem, memStr)
+                Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                Write(counterStr,fmt='(I16)') NumH_running
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)// '; '// &
+                                            Trim(AdjustL(counterStr)) // ' elements'
+                Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
+                Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                                    // ', davidson = ' // trim(memStr5) &
+                                    // ', Hamiltonian = ' // trim(memStr2) // ')'
+                If (memTotalPerCPU /= 0) Then
+                    If (statmem > memTotalPerCPU) Then
+                        Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, but only ', &
+                                                Trim(memTotStr2) ,' is available.'
+                        Stop
+                    Else If (statmem < memTotalPerCPU) Then
+                        Write(*,'(A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, and ' , &
+                                                Trim(memTotStr2) ,' is available.'
+                    End If
+                Else
+                    Write(*,'(2X,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, &
+                                            but available memory was not saved to environment'
+                End If
             Else
                 ! Workers: receive iconf rows and compute matrix elements
                 Do
@@ -739,7 +828,8 @@ Contains
                     End If
 
                     cntarray(1) = int(ih8 - ih8_before)
-                    Call MPI_SEND(cntarray, 1, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                    cntarray(2) = int(ih8)
+                    Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
                 End Do
             End If
         End If
