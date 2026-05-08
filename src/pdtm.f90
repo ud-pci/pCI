@@ -1888,15 +1888,16 @@ Contains
             End If
         End Do
         
-        ! ===           AMPLITUDES IN CONVENTIONAL Unlvs            ===
+        ! ===           AMPLITUDES IN CONVENTIONAL Units            ===
         ! ===  all phys. constants below are taken from "phys.par"  ===
         If (iprt == 1) Then
-            A=-Gnuc/(DPcl*4*DPmp)*A*DPau*1.d-6
-            B= Qnuc*B*DPau/(DPrb*DPrb)*1.d-30
-            Write( 6,55) ppl,G,A,AE2,AM3
-            Write(11,55) ppl,G,A,AE2,AM3
-55          format(' Trace =',F8.4,' <b||M1||a> =',F9.5,' mu_0',2x, &
-                   ' <b||H_hfs||a> =',E11.4,' MHz'/,16x, &
+            A= -1.d0/(DPcl*4*DPmp)*A*DPau*1.d-6 
+            B= -B*DPau/(DPrb*DPrb)*1.d-30  
+            Write( 6,55) ppl,G,A,B,AE2,AM3
+            Write(11,55) ppl,G,A,B,AE2,AM3
+55          format(' Trace =',F8.4,' <b||M1||a> =',E19.5,' mu_0',2x, &
+                   ' <b||H_hfs(A)||a> =',E13.5,' MHz'/,16x, &
+                   ' <b||H_hfs(B)||a> =',E13.5,' MHz'/,16x, &
                    ' <b||E2||a> =',E13.5,' a.u.'/,16x, &
                    ' <b||M3||a> =',E13.5,' mu_0')
             If (dabs(tj1-tj2) < 1.d-6) Then
