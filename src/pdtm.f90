@@ -1762,6 +1762,7 @@ Contains
         AE1V= 0.d0 !###  AE1V = REDUCED E1 AMPLITUDE IN V GAUGE
         A   = 0.d0 !###  A    = REDUCED Magnetic HFS AMPLITUDE
         G   = 0.d0 !###  G    = REDUCED M1 AMPLITUDE
+        B   = 0.d0 !###  B    = REDUCED Electric HFS AMPLITUDE
         EDM = 0.d0 !###  EDM  = ELECTRON DIPOLE AMPLITUDE
         PNC = 0.d0 !###  PNC  = WEAK CHARGE AMPLITUDE
         AM  = 0.d0 !###  AM   = ANAPOLE MOMENT AMPLITUDE
@@ -1868,6 +1869,7 @@ Contains
                                 End If
                                 If (l1 == 3 .and. iabs(jl-jk) <= 4 .and. (jl+jk) >= 4) Then
                                     AE2= AE2 - AmpE2(tme, nol,xjl,lll, nok,xjk,lk)
+                                    B= B + HfsB(tme, nol,xjl,lll, nok,xjk,lk)
                                 End If
                                 If (l1 == 4) Then
                                     If (iabs(jl-jk) <= 6.and.(jl+jk) >= 6) Then
