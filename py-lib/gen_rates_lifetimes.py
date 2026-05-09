@@ -149,8 +149,8 @@ def format_wavelength(wl, unc):
     if unc > 950:
         exp  = math.floor(math.log10(abs(wl)))
         sign = "+" if exp >= 0 else "-"
-        m_str = format_with_uncertainty(wl / 10**exp, unc / 10**exp, n_sig_figs=1)
-        return f"{m_str}E{sign}{abs(exp):02d}"
+        coefficient_str = format_with_uncertainty(wl / 10**exp, unc / 10**exp, n_sig_figs=1)
+        return f"{coefficient_str}E{sign}{abs(exp):02d}"
 
     return format_with_uncertainty(wl, unc, n_sig_figs=1)
 
@@ -180,7 +180,7 @@ def format_rate_scientific(value, unc):
     """
     Transition rate display (s^-1).
       - 2 sig figs in uncertainty
-      - Primary: scientific with parenthetical mantissa (e.g. 1.661(12)E+06)
+      - Primary: scientific with parenthetical coefficient (e.g. 1.661(12)E+06)
       - Exception: E+00 is omitted for normal display (e.g. 1.5(10))
       - Version 3: unc > value  ->  <(value + unc) in scientific; E+00 kept
     """
@@ -199,16 +199,23 @@ def format_rate_scientific(value, unc):
         return f"<{_round_half_up(upper / 10**upper_exp, 1)}E{sign}{abs(upper_exp):02d}"
 
     exp      = math.floor(math.log10(abs(value)))
-    mantissa = value / (10.0 ** exp)
-    m_str    = format_with_uncertainty(mantissa, unc / (10.0 ** exp)) if unc > 0 \
-               else str(_round_half_up(mantissa, 4))
+    coefficient = value / (10.0 ** exp)
+    unc_scaled = unc / (10.0 ** exp)
+    coefficient_str    = format_with_uncertainty(coefficient, unc_scaled) if unc > 0 \
+               else str(_round_half_up(coefficient, 4))
+
+    # If rounding pushed coefficient to 10, bump the exponent and reformat
+    if float(coefficient_str.split('(')[0]) >= 10.0:
+        exp += 1
+        coefficient_str = format_with_uncertainty(value / 10.0**exp, unc / 10.0**exp) if unc > 0 \
+                else str(_round_half_up(value / 10.0**exp, 4))
 
     # Omit E+00 in normal display
     if exp == 0:
-        return m_str
+        return coefficient_str
 
     sign = "+" if exp >= 0 else "-"
-    return f"{m_str}E{sign}{abs(exp):02d}"
+    return f"{coefficient_str}E{sign}{abs(exp):02d}"
 
 
 def format_branching_ratio(B, unc):
@@ -295,10 +302,14 @@ def format_lifetime(lt_ns, unc):
 
     # Scientific for large lifetimes
     if lt_ns > 1e5:
-        exp  = math.floor(math.log10(abs(lt_ns)))
+        exp   = math.floor(math.log10(abs(lt_ns)))
+        coefficient_str = format_with_uncertainty(lt_ns / 10**exp, unc / 10**exp, n_sig_figs=2)
+        # If rounding pushed coefficient to 10, bump the exponent and reformat
+        if float(coefficient_str.split('(')[0]) >= 10.0:
+            exp += 1
+            coefficient_str = format_with_uncertainty(lt_ns / 10**exp, unc / 10**exp, n_sig_figs=2)
         sign = "+" if exp >= 0 else "-"
-        m_str = format_with_uncertainty(lt_ns / 10**exp, unc / 10**exp, n_sig_figs=2)
-        return f"{m_str}E{sign}{abs(exp):02d}"
+        return f"{coefficient_str}E{sign}{abs(exp):02d}"
 
     return format_with_uncertainty(lt_ns, unc, n_sig_figs=2)
 
