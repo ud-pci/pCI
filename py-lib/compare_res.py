@@ -11,6 +11,24 @@ This script combines two CONFFINAL.RES files, e.g. ci+all-order and ci+mbpt resu
 ORBITAL_LABELS_LOWER = ['s', 'p', 'd', 'f', 'g', 'h', 'i']
 ORBITAL_LABELS_UPPER = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
 
+# Matches a spectroscopic term like 2S1/2, 3D2, 1F3*, etc.
+_TERM_RE = re.compile(r'^\d+[SPDFGHI]\d+(?:/\d+)?\*?$')
+
+
+def _split_conf_term_string(string):
+    """Split a merged 'conf term' string where conf and term have only 1 space between them.
+    Scans space-separated words left-to-right; the term starts at the first word that
+    matches a spectroscopic term pattern (digit + uppercase orbital + digit(s)).
+    Returns (conf_str, term_str), or (string, None) if no term is found.
+    """
+    words = string.strip().split()
+    for i, word in enumerate(words):
+        if _TERM_RE.match(word):
+            conf = ' '.join(words[:i])
+            term = ''.join(words[i:])   # join without spaces, e.g. '2S1/2'
+            return conf, term
+    return string.strip(), None
+
 # Hartree to cm^-1 conversion factor
 HARTREE_TO_CM = 219474.63
 
@@ -274,11 +292,29 @@ def parse_final_res(filename):
 
     for line in lines[1:]:
         index = int(re.findall(r"\d+",line)[0])
-        confs = [conf for conf in line.split('  ') if any(l in conf for l in ORBITAL_LABELS_LOWER)]
-        confs = [conf.strip() for conf in confs]
+        confs = []
+        terms = []
+        for _str in line.split('  '):
+            _str = _str.strip()
+            # Skip empty strings and strings that don't start with a digit
+            if not _str or not _str[0].isdigit():
+                continue
+            _has_lower = any(l in _str for l in ORBITAL_LABELS_LOWER)
+            _has_upper = any(L in _str for L in ORBITAL_LABELS_UPPER)
+            if _has_lower and _has_upper:
+                # conf and term share only 1 space — split between conf and term
+                _conf_part, _term_part = _split_conf_term_string(_str)
+                if _term_part is not None:
+                    if _conf_part:
+                        confs.append(_conf_part)
+                    terms.append(_term_part)
+                else:
+                    confs.append(_str)
+            elif _has_lower:
+                confs.append(_str)
+            elif _has_upper:
+                terms.append(_str.replace(' ', ''))
         confs = [conf.replace(' ', '.') for conf in confs]
-
-        terms = [term for term in line.split('  ') if any(L in term for L in ORBITAL_LABELS_UPPER)]
         nums = [num for num in line.split('  ') if '.' in num]
 
         main_conf = confs[0]
