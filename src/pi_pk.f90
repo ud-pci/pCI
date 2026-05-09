@@ -77,7 +77,7 @@ Module pi_pk
         Implicit None
 
         Integer :: la, lc, ila, ja, ilc, jc, lmax, ilmax, ih, i
-        Real(dp) :: ga, half, xjx, xjn, s0, s1, ss, s2, ds
+        Real(dp) :: ga, half, xjx, xjn, s0, s1, ss, s2, ds, xja, xjc, xla, xlc, yla, ylc
         Real(dp), Dimension(IP6) :: Pa,Pc,Qa,Qc,Da
 
         P_eff=0.d0

@@ -319,14 +319,14 @@ Contains
         If (.not. Allocated(mx2)) Allocate(mx2(nozmax, k1max))
 
         ! Reallocate Ac, NOz
-        num_rel_confs0 = size(NOz)
+        num_rel_confs0 = Nc
         Call move_alloc(Ac, temp2)
         Call move_alloc(NOz, temp)
         Allocate(NOz(num_rel_confs), Ac(num_rel_confs, max_num_shells))
         NOz=0
-        NOz(1:num_rel_confs0) = temp
+        NOz(1:num_rel_confs0) = temp(1:num_rel_confs0)
         Ac=0_dp
-        Ac(1:num_rel_confs0,1:max_num_shells) = temp2
+        Ac(1:num_rel_confs0,1:max_num_shells) = temp2(1:num_rel_confs0,1:max_num_shells)
         Deallocate(temp, temp2)
 
         ! Loop over non-relativistic configurations

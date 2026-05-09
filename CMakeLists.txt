@@ -83,6 +83,17 @@ elseif (${CMAKE_Fortran_COMPILER} MATCHES "gfortran")
     add_compile_options(-fopenmp -lscalapack -lblas -llapack)
     add_link_options(-fopenmp -lscalapack -lblas -llapack)
 endif()
+
+# Add flag to turn on double-precision integrals for isotope shift calculations
+option(USE_DP_INTEGRALS "Use double-precision integrals" OFF)
+
+if (${CMAKE_Fortran_COMPILER} MATCHES "ifort")
+    if (USE_DP_INTEGRALS)
+        message(STATUS "Using double-precision integrals (-DUSE_DP_INTEGRALS)")
+        add_compile_options(-DUSE_DP_INTEGRALS)
+    endif()
+endif()
+
 # The FindMPI returns linker flags as a space-delimited string, but target_link_options() needs a list:
 string(REGEX REPLACE "[ \t\r\n]" ";" MPI_Fortran_LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
 

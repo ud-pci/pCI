@@ -165,7 +165,7 @@ Contains
         Ng  =PQ(10)+C1
         Rnuc=PQ(13)
 
-        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp),Kbas(Nso))
+        Allocate(Nvc(Nc),Nc0(Nc),Nq(Nsp),Nip(Nsp))
 
         strfmt = '(/4X,"Z   = ",F6.2,5X,"Kt  =",I3,  7X,"II =",I4,    &
                 /4X,"H   =",F7.4, 5X,"R2  =",F6.2,4X,"R1 =",E11.4, &
@@ -205,7 +205,6 @@ Contains
         End If
 
         Norb=0
-        Kfile=0
         nsb=Ns
         Do nj=1,Nsp
             i=dsign(1.d0,Qnl(nj))
@@ -234,8 +233,6 @@ Contains
             Kk(ni)=kkj
             Ll(ni)=llj
             Jj(ni)=jjj
-            If (Kbas(ni) == 3) Kfile=1
-            If (Kbas(ni) == 4) kfile=1
  210        Nip(nj)=ni
         End Do
         Write(*,*) Norb, ' new orbitals to be formed'
@@ -545,8 +542,7 @@ Contains
         P(19)=Hcore
         Call WriteF(12,1,P,Q,2)
         strfmt='(/4X,"one-el. and total core energy:",F17.7,4X,F17.7, &
-              /6X "including Breit core energy:",F17.7)'
-        ! strfmt='(/4X,"one-el., Coulomb & Breit core energy:",F17.7,2(4X,F17.7))'
+              /6X, "including Breit core energy:",F17.7)'
         Write( *,strfmt) Hcore,Ecore,Ebcore
         Write(11,strfmt) Hcore,Ecore,Ebcore
 
@@ -1265,10 +1261,17 @@ Contains
                                     strfmt = '(1X,I11,1X,I2,2X,I3,A1,I2,"/2",1X,I3,A1,I2, &
                                             "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
-                                        write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
-                                        write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                        nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                        If (l_br) Then
+                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                        Else
+                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
+                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                        End If
                                     End If
                                 End Do
                                 If (n1 == n2.OR.n3 == n4) Exit

@@ -139,96 +139,164 @@ Module formj2
             Call startTimer(s1)
     
             If (mype == 0) Then
-                ! Distribute a portion of the workload of size ncGrowBy to each worker process
-                Do an_id = 1, npes - 1
-                   nnc = ncGrowBy*an_id + 1
-                   Call MPI_Send( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
-                End Do
-
-                Do ic1=1, ncGrowBy
-                    ndn=Ndc(ic1)
-                    n=sum(Ndc(1:ic1-1))
-                    Do n1=1,ndn
-                        n=n+1
-                        ndr=n
-                        Call Gdet(n,idet1)
-                        k=n-n1
-                        Do k1=1,n1
-                            k=k+1
-                            Call Gdet(k,idet2)
-                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                            If (diff == 0 .or. diff == 2) Then
-                                nn=n
-                                kk=k
-                                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                tt=F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                If (tt /= 0) Then
-                                    cntarray = cntarray + 1
-                                    Call IVAccumulatorAdd(iva1, nn)
-                                    Call IVAccumulatorAdd(iva2, kk)
-                                    Call RVAccumulatorAdd(rva1, tt)
-                                End If
-                            End If
-                        End Do
-                    End Do
-                End Do
-
-                NumJ = cntarray(1)
-                num_done = 0
                 ncsplit = Nc/10
                 nccnt = ncsplit
-                maxme = cntarray(2)
                 j=9
 
-                Do 
-                    Call MPI_Recv(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status%MPI_SOURCE
-             
-                    If (nnc + ncGrowBy <= Nc) Then
-                        nnc = nnc + ncGrowBy
-                        Call MPI_Send( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
-                    Else
-                        msg = -1
-                        Call MPI_Send( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
-                        num_done = num_done + 1
-                    End If
-                    
-                    NumJ = NumJ + cntarray(1)
-                    maxme = max(cntarray(2),maxme)
+                If (npes == 1) Then
+                    ! Single process: loop over all configurations directly.
+                    Do ic1=1, Nc
+                        ndn=Ndc(ic1)
+                        n=sum(Ndc(1:ic1-1))
+                        Do n1=1,ndn
+                            n=n+1
+                            ndr=n
+                            Call Gdet(n,idet1)
+                            k=n-n1
+                            Do k1=1,n1
+                                k=k+1
+                                Call Gdet(k,idet2)
+                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                If (diff == 0 .or. diff == 2) Then
+                                    nn=n
+                                    kk=k
+                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    tt=F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                    If (tt /= 0) Then
+                                        cntarray = cntarray + 1
+                                        Call IVAccumulatorAdd(iva1, nn)
+                                        Call IVAccumulatorAdd(iva2, kk)
+                                        Call RVAccumulatorAdd(rva1, tt)
+                                    End If
+                                End If
+                            End Do
+                        End Do
+                        If (ic1 == nccnt .and. j /= 0) Then
+                            Call stopTimer(s1, timeStr)
+                            NumJ = cntarray(1)
+                            maxme = cntarray(2)
+                            mem = NumJ * (8_int64+type_real)
+                            maxmem = maxme * (8_int64+type_real)
+                            statmem = memEstimate + maxmem
+                            Call FormattedMemSize(statmem, memTotStr)
+                            Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                            Call FormattedMemSize(mem, memStr)
+                            Call FormattedMemSize(maxmem, memStr2)
+                            Write(counterStr,fmt='(I16)') NumJ
+                            Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
+                                    ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
+                                    ', '//trim(memStr2)//' for a single core)'
+                            flush(6)
+                            If (memTotalPerCPU /= 0 .and. memEstimate > memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
+                                Trim(memTotStr2) ,' is available.'
+                                Stop
+                            End If
+                            j=j-1
+                            nccnt = nccnt + ncsplit
+                        End If
+                    End Do
+                    ! Final summary
+                    Call stopTimer(s1, timeStr)
+                    NumJ = cntarray(1)
+                    maxme = cntarray(2)
                     mem = NumJ * (8_int64+type_real)
                     maxmem = maxme * (8_int64+type_real)
-                    statmem = memEstimate + maxmem
-                    Call FormattedMemSize(statmem, memTotStr)
-                    Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                    memEstimate = memEstimate + maxmem
+                    Call FormattedMemSize(mem, memStr)
+                    Call FormattedMemSize(maxmem, memStr2)
+                    Write(counterStr,fmt='(I16)') NumJ
+                    Write(*,'(2X,A,1X,I3,A)') 'FormJ:', 100, '% done in '// trim(timeStr)// ' with '// &
+                    Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
+                Else
+                    ! Multi-process: distribute a portion of the workload to each worker process
+                    Do an_id = 1, npes - 1
+                       nnc = ncGrowBy*an_id + 1
+                       Call MPI_Send( nnc, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                    End Do
 
-                    If (nnc == nccnt .and. nnc /= ncsplit*10) Then
-                        Call stopTimer(s1, timeStr)
-                        Call FormattedMemSize(mem, memStr)
-                        Call FormattedMemSize(maxmem, memStr2)
-                        Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
-                                ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
-                                ', '//trim(memStr2)//' for a single core)'
-                        If (memTotalPerCPU /= 0 .and. memEstimate > memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
-                            Trim(memTotStr2) ,' is available.'
-                            Stop
+                    Do ic1=1, ncGrowBy
+                        ndn=Ndc(ic1)
+                        n=sum(Ndc(1:ic1-1))
+                        Do n1=1,ndn
+                            n=n+1
+                            ndr=n
+                            Call Gdet(n,idet1)
+                            k=n-n1
+                            Do k1=1,n1
+                                k=k+1
+                                Call Gdet(k,idet2)
+                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                If (diff == 0 .or. diff == 2) Then
+                                    nn=n
+                                    kk=k
+                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    tt=F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                    If (tt /= 0) Then
+                                        cntarray = cntarray + 1
+                                        Call IVAccumulatorAdd(iva1, nn)
+                                        Call IVAccumulatorAdd(iva2, kk)
+                                        Call RVAccumulatorAdd(rva1, tt)
+                                    End If
+                                End If
+                            End Do
+                        End Do
+                    End Do
+
+                    NumJ = cntarray(1)
+                    num_done = 0
+                    maxme = cntarray(2)
+
+                    Do
+                        Call MPI_Recv(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                        sender = status%MPI_SOURCE
+
+                        If (nnc + ncGrowBy <= Nc) Then
+                            nnc = nnc + ncGrowBy
+                            Call MPI_Send( nnc, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        Else
+                            msg = -1
+                            Call MPI_Send( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                            num_done = num_done + 1
                         End If
-                        j=j-1
-                        nccnt = nccnt + ncsplit
-                    End If
-                    
-                    If (num_done == npes-1) Then
-                        Call stopTimer(s1, timeStr)
-                        Call FormattedMemSize(mem, memStr)
-                        Call FormattedMemSize(maxmem, memStr2)
-                        memEstimate = memEstimate + maxmem
-                        Write(counterStr,fmt='(I16)') NumJ
-                        Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
-                        Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
-                        Exit
-                    End If
-                End Do
+
+                        NumJ = NumJ + cntarray(1)
+                        maxme = max(cntarray(2),maxme)
+                        mem = NumJ * (8_int64+type_real)
+                        maxmem = maxme * (8_int64+type_real)
+                        statmem = memEstimate + maxmem
+                        Call FormattedMemSize(statmem, memTotStr)
+                        Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+
+                        If (nnc == nccnt .and. nnc /= ncsplit*10) Then
+                            Call stopTimer(s1, timeStr)
+                            Call FormattedMemSize(mem, memStr)
+                            Call FormattedMemSize(maxmem, memStr2)
+                            Write(counterStr,fmt='(I16)') NumJ
+                            Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// &
+                                    ' with '//Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)// &
+                                    ', '//trim(memStr2)//' for a single core)'
+                            If (memTotalPerCPU /= 0 .and. memEstimate > memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ' , &
+                                Trim(memTotStr2) ,' is available.'
+                                Stop
+                            End If
+                            j=j-1
+                            nccnt = nccnt + ncsplit
+                        End If
+
+                        If (num_done == npes-1) Then
+                            Call stopTimer(s1, timeStr)
+                            Call FormattedMemSize(mem, memStr)
+                            Call FormattedMemSize(maxmem, memStr2)
+                            memEstimate = memEstimate + maxmem
+                            Write(counterStr,fmt='(I16)') NumJ
+                            Write(*,'(2X,A,1X,I3,A)') 'FormJ:', (10-j)*10, '% done in '// trim(timeStr)// ' with '// &
+                            Trim(AdjustL(counterStr)) // ' elements (Mem='// trim(memStr)//', '//trim(memStr2)//' for a single core)'
+                            Exit
+                        End If
+                    End Do
+                End If
             Else
                 Do 
                     Call MPI_Recv ( nnc, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpierr)
