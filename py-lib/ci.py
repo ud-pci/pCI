@@ -40,7 +40,7 @@ def read_yaml(filename):
 
     return config
 
-def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parity):
+def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, C_is):
     """Write ADD.INP file for specified parity"""
 
     configurations = config['add']['ref_configs']
@@ -49,21 +49,6 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     if configurations[parity] == []:
         print(parity.capitalize(), 'parity configurations were not specified')
         return
-
-    if parity == 'odd':
-        parity_config = config['conf']['odd']
-    elif parity == 'even':
-        parity_config = config['conf']['even']
-    else:
-        print('parity ' + parity + ' is not valid')
-        return
-    
-    # Set number of energy levels
-    J = parity_config['J']
-    JM = parity_config['JM']
-    J_selection = parity_config['J_selection']
-    num_energy_levels = parity_config['num_energy_levels']
-    num_dvdsn_iterations = parity_config['num_dvdsn_iterations']
 
     # Define name of file to export
     filename = filename[0:-4] + parity + filename[-4:]
@@ -141,6 +126,9 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
     else:
         kbrt = 0
     f.write('Kbrt= ' + str(kbrt) + '\n')
+    if K_is > 0:
+        f.write('K_is= ' + str(K_is) + '\n')
+        f.write('C_is= ' + str(C_is) + '\n')
     
     # Write core orbitals
     if num_core_orb != 0:
@@ -195,7 +183,7 @@ def format_orb_occ(orb, occ):
 
     return orb_occ_formatted
 
-def create_add_inp(config):
+def create_add_inp(config, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c):
     # Get atomic data
     atom = config['atom']
     
@@ -209,15 +197,45 @@ def create_add_inp(config):
     orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
     multiplicity = orb_lib.count_excitations(add['excitations'])
 
-    if add['ref_configs']['even']:
-        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'even')
+    if add['ref_configs'][parity]:
+        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c)
     else:
-        print('no even reference configurations specified')
+        print('no ' + parity + ' reference configurations specified')
         
-    if add['ref_configs']['odd']:
-        write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd')
+    #if add['ref_configs']['odd']:
+    #    write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, 'odd', J, JM, K_is, c)
+    #else:
+    #    print('no odd reference configurations specified')
+
+def create_add_inp_portal(config, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c):
+    """Create ADD.INP for portal mode with unique filename based on parity and J value"""
+    # Get atomic data
+    atom = config['atom']
+    
+    try:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], atom['isotope'])
+    except KeyError as e:
+        Z, AM, symbol, cfermi, rnuc, num_rem_ele = libatomic.get_atomic_data(atom['name'], "")
+    
+    add = config['add']
+    num_val = orb_lib.count_valence(add['ref_configs'])
+    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
+    multiplicity = orb_lib.count_excitations(add['excitations'])
+
+    if add['ref_configs'][parity]:
+        # Create unique filename for portal mode: ADDeven0.INP, ADDeven1.INP, etc.
+        j_int = int(J)
+        
+        print(f'Creating ADD{parity}{j_int}.INP for {parity} parity with J={J}')
+        write_add_inp("ADD.INP", Z, AM, config, multiplicity, num_val, orb_occ, parity, J, J, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c)
+        
+        # Add J-value to the file name
+        old_name = f'ADD{parity}.INP'
+        new_name = f'ADD{parity}{j_int}.INP'
+        if os.path.isfile(old_name):
+            os.rename(old_name, new_name)
     else:
-        print('no odd reference configurations specified')
+        print('no ' + parity + ' reference configurations specified')
 
 def form_conf_inp(parity, bin_dir):
     if bin_dir and bin_dir[-1] != '/':
@@ -231,15 +249,50 @@ def form_conf_inp(parity, bin_dir):
     run_shell("cp CONF.INP CONF" + parity + ".INP")
     print("CONF" + parity + ".INP created")
 
-def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij):
+def form_conf_inp_portal(parity, j_value, bin_dir):
+    """Generate CONF.INP from ADD.INP for portal mode with unique naming"""
+    if bin_dir and bin_dir[-1] != '/':
+        bin_dir += '/'
+    
+    j_int = int(j_value)
+    add_filename = f"ADD{parity}{j_int}.INP"
+    conf_filename = f"CONF{parity}{j_int}.INP"
+    output_filename = f"add{parity}{j_int}.out"
+    
+    print(f"Generating {conf_filename} from {add_filename}")
+    
+    # Step 1: Copy specific ADD file to ADD.INP (required by add program)
+    run_shell(f"cp {add_filename} ADD.INP")
+    
+    # Step 2: Run add program (reads ADD.INP, outputs CONF.INP)
+    run_shell(f"{bin_dir}add < add.in > {output_filename}")
+    print(f"Output of add saved to {output_filename}")
+    
+    # Step 3: Copy CONF.INP to unique filename
+    run_shell(f"cp CONF.INP {conf_filename}")
+    print(f"{conf_filename} created")
+    
+    # Step 4: Clean up temporary ADD.INP
+    run_shell("rm ADD.INP")
+
+def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij, K_is, C_is):
     if not os.path.isdir(conf_dir):
         run_shell("mkdir " + conf_dir)
     if os.path.isfile('basis/HFD.DAT'):
         run_shell("cp basis/HFD.DAT " + conf_dir)
+    else:
+        print('basis/HFD.DAT was not found.. try running basis.py first')
+        sys.exit()
     if os.path.isfile(root_dir + '/CONF' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + conf_dir + "/CONF.INP")
+        if K_is > 0:
+            run_shell("cp " + root_dir + "/CONF" + parity + str(C_is) + ".INP " + conf_dir + "/CONF.INP")
+        else:
+            run_shell("cp " + root_dir + "/CONF" + parity + ".INP " + conf_dir + "/CONF.INP")
     if os.path.isfile(root_dir + '/ADD' + parity + '.INP'):
-        run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + conf_dir + "/ADD.INP")
+        if K_is > 0:
+            run_shell("cp " + root_dir + "/ADD" + parity + str(C_is) + ".INP " + conf_dir + "/ADD.INP")
+        else:
+            run_shell("cp " + root_dir + "/ADD" + parity + ".INP " + conf_dir + "/ADD.INP")
     if os.path.isfile('basis/SGC.CON'):
         run_shell("cp basis/SGC.CON "  + conf_dir)
     if os.path.isfile('basis/SCRC.CON'):
@@ -247,6 +300,62 @@ def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij)
     if run_codes and os.path.isfile(root_dir + '/ci.qs'):
         run_shell("cp " + root_dir + "/ci.qs " + conf_dir)
         
+    Kw = '1' if write_hij else '0'
+    KLSJ = '1' if include_lsj else '0'
+
+    if os.path.isfile('basis/SGC.CON'):
+        with open(conf_dir + '/ci.in', 'w') as f:
+            f.write('Kl = 2 \n')
+            if os.path.isfile('basis/SCRC.CON'):
+                f.write('Ksig = 2 \n')
+            else:
+                f.write('Ksig = 1 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
+    else:
+        with open(conf_dir + '/ci.in', 'w') as f:
+            f.write('Kl = 0 \n')
+            f.write('Ksig = 0 \n')
+            f.write('Kdsig = 0 \n')
+            f.write('Kw = ' + Kw + '\n')
+            f.write('KLSJ = ' + KLSJ)
+
+def move_conf_inp_portal(conf_dir, root_dir, parity, j_value, run_codes, include_lsj, write_hij, K_is, C_is):
+    """Move CONF.INP and ADD.INP files for portal mode with unique naming"""
+    if not os.path.isdir(conf_dir):
+        run_shell("mkdir " + conf_dir)
+    
+    j_int = int(j_value)
+    
+    # Copy basis files
+    if os.path.isfile('basis/HFD.DAT'):
+        run_shell("cp basis/HFD.DAT " + conf_dir)
+    else:
+        print('basis/HFD.DAT was not found.. try running basis.py first')
+        sys.exit()
+    
+    # Copy portal-specific CONF file
+    conf_source = f"{root_dir}/CONF{parity}{j_int}.INP"
+    if os.path.isfile(conf_source):
+        run_shell(f"cp {conf_source} {conf_dir}/CONF.INP")
+    
+    # Copy portal-specific ADD file  
+    add_source = f"{root_dir}/ADD{parity}{j_int}.INP"
+    if os.path.isfile(add_source):
+        run_shell(f"cp {add_source} {conf_dir}/ADD.INP")
+    
+    # Copy QED files if they exist
+    if os.path.isfile('basis/SGC.CON'):
+        run_shell("cp basis/SGC.CON " + conf_dir)
+    if os.path.isfile('basis/SCRC.CON'):
+        run_shell("cp basis/SCRC.CON " + conf_dir)
+    
+    # Copy job script if it exists
+    if run_codes and os.path.isfile(root_dir + '/ci.qs'):
+        run_shell("cp " + root_dir + "/ci.qs " + conf_dir)
+    
+    # Create ci.in file
     Kw = '1' if write_hij else '0'
     KLSJ = '1' if include_lsj else '0'
 
@@ -319,6 +428,7 @@ if __name__ == "__main__":
     atom = get_dict_value(config, 'atom')
     code_method = get_dict_value(atom, 'code_method')
     conf = get_dict_value(config, 'conf')
+    for_portal = get_dict_value(system, 'for_portal')
     
     include_lsj = get_dict_value(conf, 'include_lsj')
     write_hij = get_dict_value(conf, 'write_hij')
@@ -342,8 +452,12 @@ if __name__ == "__main__":
             if 'BASS.INP' in files:
                 bass_inp_paths.append(root)
     if not isinstance(code_method, list):
-        run_shell('cp ./basis/BASS.INP .')
-        print('BASS.INP taken from basis/')
+        if include_isotope_shifts and K_is > 0:
+            run_shell('cp ./' + K_is_dict[K_is] + '/0/basis/BASS.INP .')
+            code_method = ['']
+        else:
+            run_shell('cp ./basis/BASS.INP .')
+            print('BASS.INP taken from basis/')
     else:
         if os.path.isdir('ci+all-order'):
             run_shell('cp ./ci+all-order/basis/BASS.INP .')
@@ -353,27 +467,82 @@ if __name__ == "__main__":
             print('BASS.INP taken from ci+all-order/basis/')
 
     # Run script to generate ADD.INP for even and odd configurations
-    create_add_inp(config)
+    J_odd = conf['odd']['J']
+    JM_odd = conf['odd']['JM']
+    J_even = conf['even']['J']
+    JM_even = conf['even']['JM']
     
-    # Cleanup BASS.INP
-    if os.path.isfile('BASS.INP'):
-        run_shell('rm BASS.INP')
+    J_selection_odd = conf['odd']['J_selection']
+    num_energy_levels_odd = conf['odd']['num_energy_levels']
+    num_dvdsn_iterations_odd = conf['odd']['num_dvdsn_iterations']
     
-    # Check if ADDeven.INP and ADDodd.INP exist
-    even_exists = os.path.isfile('ADDeven.INP')
-    odd_exists = os.path.isfile('ADDodd.INP')
+    J_selection_even = conf['even']['J_selection']
+    num_energy_levels_even = conf['even']['num_energy_levels']
+    num_dvdsn_iterations_even = conf['even']['num_dvdsn_iterations']
     
-    # Run add and form CONF.INP from respective ADD.INP files
-    parities = []
-    if even_exists: 
-        form_conf_inp('even', bin_dir)
-        parities.append('even')
-    if odd_exists: 
-        form_conf_inp('odd', bin_dir)
-        parities.append('odd')
-    
-    # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP
-    run_shell("rm add.in ADD.INP CONF.INP CONF_.INP")
+    if include_isotope_shifts:
+        for c in c_list:
+            create_add_inp(config, 'even', J_even, JM_even, J_selection_even, num_energy_levels_even, num_dvdsn_iterations_even, K_is, c)
+            create_add_inp(config, 'odd', J_odd, JM_odd, J_selection_odd, num_energy_levels_odd, num_dvdsn_iterations_odd, K_is, c)
+            even_exists = os.path.isfile('ADDeven.INP')
+            odd_exists = os.path.isfile('ADDodd.INP')
+            if even_exists:
+                run_shell('cp ADDeven.INP ADDeven' + str(c) + '.INP')
+            if odd_exists:
+                run_shell('cp ADDodd.INP ADDodd' + str(c) + '.INP')
+            # Run add and form CONF.INP from respective ADD.INP files
+            parities = []
+            if even_exists: 
+                form_conf_inp('even', bin_dir)
+                run_shell('cp CONFeven.INP CONFeven' + str(c) + '.INP')
+                parities.append('even')
+            if odd_exists: 
+                form_conf_inp('odd', bin_dir)
+                run_shell('cp CONFodd.INP CONFodd' + str(c) + '.INP')
+                parities.append('odd')
+    else:
+        if for_portal:
+            # Portal mode: run CI for both J=0.0 and J=1.0 for both parities
+            print("Portal mode enabled - generating configurations for J=0.0 and J=1.0 for both parities")
+            j_values = [0.0, 1.0]
+            parities = []
+            
+            # Generate ADD files for all combinations
+            for parity in ['even', 'odd']:
+                parity_config = conf[parity]
+                JM = parity_config['JM']
+                J_selection = parity_config['J_selection']
+                num_energy_levels = parity_config['num_energy_levels']
+                num_dvdsn_iterations = parity_config['num_dvdsn_iterations']
+                
+                # Check if this parity has reference configurations
+                if config['add']['ref_configs'][parity]:
+                    parities.append(parity)
+                    for J in j_values:
+                        create_add_inp_portal(config, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, 0, 0)
+            
+            # Generate CONF files from ADD files
+            for parity in parities:
+                for J in j_values:
+                    j_int = int(J)
+                    add_filename = f'ADD{parity}{j_int}.INP'  # Correct filename pattern after rename
+                    if os.path.isfile(add_filename):
+                        form_conf_inp_portal(parity, J, bin_dir)
+        else:
+            # Regular mode: use specified J values for each parity
+            create_add_inp(config, 'even', J_even, JM_even, J_selection_even, num_energy_levels_even, num_dvdsn_iterations_even, 0, 0)
+            create_add_inp(config, 'odd', J_odd, JM_odd, J_selection_odd, num_energy_levels_odd, num_dvdsn_iterations_odd, 0, 0)
+            # Check if ADDeven.INP and ADDodd.INP exist
+            even_exists = os.path.isfile('ADDeven.INP')
+            odd_exists = os.path.isfile('ADDodd.INP')
+            # Run add and form CONF.INP from respective ADD.INP files
+            parities = []
+            if even_exists: 
+                form_conf_inp('even', bin_dir)
+                parities.append('even')
+            if odd_exists: 
+                form_conf_inp('odd', bin_dir)
+                parities.append('odd')
     
     # Create a ci.qs job script if it doesn't exist yet
     if on_hpc:
@@ -400,11 +569,16 @@ if __name__ == "__main__":
                     dir_name = dir_prefix+str(abs(c))
                     Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run_shell('pwd')
+                    print(dir_name)
                     for parity in parities:
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = parity + str(J)[0]
-                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
+                        # check if run has already been completed
+                        if os.path.isfile(conf_path + '/FINAL.RES'):
+                            print('Completed run detected in ' + conf_path)
+                            print('Skipping..')
+                            continue
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, K_is, c)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
@@ -417,8 +591,6 @@ if __name__ == "__main__":
                             print("run_codes option is only available with HPC access")
                     os.chdir('../')
                 if K_is_dict[K_is]:
-                    os.chdir('../../')
-                else:
                     os.chdir('../')
         else:
             if isinstance(code_method, list):
@@ -427,10 +599,72 @@ if __name__ == "__main__":
                     Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method)
                     run_shell('pwd')
+                    if for_portal:
+                        # Portal mode: create directories for both J values
+                        j_values = [0.0, 1.0]
+                        for parity in parities:
+                            for J in j_values:
+                                j_int = int(J)
+                                conf_path = parity + str(j_int)
+                                # Check if portal CONF file exists
+                                portal_conf = f"{root_dir}/CONF{parity}{j_int}.INP"
+                                if os.path.isfile(portal_conf):
+                                    move_conf_inp_portal(conf_path, root_dir, parity, J, run_codes, include_lsj, write_hij, 0, 0)
+                                    # Submit CI job if run_codes == True
+                                    if on_hpc and run_codes: 
+                                        os.chdir(conf_path)
+                                        if script_name and submit_job:
+                                            run_shell("sbatch " + script_name)
+                                        else:
+                                            print('job script was not submitted. check job script and submit manually.')
+                                        os.chdir('../')
+                                    else:
+                                        print("run_codes option is only available with HPC access - please run ci codes manually")
+                    else:
+                        for parity in parities:
+                            J = get_dict_value(conf[parity], 'J')
+                            conf_path = parity + str(J)[0]
+                            move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0)
+                            # Submit CI job if run_codes == True
+                            if on_hpc and run_codes: 
+                                os.chdir(conf_path)
+                                if script_name and submit_job:
+                                    run_shell("sbatch " + script_name)
+                                else:
+                                    print('job script was not submitted. check job script and submit manually.')
+                                os.chdir('../')
+                            else:
+                                print("run_codes option is only available with HPC access - please run ci codes manually")
+                    os.chdir('../')
+            else:
+                dir_path = os.getcwd()
+                run_shell('pwd')
+                if for_portal:
+                    # Portal mode: create directories for both J values
+                    j_values = [0.0, 1.0]
+                    for parity in parities:
+                        for J in j_values:
+                            j_int = int(J)
+                            conf_path = parity + str(j_int)
+                            # Check if portal CONF file exists
+                            portal_conf = f"{root_dir}/CONF{parity}{j_int}.INP"
+                            if os.path.isfile(portal_conf):
+                                move_conf_inp_portal(conf_path, root_dir, parity, J, run_codes, include_lsj, write_hij, 0, 0)
+                                # Submit CI job if run_codes == True
+                                if on_hpc and run_codes: 
+                                    os.chdir(conf_path)
+                                    if script_name and submit_job:
+                                        run_shell("sbatch " + script_name)
+                                    else:
+                                        print('job script was not submitted. check job script and submit manually.')
+                                    os.chdir('../')
+                                else:
+                                    print("run_codes option is only available with HPC access - please run ci codes manually")
+                else:
                     for parity in parities:
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = parity + str(J)[0]
-                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0)
                         # Submit CI job if run_codes == True
                         if on_hpc and run_codes: 
                             os.chdir(conf_path)
@@ -441,24 +675,9 @@ if __name__ == "__main__":
                             os.chdir('../')
                         else:
                             print("run_codes option is only available with HPC access - please run ci codes manually")
-                    os.chdir('../')
-            else:
-                dir_path = os.getcwd()
-                run_shell('pwd')
-                for parity in parities:
-                    J = get_dict_value(conf[parity], 'J')
-                    conf_path = parity + str(J)[0]
-                    move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij)
-                    # Submit CI job if run_codes == True
-                    if on_hpc and run_codes: 
-                        os.chdir(conf_path)
-                        if script_name and submit_job:
-                            run_shell("sbatch " + script_name)
-                        else:
-                            print('job script was not submitted. check job script and submit manually.')
-                        os.chdir('../')
-                    else:
-                        print("run_codes option is only available with HPC access - please run ci codes manually")
 
+    # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP from root directory
+    run_shell("rm add.in ADD*.INP CONF*.INP add*.out BASS.INP")
+    
     print('add script completed')
 

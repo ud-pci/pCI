@@ -37,7 +37,7 @@ def read_yaml(filename):
     return config
 
 def parse_final_res():
-    f = open('CONFFINAL.RES', 'r')
+    f = open('FINAL.RES', 'r')
     lines = f.readlines()
     f.close()
 
@@ -57,7 +57,7 @@ def parse_final_res():
     return main_confs, terms_list, energies_ev
 
 def get_radius():
-    f = open('0/HFD.RES', 'r') # TODO - default 0 directory, change to be dynamic and check all radii in HFD.RES
+    f = open('0/basis/HFD2.RES', 'r') # TODO - default 0 directory, change to be dynamic and check all radii in HFD.RES
     lines = f.readlines()
     f.close()
 
@@ -73,6 +73,10 @@ if __name__ == "__main__":
         config = read_yaml('config.yml')
         K_is = int(config['optional']['isotope_shifts']['K_is'])
         C_is = float(config['optional']['isotope_shifts']['C_is'])
+    else:
+        config = read_yaml(input('Input name of config.yml file: '))
+        K_is = int(config['optional']['isotope_shifts']['K_is'])
+        C_is = float(config['optional']['isotope_shifts']['C_is'])
     
     # If K_is in config.yml is 0, ask user for K_is
     if K_is == 0:
@@ -83,25 +87,28 @@ if __name__ == "__main__":
     program = input("Enter program you want to run (basis, ci, analysis): ")
 
     if program == 'analysis':  
+        directory = input("Enter directory to analyze: ")
         if K_is != 0:
             step_size = C_is/2
             c_list = [-C_is, -C_is/2, 0, C_is/2, C_is] 
 
-            # Parse CONFFINAL.RES files in IS directories for energies 
+            # Parse FINAL.RES files in IS directories for energies 
             energies = []
             for c in c_list:
                 dir_path = os.getcwd()
                 dir_prefix = ''
                 if c < 0:
-                    dir_prefix = 'minus'
+                    dir_prefix = 'minus' 
                 elif c > 0:
                     dir_prefix = 'plus'
-                dir_name = dir_prefix+'{:.5f}'.format(abs(c))
-                if c == 0: dir_name = dir_prefix + '0'
+                else:
+                    dir_prefix = ''
+                dir_name = dir_path + '/' + dir_prefix+str(abs(c))+'/'+directory
                 os.chdir(dir_name)
+                print(dir_name)
                 main_confs, terms_list, energies_ev = parse_final_res()
                 energies.append(energies_ev)
-                os.chdir('../')
+                os.chdir('../../')
 
             # calculate 2-point and 4-point derivatives and isotope coefficients (K_fs, K_sms, K_nms, K_ms)
             points = [1, -8, 0, 8, -1] 

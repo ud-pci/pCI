@@ -1335,7 +1335,7 @@ Contains
             Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
 
-            count = imax**2
+            count = size(Ro)
             Call AllReduceD(Ro, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
             
             If (mype==0) Then
@@ -1633,7 +1633,7 @@ Contains
                     Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
         
-                    count = imax**2
+                    count = size(Ro)
                     Call AllReduceD(Ro, count, 0, MPI_SUM, MPI_COMM_WORLD, mpierr)
 
                     If (mype==0) Then 
