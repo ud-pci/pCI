@@ -22,19 +22,21 @@ Contains
         Implicit None
         External :: DSYEV
 
-        Integer :: mype, npes, ierr, lwork
+        Integer :: mype, npes, ierr, lwork, liwork
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
         Integer :: jp
         Integer :: an_id, nnd, num_done, sender, iconf_neq_task, iconf_neq_rcvd, ncsfi_rcvd, ndi_rcvd
         Integer :: header(2)
-        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order, iwork
         Integer, Parameter :: send_tag = 2001, return_tag = 2002, data_tag = 2003
         Type(MPI_STATUS) :: status
 
         Real(dp) :: t, tj
         Real(dp), Allocatable :: zz(:,:), de(:), dd(:), pack_buf(:)
         Real(dp), Dimension(4) :: realtmp
+        Real(dp), Parameter :: limint32 = 2147483647.d0
+
 
         Type :: t_eigvec_buf
             Real(dp), Allocatable :: data(:)
@@ -135,12 +137,29 @@ Contains
                 n2 = n1+ndi-1
                 Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                 If (ndi > 0) Then
-                    Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
-                    lwork = Nint(realtmp(1))
-                    Allocate(dd(lwork))
-                    Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                    If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
-                    Deallocate(dd)
+                    Allocate(iwork(3+5*ndi))
+                    Call DSYEVD('V','U',ndi,zz,ndi,de,realtmp,-1,iwork,-1,ifail)
+                    If (ifail == 0 .and. realtmp(1) <= limint32) Then
+                        lwork = Nint(realtmp(1))
+                        liwork = iwork(1)
+                        deallocate(iwork)
+                        Allocate(dd(lwork), iwork(liwork))
+                        Call DSYEVD('V','U',ndi,zz,ndi,de,dd,lwork,iwork,liwork,ifail)
+                        Deallocate(dd,iwork)
+                    Else
+                        Write(*,'(4X,A,I0,A,I0,A,F12.0,A)') 'WARNING: Core ', mype, &
+                        ' uses DSYEV. DSYEVD for Ndi=', ndi, &
+                        ' requires LWORK ', realtmp(1), ' That exceeds 32-bit limit.'
+                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                        lwork = Nint(realtmp(1))
+                        Allocate(dd(lwork))
+                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                        Deallocate(dd)   
+                    End If
+                    If (ifail /= 0) Then
+                        Write(*,*) mype, ' core: Solver failed with ifail =', ifail
+                        Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                    End If 
                 End If
                 ncsfi = 0
                 Do i2 = 1, ndi
@@ -234,12 +253,29 @@ Contains
                     n2 = n1+ndi-1
                     Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                     If (ndi > 0) Then
-                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
-                        lwork = Nint(realtmp(1))
-                        Allocate(dd(lwork))
-                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                        If (ifail /= 0) Write(*,*) mype, ' core: dsyev failed with ifail =', ifail
-                        Deallocate(dd)
+                        Allocate(iwork(3+5*ndi))
+                        Call DSYEVD('V','U',ndi,zz,ndi,de,realtmp,-1,iwork,-1,ifail)
+                        If (ifail == 0 .and. realtmp(1) <= limint32) Then
+                            lwork = Nint(realtmp(1))
+                            liwork = iwork(1)
+                            deallocate(iwork)
+                            Allocate(dd(lwork), iwork(liwork))
+                            Call DSYEVD('V','U',ndi,zz,ndi,de,dd,lwork,iwork,liwork,ifail)
+                            Deallocate(dd,iwork)
+                        Else
+                            Write(*,'(4X,A,I0,A,I0,A,F12.0,A)') 'WARNING: Core ', mype, &
+                            ' uses DSYEV. DSYEVD for Ndi=', ndi, &
+                            ' requires LWORK ', realtmp(1), ' That exceeds 32-bit limit.'
+                            Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                            lwork = Nint(realtmp(1))
+                            Allocate(dd(lwork))
+                            Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                            Deallocate(dd)   
+                        End If
+                        If (ifail /= 0) Then
+                            Write(*,*) mype, ' core: Solver failed with ifail =', ifail
+                            Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+                        End If 
                     End If
                     ncsfi = 0
                     Do i1 = 1, ndi
