@@ -2570,7 +2570,11 @@ Contains
         If (.not. Allocated(In)) Allocate(In(Ngaunt))
         If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
-        If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
+        If (Kbrt == 0) Then
+            If (.not. Allocated(Rint2)) Allocate(Rint2(1,Ngint))
+        Else
+            If (.not. Allocated(Rint2)) Allocate(Rint2(2,Ngint))
+        End If
         If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
