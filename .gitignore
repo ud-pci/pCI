@@ -5,6 +5,7 @@
 *.a
 
 # Executables
+bin/
 basc
 conf
 conf_pt
@@ -17,10 +18,17 @@ build*/
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
-Makefile
 
-# Test directory
+# Test directory and generated files
 test/
+ci+all-order/
+ci+second-order/
+*.csv
+*.INP
+*.RES
+*.DAT
+*.out
+*.qs
 
 # vscode
 .vscode
@@ -28,3 +36,9 @@ test/
 
 # Python cache files
 __pycache__/
+
+# Python virtual environment
+venv
+
+# Documentation builds
+docs/_build

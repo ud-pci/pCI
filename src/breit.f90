@@ -6,18 +6,18 @@ Module breit
 
     Private
 
-    Public :: Gaunt, Gaun, Br_core, breit_int, breit_pot_magn, breit_pot_ret, sbint, coefb, brint_magn, brint_ret
+    Public :: Gaunt, Gaun, Br_core, breit_int, breit_pot_magn, breit_pot_ret, sbint, coefb, brint_magn, brint_ret, ykt, ukt, vkt
 
   Contains
 
-    Integer Function calcNumGaunts(IPlx)
+    Integer Function calcNumGaunts(Nlx)
         Implicit None
-        Integer, Intent(In) :: IPlx ! max(l)
+        Integer, Intent(In) :: Nlx ! max(l)
         Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, im1, im2, mk
         Real(dp) :: J1,M1,J2,M2
 
         l=0
-        lx=IPlx+1            !### = max(l)
+        lx=Nlx+1            !### = max(l)
         jx=2*lx-1            !### = max(2j)
         Do ij1=1,lx
             j1=ij1-0.5
@@ -49,18 +49,20 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, IPlx, Ngaunt
-        Real(dp) :: J1,M1,J2,M2, x
+        Integer :: l, lx, jx, ij1, ij2, jj2, kmin, kmax, kk, k, ind1, im1, im2, ind, mk, i, Ngaunt
+        Real(dp) :: J1, M1, J2, M2, x
 
-        IPlx = 5                           ! max(l)
-        Ngaunt = calcNumGaunts(IPlx)       ! number of tabulated Gaunts
+        If (Nlx < 5) Nlx=5                ! Set minimum lmax=5
+        Ngaunt = calcNumGaunts(Nlx)       ! number of tabulated Gaunts
 
         Allocate(In(Ngaunt))
         Allocate(Gnt(Ngaunt))
+        Allocate(num_gaunts_per_partial_wave(Nlx+1))
 
         l=0
-        lx=IPlx+1            !### = max(l)
+        lx=Nlx+1            !### = max(l)
         jx=2*lx-1            !### = max(2j)
+        num_gaunts_per_partial_wave = 0 
         Do ij1=1,lx
             j1=ij1-0.5
             Do ij2=ij1,lx
@@ -84,6 +86,7 @@ Module breit
                             in(l)=ind
                             x=Gaun(K,J1,M1,J2,M2)
                             gnt(l)=x
+                            num_gaunts_per_partial_wave(ij1) = num_gaunts_per_partial_wave(ij1) + 1
                         End Do
                     End Do
                 End Do
@@ -91,9 +94,10 @@ Module breit
         End Do
 
         Open (unit=12,file='CONF.GNT',status='UNKNOWN',form='unformatted')
-        Write(12) Ngaunt
-        Write(12) (in(i),i=1,Ngaunt)
-        Write(12) (gnt(i),i=1,Ngaunt)
+        Write(12) Nlx, Ngaunt
+        Write(12) num_gaunts_per_partial_wave
+        Write(12) (In(i),i=1,Ngaunt)  ! In = combination of quantum numbers
+        Write(12) (Gnt(i),i=1,Ngaunt) ! Gnt= value of Gaunt factor
         Close(unit=12)
 
         Deallocate(In, Gnt)
@@ -123,7 +127,7 @@ Module breit
         Return
     End Function Gaun
 
-    Real(dp) Function Br_core(na,nb) 
+    Real(dp) Function Br_core(na,nb,c,r,v,ii,kt) 
         !### exchange breit core potential
         !### kfl - file with derivatives
         !     Exchange core potential:
@@ -132,12 +136,10 @@ Module breit
         Use wigner
         Implicit None
 
-        Integer :: la, lb, lc, kmin, kmax, k, na, nb, nc, ja, jb, jc
+        Integer :: la, lb, lc, kmin, kmax, k, na, nb, nc, ja, jb, jc, ii, kt
         Real(dp) :: z12, z00,  xja, a_ab, xjc, s, xj, gac, ds
+        Real(dp), Dimension(IP6) :: c, r, v
         Character(Len=512) :: strfmt
-
-        Qb = Qd
-        Pb = Pd
 
         z12=0.5d0
         z00=0.0d0
@@ -167,7 +169,7 @@ Module breit
                 xj=k
                 gac=-(2*xjc+1)*FJ3(xja,xjc,xj,z12,-z12,z00)**2
                 ds = 0.d0
-                If (dabs(gac) > 1.d-7) ds = breit_int(k,na,Pa,Qa,nc,Pc,Qc,nc,Pc,Qc,nb,Pb,Qb)
+                If (dabs(gac) > 1.d-7) ds = breit_int(k,na,Pa,Qa,nc,Pc,Qc,nc,Pc,Qc,nb,Pb,Qb,c,r,v,ii,kt)
                 s = s+ds*gac
             End Do
             If (kout > 2) Then
@@ -188,12 +190,12 @@ Module breit
         Return
     End Function Br_core
 
-    Real(dp) Function breit_int(l,na,pa,qa,nb,pb,qb,nc,pc,qc,nd,pd,qd)
+    Real(dp) Function breit_int(l,na,pa,qa,nb,pb,qb,nc,pc,qc,nd,pd,qd,c,r,v,ii,kt)
         Implicit None
 
-        Integer :: la, lb, lc, ld, i, l, na, nb, nc, nd
+        Integer :: la, lb, lc, ld, i, l, na, nb, nc, nd, ii, kt
         Real(dp) :: ds1, ds2
-        Real(dp), Dimension(IP6) :: pa,qa,pb,qb,pc,qc,pd,qd
+        Real(dp), Dimension(IP6) :: pa,qa,pb,qb,pc,qc,pd,qd,c,r,v
 
         breit_int=0.d0
         la=Ll(na)
@@ -204,22 +206,20 @@ Module breit
 
         If (2*(i/2).ne.i) Return
 
-        Call breit_pot_magn(l,na,pa,qa,nc,pc,qc)
-
-        ds1=brint_magn(l,nb,pb,qb,nd,pd,qd)
+        Call breit_pot_magn(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
+        ds1=brint_magn(l,nb,pb,qb,nd,pd,qd,c)
         ds2=0.d0
 
         If (kbrt == 2) Then
-            Call breit_pot_ret(l,na,pa,qa,nc,pc,qc)
-            ds2=brint_ret(l,nb,pb,qb,nd,pd,qd)
+            Call breit_pot_ret(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
+            ds2=brint_ret(l,nb,pb,qb,nd,pd,qd,c)
         End If
-
         breit_int=ds1+ds2
 
         Return
     End Function breit_int
 
-    Real(dp) Function brint_magn(l,nb,pb,qb,nd,pd,qd)
+    Real(dp) Function brint_magn(l,nb,pb,qb,nd,pd,qd,c)
         Implicit None
 
         Integer :: lb, ld, k, l, i, nb, nd
@@ -258,7 +258,7 @@ Module breit
     Subroutine sbint(a,b,c,s)
         Implicit None
         
-        Integer :: i0, imax, i, j, j1, n, k
+        Integer :: i0, imax, i, j, j1, n, k, m
         Real(dp) :: r0, v0, g, t0, p0, dw, f0, dt, f, s, dv, dvr
         Real(dp), Dimension(IP6) :: a,b,c
 
@@ -328,7 +328,7 @@ Module breit
         Return
     End Function coefb
 
-    Real(dp) Function brint_ret(l,nb,pb,qb,nd,pd,qd)
+    Real(dp) Function brint_ret(l,nb,pb,qb,nd,pd,qd,c)
         Implicit None
 
         Integer :: lb, ld, l, nb, nd, k1, k2, i, k
@@ -407,15 +407,17 @@ Module breit
         Return
     End Function brint_ret
 
-    Subroutine breit_pot_magn(l,na,pa,qa,nc,pc,qc)
+    Subroutine breit_pot_magn(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
         Implicit None
 
-        Integer :: la, lc, l, na, nc, i, k, k7
+        Integer :: la, lc, l, na, nc, i, k, k7, ii, kt
         Real(dp) :: g1, g2
 
         Real(dp), Dimension(IP6) :: pa,qa,pc,qc
-        Real(dp), Dimension(IP6) :: ro,c 
+        Real(dp), Dimension(IP6) :: ro,c,r,v
 
+        ro=0_dp
+        c=0_dp
         la=Ll(na)
         lc=Ll(nc)
 
@@ -432,9 +434,8 @@ Module breit
     
             g1=coefb( 1,k,l,na,nc)
             g2=coefb(-1,k,l,na,nc)
-            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
-            Call ykt(k,MaxT,ro,c)
-
+            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
+            Call ykt(k,MaxT,ro,c,r,v,r2,ii,kt)
             Do i=1,IP6
                 yy(i,k+1)=c(i)
             End Do
@@ -444,13 +445,13 @@ Module breit
     End Subroutine breit_pot_magn
 
 
-    Subroutine breit_pot_ret(l,na,pa,qa,nc,pc,qc)
+    Subroutine breit_pot_ret(l,na,pa,qa,nc,pc,qc,c,r,v,ii,kt)
         Implicit None
 
-        Integer :: la, lc, l, na, nc, i, k, k1, k2, k7
+        Integer :: la, lc, l, na, nc, i, k, k1, k2, k7, ii, kt
         Real(dp) :: g1, g2, dk, ck2
         Real(dp), Dimension(IP6) :: pa,qa,pc,qc
-        Real(dp), Dimension(IP6) :: ro,c
+        Real(dp), Dimension(IP6) :: ro,c,r,v
 
         la=Ll(na)
         lc=Ll(nc)
@@ -462,7 +463,7 @@ Module breit
     
             g1=coefb( 1,k1,l,na,nc)
             g2=coefb(-1,k1,l,na,nc)
-            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
+            Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
     
             Do k2=l-1,l+1,2
                 If (k2 < 0) Cycle
@@ -479,7 +480,7 @@ Module breit
         
                 g1=coefb( 1,k1,l,na,nc)
                 g2=coefb(-1,k1,l,na,nc)
-                Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro)
+                Call rho_pq_tot(g1,g2,pa,qa,pc,qc,ro,c,r,v,ii,kt)
         
                 If (k1 == k2) Then
                     If (k1 > maxk) Then
@@ -487,7 +488,7 @@ Module breit
                         Call exit(1)
                     End If
             
-                    Call ykt(k1,MaxT,ro,c)
+                    Call ykt(k1,MaxT,ro,c,r,v,r2,ii,kt)
             
                     Do i=1,IP6
                         yy(i,k1+1)=c(i)
@@ -501,14 +502,14 @@ Module breit
                     End If
             
                     If (k2 == k1+2) Then
-                        Call ukt(k,MaxT,ro,c)
+                        Call ukt(k,MaxT,ro,c,r,v,r2,ii,kt)
                         Do i=1,IP6
                           uu(i,k+1)=c(i)
                         End Do
                     End If
             
                     If (k1 == k2+2) Then
-                        Call vkt(k,MaxT,ro,c)
+                        Call vkt(k,MaxT,ro,c,r,v,r2,ii,kt)
                         Do i=1,IP6
                            vv(i,k+1)=c(i)
                         End Do
@@ -520,22 +521,24 @@ Module breit
         Return
     End Subroutine breit_pot_ret
 
-    Subroutine rho_pq_tot(coef1,coef2,p,q,a,b,ro)
+    Subroutine rho_pq_tot(coef1,coef2,p,q,a,b,ro,c,r,v,ii,kt)
         Implicit None
 
-        Integer :: i, imax, j, n, ih
-        Real(dp) :: coef1, coef2, d1, d2, ulam, c1, dh1, dh2, dr
-        Real(dp), Dimension(IP6) :: p, q, a, b, ro
+        Integer :: i, imax, j, n, ih, ii, m, kt
+        Real(dp) :: coef1, coef2, d1, d2, ulam, c1, dh1, dh2, dr, h0, h1
+        Real(dp), Dimension(IP6) :: p, q, a, b, c, r, v
+        Real(dp), Dimension(IP6), Intent(Out) :: ro
 
         c1=0.01
 
         IH=2-KT
-        H=H0*IH
+        H0=H
+        H1=H0*IH
         ulam = 1
 
         imax=ii          ! mgk
-        dh1=ulam*h*coef1
-        dh2=ulam*h*coef2
+        dh1=ulam*h1*coef1
+        dh2=ulam*h1*coef2
         Do i=1,imax
             ro(i)=(dh1*p(i)*b(i)+dh2*q(i)*a(i))*v(i)
         End Do
@@ -559,23 +562,24 @@ Module breit
         Return
     End Subroutine rho_pq_tot
 
-    Subroutine ykt(k,nmax,ro,c)
+    Subroutine ykt(k,nmax,ro,c,r,v,r2,ii,kt)
         Implicit None
 
-        Integer :: i0, imax, k, ih, i1, i, im, j, ip, id, nmax
-        Real(dp) :: r0, v0, dk1, dk2, g, t0, p0, f0, fm, t, d, fi, dh, s, g0, r0d, dv, dvr
-        Real(dp), Dimension(IP6):: ro,c,w
+        Integer :: i0, imax, k, ih, i1, i, im, j, ip, id, nmax, ii, m, kt
+        Real(dp) :: r0, v0, dk1, dk2, g, t0, p0, f0, fm, t, d, fi, dh, s, g0, r0d, dv, dvr, h0, h1, r2
+        Real(dp), Dimension(IP6):: ro, c, r, v, w
 
         IH=2-KT
-        H=H0*IH
+        H1=H*IH
+        w=0_dp
 
         ! Calculation functions z(k,r) and y(k,r)
         i0=1
         imax=ro(ii+3)+0.01d0
         r0=r(i0)
         v0=v(i0)
-        dk1=1.d0-dexp(-k*h)
-        dk2=1.d0-dexp(-(k+1)*h)
+        dk1=1.d0-dexp(-k*h1)
+        dk2=1.d0-dexp(-(k+1)*h1)
 
         If (r2 >= 0.d0) Then
             i1=i0+1
@@ -596,15 +600,15 @@ Module breit
         t0=t0*r0**(g+1-k)
         p0=p0*r0**(g-1-k)
         f0=ro(i0)
-        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h)
+        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h1)
         dv=r(1)/v(1)*dvr+v(1)/r(1)
-        p0=h*p0*v0*v0+f0*dv
+        p0=h1*p0*v0*v0+f0*dv
         fm=ro(imax)
 
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Calculation of the Function z(k;r)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        t=t0+0.5d0*f0+h/12.d0*p0
+        t=t0+0.5d0*f0+h1/12.d0*p0
         c(i0)=t
         d=dk1
         i1=i0+1
@@ -620,7 +624,7 @@ Module breit
         ! Calculation of the Function y(k;r)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         t=-0.5d0*fm
-        dh=(2*k+1)*h/12.d0
+        dh=(2*k+1)*h1/12.d0
         d=dk2
         im=imax-1
         i1=im+i0
@@ -682,16 +686,17 @@ Module breit
         Return
     End Subroutine ykt
 
-    Subroutine ukt(k,nmax,ro,c)
+    Subroutine ukt(k,nmax,ro,c,r,v,r2,ii,kt)
         Implicit None
 
-        Integer :: ih, k, i0, imax, i1, i, id, nmax
-        Real(dp) :: r0, v0, dk1, g, t0, p0, t2, p2, f0, zi, d, d12, d2, dv, dvr
-        Real(dp) :: fi, fm, t, dh1, g0, z1, r0d
-        Real(dp), Dimension(IP6) :: ro,c,w
+        Integer :: ih, k, i0, imax, i1, i, id, nmax, ii, m, kt
+        Real(dp) :: r0, v0, dk1, g, t0, p0, t2, p2, f0, zi, d, d12, d2, dv, dvr, h0, h1
+        Real(dp) :: fi, fm, t, dh1, g0, z1, r0d, r2
+        Real(dp), Dimension(IP6) :: ro,c,r,v,w
 
         IH=2-KT
-        H=H0*IH
+        H0=H
+        H1=H0*IH
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Calculation the Function uk(k,r)=z(k+2,r)-z(k,r).
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -699,7 +704,7 @@ Module breit
         imax=ro(ii+3)+0.01d0
         r0=r(i0)
         v0=v(i0)
-        dk1=1.d0-dexp(-k*h)
+        dk1=1.d0-dexp(-k*h1)
 
         If (r2 >= 0.d0) Then
             i1=i0+1
@@ -727,16 +732,16 @@ Module breit
         p0=p0*r0**(g-1-k)
         p2=p2*r0**(g-1-k)
         f0=ro(i0)
-        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h)
+        dvr=(-3*v(1)/r(1)+4*v(2)/r(2)-v(3)/r(3))/(2*h1)
         dv=r(1)/v(1)*dvr+v(1)/r(1)
-        p0=h*p0*v0*v0+f0*dv
-        p2=h*p2*v0*v0+f0*dv
+        p0=h1*p0*v0*v0+f0*dv
+        p2=h1*p2*v0*v0+f0*dv
 
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Calculation of the Function uk(k;r)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        zi=t0+0.5d0*f0+h/12.d0*p0
-        z1=(t2+0.5d0*f0+h/12.d0*p2)-zi
+        zi=t0+0.5d0*f0+h1/12.d0*p0
+        z1=(t2+0.5d0*f0+h1/12.d0*p2)-zi
         c(i0)=z1
         d=dk1
         i1=i0+1
@@ -769,7 +774,7 @@ Module breit
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! zi=h/12.d0*p0
         ! c(i0)=c(i0)-h/12.d0*p2+zi
-        dh1=2*h/12.d0
+        dh1=2*h1/12.d0
         Do i=i0,imax
         c(i)=c(i)-dh1*ro(i)*v(i)/r(i)
         End Do
@@ -794,17 +799,18 @@ Module breit
         Return
     End Subroutine ukt
 
-    Subroutine vkt(k,nmax,ro,c)
+    Subroutine vkt(k,nmax,ro,c,r,v,r2,ii,kt)
         Implicit None
 
-        Integer :: ih, i0, imax, i1, k, i, im, j, ip, id, nmax
+        Integer :: ih, i0, imax, i1, k, i, im, j, ip, id, nmax, ii, m, kt
         Real(dp) :: r0, v0, dk2, d, g, fm, xi, d12, d2, fi, dh1, g0, r0d, t0
-        Real(dp) :: x1, c1, c2, c3, x2, x3, a2, a1, a3, t2
-        Real(dp), Dimension(IP6):: ro,c,w
+        Real(dp) :: x1, c1, c2, c3, x2, x3, a2, a1, a3, t2, h0, h1, r2
+        Real(dp), Dimension(IP6):: ro,c,r,v,w
         Real(dp), Dimension(10) :: v1,v2
 
         IH=2-KT
-        H=H0*IH
+        H0=H
+        H1=H0*IH
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! calculation functions v(k,r)=x(k+2,r)-x(k,r)
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -812,7 +818,7 @@ Module breit
         imax=ro(ii+3)+0.01d0
         r0=r(i0)
         v0=v(i0)
-        dk2=1.d0-dexp(-(k+1)*h)
+        dk2=1.d0-dexp(-(k+1)*h1)
 
         If (r2 >= 0.d0) Then
             i1=i0+1
@@ -857,7 +863,7 @@ Module breit
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
         ! Correction
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        dh1=2*h/12.d0
+        dh1=2*h1/12.d0
         Do i=i0,imax
             c(i)=c(i)-dh1*ro(i)*v(i)/r(i)
         End Do

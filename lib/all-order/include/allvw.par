@@ -1,0 +1,30 @@
+      include "all.par"
+      PARAMETER (NZ=100,NVWH=140000)
+      PARAMETER (NVH2=83000,NXV2=45000,NXCN=118000)		  
+***********************************************************************
+*     Additional parameter file for sdvw-ci.f                         *
+*********************************************************************** 
+*                                                                     *
+*     NZ   = MAX number of orbitals for sigma calculation             *
+*                                                                     *
+*     NVWH = MAX number of sigma 2 S_k(mnvw) channels                 *
+*                                                                     *
+*     EXAMPLE:                                                        *
+*     COMMON /radvw/ ipvw(nz,nz,nk,nk,0:kk),xvw(nxx,nxx,0:NVWH),ichan *
+*                                                                     *
+*     NVH2 = MAX number of all rho_k(mnvb)                            *
+*                                                                     *
+*     NXV2  = MAX number of channels for X_k(mnav) and X_k(manv) int. *
+*                                                                     *
+*     NVH2 and NXV2 are greater than NVH and NXV since they store     *
+*     all valence rho's together while NVH/NXV stores only one valence*
+*     orbital at a time                                               *
+*                                                                     *
+*     NXCN  = MAX number of channels for X_k(civw) integrals          *
+*                                                                     *
+*********************************************************************** 
+*   Program will produce warnings and stop when the following         *
+*   parameters are exceeded:  NN, NK, NXX, KK, NZ                     *
+*   Program will precount and stop if NVWH, NXV2,NXCN are exceeded    *
+*   See valsd-ci output to set NVH2 channel                           *
+***********************************************************************

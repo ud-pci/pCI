@@ -1,8 +1,8 @@
 Program conf_lsj
-    use mpi
+    use mpi_f08
     Use conf_variables
     use davidson, Only : Prj_J
-    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm
+    use determinants, Only : Dinit, Jterm
     use integrals, Only : Rint
     use formj2, Only : FormJ, J_av
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
@@ -16,12 +16,21 @@ Program conf_lsj
     Character(Len=255)  :: eValue
     Character(Len=16)   :: timeStr
 
+    Type(MPI_Datatype) :: mpi_type2_real
+
     ! Initialize MPI
     Call MPI_Init(mpierr)
     Call MPI_Comm_rank(MPI_COMM_WORLD, mype, mpierr)
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
     Call startTimer(start_time)
+
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
 
     ! Read total memory per core from environment 
     ! Have to export CONF_MAX_BYTES_PER_CPU before job runs
@@ -33,9 +42,7 @@ Program conf_lsj
         Call Input          ! reads list of configurations from CONF.INP
         Call Init           ! reads basis set information from CONF.DAT
         Call Rint           ! reads radial integrals from CONF.INT
-        Call Dinit          ! 
-        Call Det_Number     ! counts number of determinants
-        Call Det_List(idt)  ! generates list of determinants
+        Call Dinit          ! forms list of determinants
         Call Jterm          ! prints table with numbers of levels with given J
         Call ReadXIJ(B1h)   ! reads relevant wavefunctions from CONF.XIJ
     End If
@@ -48,11 +55,11 @@ Program conf_lsj
     ! Print table of final results and total computation time
     If (mype==0) Then
         Call stopTimer(s1, timeStr)
-        Write(*,'(2X,A)'), 'LSJ done in '// trim(timeStr)
+        Write(*,'(2X,A)') 'LSJ done in '// trim(timeStr)
         Call PrintLSJ   !#   Output of the results
 
         Call stopTimer(start_time, timeStr)
-        write(*,'(2X,A)'), 'TIMING >>> Total computation time of conf_lsj was '// trim(timeStr)
+        write(*,'(2X,A)') 'TIMING >>> Total computation time of conf_lsj was '// trim(timeStr)
     End If
 
     Call MPI_Finalize(mpierr)
@@ -61,7 +68,7 @@ Contains
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, only : inpstr, ReadConfInp, ReadConfigurations
+        Use conf_init, only : ReadConfInp, ReadConfigurations
         Implicit None
         Character(Len=32) :: strfmt
 
@@ -72,7 +79,12 @@ Contains
 
         ! Write name of program
         open(unit=11,status='UNKNOWN',file='CONF_LSJ.RES')
-        strfmt = '(4X,"Program conf_lsj v2.3")'
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(4X,"Program conf_lsj v2.5")'
+        Case(dp)            
+            strfmt = '(4X,"Program conf_lsj v2.5 with double precision for 2e integrals")'
+        End Select
         Write( 6,strfmt)
         Write(11,strfmt)
 
@@ -96,6 +108,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
+        Use utils, Only : DetermineRecordLength
         Implicit None
         Integer  :: ic, n, j, imax, ni, kkj, llj, nnj, i, nj, If, &
                     ii, i1, n2, n1, l, nmin, jlj, i0, nlmax, err_stat
@@ -105,7 +118,7 @@ Contains
         Integer, Dimension(33)  ::  nnn ,jjj ,nqq 
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
-        logical :: longbasis
+        logical :: longbasis, success
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Character(Len=256) :: strfmt, err_msg
@@ -116,8 +129,14 @@ Contains
 
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
+        
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
@@ -330,7 +349,7 @@ Contains
     End Subroutine ReadXIJ
 
     Subroutine AllocateLSJArrays(mype)
-        Use mpi
+        use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
 
@@ -347,10 +366,11 @@ Contains
         Call MPI_Bcast(Ngaunt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NhintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(NgintS, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ksig, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -361,12 +381,16 @@ Contains
         If (.not. Allocated(In)) Allocate(In(Ngaunt))
         If (.not. Allocated(Gnt)) Allocate(Gnt(Ngaunt))
         If (.not. Allocated(Rint1)) Allocate(Rint1(Nhint))
-        If (.not. Allocated(Rint2)) Allocate(Rint2(IPbr,Ngint))
+        If (Kbrt == 0) Then
+            If (.not. Allocated(Rint2)) Allocate(Rint2(1,Ngint))
+        Else
+            If (.not. Allocated(Rint2)) Allocate(Rint2(2,Ngint))
+        End If
         If (.not. Allocated(Iint1)) Allocate(Iint1(Nhint))
         If (.not. Allocated(Iint2)) Allocate(Iint2(Ngint))
         If (.not. Allocated(Iint3)) Allocate(Iint3(Ngint))
         If (.not. Allocated(IntOrd)) Allocate(IntOrd(nrd))
-        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
         If (.not. Allocated(D1)) Allocate(D1(nlvs))
         If (.not. Allocated(Tj)) Allocate(Tj(nlvs))
         If (.not. Allocated(Xj)) Allocate(Xj(nlvs))
@@ -377,7 +401,7 @@ Contains
         If (mype==0) Then
             memFormH = 0_int64
             memFormH = sizeof(Nvc)+sizeof(Nc0) &
-                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(idt)&
+                + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr)&
                 + sizeof(IntOrd)
             If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
                 + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
@@ -392,9 +416,11 @@ Contains
     Subroutine InitLSJ
         ! this subroutine initializes variables used for LSJ and subsequent subroutines
         ! All necessary variables are broadcasted from root to all cores
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
         Implicit None
         Integer :: mpierr, i
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(rec1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -441,15 +467,19 @@ Contains
         Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
+        If (Kbrt == 0) Then
+            count = Ngint
+        Else
+            count = Ngint*2_int64
+        End If
+        Call BroadcastD(Rint2, count, 0, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, IPx*IPx, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(idt(1:Nd,i), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End do  
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nnd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Tj(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(D1(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -518,14 +548,15 @@ Contains
     End Subroutine calcLSJ
 
     Subroutine lsj(cc,xj,xl,xs,mype,npes)
-        Use mpi
+        use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer
         Implicit None
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
         Integer(Kind=int64) :: s1, s2
         Integer :: mype, npes, mpierr, msg, ncsplit, nnc, nccnt, an_id, ncGrowBy, endnc, num_done
-        Integer :: n, j, status(MPI_STATUS_SIZE), sender
+        Integer :: n, j, sender
+        Type(MPI_STATUS) :: status
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
         Character(Len=16) :: timeStr
         Logical :: moreTimers
@@ -583,7 +614,7 @@ Contains
 
                 Do 
                     Call MPI_RECV(msg, 1, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    sender = status(MPI_SOURCE)
+                    sender = status%MPI_SOURCE
 
                     If (nnc + ncGrowBy <= Nc) Then
                         nnc = nnc + ncGrowBy
@@ -597,14 +628,14 @@ Contains
 
                     If (nnc == nccnt .and. nnc /= ncsplit*10) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         j=j-1
                         nccnt = nccnt + ncsplit
                     End If
 
                     If (num_done == npes-1) Then
                         Call stopTimer(s1, timeStr)
-                        If (moreTimers == .true.) Write(*,'(2X,A,1X,I3,A)'), 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
+                        If (moreTimers) Write(*,'(2X,A,1X,I3,A)') 'lsj:', (10-j)*10, '% done in '// trim(timeStr)
                         Exit
                     End If
                 End Do

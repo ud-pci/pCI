@@ -1,0 +1,10 @@
+c #################################################################
+c ### Parameters which determine main dimensions in program rpa ###
+c ###         >>>  memory required: 24*IPr**2  <<<              ###
+c #################################################################
+       PARAMETER(IPs   =   600, !### - number of shells
+     >           IPr   =  2500, !### - dimension of RPA space
+     >           IPcs  =    13, !### - number of cases (different operators)
+     >           IPdl  =  5000, !### - used for the output to the screen
+     >           IPv   = 19856) !### - dimension of valence space
+                                !###   check that IPv >= IPr

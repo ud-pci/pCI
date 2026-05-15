@@ -6,94 +6,291 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.8] - 2022-11-21
+### CSF (Configuration State Function) support - in development
+- csf.f90 - new module with formh_sym, hmatrix, F_J2, jbasis_init, reorder_det subroutines for CSF-basis Hamiltonian construction
+- pconf.F90 - kCSF key (ci.in) to select determinant (kCSF=0) or CSF (kCSF=1) basis
+- pconf.F90 - CSF mode: formh_sym builds Hamiltonian in CSF basis; unsym/reorder_det convert back to determinants after diagonalization
+- conf_variables.F90 - CSF variables (nconf_neq, atom, ndcs, mdc, mdcs, idt, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf)
+- davidson.f90 - skip J^2 averaging in CSF mode (Jm is exact)
 
-## [0.12.7] - 2022-10-24
-- basis.py - fix for val_aov orbitals
-- basis.py - now asks user for input file name
-- create_add_inp.py - added additional keys under system for J, JM
-- orbitals.py - simplified expand_basis function
+## [1.2.0] - 2025-03-24
+- pconf v7.0 - implemented bit representation for determinant comparisons (initial version uses both bitstring and integer representation for faster computations)
+- pconf.F90 - added logic to determine whether to use bitstring or integer representation for determinants
+- pconf.F90 - added preprocessor directives (-DFORCE_BIT_DET or -DFORCE_INT_DET) to force either bitstring or integer determinants
+- pconf.F90 - implement bitstring determinant comparison in comparison stage of FormH
+- determinants.f90 - implemented bitstring determinants functions and subroutines (FormBarr, print_bits, convert_int_rep_to_bit_rep, convert_bit_rep_to_int_rep, compare_bit_dets, get_det_indexes)
+- conf_variables.f90 -> conf_variables.F90, use preprocessing directive to select single or double precision for two-electron integrals
+- pdtm v3.4 - added transition rates in E2, E3, M2, M3 -.RES files
 
-## [0.12.6] - 2022-10-04
-- basis.py - added automation capabilities
-- basis.py - added additional keys to kvw
-- basis.py - new function construct_vvorbs constructs valence and virtual orbitals for construction of BASS.INP file
-- basis.py - new function write_bass_inp writes file BASS.INP
-- basis.py - added missing file close() statements
-- basis.py - added code to construct basis set by running a sequence of programs depending on key given in input file
-- orbitals.py - added digital format of i subshell
+## [1.1.1] - 2025-01-09
+- pdtm v4.2 - appended value of IPx parameter to end of DTM.INT to remove dependency on IPx parameter from rpa_dtm
+- add.f90 - initialize NOz and Ac arrays
 
+## [1.1.0] - 2024-12-16
+- refactored main programs for gfortran compatibility
+- check_matrices.f90 - small new program check_matrices to check for errors in CONFp.HIJ and CONFp.JJJ
+- updated matrix_io.f90 to use mpi_f08
+- pconf.f90 -> pconf.F90, use preprocessing directives to compile ScaLAPACK routines
+- pconf - fixed allocation of array E for LAPACK subroutines
+- removed IPmr parameter from params.f90 and refactored IPmr-associated arrays
+- removed IPmr parameter from all-order package and refactored IPmr-associated arrays using rec_unit module
+- pconf - refactored KXIJ and KWeights into optional inputs
+- removed IP1 parameter from params.f90 and refactored IP1-associated arrays from main programs
+- add - increased allowed number of shells per configuration to up to 24
 
-## [0.12.5] - 2022-08-22
-- conf v6.5 - implemented initial simple parallelized formh_sym subroutine as well code to change wave function from CSF back to set of determinants
-- conf.f90 - added block of code (including unsym, Det_List, reorder_det, Wdet, WriteXIJ) for CSF to change wave function from CSF back to set of determinants in main program
-- conf.f90 - added condition to use serial diagonalization if number of determinants is small to avoid errors with ScaLAPACK routines
-- conf.f90 - added condition to not run PrintWeightsDvdsn if using CSF since basis would have to be changed to determinants first
-- conf.f90 - changed Nd -> nbas when printing energy table in PrintEnergiesDvdsn
-- conf.f90 - reorganized deallocations in PrintWeightsDvdsn
-- conf.f90 - new subroutine WriteXIJ simply writes CONF.XIJ
-- conf.f90 - added broadcast of ArrB in InitLSJ
-- conf.f90 - updated final energy table
-- csf.f90 - added header to start calculation of FormH
-- csf.f90 - added condition to run formh_sym in parallel if more than 1 processor is available
-- csf.f90 - implementation of simple round-robin static parallelization scheme for formh_sym
-- csf.f90 - added allocation statements for idet1, idet2 in reorder_det
-- csf.f90 - buf fixes in reorder_det subroutine
-- determinants.f90 - Det_List subroutine now requires a 2d-integer array argument
-- determinants.f90 - refactored Wdet and Rdet subroutines to fix compile warnings
-- determinants.f90 - Wdet and Rdet subroutines now require extra arguments Nd, Ne, idt
-- davidson.f90 - CONF.WFS is now written during Davidson procedure if CSF version is used
-- davidson.f90 - Added condition to not average over J for initial eigenvectors if using CSF
-- davidson.f90 - made WriteXIJ subroutine private since it is not used
-- conf_variables.f90 - new variable atom to store name of system
-- conf_init.f90 - ReadConfInp saves name of atom
-- conf_pt.f90 - updated arguments in Det_List and Wdet
-- conf_lsj.f90 - updated arguments in Det_List and Wdet
-- ine.f90 - updated arguments in Det_List and Wdet
-- dtm.f90 - updated arguments in Det_List and Wdet
+## [1.0.7] - 2024-11-17
+- refactored IP1 parameter out of pdtm.f90 and removed IP1 array size warnings
+- fixed formatting of Operator.RES files produced by pdtm
+- pdtm now skips transitions that have already been accounted for, e.g. b -> a is skipped if a -> b was done
+- introduced AllReduceD subroutine in mpi_utils.f90 to handle MPI_AllReduce for double precision
+- updated theory_lifetimes.py script to handle multiple input files
+- updated gen_job_script.py script to use scontrol show config to determine cluster information if using SLURM
+- fixed bug in reading K_sms
+- optimized gQED calculation
 
-## [0.12.4] - 2022-08-03
-- conf v6.4 - implemented allocations and broadcasts for future MPI version of formh_sym
-- conf.f90 - moved InitFormH, calcNd0, and calcMemReqs calls to main conf program
-- csf.f90 - added memory addition for memFormH in formh_sym subroutine
+## [1.0.6] - 2024-10-30
+- refactored IPbr parameter out of params.f90
+- removed IPx dependency from pconf
+- handle mismatched Kbrt key between pbasc and pconf
+- refactored dtm, merging dtm_variables module with main program
+- refactored amp_ops module to use params module instead of dtm_variables
+- removed dtm_variables module
+- refactored write_job_script python script
 
-## [0.12.3] - 2022-08-02
-- conf v6.3 - implementation of formh_sym subroutine
-- conf.f90 - implemented serial version of DiagInitApprox
-- csf.f90 - implemented subroutines formh_sym, hmatrix, and F_J2
-- csf.f90 - added allocation statements in idif function
-- csf.f90 - changed Iarr to idt in subroutine reorder_det
-- determinants.f90 - added conditional for CSF case in calcNd0
-- miscellaneous global changes
-- ine.f90, conf.f90, dtm.f90, conf_pt.f90, conf_lsj.f90 - replaced Iarr with idt and swapped array dimension to (Nd,Ne)
-- dtm_variables.f90 - changed Iarr2 to idt2
+## [1.0.5] - 2024-10-25
+- add v3.0 - main arrays are now dynamically allocated 
 
-## [0.12.2] - 2022-07-27
-- conf v6.2 - implementation of jbasis subroutine
-- csf.f90 - bug fixes completed by allocating several arrays used for jbasis subroutine
-- csf.f90 - change type of variable jtt from dp to integer
+## [1.0.4] - 2024-10-24
+- update gen_portal_csv.py to use new config.yml format
+- add requirements.txt for required dependencies for pci-py-scripts
+- check if SLURM is installed in pci-py scripts before attempting to write SLURM job scripts
+- updated root CMakeLists.txt to account for latest LLVM-based Intel Fortran compiler
 
-## [0.12.1] - 2022-07-27
-- conf v6.1 - revamp of Dinit -> Jterm subroutines
-- params.f90 - new global variable idt to replace Iarr
-- conf_variables.f90 - replaced key ksym with kCSF
-- conf_variables.f90 - moved global variables from csf.f90 here since they are used globally in conf
-- determinants.f90 - previous Jterm subroutine is now broken into 3 parts: Det_Number, Det_List, and Jterm
-- determinants.f90 - replaced Iarr with idt and swapped dimensions to (Nd,Ne) in subroutines Wdet, Pdet, Rdet, and Gdet
-- determinants.f90 - new subroutine sort_det sorts an integer array idet1 and returns sorted array idet2
-- conf.f90 - replaced Iarr with idt and swapped dimensions to (Nd,Ne) in subbroutines FormD, AllocateFormHArrays, InitFormH, DeAllocateFormHArrays, and AllocateLSJArrays
-- conf.f90 - implemented nonequiv_conf subroutine to count number of nonequivalent configurations
-- csf.f90 - bug fixes and refactoring in nonequiv_conf subroutine
+## [1.0.3] - 2024-10-24
+- refactored several older subroutines
 
-## [0.12.0] - 2022-07-26
-- conf v6.0 - initial import of conf_csf functions
-- conf_variables.f90 - new key ksym to turn on/off usage of CSFs
-- conf.f90 - input file c.in now reads new ksym variable
-- davidson.f90 - re-imported previously removed Hould subroutine
-- csf.f90 - new module containing functions used for new CSF functionalities
+## [1.0.2] - 2024-10-20
+- pconf v6.1 - fixed bugs related to Kl=1 option
+
+## [1.0.1] - 2024-10-13
+- updated CMakeLists.txt files to require Intel Fortran compiler and OpenMPI library
+- add v2.1 - dynamically allocate part of add program
+
+## [1.0.0] - 2024-10-08
+- pCI version update for public release
+
+## [0.11.55] - 2024-10-07
+-ine.f90, pol.f90 - fixed text for omega=0
+
+## [0.11.54] - 2024-10-02
+- updated versions for parallel programs
+- dtm v3.4 -> pdtm v4.0
+- conf v5.16 -> pconf v6.0
+- basc v2.7 -> pbasc v3.0
+
+## [0.11.54] - 2024-09-20
+- initial commit of formy program, which pre-constructs YY* vectors for ine program
+- ine.f90 - read INE.YY* if they exist
+- ine.f90 - move DefJz2 outside of main loop in subroutine Vector
+- ine.f90, pol.f90 - renamed Iarr2 -> Iarr0 to make it more obvious determinants come from CONF0.DET
+
+## [0.11.53] - 2024-09-18
+- pdtm.f90 - always reconstruct DTM.INT when Mode = Init
+- pdtm.f90 - updated keys in dtm.in
+
+## [0.11.52] - 2024-09-13
+- sort.f90 - initial commit of new sorting program based on quicksort
+- initial commit of rpa programs rpa, rpa_dtm, and their dependencies
+
+## [0.11.51] - 2024-09-12
+- ine.f90, pol.f90 - fixed issue where dc and ac polarizabilities could not be calculated in the same run
+- ine.f90, pol.f90 - dynamically set IPad (number of probe vectors) to be 3 + number of levels in CONF.XIJ
+
+## [0.11.50] - 2024-09-10
+- str_fmt.f90 - removed dependency on params.f90
+
+## [0.11.49] - 2024-09-09
+- pol.f90 - renamed INE.RES -> POL.RES
+
+## [0.11.48] - 2024-09-07
+- ine.f90, pol.f90 - do not divide alphas by 2 in the case of static polarizabilities
+
+## [0.11.47] - 2024-09-06
+- initial commit of QED programs sgc, qedpot_conf, qed_rot, and their dependencies
+
+## [0.11.46] - 2024-09-04
+- conf.f90 - added default values for keys in ci.in
+- conf.f90 - renamed c.in -> ci.in
+- pol v1.0 - initial commit of new pol program for E1 polarizabilities
+- pol.f90 - revamped ine.f90, removing all features outside of E1 polarizabilities
+- pol.f90 - initialize convergence criteria
+- pol.f90 - removed Khe parameter, which defines variant of solution of homogeneous equation
+- pol.f90 - read new pol.in input file, using key-value assignments
+- pol.f90 - renamed INEFINAL.RES -> POL_E1.RES
+- pol.f90 - set default values for keys and throw error if no wavelengths are given
+- pol.f90 - allow user-inputted dimension of matrix
+- ine.f90 - write INE.XIJ and INE_J.XIJ to separate +/- files labeled with p/m
+- ine.f90, pol.f90 - increased int -> int64 for NumH, minor refactoring
+- ine.f90, pol.f90 - throw Fint error and terminate program if error occurs
+- utils.f90 - utility module for various pci programs
+- dtm.f90 - use CountStr from utils module
+- conf.f90 - renamed Kl -> Mode in ci.in
+- renamed parallel programs basc -> pbasc, conf -> pconf, dtm -> pdtm
+
+## [0.11.45] - 2024-08-29
+- ine.f90 - fixed unallocated bug
+
+## [0.11.44] - 2024-08-22
+- dtm.f90 - removed extra '|' when writing reduced matrix elements
+- conf.f90 - fixed bug in final tables when dealing with very short configurations (e.g. 2s^2, where len(conf) < 4)
+- conf.f90 - realigned FINAL.RES table
+
+## [0.11.43] - 2024-08-20
+- dtm.f90 - fixed bug in reading dtm.in
+
+## [0.11.42] - 2024-08-12
+- dtm.f90 - revamp of dtm.in input file, using key-value assignments (e.g. Mode = TM)
+- dtm.f90 - added warning and error messages when reading dtm.in
+- dtm.f90 - fixed bug in Mode = Init regime when running with multiple cores
+
+## [0.11.41] - 2024-08-09
+- conf_init.f90 - handle blank line before list of core orbitals and add number of core orbitals to Nsp
+- conf.f90 - revamp reading of c.in input file, using key-value assignments (e.g. Kl = 0)
+- conf.f90 - added Kw=1 condition to writing CONFp.JJJ file
+
+## [0.11.40] - 2024-08-08
+- conf.f90 - renamed CONFLEVELS.RES -> LEVELS.RES, CONFFINAL.RES -> FINAL.RES
+
+## [0.11.39] - 2024-07-26
+- dtm.f90 - added estimation for QED correction to g factor
+
+## [0.11.38] - 2024-07-23
+- conf_init.f90 - fixed bug in reading core orbitals
+
+## [0.11.37] - 2024-07-09
+- basc.f90 - use AddReduceR and AllReduceI to call MPI_AllReduce after calculations of radial integrals
+- conf_pt.f90, conf_lsj.f90, conf.f90 - removed unused imports of old inpstr subroutine
+
+## [0.11.36] - 2024-07-03
+- conf_init.f90 - refactored ReadConfInp to use ReadConfParams instead of old inpstr subroutine
+- mpi_utils.f90 - added AllReduceI and AllReduceR subroutines
+
+## [0.11.35] - 2024-07-02
+- conf.f90 - refactored reading of CONF.INP, allowing Qnl to be dynamically allocated via Nsp
+
+## [0.11.34] - 2024-06-21
+- conf.f90, conf_init.f90, determinants.f90 - changed weight formatting in CONF.RES to scientific notation
+
+## [0.11.33] - 2024-06-20
+- dtm v3.4 - corrected transition rate formulas for correct J in denominator depending on lower/upper level
+
+## [0.11.32] - 2024-06-14
+- hfd v1.1 - resolved SMS-related bugs
+- bass v1.2 - resolved SMS-related bugs
+- basc v2.7 - resolved SMS-related bugs
+
+## [0.11.31] - 2024-05-09
+- bass v1.1 - resolved array overflow error and undefined variable warning
+
+## [0.11.30] - 2024-03-19
+- dtm.f90 - added option to only form DTM.INT if Kl1 = 3
+
+## [0.11.29] - 2024-03-05
+- hfd.f90 - fixes for discrepancies in HFD.DAT, remaining discrepancies seem to be due to floating point precision
+- ine.f90 - moved global arrays from ine_variables.f90 to main program
+- conf_pt.f90 - moved global arrays from conf_pt_variables.f90 to main program
+
+## [0.11.28] - 2024-03-02
+- introduced key so double precision can now be used for two-electron and IS integrals
+
+## [0.11.27] - 2024-03-01
+- bass v1.0 - initial commit of modernized bass
+
+## [0.11.26] - 2024-02-27
+- hfd v1.0 - initial commit of modernized hfd, includes reformatting of relevant subroutines
+
+## [0.11.25] - 2024-02-19
+- ine v1.22 - include result line for lambda=0, added new output file INEFINAL.RES with only result lines
+
+## [0.11.24] - 2024-02-07
+- dtm.f90 - fixed missing E2 transition for 1st matrix element
+
+## [0.11.23] - 2024-01-24
+- ine.f90 - moved converged/diverged statement to result line
+
+## [0.11.22] - 2024-01-23
+- ine v1.21 - added kIters as a parameter in ine.in
+
+## [0.11.21] - 2024-01-21
+- ine v1.20 - fixed alpha averaging
+
+## [0.11.20] - 2023-12-12
+- conf v5.16 - updated CONFFINAL.RES energy tables to include convergence
+- conf.f90 - added check for J value convergence
+
+## [0.11.19] - 2023-10-28
+- ine.f90 - fixed order of IP1, Nddir
+
+## [0.11.18] - 2023-09-19
+- dtm v3.4 - fixed error in transition rate calculations: tj2 -> tj1 in denominator
+
+## [0.11.17] - 2023-09-11
+- dtm v3.3 - changed labels of matrix elements to reduced matrix elements and bug fix for missing first M1 transition
+
+## [0.11.16] - 2023-07-06
+- add v2.0 - updated to non-relativistic version for significant speedup
+- add.f90 - removed Nonrel subroutine
+- add.f90 - added l=7,8,9 (k,l,m)
+- add.f90 - added code to write a secondary CONF.INP with relativistic configurations in a single line
+
+## [0.11.15] - 2023-05-19
+- basc v2.5 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- conf v5.15 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- conf_lsj v2.4 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- conf_pt v2.2 - increased data size of Ngint arrays to integer*8 to fix integer overflow problems
+- basc.f90 - changed datatype of Ngint related variables and arrays to integer*8
+- basc.f90 - added code to split arrays in half if array size goes over 2^31 for MPI_AllReduce calls
+- basc.f90 - increased string formatting for Ngint to I11
+- basc.f90 - CONF.INT datatypes changed to reflect int*8 Ngint arrays
+- basc_variables.f90 - gets Ngint from conf_variables module
+- conf.f90 - changed datatype of Ngint related variables and arrays to integer*8
+- conf.f90 - changed broadcast of Ngint related arrays to use mpi_utils functions
+- conf_variables.f90 - Ngint and IntOrd datatypes changed to int*8
+- integrals.f90 - changed datatype of Ngint related variables and arrays to integer*8
+- integrals.f90 - reads new CONF.INT with int*8 Ngint arrays
+
+## [0.11.14] - 2023-04-18
+- basc v2.4 - automated detection of max partial wave from configuration list and calculation of number of gaunt factors
+- conf v5.14 - automated detection of max partial wave from configuration list and number of gaunt factors
+- global change: renamed IPlx to Nlx since it is no longer a parameter
+- conf_variables.f90 - added Nlx as a global variable
+- conf_variables.f90 - added num_gaunts_per_partial_wave as a global array to store number of gaunt factors per partial wave
+- basc_variables.f90 - include num_gaunts_per_partial wave from conf_variables module
+- breit.f90 - save number of gaunt factors per partial wave to new allocatable array num_gaunts_per_partial_wave
+- breit.f90 - CONF.GNT now writes Nlx and num_gaunts_per_partial_wave in addition to Ngaunt and In, Gnt arrays
+- conf.f90 - subroutine Input now reads new version of CONF.GNT with additional Nlx and num_gaunts_per_partial_wave
+- conf.f90 - added exception if Nlx or num_gaunts_per_partial_wave could not be found to set Nlx=5 and Ngaunt=2891 as default
+- conf_init.f90 - added code to set Nlx to be the maximum partial wave read from configuration list from CONF.INP
+- integrals.f90 - removed assignment of IPlx since it is now determined from configuration list
+
+## [0.11.13] - 2023-01-31
+- conf v5.13 - bug fix for lost allocation of lsj arrays xj, xl, xs
+
+## [0.11.12] - 2022-12-26
+- conf v5.12 - bug fix for integer overflow for very large CI calculations
+
+## [0.11.11] - 2022-11-30
+- conf v5.11 - writing of configurations in ADD.INP format
+- conf.f90 - increased weight threshold to 0.9999
+- conf.f90 - new code to write top weighted configurations in the format of ADD.INP basic configurations
 
 ## [0.11.10] - 2022-11-21
-- conf v5.10 - bug fix for ScaLAPACK routines causing openmp-related issues
+- conf v5.10 - bug fixes for ScaLAPACK routines causing openmp-related issues done by Dr. Jeffrey Frey of UD IT-RCI
+- conf.f90 - reimplemented DiagInitApprox subroutine with parallel blocking method
+- conf.f90 - bug fix for memory estimation of Davidson producing negative values
+- conf.f90 - threshold for Nd0 for use of S/DSYEV over ScaLAPACK can now be set from environment (defaulted to 800MiB matrix)
+- str_fmt.f90 - error catching for negative value of memory
+- env_var.f90 - new subroutine GetEnvInteger64 gets an environment variable as an int64 integer
 
 ## [0.11.9] - 2022-08-17
 - ine v1.19 - fixed numerical errors in calculating a_1 value

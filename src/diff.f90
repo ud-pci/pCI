@@ -6,17 +6,17 @@ Module diff
 
     Private
 
-    Public :: Dif, Origin
+    Public :: Dif, Dif5, Origin, Cut_Short
 
   Contains
 
-    Subroutine Dif(P,CP,gm)          
+    Subroutine Dif(P,CP,R,V,gm,ii,kt,MaxT,h)          
         ! This subroutine should be used for functions which are not very smooth at R=R(1).
         Implicit None
 
-        Integer :: i, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap
-        Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err
-        Real(dp), Dimension(IP6) :: P, CP                 !
+        Integer :: i, ii, ih, im, ix, j, i1, ih2, ih3, ih4, ih5, ih6, ierr, kap, kt, MaxT, m
+        Real(dp) :: h60, gm, r1, cp1, p1, pim, scale, err, h
+        Real(dp), Dimension(IP6) :: P, CP, R, V
 
         If (MaxT.EQ.0) MaxT=9      !### hfd uses Nmax instead of MaxT
         ih=2-kt
@@ -106,36 +106,77 @@ Module diff
         ! If (cp1.EQ.0.d0.AND.P(1).EQ.0.d0) CP(1)=0.d0 ! may occur only for
         !                                              ! B-spline.
         err=cp1-CP(1)
+        ierr=0
         If (dabs(cp1).GT.1.d0) err=err/cp1
         If (dabs(err).GT.1.d-1) Then
             Write(*,'(4X,"Dif: matching error at R1. Taylor:",E12.5, &
                    ", Num:",E12.5,/4X,"Using Origin for new expansion.")') cp1,CP(1)
-            Ierr=Ierr+10*dabs(err)
+            ierr=ierr+10*Int(dabs(err))
             If (dabs(CP(ii+5)).GT.dabs(CP(ii+6))) Then
                 kap=1                            ! For kap>0 expansion
             Else                                 ! goes over even powers
                 kap=-1
             End If
-            call Origin(CP,CP(ii+4),kap)
+            call Origin(CP,R,V,CP(ii+4),kap,ii,MaxT,h)
             Read(*,*)
         End If
 
         Return
     End Subroutine Dif
 
-    Subroutine Origin(P,gam,kap)           ! 19/05/08
+    Subroutine Dif5(P,CP,k,V,ii,kt,h)             
+        ! 5 node derivative without Taylor expansion, first k nodes are skipped
+        Implicit None           
+        
+        Integer :: ih, i0, i1, ix, k, j, ih2, ih3, i, ii, kt
+        Real(dp) :: h12, h
+        Real(dp), Dimension(IP6) :: P, CP, V
+
+        ih=2-kt
+        i0=1+k*ih
+        h12=12*ih*h
+  
+        ix=ii                      !### P(ix) is last nonzero value
+        Do j=1,ii,ih
+            i1=ii-j+1
+            if (P(i1).NE.0.d0) Exit
+            ix=i1-ih
+            CP(i1)=0.d0
+        End Do
+    
+        ! Symmetric 5-node differentiation for internal nodes:
+        ih2=2*ih
+        ih3=3*ih
+        Do i=ih2+i0,ix-ih2,ih
+            CP(i)=(-P(i+ih2)+P(i-ih2)+8*(P(i+ih)-P(i-ih)))/(h12*V(i))
+        End Do
+  
+        ! Last two nodes. Extrapolation by (ix-i)**2*(a+b*(i+3-ix)):
+        CP(ix-ih)=CP(ix-ih2)/2-CP(ix-ih3)/9
+        CP(ix)=0.d0
+  
+        ! Short distances are not treated here:
+        Do i=1,i0+ih,ih
+            CP(i)=0.d0
+        End Do
+
+        Return
+    End Subroutine Dif5
+
+    Subroutine Origin(P,R,V,gam,kap,ii,MaxT,h)           ! 19/05/08
         !     >> variant with four terms of Taylor expansion <<
         !# we now match P(1),P(2), dP/dr(1), and dP/dr(2)
         Implicit None
-        Integer :: k, kap, ier, iyes, ierr
-        Real(dp) :: gam, rn, g, dp1, dp2, p1, p2, d2, r1, y, p21, p11, d1
+        Integer :: k, kap, ier, iyes, ierr, ii, MaxT
+        Real(dp) :: gam, rn, g, dp1, dp2, p1, p2, d2, r1, y, p21, p11, d1, h
         Real(dp) :: p22, p2111, p2211, c2, c3, c1, c0, rk, pr1, dr1, pr2, dr2
-        Real(dp), Dimension(IP6) :: P
+        Real(dp), Dimension(IP6) :: P, R, V
         Character(Len=512) :: strfmt
 
         If (MaxT.EQ.0) MaxT=9        !### hfd uses Nmax instead of MaxT
 
         P(ii+5:ii+5+MaxT)=0.d0
+        ierr=0
 
         If (P(1).EQ.0.d0) Return
 
@@ -186,7 +227,7 @@ Module diff
         pr2=rk*(c0+c1*y+c2*y*y+c3*y**3)*R(2)**gam / P(2) !# should be equal to 1
         dr2=rk*(g*c0+(g+2)*c1*y+(g+4)*c2*y*y+(g+6)*c3*y**3)*R(2)**(gam-1) / dp2    
 
-        ier=1.d6*(dabs(pr1-1.d0)+dabs(dr1-1.d0)+dabs(pr2-1.d0)+dabs(dr2-1.d0))
+        ier=Int(1.d6*(dabs(pr1-1.d0)+dabs(dr1-1.d0)+dabs(pr2-1.d0)+dabs(dr2-1.d0)))
         If (ier.GE.1) Then
             strfmt='(4X,"Expansion error for gam = ",F5.1," kap = ",I2, &
                 /4X,"pr1 = ",E15.7," dr1 = ",E15.7 &
@@ -201,5 +242,51 @@ Module diff
 
         Return
     End Subroutine Origin
+
+    subroutine Cut_Short(P,R,V,ii,kt,MaxT,h)         
+        ! Smoothly brings P to zero between r_1 and r_k.
+        ! Anzatz used: (r-r1)**2*[a(r-rk)**2+b(r-rk)+c]
+        Implicit None
+
+        Integer :: ih, ih2, ih3, k, i, kp, km, ii, kt, MaxT
+        Real(dp) :: h12, pk, dpk, ddpk, r1, ri, rk, dr, dr2, a, b, c, dpk1, h
+        Real(dp), Dimension(IP6) :: P, R, V
+
+        ih=2-kt
+        h12=12*ih*h
+        ih2=2*ih
+        ih3=3*ih
+ 
+        k=15                          ! defines grid node r_k
+        if (MaxT.EQ.0) MaxT=9         ! hfd uses Nmax instead of MaxT
+        Do i=ii+4,ii+5+MaxT
+            P(i)=0.d0
+        End Do
+ 
+        kp=k+ih
+        km=k-ih
+        pk=P(k)
+        ! first derivative at r_k
+        dpk=(-(P(k+ih2)-P(k-ih2))+8*(P(kp)-P(km)))/(h12*V(k))
+        ! second derivative at r_k
+        ddpk=(-(P(k+ih2)+P(k-ih2))+16*(P(kp)+P(km))-30*pk)/(h12*V(k))**2                        
+ 
+        r1=R(1)
+        rk=R(k)
+        dr = rk-r1
+        dr2=dr*dr
+        c  = pk/dr2                                 ! parameters of anzatz
+        b  = dpk/dr2 - 2*c/dr                       ! which preserves C_2
+        a  = 0.5d0*ddpk/dr2 - c/dr2 - 2*b/dr        ! smoothness
+ 
+        Do i=1,k,ih
+            ri=R(i)
+            P(i)=(ri-r1)**2 * (a*(ri-rk)**2 + b*(ri-rk) + c)
+        End Do
+        ! new value for P'(rk)
+        dpk1=(-(P(k+ih2)-P(k-ih2))+8*(P(kp)-P(km)))/(h12*V(k))
+ 
+        Return
+    End Subroutine Cut_Short
 
 End Module diff

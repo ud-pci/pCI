@@ -13,13 +13,21 @@ Module amp_ops
     !       AE3  = REDUCED E3 AMPLITUDE
     !       AM2  = REDUCED M2 AMPLITUDE
     !       AM3  = REDUCED M3 AMPLITUDE
-    Use dtm_variables
+    !       gQED = REDUCED AMPLITUDE for QED correction to g factor 
+    Use params
     Implicit None
 
     Private
 
     Public :: AmpE1, AmpE2, AmpE3, AmpM1, AmpM2, AmpM3, AmpEDM, AmpPNC
     Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
+    Public :: gQED
+
+    Integer, Allocatable, Dimension(:), Public      :: Intg
+    Real(dp), Allocatable, Dimension(:), Public     :: Rnt
+    Real(dp), Public :: AE1V
+    Character(Len=4), Dimension(15), Public :: Alet
+    Character(Len=1), Dimension(6), Public :: Let
 
   Contains 
 
@@ -27,7 +35,7 @@ Module amp_ops
         ! this function searches for radial integrals of one-electron operators
         Implicit None
         Integer :: isg, na, nb, is, nfin, nini, ic, ind, i
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+
         isg=1
         na=nfin
         nb=nini
@@ -37,15 +45,18 @@ Module amp_ops
             isg=ic
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
-        Do i=1,Nint
+
+        Do i=1,size(Intg, 1)
             If (ind == Intg(i)) Then
                 Fint=Rnt(i)*isg
                 Return
             End If
         End Do
+
         Write( 6,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
         Write(11,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
         Fint=0.d0
+        
         Return
     End function Fint
     
@@ -132,7 +143,7 @@ Module amp_ops
         AE=Ro*Fint(11,nk,nl,+1)
         If (AE /= 0.d0) Then
             is = 1
-            k=xjl-0.51d0
+            k=xjl+0.51d0
             If (k /= 2*(k/2)) is=-is
             xlk=lk
             xll=ll
@@ -333,5 +344,35 @@ Module amp_ops
             HfsB=B
         Return
     End function HfsB
+
+
+    Real(dp) function gQED(Ro, nk,xjk,lk, nl,xjl,ll)   
+        ! this function calculates matrix element for QED correction to g factor <k||beta Sigma_z||l>
+        Use wigner    
+        Implicit None
+        Integer :: nk, nl, lk, ll, kpl, kpk, is, k
+        Real(dp) :: Ro, G, G1, G2, xjk, xjl
+            G=0.d0
+            G1=Ro*Fint(14,nk,nl,+1)
+            G2=Ro*Fint(15,nk,nl,+1)           
+            If ((G1 /= 0.d0).or.(G2 /= 0.d0)) Then
+              is = 1
+              k=xjl+0.51d0
+              If (k /= 2*(k/2)) is=-is
+              kpk=(lk-xjk)*(2*xjk+1)
+              kpl=(ll-xjl)*(2*xjl+1)  
+              G1=G1*(kpk+kpl-1)*is*dsqrt((2*xjk+1)*(2*xjl+1)) & 
+                *Fj3(xjk,xjl,1.d0,0.5d0,-0.5d0,0.d0)
+              G2=G2*(kpk+kpl+1)*is*dsqrt((2*xjk+1)*(2*xjl+1)) & 
+                *Fj3(xjk,xjl,1.d0,0.5d0,-0.5d0,0.d0)
+              G=G1+G2  
+              If (Kl == 1) Then
+                Call AmpOut(14,Ro,nl,nk,xjl,xjk,ll,lk,G1)
+                Call AmpOut(15,Ro,nl,nk,xjl,xjk,ll,lk,G2)
+              End If  
+            End If
+            gQED=G
+        Return
+    End function gQED
 
 End Module amp_ops

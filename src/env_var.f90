@@ -34,9 +34,11 @@ Module env_var
         GetEnvLogical = defaultValue
         Call GetEnv(varName, varValue)
         If (Len_Trim(varValue) > 0) then
-            If (varValue == 'y' .or. varValue == 'Y' .or. varValue == 'yes' .or. varValue == 'YES' .or. varValue == 't' .or. varValue == 'T' .or. varValue == 'true' .or. varValue == 'TRUE') then
+            If (varValue == 'y' .or. varValue == 'Y' .or. varValue == 'yes' .or. varValue == 'YES' &
+                .or. varValue == 't' .or. varValue == 'T' .or. varValue == 'true' .or. varValue == 'TRUE') then
                 GetEnvLogical = .true.
-            Else If (varValue == 'n' .or. varValue == 'N' .or. varValue == 'no' .or. varValue == 'NO' .or. varValue == 'f' .or. varValue == 'F' .or. varValue == 'false' .or. varValue == 'FALSE') then
+            Else If (varValue == 'n' .or. varValue == 'N' .or. varValue == 'no' .or. varValue == 'NO' .or. &
+                    varValue == 'f' .or. varValue == 'F' .or. varValue == 'false' .or. varValue == 'FALSE') then
                 GetEnvLogical = .false.
             Else
                 Read(varValue,*,iostat=convStat) iValue

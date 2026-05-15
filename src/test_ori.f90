@@ -11,13 +11,13 @@ Module test_ori
 
   Contains
 
-    Subroutine Test_Origin(str,P,err,ierr)  
+    Subroutine Test_Origin(str,P,R,MaxT,ii,err,ierr)  
         ! Test of the Taylor expansion at the origin
         Implicit None
 
-        Integer :: ierr, i, k, ik, igm
+        Integer :: ierr, i, k, ik, igm, MaxT, ii
         Real(dp) :: gm, r1, r2, q, q0, pp1, pp2, err1, err2, err
-        Real(dp), Dimension (IP6) :: P
+        Real(dp), Dimension (IP6) :: P, R
         Character(Len=1) :: str(10), chr
         Character(Len=512) :: strfmt
 

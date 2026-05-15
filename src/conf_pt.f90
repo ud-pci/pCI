@@ -6,13 +6,28 @@ Program conf_pt
     ! This code forms the second order corrections to eigenvalues from CONF.XIJ. 
     ! It is supposed that vectors in CONF.XIJ correspond to the same Hamiltonian 
     ! in a smaller space.
-    Use mpi
-    Use conf_pt_variables
+    use mpi_f08
+    Use conf_variables
     Use integrals, Only : Rint
-    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm, Wdet
+    Use determinants, Only : Dinit, Jterm, Wdet
     Implicit None
+    
+    ! global variables for conf_pt
+    integer, parameter :: IPPT = 5000
+    integer     :: Nd1, Ncci, Nmax, Ncp0, Ncnr, Ncnrci, Ncnr0, Ncnew, &
+                   NcOld, n_is, KmaxScr, KsymScr, NsumScr, MaxScr, ktf, kvar
+    real(dp)    :: dvnrx, dvnrn
+    logical     :: average_diag
+
     Integer  :: Nc_0, mpierr, mype, npes
     Real :: start_time, stop_time
+
+    integer, allocatable, dimension(:)    :: Ndcnr, Nvcnr, NRR, NRN, Ndirc
+    real(dp), allocatable, dimension(:)   :: B1h, En, Xj, EnG, Ey, DEnr, DVnr
+    real(dp), allocatable, dimension(:,:) :: X0
+    
+    Type(MPI_Datatype) :: mpi_type2_real
+
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -27,7 +42,6 @@ Program conf_pt
     !             Other dimensions are:
     !                   valence e              2*3*Nlv
     !                   positions for val. e   Nst
-    !                   different Jtot         IPjd
     !     - - - - - - - - - - - - - - - - - - - - - - - - -
     !Init mpi
     Call MPI_Init(mpierr)
@@ -36,6 +50,14 @@ Program conf_pt
     !Get number of processes
     Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
+    ! Set MPI type for type_real
+    Select Case(type2_real)
+    Case(sp)
+        mpi_type2_real = MPI_REAL
+    Case(dp)
+        mpi_type2_real = MPI_DOUBLE_PRECISION
+    End Select
+
     If (mype == 0) Then
         ! CONF_PT.RES is opened only by the master process
         open(unit=11,status='UNKNOWN',file='CONF_PT.RES')
@@ -43,11 +65,9 @@ Program conf_pt
         Call Input
         Call Init
         Call Rint
-        Call Dinit                        ! 
-        Call Det_Number                   ! counts number of determinants
-        Call Det_List(idt)                ! generates list of determinants
+        Call Dinit
         Call Jterm
-        Call Wdet(Nd, Ne, idt, 'CONF_PT.DET')
+        Call Wdet('CONF_PT.DET')
         Call NR_Init
         Call Weight_CI
     End If
@@ -90,16 +110,25 @@ Contains
 
     Subroutine Input
         ! This subroutine reads in parameters and configurations from CONF.INP
-        Use conf_init, Only : inpstr, ReadConfInp, ReadConfigurations
+        Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
         Character(Len=512) :: strfmt
 
         ! Write name of program
-        strfmt = '(/4X,"Program CONF_PT v2.1", &
+        Select Case(type2_real)
+        Case(sp)
+            strfmt = '(/4X,"Program CONF_PT v2.3", &
                /4X,"PT corrections to binding energy", & 
                /4X,"Zero approximation is taken from CONF.XIJ", &
                /4X,"New vectors are in CONF_PT.XIJ and", &
                /4X,"new input is in CONF_new.INP")'
+        Case(dp) 
+            strfmt = '(/4X,"Program CONF_PT v2.3 with double precision for 2e integrals", &
+               /4X,"PT corrections to binding energy", & 
+               /4X,"Zero approximation is taken from CONF.XIJ", &
+               /4X,"New vectors are in CONF_PT.XIJ and", &
+               /4X,"new input is in CONF_new.INP")'           
+        End Select
         Write( 6,strfmt) 
         Write(11,strfmt)
 
@@ -135,7 +164,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use conf_init, Only : inpstr
+        Use utils, Only : DetermineRecordLength
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, err_stat, &
                                        nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
@@ -147,7 +176,8 @@ Contains
         Integer, Dimension(33)      :: nnn, jjj, nqq
         Character(Len=1)            :: Let(9), lll(33)
         Character(Len=512)          :: strfmt, err_msg
-        Logical                     :: longbasis
+        Logical                     :: longbasis, success
+
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                     (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
@@ -156,7 +186,13 @@ Contains
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Call DetermineRecordLength(Mrec, success)
+        If (.not. success) Then
+            Write(*,*) 'ERROR: record length could not be determined'
+            Stop
+        End If
+
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
@@ -338,7 +374,7 @@ Contains
     End Subroutine Init
 
     Subroutine BcastParams
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer :: mpierr
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -373,7 +409,7 @@ Contains
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nsu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_is, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ngint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ngint, 1, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nhint, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndr, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -383,7 +419,7 @@ Contains
     End Subroutine BcastParams
 
     Subroutine AllocatePTArrays
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer :: mpierr
         
@@ -402,12 +438,16 @@ Contains
         If (.not. allocated(Iint1)) allocate(Iint1(Nhint))
         If (.not. allocated(Iint2)) allocate(Iint2(Ngint))
         If (.not. allocated(Iint3)) allocate(Iint3(Ngint))
-        If (.not. allocated(Rint2)) allocate(Rint2(IPbr,Ngint))
+        If (Kbrt == 0) Then
+            If (.not. allocated(Rint2)) allocate(Rint2(1,Ngint))
+        Else
+            If (.not. allocated(Rint2)) allocate(Rint2(2,Ngint))
+        End If
         If (.not. allocated(IntOrd)) allocate(IntOrd(nrd))
-        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(DVnr)) allocate(DVnr(Nc))
 
-        If (Ksig /= 0) Then
+        If (K_is /= 0) Then
             If (.not. allocated(R_is)) allocate(R_is(Nhint))
             If (.not. allocated(I_is)) allocate(I_is(Nhint))
         End If
@@ -417,35 +457,41 @@ Contains
     End Subroutine AllocatePTArrays
 
     Subroutine BcastPTArrays
-        Use mpi
+        Use mpi_f08
+        Use mpi_utils
     	Implicit None
         Integer :: i, mpierr
+        Integer(Kind=int64) :: count
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nn(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Kk(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ll(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jj(1:Ns), Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Nh(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jz(1:Nst), Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Ndc(1:Nc), Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint1(1:Nhint), Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint1(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint2(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Iint3(1:Ngint), Ngint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(IntOrd(1:nrd), nrd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rint2(1:IPbr,1:Ngint), IPbr*Ngint, MPI_REAL, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,Ne
-            Call MPI_Bcast(idt(1:Nd,i), Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        Call MPI_Bcast(Nn, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Kk, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ll, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Rint1, Nhint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Iint1, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (Kbrt == 0) Then
+            count = Ngint
+        Else
+            count = Ngint*2_int64
+        End If
+        Call BroadcastI(Iint2, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iint3, Ngint, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(IntOrd, nrd, MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastD(Rint2, count, 0, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+        count = Ne*Int(Nd,kind=int64)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(DVnr(1:Nc), Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Diag(1:Nd), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(DVnr, Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Diag, Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
 
-        If (Ksig /= 0) Then
-            Call MPI_Bcast(R_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-            Call MPI_Bcast(I_is(1:Nhint), Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (K_is /= 0) Then
+            Call MPI_Bcast(R_is, Nhint, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(I_is, Nhint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
@@ -609,7 +655,7 @@ Contains
     End Subroutine Weight_CI
     ! =============================================================================
     Subroutine PT_Init(npes, mype)
-    	Use mpi
+    	use mpi_f08
         Implicit None
         Integer  :: i, ni, j, n, k, kx, ic, kd, ndci
         Integer :: npes, mype, mpierr
@@ -704,7 +750,7 @@ Contains
     End Subroutine PT_Init
 
     Subroutine PTE(npes,mype)
-        Use mpi
+        use mpi_f08
         Implicit None
         Integer  :: n, ic, l, i, k, ix
         Integer, Dimension(Nc)  :: Ndic
@@ -1107,7 +1153,7 @@ Contains
             Do ic=ic0,ic1
               kd=kd+Ndc(ic)
             End Do
-            If (kd4+kd > IP1) goto 100
+            If (kd4+kd > MaxNd0) goto 100
             kd4=kd4+kd
             kc4=kc4+NRN(icnr)
           End Do
@@ -1354,7 +1400,7 @@ Contains
     End function Hmltn
 
     Subroutine DiagH(nd0,npes,mype)
-    	Use mpi
+    	use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
         Integer   :: n, i, nd0, start, End, j

@@ -1,6 +1,6 @@
 Module str_fmt
 
-    Use, Intrinsic :: iso_fortran_env, Only : int64
+    Use, Intrinsic :: iso_fortran_env, Only : dp => real64, int64
 
     Implicit None
     
@@ -66,7 +66,6 @@ Module str_fmt
     End Subroutine FormattedMemSize
 
     Subroutine FormattedTime(inpSec, outString)
-        use params, only : dp
         Implicit none
 
         Real, Intent(In)     :: inpSec

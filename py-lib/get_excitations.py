@@ -13,7 +13,7 @@ def check_parity(orbitals):
     """ Checks parity of a dictionary of subshells and electron occupancies """
     parity = 0
     for orbital in orbitals:
-        l_str = re.findall('[spdfgh]+', orbital)[0]
+        l_str = re.findall('[spdfghi]+', orbital)[0]
         if orbitals[orbital] > 0:
             parity += (l_val_dict[l_str] * orbitals[orbital]) % 2
     parity %= 2
@@ -48,7 +48,7 @@ class Basis:
                 nmax = nmin
             min_occ = int(re.findall('[0-9]+', str(list(orbital.values())[0]))[0])
             max_occ = int(re.findall('[0-9]+', str(list(orbital.values())[0]))[1])
-            l = re.findall('[spdfgh]+', str(list(orbital.keys())[0]))[0]
+            l = re.findall('[spdfghi]+', str(list(orbital.keys())[0]))[0]
             for i in range(nmin,nmax+1):
                 if str(i) + l not in list(self.orb_occ_dict.keys()):
                     orb_occ_dict2[(str(i) + l)] = str(min_occ), str(max_occ)
@@ -61,7 +61,7 @@ class Basis:
         orb_occ_copy = copy.deepcopy(self.orb_occ_dict)
         for orbital in orb_occ_copy:
             n = int(re.findall('[0-9]+', orbital)[0])
-            l = re.findall('[spdfgh]+', orbital)[0]
+            l = re.findall('[spdfghi]+', orbital)[0]
             nmax = int(nlmax[l])
             if n > nmax:
                 self.orb_occ_dict.pop(orbital)
@@ -82,7 +82,7 @@ class Basis:
 
         nmin_dict = {'s': 1, 'p': 2, 'd': 3, 'f': 4, 'g': 5, 'h': 6}
         n_array = re.findall('[0-9]+', self.name)
-        l_array = re.findall('[spdfgh]+', self.name)
+        l_array = re.findall('[spdfghi]+', self.name)
 
         for i in range(len(n_array)):
             for l in l_array[i]:
@@ -144,7 +144,7 @@ class Configuration:
     def add_electron(self, subshell):
         """ add an electron to a subshell """
         # check to see if subshell is filled
-        l = re.findall('[spdfgh]+', subshell)[0]
+        l = re.findall('[spdfghi]+', subshell)[0]
         filled = self.orbitals[subshell] == max_occ_dict[l]
         # If not filled, add electron to that subshell
         if not filled:

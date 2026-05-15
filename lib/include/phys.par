@@ -1,0 +1,15 @@
+c ##################################################################
+c ### This file contains numerical values for physical constants ###
+c ##################################################################
+       PARAMETER(DPcl = 137.0359922594d0, ! speed of light in a.u. (= 1/alpha)
+c     >                 *1.264911064067,    ! =sqrt(8/5)
+c     >                 *1.069044967650,    ! =sqrt(8/7)
+c     >                 *0.942809041582,    ! =sqrt(8/9)
+     >           DPRy = 109737.315709d0,  ! Rydberg constant in 1/cm
+     >           DPau = 6.5796839d15,     ! au = a.u. for energy in Hz
+     >           DPmp = 1836.153d0,       ! mp = proton mass in a.u.
+     >           DPrb = 0.529177249d-8,   ! rb = Bohr radius in cm
+     >           DPsw = 0.2319,           ! sin**2(Qeta_W)
+     >           DPcw = 1.00050d-14,      ! 2**(1/2)*G_F*alpha/pi (a.u.)
+     >           DPef = 5.14225d9         ! au for electric field in V/cm
+     >           )

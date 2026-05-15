@@ -3,7 +3,6 @@ Module csf
     Use conf_variables
     Use determinants, Only : Rspq
     Use formj2, Only : Plj
-    ! Use davidson, Only : Hould
 
     Implicit None
 
@@ -11,32 +10,31 @@ Module csf
 
     Public :: jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det, idif
 
-    Real(dp), Allocatable :: ccj_module(:)
+    Real(type_real), Allocatable :: ccj_module(:)
 
 Contains
 
     Subroutine jbasis(nconf,ncsf,nccj,max_ndcs,mype,npes)
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedMemSize
-        Use mpi_utils, Only : BroadcastD
+        Use mpi_utils, Only : BroadcastD_dp
         Implicit None
         External :: DSYEV
 
-        Integer :: mype, npes, ierr, lwork, liwork
+        Integer :: mype, npes, ierr, lwork
         Integer :: nconf, ncsf, nccj, max_ndcs
-        Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, n, k, nf, is, ia, ib, ic, id, iq, na, ja, ma, jq0, jq, i1, i2, j, ifail, jtt
+        Integer :: iconf_neq, iconf, ndi, ncsfi, ic1, n1, n2, i1, i2, j, k, ifail, jtt
         Integer :: jp
         Integer :: an_id, nnd, num_done, sender, iconf_neq_task, iconf_neq_rcvd, ncsfi_rcvd, ndi_rcvd
         Integer :: header(2)
-        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order, iwork
+        Integer, Allocatable, Dimension(:) :: idet1, idet2, first_iconf_for_neq, dispatch_order
         Integer, Parameter :: send_tag = 2001, return_tag = 2002, data_tag = 2003
         Type(MPI_STATUS) :: status
+        Type(MPI_Datatype) :: mpi_type_real
 
-        Real(dp) :: t, tj
+        Real(dp) :: tj
         Real(dp), Allocatable :: zz(:,:), de(:), dd(:), pack_buf(:)
         Real(dp), Dimension(4) :: realtmp
-        Real(dp), Parameter :: limint32 = 2147483647.d0
-
 
         Type :: t_eigvec_buf
             Real(dp), Allocatable :: data(:)
@@ -47,6 +45,12 @@ Contains
         Integer(Kind=int64) :: start_time, mem_jbasis, total_work, work_done
         Character(Len=16) :: timeStr, memStr
 
+        If (type_real == sp) Then
+            mpi_type_real = MPI_REAL
+        Else
+            mpi_type_real = MPI_DOUBLE_PRECISION
+        End If
+
         If (.not. allocated(mdcs)) Allocate(mdcs(nconf))
         If (.not. allocated(ndcs)) Allocate(ndcs(nconf_neq))
         If (.not. allocated(ndc_neq)) Allocate(ndc_neq(nconf_neq))
@@ -56,7 +60,7 @@ Contains
         If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
-        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(Nh)) Allocate(Nh(Nst))
         If (.not. allocated(Jz)) Allocate(Jz(Nst))
 
@@ -99,9 +103,13 @@ Contains
             j = dispatch_order(i1)
             ndi = ndc_neq(j)
             i2 = i1 - 1
-            Do While (i2 >= 1 .and. ndc_neq(dispatch_order(i2)) < ndi)
-                dispatch_order(i2+1) = dispatch_order(i2)
-                i2 = i2 - 1
+            Do While (i2 >= 1)
+                If (ndc_neq(dispatch_order(i2)) < ndi) Then
+                    dispatch_order(i2+1) = dispatch_order(i2)
+                    i2 = i2 - 1
+                Else
+                    Exit
+                End If
             End Do
             dispatch_order(i2+1) = j
         End Do
@@ -137,29 +145,12 @@ Contains
                 n2 = n1+ndi-1
                 Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                 If (ndi > 0) Then
-                    Allocate(iwork(3+5*ndi))
-                    Call DSYEVD('V','U',ndi,zz,ndi,de,realtmp,-1,iwork,-1,ifail)
-                    If (ifail == 0 .and. realtmp(1) <= limint32) Then
-                        lwork = Nint(realtmp(1))
-                        liwork = iwork(1)
-                        deallocate(iwork)
-                        Allocate(dd(lwork), iwork(liwork))
-                        Call DSYEVD('V','U',ndi,zz,ndi,de,dd,lwork,iwork,liwork,ifail)
-                        Deallocate(dd,iwork)
-                    Else
-                        Write(*,'(4X,A,I0,A,I0,A,F12.0,A)') 'WARNING: Core ', mype, &
-                        ' uses DSYEV. DSYEVD for Ndi=', ndi, &
-                        ' requires LWORK ', realtmp(1), ' That exceeds 32-bit limit.'
-                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
-                        lwork = Nint(realtmp(1))
-                        Allocate(dd(lwork))
-                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                        Deallocate(dd)   
-                    End If
-                    If (ifail /= 0) Then
-                        Write(*,*) mype, ' core: Solver failed with ifail =', ifail
-                        Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                    End If 
+                    Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                    lwork = Nint(realtmp(1))
+                    Allocate(dd(lwork))
+                    Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                    If (ifail /= 0) Write(*,*) mype, ' rank: dsyev failed with ifail =', ifail
+                    Deallocate(dd)
                 End If
                 ncsfi = 0
                 Do i2 = 1, ndi
@@ -253,29 +244,12 @@ Contains
                     n2 = n1+ndi-1
                     Call build_j2(n1, n2, ndi, idet1, idet2, zz)
                     If (ndi > 0) Then
-                        Allocate(iwork(3+5*ndi))
-                        Call DSYEVD('V','U',ndi,zz,ndi,de,realtmp,-1,iwork,-1,ifail)
-                        If (ifail == 0 .and. realtmp(1) <= limint32) Then
-                            lwork = Nint(realtmp(1))
-                            liwork = iwork(1)
-                            deallocate(iwork)
-                            Allocate(dd(lwork), iwork(liwork))
-                            Call DSYEVD('V','U',ndi,zz,ndi,de,dd,lwork,iwork,liwork,ifail)
-                            Deallocate(dd,iwork)
-                        Else
-                            Write(*,'(4X,A,I0,A,I0,A,F12.0,A)') 'WARNING: Core ', mype, &
-                            ' uses DSYEV. DSYEVD for Ndi=', ndi, &
-                            ' requires LWORK ', realtmp(1), ' That exceeds 32-bit limit.'
-                            Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
-                            lwork = Nint(realtmp(1))
-                            Allocate(dd(lwork))
-                            Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
-                            Deallocate(dd)   
-                        End If
-                        If (ifail /= 0) Then
-                            Write(*,*) mype, ' core: Solver failed with ifail =', ifail
-                            Call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
-                        End If 
+                        Call DSYEV('V','U',ndi,zz,ndi,de,realtmp,-1,ifail)
+                        lwork = Nint(realtmp(1))
+                        Allocate(dd(lwork))
+                        Call DSYEV('V','U',ndi,zz,ndi,de,dd,lwork,ifail)
+                        If (ifail /= 0) Write(*,*) mype, ' core: dsyev failed with ifail =', ifail
+                        Deallocate(dd)
                     End If
                     ncsfi = 0
                     Do i1 = 1, ndi
@@ -359,7 +333,7 @@ Contains
 
         If (nccj > 0) Then
             If (.not. Allocated(ccj_module)) Allocate(ccj_module(nccj))
-            Call BroadcastD(ccj_module, int(nccj, int64), 0, 0, MPI_COMM_WORLD, ierr)
+            Call BroadcastD_dp(ccj_module, int(nccj, int64), 0, mpi_type_real, 0, MPI_COMM_WORLD, ierr)
         End If
 
         ncsf = 0
@@ -406,9 +380,9 @@ Contains
         Real(dp) :: t
 
         Do n = n1, n2
-            idet1(1:Ne) = idt(n,1:Ne)
+            idet1(1:Ne) = Iarr(1:Ne,n)
             Do k = n1, n
-                idet2(1:Ne) = idt(k,1:Ne)
+                idet2(1:Ne) = Iarr(1:Ne,k)
                 t = 0.d0
                 If (k /= n) Then
                     Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
@@ -535,7 +509,8 @@ Contains
         Integer :: mype, npes, mpierr
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
-        Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj, counter1, counter2, counter3
+        Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj
+        Integer(Kind=int64) :: counter1, counter2, counter3
         Integer :: j, mesplit, iconf_local_count
         Integer :: an_id, nnd, num_done, sender, iconf_task
         Integer :: cntarray(2)
@@ -544,13 +519,12 @@ Contains
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
-        Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer               :: vaGrowBy, ndGrowBy
         Integer(Kind=int64)   :: s1, ih8_before
-        Integer(Kind=int64)   :: mem, maxmem, statmem, NumH_running, maxme_running
+        Integer(Kind=int64)   :: maxmem, statmem, NumH_running, maxme_running
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
-        Character(Len=256) :: strfmt
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
@@ -636,12 +610,12 @@ Contains
                     n2=n1+ndc(iconf)-1
                     do n=n1,n2
                         id=n-n1+1
-                        idet1(1:Ne)=idt(n,1:Ne)
+                        idet1(1:Ne)=Iarr(1:Ne,n)
                         k1=mdc(jconf)+1
                         k2=k1+ndc(jconf)-1
                         buf(1:ncj)=0.d0
                         do k=k1,k2
-                            idet2(1:Ne)=idt(k,1:Ne)
+                            idet2(1:Ne)=Iarr(1:Ne,k)
                             if (Kdsig.NE.0) E_k=Diag(k)
                             call Hmatrix(idf,idet1,idet2,hij)
                             if (dabs(hij).lt.1.d-20) cycle
@@ -815,12 +789,12 @@ Contains
                             n2=n1+ndc(iconf)-1
                             do n=n1,n2
                                 id=n-n1+1
-                                idet1(1:Ne)=idt(n,1:Ne)
+                                idet1(1:Ne)=Iarr(1:Ne,n)
                                 k1=mdc(jconf)+1
                                 k2=k1+ndc(jconf)-1
                                 buf(1:ncj)=0.d0
                                 do k=k1,k2
-                                    idet2(1:Ne)=idt(k,1:Ne)
+                                    idet2(1:Ne)=Iarr(1:Ne,k)
                                     if (Kdsig.NE.0) E_k=Diag(k)
                                     call Hmatrix(idf,idet1,idet2,hij)
                                     if (dabs(hij).lt.1.d-20) cycle
@@ -881,7 +855,7 @@ Contains
         memEstimate = memEstimate + ih8_max * 16
 
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
 
         If (mype == 0) Then
             write(*,*) 'NumH=',NumH
@@ -1022,11 +996,11 @@ Contains
 
     End Subroutine unsym
 
-    Subroutine reorder_det(nconf,idt,idt_orig)
+    Subroutine reorder_det(nconf,det_arr,det_arr_orig)
         Implicit None
         Integer :: nconf
-        Integer, Allocatable, Dimension(:,:) :: idt, idt_orig
-        
+        Integer, Allocatable, Dimension(:,:) :: det_arr, det_arr_orig
+
         Integer :: iconf, ndi, n1, n2, n, i, k1, k2, k, nf, is, ia, ib, ic, id, ilev
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Real(dp) :: t
@@ -1041,13 +1015,13 @@ Contains
             n2=n1+ndc(iconf)-1
             Outer: Do n=n1,n2
                 Do i=1,ne
-                    idet1(i)=idt_orig(n,i)
+                    idet1(i)=det_arr_orig(i,n)
                 End Do
                 k1=mdc(iconf)+1
                 k2=k1+ndc(iconf)-1
                 Inner: Do k=k1,k2
                     Do i=1,ne
-                        idet2(i)=idt(k,i)
+                        idet2(i)=det_arr(i,k)
                     End Do
                     Call Rspq(idet1,idet2,is,nf,ia,ic,ib,id)
                     If (nf /= 0) Cycle Inner
@@ -1058,9 +1032,9 @@ Contains
                     End If
                     If (k == n) Cycle Outer
                     Do i=1,ne
-                        id=idt(n,i)
-                        idt(n,i)=idt(k,i)
-                        idt(k,i)=id
+                        id=det_arr(i,n)
+                        det_arr(i,n)=det_arr(i,k)
+                        det_arr(i,k)=id
                     End Do
                     Do ilev=1,Nlv
                         t=ArrB(n,ilev)
@@ -1135,15 +1109,15 @@ Contains
         If (.not. Allocated(nc_neq)) Allocate(nc_neq(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. allocated(Mdc)) Allocate(Mdc(Nc))
-        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
         If (.not. allocated(Nh)) Allocate(Nh(Nst))
         If (.not. allocated(Jz)) Allocate(Jz(Nst))
 
-        Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)   
+        Call MPI_Bcast(nc_neq, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         count = Ne*Int(Nd, kind=int64)
-        Call BroadcastI(idt, count, 0, 0, MPI_COMM_WORLD, mpierr)
+        Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jj, Ns, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)

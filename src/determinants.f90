@@ -1,6 +1,6 @@
 Module determinants
     !
-    ! This module implements Subroutines related to determinants.
+    ! This module implements subroutines related to determinants.
     !
     Use conf_variables
 
@@ -9,7 +9,13 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompD2, CompCD, CompNRC, sort_det, Det_Number, Det_List
+    Public :: Gdet, CompC, CompD, CompCD, CompNRC, Det_Number, Det_List
+    Public :: FormBarr, print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, get_det_indexes
+
+    Integer, Parameter, Public :: bits_per_int = 32
+    Integer, Public :: num_ints_bit_rep
+    Integer, Dimension(:), Allocatable, Public :: bdet, bdet1, bdet2
+    Integer, Dimension(:,:), Allocatable, Public :: Barr
 
   Contains
 
@@ -19,10 +25,11 @@ Module determinants
         Integer :: ic, n1, n0, iconf_neq
 
         ic1=0
-        n0=IP1+1
+        n0=MaxNd0+1
         n1=0
 
         Do ic=1,Nc4
+            if (ic > Nc) Exit
             If (kCSF > 0) Then
                 iconf_neq=nc_neq(ic)
                 n1=n1+ndcs(iconf_neq)
@@ -30,8 +37,8 @@ Module determinants
                 n1=n1+Ndc(ic)
             End If
             If (n1 < n0) Then
-                 n2=n1
-                 ic1=ic
+                n2=n1
+                ic1=ic
             End If
         End Do
         
@@ -60,18 +67,18 @@ Module determinants
             else
                 NRorb=.FALSE.
             end if
-            nem=Jj(ni)+1
+            nem=Jj(ni)+1 
             Nf0(ni)=i0
             imax=2*Jj(ni)+1
             Do j=1,imax,2
                 i0=i0+1
-                Jz(i0)=j-nem
-                Nh(i0)=ni
+                Jz(i0)=j-nem ! total magnetic quantum number m_j (unit of 1/2)
+                Nh(i0)=ni    ! orbital index for Jz 
                 if (NRorb) then
                     Nh0(i0)=ni-1
-                  else
+                else
                     Nh0(i0)=ni
-                  end if
+                end if
             End Do
         End Do
         n=0
@@ -130,9 +137,6 @@ Module determinants
            Stop
         end if
 
-        strfmt = '(4X,"Nd   =",I8)'
-        write( 6,strfmt) Nd
-        write(11,strfmt) Nd
         Deallocate(idet)
 
     End Subroutine Det_Number
@@ -147,7 +151,7 @@ Module determinants
 
         If (.not. allocated(idet1)) allocate(idet1(Ne))
         If (.not. allocated(idet2)) allocate(idet2(Ne))
-        If (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        If (.not. allocated(idt)) allocate(idt(Ne,Nd))
         If (.not. allocated(Jtc)) Allocate(Jtc(Nc))
 
         Nd0=0
@@ -164,7 +168,7 @@ Module determinants
                     if (M.EQ.Mj) then
                         call sort_det(idet1,idet2)
                         do i=1,ne
-                            idt(nd1,i)=idet2(i)
+                            idt(i,nd1)=idet2(i)
                         enddo
                     end if
                     im=(M-Mj)/2+1
@@ -181,25 +185,83 @@ Module determinants
     Subroutine Jterm
         Implicit None
 
-        Integer         :: ndj, i, j, mt, n, im, ndi, nd1, imax, iconf, ndi1
+        Integer         :: j, mt, n, im, ndi, nd1, imax, iconf, ndi1, iconf1, jmax
         Real(dp)        :: d
         Integer, allocatable, dimension(:) :: idet, nmj
-        logical :: fin
+        logical :: fin, swapped
 
-        If (.not. allocated(idet)) allocate(idet(Ne))
-        if (.not. allocated(idt)) allocate(idt(Nd,Ne))
+        allocate(idet(Ne))
+        if (.not. allocated(Ndc)) allocate(Ndc(Nc))
+        if (.not. allocated(Jtc)) allocate(Jtc(Nc))
 
         Njd=0
-        Do iconf=1,Nc
-            ndi=Ndc(iconf)
-            imax=Jtc(iconf)
+        Nd=0
+        jmax=0
+
+        ! Calculate total number of determinants Nd
+        Do iconf1=1,Nc
+            ndi=0
+            iconf=iconf1
+            fin=.true.
+            Call Ndet(iconf,fin,idet)
+            Do While (.not. fin)
+                im = (M-Mj)/2+1
+                If (im > jmax) jmax = im
+                If (M == Mj) Then
+                    ndi = ndi + 1
+                End If
+                Call Ndet(iconf,fin,idet)
+            End Do
+            Nd=Nd+Ndi
+        End Do
+
+        ! Allocate global arrays:
+        ! Iarr - 2d array of determinants, dimension(Ne, Nd)
+        ! Jt - array of J term
+        ! Njt - array of number of determinants with J term
+        if (.not. allocated(Iarr)) allocate(Iarr(Ne,Nd))
+        if (.not. allocated(Jt)) allocate(Jt(jmax))
+        if (.not. allocated(Njt)) allocate(Njt(jmax))
+        if (.not. allocated(nmj)) allocate(nmj(jmax))
+
+        Njd=0
+        Nd=0
+
+        ! Loop over configurations
+        Do iconf1=1,Nc
+            ndi=0
+            ndi1=0
+            iconf=iconf1
+            imax=1
+            fin=.true.
+            Call Ndet(iconf,fin,idet)
+
+            ! Construct next determinant in configuration iconf
+            Do While (.not. fin)
+                If (M >= Mj) Then
+                    If (M == Mj) ndi=ndi+1
+                    If (M == Mj+2) ndi1=ndi1+1
+
+                    nd1=nd+ndi
+
+                    If (M == Mj) Call Pdet(nd1,idet) ! Save determinant to Iarr(1:Ne,nd1)
+
+                    im=(M-Mj)/2+1
+                    If (im > imax) imax=im
+                End If
+                Call Ndet(iconf,fin,idet)
+            End Do
+
+            Ndc(iconf)=ndi
+            Jtc(iconf)=ndi
+            If (kv == 1) Jtc(iconf)=ndi-ndi1
+            Nd=Nd+Ndi
+
             If (ndi /= 0) Then
-                allocate(nmj(imax))
-                Do im=1,imax
-                    nmj(im)=0
-                End Do
+                nmj(1:imax)=0
                 fin= .true.
                 Call Ndet(iconf,fin,idet)
+
                 Do While (.NOT.fin) 
                     If (M >= Mj) Then
                         im=(M-Mj)/2+1
@@ -207,57 +269,70 @@ Module determinants
                     End If
                     Call Ndet(iconf,fin,idet)
                 End Do
+
                 ! list of terms
-                im=imax+1
-    230         im=im-1
-                If (im >= 1) Then
+                Do im=imax, 1, -1
                     n=nmj(im)
                     If (n /= 0) Then
                         mt=(im-1)*2+Mj
                         Do j=1,im
                             nmj(j)=nmj(j)-n
                         End Do
-                        If (njd /= 0) Then
-                            Do j=1,njd
-                                If (Jt(j) == mt) Then
-                                    njt(j)=njt(j)+n
-                                    goto 230
-                                End If
-                            End Do
+
+                        ! Check if J term is already in Jt array
+                        Do j=1,njd
+                            If (Jt(j) == mt) Then
+                                njt(j)=njt(j)+n
+                                Exit
+                            End If
+                        End Do
+                        
+                        ! Add a new J term if not already present
+                        If (j > Njd) Then
+                            Njd=Njd+1
+                            Jt(njd)=mt
+                            Njt(njd)=n
                         End If
-                        njd=njd+1
-                        If (njd > IPjd) Then
-                            write(*,*) ' Jterm: number of Js'
-                            write(*,*) ' exceed IPjd=',IPjd
-                            Read(*,*)
-                        End If
-                        Jt(njd)=mt
-                        Njt(njd)=n
                     End If
-                    goto 230
-                End If
-                Deallocate(nmj)
+                End Do
             End If
         End Do
 
-        ! Writing table of J
-        write( 6,'(3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))')
-        write(11,'(3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))')
-        i = 1
-        Do While (i == 1)
-            i=0
+        ! Handle case when no determinants were constructed for J terms
+        If (Nd == 0) Then
+            write( 6,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
+            write(11,'(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)') Jm
+            stop
+        End If
+
+        ! Write table of number of determinants with respective J terms
+        write( 6,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
+        write(11,'(4X,"Nd   =",I9/3X,23("=")/4X,"N",3X,"  mult.",7X,"J"/3X,23("-"))') Nd
+
+        ! Sort Jt and Njt
+        Do
+            swapped = .false.
             Do j=2,njd
                 If (Jt(j) < Jt(j-1)) Then
+                    ! swap Jt values
                     n=Jt(j)
                     Jt(j)=Jt(j-1)
                     Jt(j-1)=n
+
+                    ! swap Njt values
                     n=Njt(j)
                     Njt(j)=Njt(j-1)
                     Njt(j-1)=n
-                    i=1
+                    
+                    swapped = .true.
                 End If
             End Do
+
+            ! Exit loop if no elements were swapped
+            If (.not. swapped) Exit
         End Do
+
+        ! Print number of determinants for each J term
         Do j=1,njd
             d=Jt(j)*0.5d0
             n=j
@@ -266,15 +341,8 @@ Module determinants
         End Do
         write( 6,'(3X,23("="))')
         write(11,'(3X,23("="))')
-     
-        i=0
-        Do j=1,njd
-            d=Jt(j)*0.5d0
-            n=j
-            ndj=Njt(n)
-        End Do
 
-        Deallocate(idet)
+        Deallocate(idet, Jtc, nmj)
 
         Return
     End Subroutine Jterm
@@ -373,51 +441,43 @@ Module determinants
         Integer  ::  n
         Integer, allocatable, dimension(:) :: idet
         !  - - - - - - - - - - - - - - - - - - - - - - - - -
-        idt(n,1:Ne)=idet(1:Ne) 
+        Iarr(1:Ne,n)=idet(1:Ne)
         Return
     End Subroutine Pdet
 
-    Subroutine Wdet(Nd, Ne, idt, str)
+    Subroutine Wdet(str)
         ! This subroutine writes the basis set of determinants to the file 'str'.
         !
         Implicit None
-        Integer  :: i, n, Nd, Ne
-        Integer, Allocatable, Dimension(:) :: idet
-        Integer, Allocatable, Dimension(:,:) :: idt
+        Integer  :: i
         Character(Len=*) :: str
-
-        If (.not. Allocated(idet)) Allocate(idet(Ne))
 
         Open (16,file=str,status='UNKNOWN',form='UNFORMATTED')
         Write(16) Nd,Nsu
-        Do n=1,Nd
-            idet(1:Ne) = idt(n,1:Ne)
-            write(16) (idet(i),i=1,Ne)
+        Do i=1,Nd
+           write(16) Iarr(1:Ne,i)
         End Do
         close(16)
-        If (Allocated(idet)) Deallocate(idet)
         Return
     End Subroutine Wdet
 
-    Subroutine Rdet(Nd, Ne, idt, str)
+    Subroutine Rdet(str)
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
         !
         Implicit None
-        Integer :: i, n, Nd, Ne
-        Integer, Allocatable, Dimension(:) :: idet
-        Integer, Allocatable, Dimension(:,:) :: idt
+        Integer :: i
         Character(Len=*) :: str
 
-        If (.not. Allocated(idt)) Allocate(idt(Nd,Ne))
-        If (.not. Allocated(idet)) Allocate(idet(Ne))
-
-        Open(16,file=str,status='OLD',form='UNFORMATTED')
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
+        Open (16,file=str,status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
-        Do n=1,Nd
-            Read(16) (idet(i),i=1,Ne)
-            idt(n,1:Ne)=idet(1:Ne)
+        Do i=1,Nd
+           Read(16,end=710) Iarr(1:Ne,i)
         End Do
-        Close(16)
+        close(16)
+        Return
+710     write(*,*)' Rdet: end of CONF.DET for idet=',i
+        stop
     End Subroutine Rdet
 
     Subroutine Rspq(id1,id2,is,nf,i1,j1,i2,j2)
@@ -523,7 +583,7 @@ Module determinants
         ! it does NOT post-process the located indices to determine scaling factor (is) or
         ! correct differing indices
         !
-        ! The two Integer index vectors, "i" and "j", are three elements in size and are
+        ! The two integer index vectors, "i" and "j", are three elements in size and are
         ! used as:
         !
         !     i(1)        running index over comparison
@@ -658,7 +718,7 @@ Module determinants
         Integer :: n
         Integer, allocatable, dimension(:)  :: idet
 
-        idet(1:Ne)=idt(n,1:Ne)
+        idet(1:Ne)=Iarr(1:Ne,n)
         Return
     End Subroutine Gdet
 
@@ -666,40 +726,12 @@ Module determinants
         Implicit None
         Integer, Intent(Out)  :: icomp
         Integer, allocatable, dimension(:), Intent(In)  :: idet1, idet2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+        
         iconf1(1:Ne)=Nh(idet1(1:Ne))   ! iconf1(i) = No of the orbital occupied by the electron i
         iconf2(1:Ne)=Nh(idet2(1:Ne))    
         Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompCD
-
-    Subroutine CompD2(id1,id2,nf)
-        ! this subroutine compares determinants and counts number of differences in orbitals
-        ! return the number of differences nf
-        Implicit None
-        Integer  :: nf, i, imax
-        Integer, allocatable, dimension(:)   :: id1, id2
-        Integer, dimension(Nsu) :: det1, det2
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        det1=0
-        det2=0
-        det1(id1(1:Ne))=1
-        det2(id2(1:Ne))=1
-        nf = 0
-        imax=max(maxval(id1),maxval(id2))
-        !print*,imax
-        Do i=1,imax
-            nf = nf + popcnt(xor(det1(i),det1(i))) 
-        End Do
-        !Do i=1,Ne
-        !    nf = nf + popcnt(xor(id1(i),id2(i)))
-        !End Do
-        !print*,'before',id1(1:Ne),id2(1:Ne),nf
-        nf = ishft(nf,-1)
-        !print*,'after',id1(1:Ne),id2(1:Ne),nf
-        Return
-    End Subroutine CompD2
-
 
     Subroutine CompD(id1,id2,nf)
         ! this subroutine compares determinants and counts number of differences in orbitals
@@ -791,4 +823,202 @@ Module determinants
 
     End Subroutine sort_det
 
-end module determinants
+
+    Subroutine FormBarr
+        Implicit None
+        
+        Integer :: i
+        Integer, Dimension(:), Allocatable :: idet, bdet
+
+        print*, 'Forming Barr...'
+
+        ! Calculate number of integers needed to store basis orbitals in bit representation
+        num_ints_bit_rep = (Nst + bits_per_int - 1) / bits_per_int
+
+        ! Allocate bit_rep equivalent of Iarr
+        Allocate(Barr(num_ints_bit_rep, Nd), bdet(num_ints_bit_rep), idet(Ne))
+
+        ! convert integer representation to bit representation
+        Do i=1,Nd
+            idet = Iarr(1:Ne, i)
+            Call convert_int_rep_to_bit_rep(idet, bdet, Ne)
+            Barr(1:num_ints_bit_rep, i) = bdet
+        End Do
+
+        print*, 'Barr formed...'
+
+        Deallocate(bdet, idet)
+
+    End Subroutine FormBarr
+
+    Function print_bits(num, n_bits) Result(bitstr)
+        ! print bit string from bit representation of determinant
+        Implicit None
+        Integer, Intent(In) :: num, n_bits
+        Character(Len=n_bits) :: bitstr
+        Integer :: i
+
+        Do i=1,n_bits
+            If (btest(num, i-1)) Then
+                bitstr(i:i) = '1'
+            Else
+                bitstr(i:i) = '0'
+            End If
+        End Do
+
+    End Function print_bits
+
+    Subroutine convert_int_rep_to_bit_rep(int_rep, bit_rep, size_int_rep)
+        Implicit none
+        Integer, Dimension(:), Allocatable, Intent(In) :: int_rep ! integer representation
+        Integer, Dimension(:), Allocatable, Intent(InOut) :: bit_rep ! bit representation
+        Integer, Intent(In) :: size_int_rep
+        Integer :: i, index, bit_position ! loop index, integer index, bit position
+
+        ! initialize bit representation array to 0 (all orbitals unoccupied)
+        bit_rep = 0
+
+        ! loop over occupied orbitals and set the corresponding bits
+        Do i=1, size_int_rep
+            ! find which integer the orbital falls in
+            index = (int_rep(i) - 1) / bits_per_int + 1
+            
+            ! find which bit position within the integer the orbital falls in
+            bit_position = mod(int_rep(i) - 1, bits_per_int)
+            
+            ! set the bit corresponding to the orbital
+            bit_rep(index) = ibset(bit_rep(index), bit_position)
+        End Do
+
+    End Subroutine convert_int_rep_to_bit_rep
+
+    Subroutine convert_bit_rep_to_int_rep(bit_rep, int_rep)
+        Implicit None
+        Integer, Dimension(:), Allocatable, Intent(In) :: bit_rep ! bit representation
+        Integer, Dimension(:), Allocatable :: int_rep             ! integer representation
+        Integer :: i, j, cnt                                      ! loop index, integer index, bit position
+        Character(len=bits_per_int) :: bit_int
+
+        ! initialize int representation array to 0
+        int_rep = 0
+
+        ! loop over occupied orbitals and set the corresponding integer positions
+        cnt = 1
+        Do i=1, size(bit_rep)
+            ! we can skip '0' elements of the bit_rep since they correspond to no occupancy 
+            If (bit_rep(i) == 0) Cycle
+            bit_int = print_bits(bit_rep(i), bits_per_int)
+            Do j = 1, bits_per_int
+                If (bit_int(j:j) == '1') Then
+                    int_rep(cnt) = j + (i-1)*bits_per_int
+                    cnt = cnt + 1
+                End If
+            End Do
+        End Do
+
+    End Subroutine convert_bit_rep_to_int_rep
+
+    Function compare_bit_dets(bdet1, bdet2, n_ints) Result(ndiffs)
+        ! print bit string from bit representation of determinant
+        Implicit None
+        Integer, Dimension(:), Allocatable, Intent(In) :: bdet1, bdet2
+        Integer :: i, n_ints, nf, ndiffs
+
+        nf=0
+
+        Do i=1,n_ints
+            ! we can skip the i-th element of bdet1 and bdet2 if there are no occupancies
+            If (bdet1(i) /= 0 .or. bdet2(i) /= 0) Then
+
+                ! count differing bits
+                nf = nf + popcnt(ieor(bdet1(i), bdet2(i)))
+
+                ! we only care if the number of differences between determinants is < 3
+                If (nf >= 6) Then
+                    ndiffs = 3
+                    Return
+                End If
+            End If
+        End Do
+
+        ndiffs = (nf + 1) / 2
+
+    End Function compare_bit_dets
+
+    Subroutine get_det_indexes(bdet1, bdet2, n_ints, ndiffs, is, det1_indexes, det2_indexes)
+        Implicit None
+
+        Integer, Dimension(:), Allocatable, Intent(In) :: bdet1, bdet2
+        Integer, Intent(In) :: n_ints, ndiffs
+        Integer, Intent(Out) :: is
+        Integer, Dimension(3), Intent(InOut) :: det1_indexes, det2_indexes
+        Integer, Dimension(2) :: l1, l2
+        Integer :: i, j, i1, j1, bit_position, temp, num_zero_bits, l
+        Logical :: first_found, bt1, bt2
+
+        i1=1
+        j1=1
+        det1_indexes = 0
+        det2_indexes = 0
+
+        num_zero_bits = 0
+        first_found = .false.
+
+        ! loop through integers representing bitstring determinants
+        Do i=1,n_ints
+            ! skip the i-th element of bdet1 and bdet2 if there are no occupancies
+            If (bdet1(i) == 0 .and. bdet2(i) == 0) Cycle
+
+            Do j=0,bits_per_int-1
+                bt1 = btest(bdet1(i), j) ! returns .true. if the j-th bit of bdet1(i) is set
+                bt2 = btest(bdet2(i), j) ! returns .true. if the j-th bit of bdet2(i) is set
+
+                ! mark first occupancy
+                If (bt1 .or. bt2) first_found = .true.
+
+                ! count zero bits after first occupancy
+                If (.not. bt1 .and. .not. bt2) Then
+                    if (first_found) num_zero_bits = num_zero_bits + 1
+                Else If (bt1 .neqv. bt2) Then
+                    bit_position = (32 * (i-1)) + j + 1
+
+                    If (bt1) Then
+                        i1 = i1 + 1
+                        det1_indexes(i1) = bit_position
+                        l1(i1 - 1) = bit_position - num_zero_bits
+                    end If
+
+                    If (bt2) Then
+                        j1 = j1 + 1
+                        det2_indexes(j1) = bit_position
+                        l2(j1 - 1) = bit_position - num_zero_bits
+                    End If
+
+                    if ((ndiffs == 1 .and. i1 == 2 .and. j1 == 2) .or. (ndiffs == 2 .and. i1 == 3 .and. j1 == 3)) exit
+                End If
+            End Do
+        End Do
+
+        is = 1
+        Select Case(ndiffs)
+            Case(1)
+                If (num_zero_bits > 0) then
+                    l = iabs(l2(1) - l1(1) - 1)
+                    If (mod(l,2) == 1) is = -is 
+                End If
+            Case(2)
+                l = iabs(l2(1) - l1(1) - mod(num_zero_bits,2))
+                If (mod(l,2) == 1) is = -is 
+                l = iabs(l2(2) - l1(2) - mod(num_zero_bits,2))
+                If (mod(l,2) == 1) is = -is
+                temp = det2_indexes(2)
+                det2_indexes(2) = det2_indexes(3)
+                det2_indexes(3) = temp
+                temp = det1_indexes(2)
+                det1_indexes(2) = det1_indexes(3)
+                det1_indexes(3) = temp
+        End Select
+
+    End Subroutine get_det_indexes
+
+End Module determinants

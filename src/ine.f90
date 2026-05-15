@@ -51,17 +51,40 @@ Program ine
     !         General convention: GLOBAL VARIABLES     |||
     !              ARE CAPITALISED                     |||
     ! ||||||||||||||||||||||||||||||||||||||||||||||||||||
-    Use ine_variables
-    Use determinants, Only : Dinit, Det_Number, Det_List, Jterm
+    Use params
+    Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
 
     Implicit None
+    
     Integer, Parameter :: IP2 = 50000
-    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4
-    Real(dp) :: dlamb
+
+    Integer :: i, n, k, l, Nd2, Nddir, nsu2, icyc, nlamb, kIters, N_it4, kl0
+    Integer  :: Kli, Klf, Ndir, Int_err, Ntr, Nint, Nmax, Nd0, ipmr, Kdiag, Nlft, IP1, IPad
+    Integer  :: IPlv, IP4, Kt, Nlev, N0, N2, nrange
+    Integer(kind=int64) :: NumH, NumJ
+    
+    Real(dp) :: Jm0, E0, E2, Tj0, Tj2, xlamb, xlamb1, xlamb2, xlambstep, XInuc, Crit1, W0, W00, Q, Elft, Hmin, dlamb
+    Real(dp), Allocatable, Dimension(:) :: xlamb1s, xlamb2s, xlambsteps, xlamblist
+    Integer, Allocatable, Dimension(:) :: Inte
+    Integer, Allocatable, Dimension(:,:) :: Iarr0
+    Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
+    Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
+    Real(dp), Dimension(2) :: s, ss, s0, s1, s2
+    logical :: ok
+
+    Character(Len=1), Dimension(9)          :: Let
+    Character(Len=4), Dimension(13)         :: Alet
+    Character(Len=4), Dimension(5)          :: Blet
+
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
-    logical :: ok
+
+    Type Matrix
+        Integer,  Allocatable, Dimension(:) :: n, k
+        Real(dp), Allocatable, Dimension(:) ::  t
+    End Type Matrix
+    Type(Matrix) :: Hamil, Jsq
 
     Call startTimer(start_time)
 
@@ -69,30 +92,23 @@ Program ine
     Call Input                        ! Read list of configurations from CONF.INP
     Call Init                         ! Read basis set information from CONF.DAT
     Call Rint                         ! Read radial integrals from CONF.INT
-    Call Dinit                        ! 
-    Call Det_Number                   ! counts number of determinants
-    Call Det_List(idt)                ! generates list of determinants
+    Call Dinit                        ! Form list of determinants
     Call Jterm                        ! Print table with numbers of levels with given J
     Call ReadHIJ                      ! Read Hamiltonian matrix in X1 space from file CONF.HIJ
     Call ReadJJJ                      ! Read J^2 matrix in X1 space from file CONF.JJJ
     Call Init0                        !### Evaluation of the RHS of
     Call Vector(kl)                   !###  the equation and vectors Yi
 
-    If (W0 == 0.d0 .or. Kli == 5) Then
-        icyc=1
-    Else
-        icyc=2
-    End If
-
+    kl0 = kl ! user-inputted Kl
     Do k=1,nrange
         xlamb1 = xlamb1s(k)
         xlamb2 = xlamb2s(k)
         xlambstep = xlambsteps(k)
         If (k > 1) Then
             If (xlamb1 == xlamb2s(k-1)) xlamb1 = xlamb1+xlambstep
-            If (xlamb2 - xlamb1 < xlambstep) xlamb1 = xlamb2
+            If (xlamb2 < xlamb1 + xlambstep) xlamb2 = xlamb1
         End If
-        If (xlamb1==xlamb2) xlambstep=1
+        If (xlamb2==xlamb1) xlambstep=1
 
         dlamb = (xlamb2-xlamb1)/xlambstep
         dlamb = Anint(dlamb*100.0)/100.0
@@ -101,9 +117,16 @@ Program ine
         print*,'nlamb=',nlamb
         xlamb=xlamb1
         Do n=1,nlamb
-            If (W0 /= 0.d0) W0 = 1.d+7/(xlamb*219474.63d0)
+            If (dabs(xlamb) > 1.d-8) Then
+                W0 = 1.d+7/(xlamb*219474.63d0)
+                icyc = 2
+            Else
+                W0 = 0.d0
+                icyc = 1
+            End If
             print*, 'xlamb=',xlamb
             Do i=1,icyc
+                If (kIters == 2 .and. kl0 == 0) Kl = 0
                 Ndir=Nddir
                 If (Kli.EQ.5) Then
                     Ndir= Nd    ! SolEq4 is not adopted yet for E2 polariz.
@@ -117,38 +140,41 @@ Program ine
                     Write( *,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                     Write(11,'(/3X,34("-")/3X,"Calculation for lambda=",F11.3,/3X,34("-")/)') xlamb
                 Else
-                    Write( *,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
-                    Write(11,'(/3X,22("-")/3X,"Calculation for W0 = 0",/3X,22("-")/)')
+                    Write( *,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
+                    Write(11,'(/3X,25("-")/3X,"Calculation for omega = 0",/3X,25("-")/)')
                 End If
                 Select Case(kIters)
                     Case(0)
-                        Call SolEq1(kl) ! Direct solution
+                        print*, 'Ndir=',Ndir
+                        Call SolEq1(kl,i) ! Direct solution
                         If (Ndir.LT.Nd) Then
-                            Call SolEq4(ok)                 !### Iterative solution
+                            Call SolEq4(ok,i)                 !### Iterative solution
                             If (Nd.LE.IP1 .AND. .NOT.ok) Then
                               Ndir= Nd
                               Write(*,*)
-                              Call SolEq1(kl)
+                              Call SolEq1(kl,i)
                               ok=.TRUE.
                             End If
                         End If
                     Case(1)
                         Ndir=Nd
                         IP1=Nd
-                        Call SolEq1(kl) ! Direct solution
+                        Call SolEq1(kl,i) ! Direct solution
                     Case(2)
                         N_it = 2
                         Do l=1,N_it4
                             print*, '   2-step ITERATION #', l
                             If (l > 1) kl = 2
-                            Call SolEq1(kl) ! Direct solution
-                            Call SolEq4(ok) ! Iterative solution
+                            Call SolEq1(kl,i) ! Direct solution
+                            If (Ndir.LT.Nd) Then
+                                Call SolEq4(ok,i) ! Iterative solution
+                            End If
                             If (ok) Exit
                         End Do
                 End Select
                 If (Kli.LE.2) Call  Prj ('  X1  ',Tj0,X1,X1J)     !### Projects X1 on J subspaces
                 If (Kli.EQ.5) Call PrjE2('  X1  ',Tj0,X1,X1J)
-                Call RdcX1J                                       !### Transforms and saves X1J
+                Call RdcX1J (i)                                      !### Transforms and saves X1J
                 If (Kli.LE.2) Call  Prj ('  Y2  ',Tj2,YY2,Y2J)    !### Projects Y2 on J subspaces
                 If (Kli.EQ.5) Call PrjE2('  Y2  ',Tj2,YY2,Y2J)
                 Call Prin                                  !### Output of the results
@@ -173,30 +199,23 @@ Program ine
         End Do
     End Do
 
-    Close(unit=11)
+    Close(unit=11) ! Close INE.RES
+    Close(unit=99) ! Close INEFINAL.RES
     Call stopTimer(start_time, timeStr)
-    Write(*,'(2X,A)'), 'TIMING >>> Total computation time of ine was '// trim(timeStr)
+    Write(*,'(2X,A)') 'TIMING >>> Total computation time of ine was '// trim(timeStr)
     
 Contains
 
     Subroutine SetParams
         Implicit None
 
-        ! Choose Khe - variant of solution of homogeneous equation
-        ! Khe=0 - old solution of homogeneous eq-n
-        ! Khe=1 - new solution of homogeneous eq-n
-        Khe= 1   
-
-        ! Specify kIters - (0-iterate and invert if diverged, 1-invert only, 2-2-step iteration)
-        kIters=2
+        ! Specify IP1 - dimension of the matrix to solve homogeneous equation
+        ! Set IP1=IP1conf for same dimensionality as in conf
+        IP1=15000
 
         ! Specify Nddir - dimension of the matrix for initial solution by SolEq1
         ! To solve homogeneous equation for the whole matrix, Nddir=IP1
         Nddir = IP1  
-
-        ! Specify IP1 - dimension of the matrix to solve homogeneous equation
-        ! Set IP1=IP1conf for same dimensionality as in conf
-        IP1=15000
 
         ! Specify N_it4 - number of iterations in SolEq4
         N_it4 = 100
@@ -291,6 +310,15 @@ Contains
         Open(unit=11,status='UNKNOWN',file='INE.RES')
         Close(unit=11,status='DELETE')
         Open(unit=11,status='NEW',file='INE.RES')
+
+        Open(unit=99,status='UNKNOWN',file='INEFINAL.RES')
+        Close(unit=99,status='DELETE')
+        Open(unit=99,status='NEW',file='INEFINAL.RES')
+
+        Write(*,'(A)') ' kIters= (0- invert and iterate if diverged, 1-invert only, 2-2-step iteration)'
+        Read(*,*) kIters
+        Write(*,'(A,I2)') ' kIters=', kIters
+
         Write(*,'(A)')' kl= (0-new, 1-use X1, 2-use X1,Y1,Y2 ):'
         Read (*,*) kl
         Write(*,'(A,I2)')' kl=',kl
@@ -315,10 +343,10 @@ Contains
         Write(*,'(A)')' X2 is in file CONF0.XIJ, record number:'
         Read (*,*) N2
         Write(*,'(A,I2)')' N2=',N2
-        Read (*,*) nrange
 
         W0= 0.d0
-        If (Kli.EQ.2 .AND. Klf.EQ.2 .OR. Kli.EQ.5) Then
+        If ((Kli.EQ.2 .AND. (Klf.EQ.2 .OR. Klf.EQ.4)) .OR. Kli.EQ.5) Then
+            Read (*,*) nrange
             allocate(xlamb1s(nrange),xlamb2s(nrange),xlambsteps(nrange))
             Write(*,'(A)')' Give a list of ranges of wavelengths (nm) followed by step size (e.g. 535 537 0.5):'
             Write(*,'(A)')' (for static polarizability give 0 0 0)'
@@ -326,15 +354,12 @@ Contains
                 Read(*,*) xlamb1s(i), xlamb2s(i), xlambsteps(i)
                 Write(*,'(A,F11.3,A,F11.3,A,F11.4)')' lambda=',xlamb1s(i),' nm to ',xlamb2s(i),' in steps of ',xlambsteps(i)
             End Do
-            
-            xlamb1 = xlamb1s(1)
-            xlamb2 = xlamb2s(1)
-            xlambstep = xlambsteps(1)
-            If (dabs(xlamb1).GT.1.d-8) Then
-              W0 = 1.d+7/(xlamb1*219474.63d0)
-            Else
-              Write(*,'(A)')' W0 = 0'
-            End If
+        Else
+            nrange = 1
+            allocate(xlamb1s(1),xlamb2s(1),xlambsteps(1))
+            xlamb1s(1) = 0.d0
+            xlamb2s(1) = 0.d0
+            xlambsteps(1) = 0.d0
         End If
 
         If (Kli.EQ.5 .AND. W0.EQ.0.d0) Then
@@ -345,12 +370,13 @@ Contains
           Write(*,'(A,1pD8.1)')' W00=',W00
         End If
 
-        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.19",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
+        strfmt = '(1X,70("#"),/1X,"Program InhomEq. v1.24",5X,"R.H.S.: ",A5," L.H.S.: ",A5)'
         Write( 6,strfmt) str(kli),str(klf)
         Write(11,strfmt) str(kli),str(klf)
 
         Call ReadConfInp
         Crit1=crt4
+        IPad=3+Nlv ! set number of probe vectors to be 3 + number of levels in CONF.XIJ
         Call ReadConfigurations
         Return
     End Subroutine Input
@@ -537,14 +563,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x.LT.1.d-6) Then
             Read(13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint),Int(Nint))
+            Allocate(Rnt(Nint),Inte(Nint))
             is=0
             Do i=1,Nsu
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is.EQ.0) Then
                 Read(13) (ki(i),i=1,13)
-                Read(13) (Rnt(i),Int(i),i=1,Nint)
+                Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
                 Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
@@ -614,6 +640,7 @@ Contains
         Close(16)
 
         Tj0=Anint(Tj0*100.0)/100.0
+        Tj2=Anint(Tj2*100.0)/100.0
 
         Open(unit=18,file='CONF0.JJJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
         If (err_stat == 0) Then
@@ -649,13 +676,14 @@ Contains
     Subroutine Vector(kl)   
         ! Read RHS vector |Y1>=A|X0> and LHS vector <Y2|=<X2|B,
         Use conf_variables, Only : iconf1, iconf2
-        Use determinants, Only : Gdet, Rspq, CompC
+        Use determinants, Only : Gdet, Rspq, CompCD, Rdet
         Implicit None
-        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat
+        Integer :: kl, i, ic, icomp, is, i0, i1, j0, j1, negl, idif, n, k, kx, err_stat, nsu1
         Integer :: mdel, nskip, k1, nf, iq
         Integer, Allocatable, Dimension(:) :: idet0, idet1
         Real(dp) :: trd, xn0, xn2, s1, s2
         Character(Len=256) :: strfmt, err_msg
+        logical :: yy1_read, yy2_read
 
         trd=1.d-10                  !### used to drop small contributions
         Open (unit=17,file='CONF0.DET',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
@@ -665,8 +693,13 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Read(17) Nd0
-        
+        Read(17) Nd0, nsu1
+        If (.not. allocated(Iarr0)) Allocate(Iarr0(Ne,Nd0))
+        Do i=1,Nd0
+           Read(17) Iarr0(1:Ne,i)
+        End Do
+        Close(17)
+
         If (.not. Allocated(YY1)) Allocate(YY1(Nd))
         If (.not. Allocated(YY2)) Allocate(YY2(Nd))
         If (.not. Allocated(idet0)) Allocate(idet0(Ne))
@@ -676,68 +709,95 @@ Contains
 
         strfmt = '(3X,63("="),/4X,"Vector: forming vectors Y1 and Y2"," Threshold: ",E9.1)'
         If (kl.NE.2) Write( 6,strfmt) trd
-        YY1(i)=0.d0
-        YY2(i)=0.d0
+        YY1(:)=0.d0
+        YY2(:)=0.d0
         negl=0              !### number of vector components below threshold
         idif= 1
         If (Kli.EQ.5) idif= 2
-        Do n=1,Nd0
-            xn0=X0(n)
-            xn2=X2(n)
-            Read(17) (idet0(i),i=1,Ne)
-            If (n.EQ.1) Then
-                Call DefJz2(idet0)
-                Q=Jm-Jm0
-                mdel=dabs(Q)+1.d-5
-                If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
-                    Write(*,*) 'Vector: |M-M0| is not zero!'
-                    Write(*,*)' M=',Jm,'  M0=',Jm0
-                    Stop
+
+        ! Read vectors from files INE.YY1 and INE.YY2 if they exist
+        yy1_read = .false.
+        Open(33,file='INE.YY1',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY1(1:Nd)
+            Close(33)
+            yy1_read = .true.
+            print*, 'vector YY1 read from INE.YY1'
+        End If
+
+        yy2_read = .false.
+        Open(33,file='INE.YY2',status='OLD',form='UNFORMATTED',iostat=err_stat)
+        If (err_stat /= 0) Then
+            Continue
+        Else
+            Read(33) YY2(1:Nd)
+            Close(33)
+            yy2_read = .true.
+            print*, 'vector YY2 read from INE.YY2'
+        End If
+
+        ! Define projection of Jz for Iarr0(:,1) corresponding to CONF0.DET
+        idet0(1:Ne)=Iarr0(1:Ne,1)
+        Call DefJz2(idet0)
+        Q=Jm-Jm0
+        mdel=dabs(Q)+1.d-5
+        If ((Kli-1)*(Klf-1).EQ.0.AND.mdel.NE.0) Then
+            Write(*,*) 'Vector: |M-M0| is not zero!'
+            Write(*,*)' M=',Jm,'  M0=',Jm0
+            Stop
+        End If
+        If (kl.EQ.2) return
+
+        if ((.not. yy1_read) .and. (.not. yy2_read)) then
+            Do n=1,Nd0
+                xn0=X0(n)
+                xn2=X2(n)
+                idet0(1:Ne)=Iarr0(1:Ne,n)
+                If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
+                    nskip=0             !### dets in skipped confs
+                    k=0
+                    Do ic=1,Nc
+                        kx=Ndc(ic)
+                        Call Gdet(k+1,idet1)
+                        Call CompCD(idet0,idet1,icomp)
+                        If (icomp.GT.1 .OR. Jdel.GT.idif) Then
+                            k=k+kx
+                            nskip=nskip+kx
+                        Else
+                            Do k1=1,kx
+                                k=k+1
+                                Call Gdet(k,idet1)
+                                Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
+                                If (nf.EQ.1) Then
+                                    If (dabs(xn0).GT.trd) Then
+                                        YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
+                                    End If
+                                    If (dabs(xn2).GT.trd) Then
+                                        YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
+                                    End If
+                                End If
+                            
+                                If (Kli.EQ.5 .AND. nf.EQ.0) Then
+                                    Do iq=1,Ne
+                                        i1=idet1(iq)
+                                        If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
+                                        If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
+                                    End Do
+                                End If
+                            End Do
+                        End If
+                    End Do
+                Else
+                    negl=negl+1
                 End If
-                If (kl.EQ.2) return
-            End If
-            If ((dabs(xn0)+dabs(xn2)).GT.trd+trd) Then
-                nskip=0             !### dets in skipped confs
-                k=0
-                Do ic=1,Nc
-                    kx=Ndc(ic)
-                    Call Gdet(k+1,idet1)
-                    Call CompC(idet0,idet1,icomp)
-                    If (icomp.GT.1 .OR. Jdel.GT.idIf) Then
-                        k=k+kx
-                        nskip=nskip+kx
-                    Else
-                        Do k1=1,kx
-                            k=k+1
-                            Call Gdet(k,idet1)
-                            Call Rspq(idet0,idet1,is,nf,i0,i1,j0,j1)
-                            If (nf.EQ.1) Then
-                                If (dabs(xn0).GT.trd) Then
-                                    YY1(k)=YY1(k)+is*Hint(j1,j0,kli)*xn0
-                                End If
-                                If (dabs(xn2).GT.trd) Then
-                                    YY2(k)=YY2(k)+is*Hint(j0,j1,klf)*xn2
-                                End If
-                            End If
-                
-                            If (Kli.EQ.5 .AND. nf.EQ.0) Then
-                                Do iq=1,Ne
-                                    i1=idet1(iq)
-                                    If (dabs(xn0).GT.trd) YY1(k)=YY1(k)+is*Hint(i1,i1,kli)*xn0
-                                    If (dabs(xn2).GT.trd) YY2(k)=YY2(k)+is*Hint(i1,i1,klf)*xn2
-                                End Do
-                            End If
-                        End Do
-                    End If
-                End Do
-            Else
-                negl=negl+1
-            End If
-            If (1000*(n/1000).EQ.n) Then
-                 strfmt='(1X,I6," from ",I6," (",I6," neglected, ",I6," skipped)")'
-                 Write(*,strfmt) n,Nd0,negl,nskip
-            End If
-        End Do
+                If (1000*(n/1000).EQ.n) Then
+                     strfmt='(1X,I8," from ",I8," (",I8," neglected, ",I8," skipped)")'
+                     Write(*,strfmt) n,Nd0,negl,nskip
+                End If
+            End Do
+        end if
 
         If (Kli.EQ.5 .AND. Nd0.EQ.Nd) Then
             s1= 0.d0
@@ -749,7 +809,6 @@ Contains
             strfmt='(/4x,"<X2|Q_0|X0>=",F10.5,/4x"<X0|Q_0|X2>=",F10.5)'
             Write (*,strfmt) s1,s2
         End If
-        Close(17)
 
         Return
     End Subroutine Vector
@@ -861,14 +920,13 @@ Contains
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
         Do i=1,Nint
-            If (ind.EQ.Int(i)) goto 210
+            If (ind.EQ.Inte(i)) goto 210
         End Do
         strfmt='(1X,"Fint: CANNOT FIND INTEGRAL ",3I4,I6)'
         Write( 6,strfmt) is,nfin,nini,ind
         Write(11,strfmt) is,nfin,nini,ind
-        Fint=0.d0
-        Int_err=Int_err+1
-        return
+        Write(*, *) 'Try reconstructing DTM.INT'
+        Stop
 210     Fint=Rnt(i)*isg
         return
     End Function Fint
@@ -876,7 +934,7 @@ Contains
     Subroutine ReadHIJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: i8
+        Integer(kind=int64) :: i8, cnt
         Character(Len=256) :: err_msg
 
         Open(unit=15,file='CONF.HIJ',status='UNKNOWN',form='unformatted',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -892,23 +950,32 @@ Contains
         If (.not. Allocated(Hamil%n)) Allocate(Hamil%n(NumH))
         If (.not. Allocated(Hamil%k)) Allocate(Hamil%k(NumH))
         If (.not. Allocated(Hamil%t)) Allocate(Hamil%t(NumH))
+        cnt=0
         Do i8=1,NumH
-            Read(15), Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            Read(15) Hamil%k(i8), Hamil%n(i8), Hamil%t(i8)
+            if (Hamil%n(i8) == Nd + 1) then
+                NumH=cnt
+                print*,'For Nd=',Nd,', NumH=', NumH
+                exit
+            end if
+            cnt = cnt + 1
         End Do
+        
+        Close(15)
         Return
-    End Subroutine
+    End Subroutine ReadHIJ
 
-    Subroutine SolEq1(kl)
+    Subroutine SolEq1(kl,sign)
         Use solvers
         Use str_fmt, Only : FormattedTime
         Implicit None
         External ZSPSV
-        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat
+        Integer :: i, ic, id, info, j, k, k1, k2, kl, nd1, err_stat, sign
         Integer(Kind=int64) :: i8, start1, end1, start2, end2, clock_rate
         Real :: ttime, ttime2
         Real(dp) :: t, e0n, e2n, tj0n, tj2n, err
         Real(dp), Allocatable, Dimension(:) :: scales
-        Complex(dp), Allocatable, Dimension(:) ::Zc, XX1
+        Complex(dp), Allocatable, Dimension(:) :: Zc, XX1
         Integer, Allocatable, Dimension(:) :: ipiv, Mps
         Real(dp), Allocatable, Dimension(:,:) :: Az
         Character(Len=256) :: strfmt, err_msg, timeStr
@@ -926,12 +993,19 @@ Contains
         elft= E0+W0                          !### equation has the form:
         If (Kli.EQ.2.AND.Klf.NE.2) elft=E2   !### (elft-H)X1=Y1
         If (kl.GE.1) then
-            Open (unit=16,file='INE.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            print*, 'Reading vectors from INE.XIJ...'
+            If (sign == 1) Then
+                Open (unit=16,file='INE_p.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            Else
+                Open (unit=16,file='INE_m.XIJ',status='OLD',form='UNFORMATTED',iostat=err_stat,iomsg=err_msg)
+            End If
             If (err_stat /= 0) Then
+                print*, 'ERROR: INE.XIJ could not be read'
                 Continue
             Else
                 Read(16,iostat=err_stat,iomsg=err_msg) e0n,tj0n,Ntr,(X1(i),i=1,Ntr)
                 If (err_stat /= 0) Then
+                    print*, 'ERROR: vector from INE.XIJ could not be read'
                     Continue
                 Else
                     err=dabs(e0n+E0)+dabs(tj0n-Tj0)
@@ -947,11 +1021,15 @@ Contains
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y1 read..'
                         End If
                         Read(16,iostat=err_stat,iomsg=err_msg) e2n,tj2n,Nd1,(YY2(i),i=1,Nd1)
                         If (err_stat /= 0) Then
                             Write(*,*) ' Error in INE.XIJ'
                             Stop
+                        Else
+                            Write(*,*) ' Y2 read..'
                         End If
                         err= err + dabs(e2n+E2)+dabs(tj2n-Tj2)+iabs(Nd-Nd1)
                         If (err.GT.1.d-1) then
@@ -966,12 +1044,18 @@ Contains
                         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
                     End If
                     Close(16)
-                    Write( *,*)'  SolEq1: solution is taken from INE.XIJ'
-                    Write(11,*)'  SolEq1: solution is taken from INE.XIJ'
+                    If (sign == 1) Then
+                        Write( *,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_p.XIJ'
+                    Else
+                        Write( *,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                        Write(11,*)'  SolEq1: solution is taken from INE_m.XIJ'
+                    End If
                     Return
                 End If
             End If
         End If
+        print*, 'Nd=',Nd, 'IP1=',Ndir
         If (Nd.GT.Ndir) then
             Ntr=0                          !### Ntr = dimension of the
             Do ic=1,Nc                     !### matrix equation to solve here
@@ -981,7 +1065,7 @@ Contains
         Else
             Ntr=Nd
         End If
-        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I6,")")'
+        strfmt = '(4X,"SolEq1: matrix (",I5," X ",I5,") ( Nd =",I8,")")'
         Write(6,strfmt) Ntr,Ntr,Nd
 
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
@@ -1008,13 +1092,13 @@ Contains
                 Az(j,i)= -t
             End If
         End Do
-        Close(unit=15)
+
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: Z matrix calculated in '// trim(timeStr)// '.'
         
-        strfmt = '(3X," NumH =",I10,";  Hmin =",F12.6/)'
+        strfmt = '(3X," NumH =",I12,";  Hmin =",F12.6/)'
         Write(*,strfmt) NumH,Hmin
 
         If (.not. Allocated(Zc)) Allocate(Zc(Ntr*Ntr))
@@ -1022,47 +1106,47 @@ Contains
         If (.not. Allocated(X1)) Allocate(X1(Nd))
 
         Call system_clock(start1)
-        If (Khe.EQ.0) Then
-            call Decomp(Z1,Ntr,scales,Mps)          !### decomposition
-            Write(*,*)' decomposition finished'            !### of the matrix
-            call Flsolv(Ntr,Z1,YY1,X1,Mps)          !### solution of the
-            Write(*,*)' flsolv finished'                   !### inhom-s equation
-        Else
-            k = 1
-            Do i=1,Ntr
-                Do j=1,i
-                    If (i.EQ.j) Then
-                        Zc(k)= Az(i,i)
-                        If (Kli.EQ.5 .AND. W0.EQ.0.d0) Zc(k)= Az(i,i)+(0,1)*W00
-                    Else
-                        Zc(k)= Az(i,j)
-                    End If
-                    k = k+1
-                End Do
-                XX1(i)= YY1(i)
+
+        k = 1
+        Do i=1,Ntr
+            Do j=1,i
+                If (i.EQ.j) Then
+                    Zc(k)= Az(i,i)
+                    If (Kli.EQ.5 .AND. W0.EQ.0.d0) Zc(k)= Az(i,i)+(0,1)*W00
+                Else
+                    Zc(k)= Az(i,j)
+                End If
+                k = k+1
             End Do
-            Call system_clock(start2)
-            Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
-            !Call Zspsv_F95(Zc,XX1,'U',ipiv,info)
-            Call system_clock(end2)
-            ttime2=Real((end2-start2)/clock_rate)
-            Call FormattedTime(ttime2, timeStr)
-            Write(*,'(2X,A)'), 'SolEq1: Zspsv in '// trim(timeStr)// '.'
-            If (info.NE.0) then
-                Write(*,*) 'info =',info
-                Stop
-            End If
-            X1= 0.d0  ! Vector
-            X1(1:Ntr)= Real(XX1(1:Ntr))
+            XX1(i)= YY1(i)
+        End Do
+        Call system_clock(start2)
+        Call Zspsv('U',Ntr,1,Zc,ipiv,XX1,Ntr,info)
+        If (info.NE.0) then
+            Write(*,*) 'info =',info
+            Stop
         End If
+
+        Call system_clock(end2)
+        ttime2=Real((end2-start2)/clock_rate)
+        Call FormattedTime(ttime2, timeStr)
+        Write(*,'(2X,A)') 'SolEq1: Zspsv in '// trim(timeStr)// '.'
+
+        X1= 0.d0 
+        X1(1:Ntr)= Real(XX1(1:Ntr), kind=dp)
         Call system_clock(end1)
         ttime=Real((end1-start1)/clock_rate)
         Call FormattedTime(ttime, timeStr)
-        Write(*,'(2X,A)'), 'SolEq1: decomp in '// trim(timeStr)// '.'
+        Write(*,'(2X,A)') 'SolEq1: decomp in '// trim(timeStr)// '.'
 
-        If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  !# Orthogonalization of X1 to X0 (If J0 /= 0)
+        ! Orthogonalization of X1 to X0 (If J0 /= 0)
+        If (Kli.EQ.5 .AND. dabs(Tj0).GT.0.51d0) Call Ort  
         
-        Open(unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        If (sign == 1) Then
+            Open(unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        Else
+            Open(unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+        End If
         Write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
         Write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
         Write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
@@ -1070,10 +1154,10 @@ Contains
         Return
     End Subroutine SolEq1
 
-    Subroutine SolEq4(ok)   !### Iterative solution of the inhomogeneous eqiation
+    Subroutine SolEq4(ok, sign)   !### Iterative solution of the inhomogeneous eqiation
         Use solvers
         Implicit None
-        Integer :: num, i, itr, k, l, n
+        Integer :: num, i, itr, k, l, n, sign
         Real(dp) :: ynorm, crit, dnorm, s2, s3, s12, s13, dx, di, x2, x3, x, y, dx1
         Character(Len=9) :: str
         Logical :: ok
@@ -1094,13 +1178,13 @@ Contains
         If (.not. Allocated(X12)) Allocate(X12(Nd))
         If (.not. Allocated(X13)) Allocate(X13(Nd))
         If (.not. Allocated(Z1)) Allocate(Z1(IP1*IP1))
-        If (.not. Allocated(Vr)) Allocate(Vr(IPad))
 
         num=4
         call FormV(num)
         num=min(Nlft,IPad)
         strfmt = '(3X,"Number of vectors: ",I2)'
         write(*,strfmt) num
+
         ynorm=0.d0
         do i=1,Nd
             ynorm=ynorm+YY1(i)**2
@@ -1109,10 +1193,12 @@ Contains
         end do
         ynorm=dsqrt(ynorm)
         crit=Crit1*ynorm
+
         strfmt = '(3X,63("="),/4X,"SolEq4: ||Y1|| = ",E10.3," Crit = ",E10.3,/3X,63("="))'
         write( 6,strfmt) ynorm,crit
         write(11,strfmt) ynorm,crit
-        Kdiag=1                        !### flags Mxmpy to fill Diag(i)
+
+        Kdiag=1                        ! flags Mxmpy to fill Diag(i)
         ok=.FALSE.
         Do itr=1,N_it
             call Mxmpy(1,1,X1,X1)
@@ -1169,14 +1255,9 @@ Contains
             X13=X1J(1:Nd,3)
             call Mxmpy(2,2,X12,X13)
             ! Evaluation of the coefficients from minimum of the residue:
-            do i=1,IPad
-                Vr(i)=0.d0
-                do k=1,IPad
-                    Z1(IPad*(i-1)+k)=0.d0
-                end do
-            end do
-            Vl=0.d0
-            Mps=0
+            Vl(1:IPad)=0.d0
+            Vr(1:IPad)=0.d0
+            Z1(1:IPad**2)=0.d0
             do i=1,Nd
                 y=YY1(i)
                 do k=1,num
@@ -1196,7 +1277,7 @@ Contains
             end do
             call Decomp(Z1,num,scales,Mps)
             call Flsolv(num,Z1,Vr,Vl,Mps)
-            !     New vector X1:
+            ! New vector X1:
             do i=1,Nd
                 X1(i)=Vl(1)*X1(i)
                 do k=2,num
@@ -1207,20 +1288,28 @@ Contains
             write( 6,strfmt) (Vl(k),k=1,num)
             write(11,strfmt) (Vl(k),k=1,num)
     
-            open (unit=16,file='INE.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            If (sign == 1) Then
+                open (unit=16,file='INE_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            Else
+                open (unit=16,file='INE_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            End If 
             write(16) -E0,Tj0,Nd,(X1(i),i=1,Nd)
             write(16) -E0,Tj0,Nd,(YY1(i),i=1,Nd)
             write(16) -E2,Tj2,Nd,(YY2(i),i=1,Nd)
             close(16)
-            If (ok) Then
-                Exit
-            Else
-                str=' DIVERGED'
-                Cycle
-            End If
+            
+            If (ok) Exit
         End Do
-        strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
-             I7," are saved",/3X,63("="))'
+
+        If (.not. ok) str = ' DIVERGED'
+        If (sign == 1) Then
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
+             I8," are saved to INE_p.XIJ",/3X,63("="))'
+        Else
+            strfmt = '(4X,"Iteration process ",A9,". Vectors of length ", &
+             I8," are saved to INE_m.XIJ",/3X,63("="))'
+        End If
+            
  200    write( 6,strfmt) str,Nd
         write(11,strfmt) str,Nd
         Return
@@ -1229,7 +1318,7 @@ Contains
     Subroutine ReadJJJ
         Implicit None
         Integer :: err_stat
-        Integer(kind=int64) :: j8
+        Integer(kind=int64) :: j8, cnt
         Character(Len=256) :: err_msg
 
         open(unit=18,file='CONF.JJJ',status='OLD',form='UNFORMATTED',access='stream',iostat=err_stat,iomsg=err_msg)
@@ -1240,13 +1329,20 @@ Contains
             Write(*,*) ' reading CONF.JJJ...'
         End If
         read(18) NumJ
+        print*, 'NumJ=',NumJ
         If (.not. Allocated(Jsq%n)) Allocate(Jsq%n(NumJ))
         If (.not. Allocated(Jsq%k)) Allocate(Jsq%k(NumJ))
         If (.not. Allocated(Jsq%t)) Allocate(Jsq%t(NumJ))
+        cnt=0
         Do j8=1,NumJ
             read(18) Jsq%k(j8),Jsq%n(j8),Jsq%t(j8)
+            if (Jsq%n(j8) == Nd + 1) then
+                NumJ=cnt
+                print*,'For Nd=',Nd,', NumJ=', NumJ
+                exit
+            end if
+            cnt = cnt + 1
         End Do
-        print*, 'NumJ=',NumJ
         close(18)
     End Subroutine ReadJJJ
 
@@ -1326,7 +1422,6 @@ Contains
         ds=dabs(sum/sn-1.d0)
         if (ds.GT.trsd) then
            write (*,*) ' Prj warning: normalization has changed by',ds
-           read(*,*)
         end if
         smin=dmin1(sm/sum,sj/sum,sp/sum)
         !if (smin.LT.trsd) then                   !### Small components of
@@ -1351,7 +1446,11 @@ Contains
         Character(Len=256) :: strfmt
 !     - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        Allocate(TJ1(Nd),TJ2(Nd),TJ3(Nd),TJ4(Nd),TJ5(Nd))
+        If (.not. Allocated(TJ1)) Allocate(TJ1(Nd))
+        If (.not. Allocated(TJ2)) Allocate(TJ2(Nd))
+        If (.not. Allocated(TJ3)) Allocate(TJ3(Nd))
+        If (.not. Allocated(TJ4)) Allocate(TJ4(Nd))
+        If (.not. Allocated(TJ5)) Allocate(TJ5(Nd))
         If (.not. Allocated(X1J)) Allocate(X1J(Nd,IPad))
         j0= 2*Tj0+0.1d0
 
@@ -1492,15 +1591,21 @@ Contains
         Return
     End Subroutine PrjE2
 
-    Subroutine RdcX1J   !### Transforms X1J to the form which corresponds
+    Subroutine RdcX1J(sign)   !### Transforms X1J to the form which corresponds
         Use wigner      !### to the reduced ME and saves it in INE_J.XIJ.
         Implicit None   
-        Integer :: i, jf, j, is
+        Integer :: i, jf, j, is, sign
         Real(dp) :: Aj, xm, W
 
-        open (unit=16,file='INE_J.XIJ',status='UNKNOWN',form='UNFORMATTED')
-        close(16,status='DELETE')
-        open (unit=16,file='INE_J.XIJ',status='NEW',form='UNFORMATTED')
+        If (sign == 1) Then
+            open (unit=16,file='INE_J_p.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_p.XIJ',status='NEW',form='UNFORMATTED')
+        Else
+            open (unit=16,file='INE_J_m.XIJ',status='UNKNOWN',form='UNFORMATTED')
+            close(16,status='DELETE')
+            open (unit=16,file='INE_J_m.XIJ',status='NEW',form='UNFORMATTED')
+        End If
 
         jf=3
         if (Kli.EQ.5) jf=5
@@ -1650,7 +1755,7 @@ Contains
             Write(11,strfmt)
             Stop
         End If
-        Allocate(XXn(Nd))
+        If (.not. allocated(XXn)) Allocate(XXn(Nd))
         j=0
         jtj=0
         Do n=1,Nlv
@@ -1661,7 +1766,6 @@ Contains
             If (ndd.NE.Nd) then
                write(*,*)' CONF.XIJ: mismatch in the length of record:'
                write(*,*)' ndd =',ndd,' while Nd =',Nd
-               Return
             End If
             j=j+1
             c1=0.d0                           !### c1=(e_x-e_n+W0)<n|X1>
@@ -1753,9 +1857,8 @@ Contains
         Use wigner, Only : FJ3, FJ6
         Implicit None
         Integer :: n, i, isk, id, k, kmin, kmax, is
-        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
+        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp, denom
         Real(dp), Dimension(3) :: sk0, sk1, sk2
-        Real(dp), Dimension(2) :: s, s0, s1, s2, ss
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
         If (.not. Allocated(Y2J)) Allocate(Y2J(Nd,5))
@@ -1834,32 +1937,56 @@ Contains
                  ") (3M^2-J(J+1))/J*(2J-1) a.u.", &
                  /3X,"Alpha_1 =",E12.5," a.u.")'
         if (isk.EQ.0) then
-          write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
-          write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
+            write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
+            write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
         end if
-        If (n.EQ.2) Then
-          alp = (ss(1)+ss(2))/2.d0
-          al  = (s(1)+s(2))/2.d0
-          al0 = (s0(1)+s0(2))/2.d0
-          al2 = (s2(1)+s2(2))/2.d0
-          al1 = (s1(1)-s1(2))
 
-          strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
-          write( 6,strfmt2)
-          write(11,strfmt2)
+        If (n.EQ.2 .or. xlamb.EQ.0_dp) Then
+            If (xlamb == 0) Then
+                denom = 1.d0
+            Else
+                denom = 2.d0
+            End If
+            alp = (ss(1)+ss(2))/denom
+            al  = (s(1)+s(2))/denom
+            al0 = (s0(1)+s0(2))/denom
+            al2 = (s2(1)+s2(2))/denom
+            al1 = (s1(1)-s1(2))
 
-          if (dabs(Q).LT.1.d-5) then
-            write( 6,strfmt) Tj0,Jm0,alp
-            write(11,strfmt) Tj0,Jm0,alp
-          end if
+            strfmt2 = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
+            write( 6,strfmt2)
+            write(11,strfmt2)
 
-          write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
-          write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
+            if (dabs(Q).LT.1.d-5) then
+              write( 6,strfmt) Tj0,Jm0,alp
+              write(11,strfmt) Tj0,Jm0,alp
+            end if
 
-          strfmt2 = '(/1X,"RESULT: lambda=",F11.4,"  alpha_0=",F15.4,"  alpha_2=",F15.4)'
-          write( 6,strfmt2) abs(xlamb),al0,al2
-          write(11,strfmt2) abs(xlamb),al0,al2
+            write( 6,strfmt3) Tj0,Jm0,al,al0,al2,al1
+            write(11,strfmt3) Tj0,Jm0,al,al0,al2,al1
+
+            if (ok) then
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
+            else
+                if (xlamb==0) then
+                    strfmt = '(1X,"omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: omega =",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                else
+                    strfmt = '(1X,"lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                    strfmt2 = '(/1X,"RESULT: lambda=",F14.6," alpha_0=",F17.7," alpha_2=",F17.7,"  CONVERGED")'
+                end if
+            end if
+            write( 6,strfmt2) abs(xlamb),al0,al2
+            write(11,strfmt2) abs(xlamb),al0,al2
+            write(99,strfmt) abs(xlamb),al0,al2
         End If
+
         Return
     End Subroutine RdcE1
 
@@ -2209,7 +2336,6 @@ Contains
            End If
         End Do
         Kdiag=0
-        Close (unit=15)
         Return
     End Subroutine Mxmpy
 

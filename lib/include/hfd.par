@@ -1,0 +1,7 @@
+c #################################################################
+c ######       Parameters which determine dimensions         ######
+c ######           of main arrays in program hfd             ######
+c #################################################################
+c                Array dimension       Associated variable
+       PARAMETER(IP6   =    470)  !### record length for DAT files
+       PARAMETER(IPns  =     62)  !### max number of shells

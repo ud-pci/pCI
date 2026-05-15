@@ -4,10 +4,10 @@ from collections import OrderedDict
 import copy
 import sys
 
-j_dict = {'s': ('1/2','1/2'), 'p': ('1/2', '3/2'), 'd': ('3/2', '5/2'), 'f': ('5/2', '7/2'), 'g': ('7/2', '9/2'), 'h': ('9/2', '11/2'), 'i': ('11/2','13/2')}
-l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6}
-q_dict = {'s': (2), 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12), 'i': (12,14)}
-maxq_dict = {'s': 2, 'p': 6, 'd': 10, 'f': 14, 'g': 18, 'h': 22, 'i': 26}
+j_dict = {'s': ('1/2','1/2'), 'p': ('1/2', '3/2'), 'd': ('3/2', '5/2'), 'f': ('5/2', '7/2'), 'g': ('7/2', '9/2'), 'h': ('9/2', '11/2'), 'i': ('11/2','13/2'), 'k': ('13/2','15/2'), 'l': ('15/2, 17/2')}
+l_dict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'i': 6, 'k': 7, 'l': 8}
+q_dict = {'s': (2), 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12), 'i': (12,14), 'k': (14,16), 'l': (16,18)}
+maxq_dict = {'s': 2, 'p': 6, 'd': 10, 'f': 14, 'g': 18, 'h': 22, 'i': 26, 'k': 30, 'l': 34}
 
 def read_bass(filename):
     """Read bass input file""" 
@@ -73,7 +73,7 @@ def get_nn(orbital):
 def get_l(orbital):
     """ Gets angular momentum quantum number l from an orbital string of format nnlqq """
     try:
-        l = re.findall('[spdfghi]+', orbital.split()[0])[0]
+        l = re.findall('[spdfghikl]+', orbital.split()[0])[0]
     except IndexError:
         return None
     return l
@@ -98,7 +98,7 @@ def get_q2(l):
 
 def convert_char_to_digital(orbitals):
     """ Converts a list of non-relativistic subshells to digital format """
-    occ_dict = {'s': 2, 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12), 'i': (12,14)}
+    occ_dict = {'s': 2, 'p': (2, 4), 'd': (4, 6), 'f': (6, 8), 'g': (8, 10), 'h': (10, 12), 'i': (12,14), 'k': (14,16), 'l': (16,18)}
     digital_orbitals = []
 
     if type(orbitals) == str:
@@ -172,7 +172,7 @@ def expand_occupancies(nr_config):
     """ Expands a configuration into relativistic form """
     occupancies = []
     nn = re.findall('[0-9]+', nr_config.split()[0])[0].rjust(2, '0')
-    l = re.findall('[spdfghi]+', nr_config.split()[0])[0]
+    l = re.findall('[spdfghikl]+', nr_config.split()[0])[0]
     qq = re.findall('[0-9]+', nr_config.split()[0])[1]
 
     if l == 's':
@@ -199,9 +199,9 @@ def expand_occupancies(nr_config):
 
 def expand_nl(basis):
     """ Expands a basis of type string and returns a dictionary of maximum principle quantum number value for each partial wave key"""
-    nlmax = {'s': 0, 'p': 0, 'd': 0, 'f': 0, 'g': 0, 'h': 0, 'i': 0}
+    nlmax = {'s': 0, 'p': 0, 'd': 0, 'f': 0, 'g': 0, 'h': 0, 'i': 0, 'k': 0, 'l': 0}
     n_array = re.findall('[0-9]+', basis)
-    l_array = re.findall('[spdfghii]+', basis)
+    l_array = re.findall('[spdfghikl]+', basis)
 
     for l in range(len(l_array)):
         for l2 in l_array[l]:
@@ -241,14 +241,15 @@ def convert_list_nr_to_rel_configs(nr_configs):
 
 def count_valence(configurations):
     """ Count the number of valence electrons in each basic configuration """
-    try:
+    if configurations['even']: 
         configurations_even = configurations['even']
-    except KeyError:
+    else:
         configurations_even = []
-    try:
+    if configurations['odd']:
         configurations_odd = configurations['odd']
-    except KeyError:
+    else:
         configurations_odd = []
+
     configurations = configurations_even + configurations_odd
     if configurations == []:
         print('No configurations were specified')
@@ -271,11 +272,11 @@ def count_excitations(excitations):
     """ Return the multiplicity of excitations given list of excitations"""
     count = 0
     for excitation in excitations:
-        if list(excitation.values()) == [True]:
+        if excitations[excitation] == True:
             count = count + 1
     return count
 
-def expand_orbitals(basis, orbital_list):
+def expand_orbitals(basis, ref_configs, orbital_list):
     """Return a table of orbitals and occupation numbers"""
 
     orb_occ = {}
@@ -301,7 +302,7 @@ def expand_orbitals(basis, orbital_list):
     orb_occ_copy = copy.deepcopy(orb_occ)
     for orbital in orb_occ_copy:
         n = int(re.findall('[0-9]+', orbital)[0])
-        l = re.findall('[spdfghi]+', orbital)[0]
+        l = re.findall('[spdfghikl]+', orbital)[0]
         nmax = int(nlmax[l])
         if n > nmax:
             orb_occ.pop(orbital)
@@ -312,7 +313,7 @@ def expand_orbitals(basis, orbital_list):
         min_occ = list(orbital.values())[0].split()[0]
         max_occ = list(orbital.values())[0].split()[1]
         for key in orbital:
-            l = re.findall('[spdfghi]+', key)
+            l = re.findall('[spdfghikl]+', key)
             n1 = int(re.findall('[0-9]+', key)[0])
             try:
                 n2 = int(re.findall('[0-9]+', key)[1])
@@ -330,11 +331,23 @@ def expand_orbitals(basis, orbital_list):
     orb_occ2.update(orb_occ)
     orb_occ = orb_occ2
 
-    # Strip core orbitals from table
+    # Strip core orbitals from table if it is not in the list of reference configurations
+    orbitals_in_ref = []
+    ref_configs_odd = ref_configs['odd']
+    ref_configs_even = ref_configs['even']
+    for parity in ['odd', 'even']:
+        if ref_configs[parity]:
+            for config in ref_configs[parity]:
+                orbs = config.split(' ')
+                for orb in orbs:
+                    nl = orb[:2]
+                    if nl not in orbitals_in_ref:
+                        orbitals_in_ref.append(nl)
+    
     try:
-        core_orbs = re.findall('[1-9][spdfghi]+', orbital_list['core'])
+        core_orbs = re.findall('[1-9][spdfghikl]+', orbital_list['core'])
         for orbital in core_orbs:
-            if orbital in orb_occ:
+            if orbital in orb_occ and orbital not in orbitals_in_ref:
                 orb_occ.pop(orbital)
     except KeyError as e:
         print('No orbitals in core')
@@ -355,7 +368,7 @@ def expand_basis(basis):
 
     nmin_dict = {'s': 1, 'p': 2, 'd': 3, 'f': 4, 'g': 5, 'h': 6}
     n_array = re.findall('[0-9]+', basis)
-    l_array = re.findall('[spdfghii]+', basis)
+    l_array = re.findall('[spdfghikl]+', basis)
 
     for i in range(len(n_array)):
         for l in l_array[i]:

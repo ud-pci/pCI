@@ -1,46 +1,76 @@
-#
-#
-#
-CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
-CMAKE_POLICY(SET CMP0074 NEW)
+ADD_LIBRARY(pci_common params.f90 conf_variables.F90 basc_variables.f90 str_fmt.f90 readfff.f90 
+         breit.f90 wigner.f90 sintg.f90 bspl.f90 conf_init.f90 test_ori.f90 pi_pk.f90 integrals.f90 determinants.f90 
+         mpi_utils.f90 solvers.f90 diff.f90 utils.f90)
 
-PROJECT(conf_new LANGUAGES Fortran)
+target_compile_definitions(pci_common PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(pci_common PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(pci_common PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(pci_common PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(pci_common PUBLIC ${MPI_Fortran_LIBRARIES})
 
-INCLUDE(GNUInstallDirs)
+ADD_EXECUTABLE(hfd hfd.f90)
+target_link_libraries(hfd PUBLIC pci_common)
 
-# SET(CMAKE_Fortran_FLAGS "-g -check all -warn all -traceback -lmkl_core -mkl -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
-SET(CMAKE_Fortran_FLAGS "-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64")
-
-ADD_LIBRARY(basc_common params.f90 str_fmt.f90 conf_variables.f90 basc_variables.f90 conf_init.f90 readfff.f90 wigner.f90 sintg.f90 test_ori.f90 diff.f90 pi_pk.f90 breit.f90)
-
-ADD_LIBRARY(conf_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90 mpi_utils.f90 csf.f90 env_var.f90)
-
-ADD_LIBRARY(lsj_common params.f90 str_fmt.f90 conf_variables.f90 determinants.f90 integrals.f90 formj2.f90 matrix_io.f90 davidson.f90 vaccumulator.f90)
-
-ADD_LIBRARY(dtm_common params.f90 str_fmt.f90 conf_variables.f90 dtm_variables.f90 conf_init.f90 wigner.f90 determinants.f90 amp_ops.f90 mpi_utils.f90)
-
-ADD_LIBRARY(ine_common params.f90 str_fmt.f90 ine_variables.f90 conf_variables.f90 determinants.f90 integrals.f90 conf_init.f90 wigner.f90 solvers.f90)
-
-ADD_LIBRARY(conf_pt_common params.f90 conf_variables.f90 conf_pt_variables.f90 conf_init.f90 integrals.f90 determinants.f90)
-
-ADD_EXECUTABLE(basc basc.f90)
-TARGET_LINK_LIBRARIES(basc basc_common) 
-
-ADD_EXECUTABLE(conf conf_init.f90 conf.f90)
-TARGET_LINK_LIBRARIES(conf conf_common)
-
-ADD_EXECUTABLE(conf_lsj conf_init.f90 conf_lsj.f90)
-TARGET_LINK_LIBRARIES(conf_lsj lsj_common)
-
-ADD_EXECUTABLE(dtm dtm.f90)
-TARGET_LINK_LIBRARIES(dtm dtm_common)
-
-ADD_EXECUTABLE(ine ine.f90)
-TARGET_LINK_LIBRARIES(ine ine_common)
-
-ADD_EXECUTABLE(conf_pt conf_pt.f90)
-TARGET_LINK_LIBRARIES(conf_pt conf_pt_common)
+ADD_EXECUTABLE(bass bass.f90)
+target_link_libraries(bass PUBLIC pci_common)
 
 ADD_EXECUTABLE(add params.f90 add.f90)
+target_link_libraries(add PUBLIC pci_common)
 
-INSTALL(TARGETS add basc conf conf_lsj dtm ine conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
+ADD_EXECUTABLE(pbasc pbasc.f90)
+target_compile_definitions(pbasc PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(pbasc PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(pbasc PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(pbasc PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(pbasc PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+ADD_EXECUTABLE(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 csf.f90 pconf.F90)
+target_compile_definitions(pconf PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(pconf PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(pconf PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(pconf PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(pconf PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+ADD_EXECUTABLE(conf_lsj matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 conf_lsj.f90)
+target_compile_definitions(conf_lsj PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(conf_lsj PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(conf_lsj PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(conf_lsj PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(conf_lsj PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+ADD_EXECUTABLE(conf_pt conf_pt.f90)
+target_compile_definitions(conf_pt PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(conf_pt PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(conf_pt PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(conf_pt PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(conf_pt PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+ADD_EXECUTABLE(pdtm amp_ops.f90 pdtm.f90)
+target_compile_definitions(pdtm PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(pdtm PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(pdtm PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(pdtm PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(pdtm PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+ADD_EXECUTABLE(sort str_fmt.f90 sort.f90)
+target_link_libraries(sort PUBLIC pci_common)
+
+ADD_EXECUTABLE(check_matrices check_matrices.f90)
+target_link_libraries(check_matrices PUBLIC pci_common)
+
+ADD_EXECUTABLE(ine ine.f90)
+target_link_options(ine PRIVATE ${MKL_PARALLEL_LINK_FLAGS})
+target_link_libraries(ine PRIVATE ${MKL_PARALLEL_LINK_FLAGS} pci_common)
+
+ADD_EXECUTABLE(pol pol.f90)
+target_link_options(pol PRIVATE ${MKL_PARALLEL_LINK_FLAGS})
+target_link_libraries(pol PRIVATE ${MKL_PARALLEL_LINK_FLAGS} pci_common)
+
+ADD_EXECUTABLE(formy formy.f90)
+target_compile_definitions(formy PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_options(formy PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
+target_include_directories(formy PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
+target_link_options(formy PUBLIC ${MPI_Fortran_LINK_FLAGS})
+target_link_libraries(formy PUBLIC ${MPI_Fortran_LIBRARIES} pci_common)
+
+INSTALL(TARGETS hfd bass add pbasc pconf conf_lsj pdtm ine pol conf_pt sort check_matrices formy DESTINATION ${CMAKE_INSTALL_BINDIR})

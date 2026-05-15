@@ -7,11 +7,11 @@ Module davidson
 
     Private
 
-    Public :: Init4, FormB0, FormB, FormBskip, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J, Hould
+    Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
 
   Contains
     
-    Subroutine Init4(mype)
+    Subroutine Init4(mype, mpi_type_real)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
         ! The initial approximation Hamilonian is stored in the 
@@ -22,6 +22,8 @@ Module davidson
         Use determinants, Only : calcNd0
         Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer  :: k, n, mype, mpierr
         Integer(Kind=int64) :: l8, s1
         Real(type_real) :: t
@@ -64,12 +66,12 @@ Module davidson
 
         If (mype == 0) Then
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Initial approximation constructed in '// trim(timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> Initial approximation constructed in '// trim(timeStr)
         End If
 
     End Subroutine Init4
 
-    Subroutine FormB0(mype)
+    Subroutine FormB0(mype, mpi_type_real)
         ! This subroutine constructs the initial eigenvectors for the Davidson iteration
         ! and stores them in the first block of ArrB.
         ! Eigenvectors are written to CONF.XIJ 
@@ -77,6 +79,8 @@ Module davidson
         Use formj2, Only : J_av
         Use str_fmt, Only : FormattedTime, startTimer, stopTimer
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer :: i, j, idum, ndpt, ierr, num, nskip, mpierr, mype
         Integer(kind=int64) :: s1
         Real(dp) :: dummy
@@ -103,7 +107,7 @@ Module davidson
             Do j=1,Nd0
                 B1(1:Nd0)=Z1(1:Nd0,j)
                 If (kCSF == 0) Then
-                    Call J_av(B1,Nd0,xj,ierr)
+                    Call J_av(B1,Nd0,xj,mpi_type_real,ierr)
                 Else
                     ierr = 0
                     xj = Jm
@@ -141,7 +145,7 @@ Module davidson
                 strfmt = '(1X,"E(",I3,") =",F12.6," Jtot =",F10.6)'
                 Write( 6,strfmt) j,E(j),Tj(j)
                 Write(11,strfmt) j,E(j),Tj(j)
-                If (kXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
+                If (KXIJ > 0) Write(17) E(j),Tj(j),Nd,(ArrB(i,j),i=1,Nd)
             End Do
             close (unit=17)
             If (nskip > 0) Then
@@ -149,7 +153,7 @@ Module davidson
                 Write(11,*) ' Selection is done', nskip,' vectors skiped'
             End If
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)'), 'TIMING >>> Initial eigenvectors constructed in '// trim(timeStr) // '.'
+            Write(*,'(2X,A)') 'TIMING >>> Initial eigenvectors constructed in '// trim(timeStr) // '.'
         End If
         
         Return
@@ -335,8 +339,11 @@ Module davidson
 
         Integer :: j1, i, k, n01
         Real(type_real) :: val, t, cnorm, s
+        Real(type_real), Dimension(:), Allocatable :: C
         character(len=9) :: char
 
+        If (.not. Allocated(C)) Allocate(C(Nd0))
+        
         cnorm=0_type_real
         j1=j+Nlv
         val=P(j,j)
@@ -357,10 +364,10 @@ Module davidson
         If (cnorm < Crt4) Then
             If (kdavidson == 1) Then
                 char='Stopped  '
-                Iconverge(j)=1
             Else
                 char='converged'
             End If
+            Iconverge(j)=1
         End If
         Write ( 6,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
         Write (11,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
@@ -391,16 +398,21 @@ Module davidson
         End Do
         s=1.d0/dsqrt(s)
         ArrB(1:Nd,J1)=B1(1:Nd)*s
+
+        If (Allocated(C)) Deallocate(C)
+
         Return
     End Subroutine Dvdsn
 
-    Subroutine Mxmpy(ip, mype)
+    Subroutine Mxmpy(ip, mpi_type_real, mype)
         ! This subroutine evaluates the products Q_i = H_ij * B_j
         ! if ip=1, products are stored in the second block of ArrB
         ! if ip=2, products are stored in the third block of ArrB
         Use mpi_f08
         Use mpi_utils, Only : BroadcastD
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer, Intent(In) :: ip, mype
 
         Integer :: i, k, nlp, n, mpierr, i2min, i2max, i1min, i1max, kd
@@ -437,7 +449,6 @@ Module davidson
                 t=t-Hamil%minval
                 If (kd == 1) Diag(n)=t
             End If
-            !If (devmode == 1 .and. mype == 1) print*, n, k, t, ArrB(n,i2min:i2max)
             ArrB(n,i2min:i2max)=ArrB(n,i2min:i2max)+t*ArrB(k,i1min:i1max)
             If (n /= k) ArrB(k,i2min:i2max)=ArrB(k,i2min:i2max)+t*ArrB(n,i1min:i1max)
         End Do
@@ -522,12 +533,15 @@ Module davidson
         Return
     End Subroutine Ortn
 
-    Subroutine Prj_J(lin, num, lout, trsd, mype) 
+    Subroutine Prj_J(lin, num, lout, trsd, mpi_type_real, mype) 
         Use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
+
+        Type(MPI_Datatype) :: mpi_type_real
         Integer :: ierr, i, n, k, j, i2, i1, jx, it, iter, lout, num, lin, jav, mpierr, imin, imax
         Integer, optional :: mype
+        Integer(kind=int64) :: j8
         Real(dp) :: err1, err, f, trsd
         Real(type_real) :: t, sj, aj, s, s1, a
         logical :: proceed
@@ -540,15 +554,13 @@ Module davidson
             Write(11,strfmt) Nlv,lout+num-1,IPlv
             Stop
         End If
-        jav=2*XJ_av+0.1d0
+        jav=Int(2*XJ_av+0.1d0)
         If (mype == 0) Then
             strfmt = '(4X,"Prj_J: projecting",I3," vectors on subspace J=",F5.1)'
             Write( *,strfmt) num,XJ_av
             Write(11,strfmt) num,XJ_av
         End If
 
-        Call MPI_Bcast(Njd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Jt, IPjd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Iconverge, Nlv, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         imin=lin
@@ -567,10 +579,10 @@ Module davidson
                     i2=lout+i-1
                     ArrB(1:Nd,i2)=0_type_real
                 End Do
-                Do j=1,ij8
-                    n=Jsq%ind1(j)
-                    k=Jsq%ind2(j)
-                    t=Jsq%val(j)
+                Do j8=1,ij8
+                    n=Jsq%ind1(j8)
+                    k=Jsq%ind2(j8)
+                    t=Jsq%val(j8)
                     Do i=1,num
                         proceed=(lin-1)*Iconverge(i)==0
                         If (proceed) Then
@@ -644,196 +656,4 @@ Module davidson
         Return
     End Subroutine Prj_J
 
-    Subroutine Hould(n,Ee,Dd,Zz,ifail)
-        ! This subroutine diagonalizes the matrix Zz using 
-        ! Householder's method of diagonalization.
-        ! n-dimension of matrix Zz
-        ! Ee-work vector
-        ! Dd-array of eigenvalues
-        ! Zz-matrix of eigenvectors
-        ! ifail-error status
-        ! eps-criteria of diagonalization
-        Implicit None
-        Integer, Intent(In) :: n
-        Integer, Intent(Out) :: ifail
-        Real(dp), dimension(:), allocatable, Intent(InOut) :: Ee, Dd
-        Real(dp), dimension(:,:), allocatable, Intent(InOut) :: Zz
-
-        Integer :: ii, k, j, l, i, jj, m1, im, im1, k1, l1
-        Real(dp) :: tol, f, g, b, r, em, h, hh, c, ei, s, p, di, eps
-
-
-        ifail=0
-        tol=2.0d0**(-1021) !-103 or -1021
-        eps=2.0d0**(-53) ! -24 or -53
-        If (n > 1) Then
-            Do ii=2,n
-                i=n-ii+2
-                l=i-2
-                f=Zz(i,i-1)
-                g=0.0d0
-                If (l > 0) Then
-                    Do k=1,l
-                        g=g+Zz(i,k)**2
-                    End Do
-                End If
-                h=f**2+g
-                If (g < tol) Then
-                    Ee(i)=f
-                    h=0.0d0
-                    Dd(i)=h
-                    Cycle
-                End If
-                l=l+1
-                g=-dsign(dsqrt(h),f)
-                Ee(i)=g
-                h=h-f*g
-                Zz(i,i-1)=f-g
-                f=0.0d0
-                Do j=1,l
-                    Zz(j,i)=Zz(i,j)/h
-                    g=0.0d0
-                    Do k=1,j
-                        g=g+Zz(j,k)*Zz(i,k)
-                    End Do
-                    k1=j+1
-                    If (k1 <= l) Then
-                        Do k=k1,l
-                            g=g+Zz(k,j)*Zz(i,k)
-                        End Do
-                    End If
-                    ee(j)=g/h
-                    f=f+g*Zz(j,i)
-                End Do
-                hh=f/(h+h)
-                Do j=1,l
-                    f=Zz(i,j)
-                    g=Ee(j)-hh*f
-                    Ee(j)=g
-                    Zz(j,1:j)=Zz(j,1:j)-f*Ee(1:j)-g*Zz(i,1:j)
-                End Do
-                Dd(i)=h
-            End Do
-        End If
-
-        Dd(1)=0.0d0
-        Ee(1)=0.0d0
-        Do i=1,n
-            l=i-1
-            If (Dd(i) /= 0.0d0 .and. l /= 0) Then
-                 Do j=1,l
-                     g=0.0d0
-                     Do k=1,l
-                         g=g+Zz(i,k)*Zz(k,j)
-                     End Do
-                     Zz(1:l,j)=Zz(1:l,j)-g*Zz(1:l,i)
-                 End Do
-            End If
-            Dd(i)=Zz(i,i)
-            Zz(i,i)=1.0d0
-            If (l /= 0) Then
-                Zz(i,1:l)=0.0d0
-                Zz(1:l,i)=0.0d0
-            End If
-         End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! p matrix is formed
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        If (n /= 1) Then
-            Ee(1:n-1)=Ee(2:n)
-        End If
-        Ee(n)=0.0d0
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! triadigonalisation is finished
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        b=0.0d0
-        f=0.0d0
-        Do l=1,n
-            jj=0
-            h=(dabs(Dd(l))+dabs(Ee(l)))*eps
-            If (b < h) b=h
-            Do m1=l,n
-                m=m1
-                em=dabs(Ee(m))
-                If (em <= b) Exit
-            End Do
-            If (m /= l) Then
-                Do while (dabs(Ee(l)) > b)
-                    If (jj == 30) Then
-                        ifail=1
-                        Return
-                    End If
-                    jj=jj+1
-                    g=Dd(l)
-                    p=(Dd(l+1)-g)/Ee(l)*0.5d0
-                    r=dsqrt(p**2+1.0d0)
-                    em=p+dsign(r,p)
-                    Dd(l)=Ee(l)/em
-                    h=g-Dd(l)
-                    l1=l+1
-                    Dd(l1:n)=Dd(l1:n)-h
-                    f=f+h
-                    p=Dd(m)
-                    c=1.0d0
-                    s=0.0d0
-                    im1=m-1
-                    If (im1 >= l) Then
-                        Do im=l,im1
-                            i=im1+l-im
-                            ei=Ee(i)
-                            g=c*ei
-                            h=c*p
-                            If (dabs(p) >= dabs(ei)) Then
-                                c=ei/p
-                                r=dsqrt(c**2+1.0d0)
-                                Ee(i+1)=s*p*r
-                                s=c/r
-                                c=1.0d0/r
-                            Else
-                                c=p/ei
-                                r=dsqrt(c**2+1.0d0)
-                                Ee(i+1)=s*ei*r
-                                s=1.0d0/r
-                                c=c/r
-                            End If
-                            di=Dd(i)
-                            p=c*di-s*g
-                            Dd(i+1)=h+s*(c*g+s*di)
-                            Do k=1,n
-                                h=Zz(k,i+1)
-                                ei=Zz(k,i)
-                                Zz(k,i+1)=s*ei+c*h
-                                Zz(k,i)=c*ei-s*h
-                            End Do
-                        End Do
-                    End If
-                    Ee(l)=s*p
-                    Dd(l)=c*p
-                End Do
-            End If
-            Dd(l)=Dd(l)+f
-        End Do
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! eigenvalues in Dd; eigenvectors in Zz
-        ! ordering of Dd and Zz
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        i=0
-        Do while (i < n)
-            i=i+1
-            If (i >= n) Return
-            h=Dd(i)
-            f=Dd(i+1)
-            If (h <= f) Cycle
-            Dd(i)=f
-            Dd(i+1)=h
-            Do k=1,n
-                h=Zz(k,i)
-                Zz(k,i)=Zz(k,i+1)
-                Zz(k,i+1)=h
-            End Do
-            If (i /= 1) i=i-2
-        End Do
-        Return
-    End Subroutine Hould
-    
 End Module davidson
