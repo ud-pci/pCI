@@ -4,8 +4,8 @@ PREFIX=../../bin
 # Specify include directory
 INCLUDE=../include
 
-# Specify Fortran compiler
-FC=ifort
+# Specify Fortran compiler (override with FC=ifort or FC=gfortran on the command line)
+FC ?= ifx
 
 # Specify Fortran compiler flags
 FFLAGS=-O -r8 -I $(INCLUDE)
