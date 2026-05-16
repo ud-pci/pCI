@@ -23,6 +23,7 @@ find_package(MPI REQUIRED)
 execute_process(
     COMMAND ${MPIEXEC_EXECUTABLE} --version
     OUTPUT_VARIABLE MPI_VERSION_OUTPUT
+    ERROR_VARIABLE MPI_VERSION_OUTPUT
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 if (MPI_VERSION_OUTPUT MATCHES "Open MPI" OR MPI_VERSION_OUTPUT MATCHES "OpenRTE")
@@ -69,29 +70,24 @@ else()
 endif()
 
 # Add default Intel compile/link flags:
-if (${CMAKE_Fortran_COMPILER} MATCHES "ifort")
-    set(MKL_PARALLEL_FLAGS -qopenmp -mkl=parallel)
+if (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel")
     set(MKL_PARALLEL_LINK_FLAGS -qopenmp -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
     add_compile_options(-qopenmp -mkl=sequential)
     add_link_options(-qopenmp -mkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
-elseif (${CMAKE_Fortran_COMPILER} MATCHES "ifx")
-    set(MKL_PARALLEL_FLAGS -qopenmp -qmkl=parallel)
+elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "IntelLLVM")
     set(MKL_PARALLEL_LINK_FLAGS -qopenmp -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
     add_compile_options(-qopenmp -qmkl=sequential)
     add_link_options(-qopenmp -qmkl=sequential -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64)
-elseif (${CMAKE_Fortran_COMPILER} MATCHES "gfortran")
-    add_compile_options(-fopenmp -lscalapack -lblas -llapack)
+elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "GNU")
+    add_compile_options(-fopenmp)
     add_link_options(-fopenmp -lscalapack -lblas -llapack)
 endif()
 
 # Add flag to turn on double-precision integrals for isotope shift calculations
 option(USE_DP_INTEGRALS "Use double-precision integrals" OFF)
 
-if (${CMAKE_Fortran_COMPILER} MATCHES "ifort")
-    if (USE_DP_INTEGRALS)
-        message(STATUS "Using double-precision integrals (-DUSE_DP_INTEGRALS)")
-        add_compile_options(-DUSE_DP_INTEGRALS)
-    endif()
+if (USE_DP_INTEGRALS)
+    message(STATUS "Using double-precision integrals")
 endif()
 
 # The FindMPI returns linker flags as a space-delimited string, but target_link_options() needs a list:

@@ -2,7 +2,7 @@ add_library(pci_common params.f90 conf_variables.F90 basc_variables.f90 str_fmt.
          breit.f90 wigner.f90 sintg.f90 bspl.f90 conf_init.f90 test_ori.f90 pi_pk.f90 integrals.f90 determinants.f90 
          mpi_utils.f90 solvers.f90 diff.f90 utils.f90)
 
-target_compile_definitions(pci_common PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS})
+target_compile_definitions(pci_common PUBLIC ${MPI_Fortran_COMPILE_DEFINITIONS} $<$<BOOL:${USE_DP_INTEGRALS}>:USE_DP_INTEGRALS>)
 target_compile_options(pci_common PUBLIC ${MPI_Fortran_COMPILE_OPTIONS})
 target_include_directories(pci_common PUBLIC ${MPI_Fortran_INCLUDE_DIRS})
 target_link_options(pci_common PUBLIC ${MPI_Fortran_LINK_FLAGS})
