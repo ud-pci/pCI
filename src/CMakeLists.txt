@@ -14,7 +14,7 @@ target_link_libraries(hfd PUBLIC pci_common)
 ADD_EXECUTABLE(bass bass.f90)
 target_link_libraries(bass PUBLIC pci_common)
 
-ADD_EXECUTABLE(add params.f90 add.f90)
+ADD_EXECUTABLE(add add.f90)
 target_link_libraries(add PUBLIC pci_common)
 
 ADD_EXECUTABLE(pbasc pbasc.f90)
@@ -32,7 +32,7 @@ target_link_libraries(conf_pt PUBLIC pci_common)
 ADD_EXECUTABLE(pdtm amp_ops.f90 pdtm.f90)
 target_link_libraries(pdtm PUBLIC pci_common)
 
-ADD_EXECUTABLE(sort str_fmt.f90 sort.f90)
+ADD_EXECUTABLE(sort sort.f90)
 target_link_libraries(sort PUBLIC pci_common)
 
 ADD_EXECUTABLE(check_matrices check_matrices.f90)
