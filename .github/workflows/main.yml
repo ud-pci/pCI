@@ -84,3 +84,6 @@ jobs:
           FC=${FC} cmake -DMPI_Fortran_COMPILER=mpifort -DMPI_HOME=${HOME}/openmpi -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
           make
           make install
+
+      - name: Build lib programs
+        run: make -C lib FC=${FC}
