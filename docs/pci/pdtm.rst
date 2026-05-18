@@ -65,4 +65,4 @@ To run parallel ``pdtm``, run the command:
 
 .. code-block:: 
 
-    mpirun -n <nprocs> ./dtm
+    mpirun -n <nprocs> pdtm
