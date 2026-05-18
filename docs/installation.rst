@@ -6,7 +6,7 @@ Required libraries
 In order to compile pCI the following software libraries and tools are required: 
 
 * `Intel Fortran compiler 2020u4+ <https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html>`_
-* `CMake v3.12+ <https://cmake.org/download>`_
+* `CMake v3.13+ <https://cmake.org/download>`_
 * `OpenMPI v4.1+ <https://www-lb.open-mpi.org/software/ompi>`_
 * `Python v3.x <https://www.python.org/downloads/>`_
 
@@ -23,7 +23,6 @@ Users can download the latest version of the pCI code package from our `GitHub r
 
 via direct download
 ~~~~~~~~~~~~~~~~~~~
-
 From the GitHub repository, click on the green ``<> Code`` button towards the top, then click ``Download ZIP``. You can then unzip the downloaded file to obtain the source codes.
 
 via git

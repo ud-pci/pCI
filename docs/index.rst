@@ -50,6 +50,7 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
 
    about
    publications
+   citation
    
 
 pCI Resources
