@@ -38,7 +38,7 @@ The ``config.yml`` file defines the entire calculation from beginning to end usi
             partition: large-mem
             nodes: 1
             tasks_per_node: 64
-            submit_job = False
+            submit_job: False
 
         # Atomic information
         atom:
@@ -145,5 +145,6 @@ The ``config.yml`` file defines the entire calculation from beginning to end usi
                 include: False
                 K_is: 0
                 C_is: 0
+
 
 |

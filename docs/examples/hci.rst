@@ -80,7 +80,7 @@ In this section, we describe a method used to construct basis sets for the cases
           Z = 26.0
          Am = 52.0
          Nso=    4         # number of core orbitals (defines DF operator)
-         Nv =  194         # number of valence & virtual orbitals
+         Nv =  192         # number of valence & virtual orbitals
          Ksg=    1         # defines Hamiltonian: 1-DF, 3-DF+Breit
          Kdg=    0         # diagonalization of Hamiltonian (0=no,1,2=yes)
          orb= 4s 1         # first orbital for diagonalization

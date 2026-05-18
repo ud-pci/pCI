@@ -109,21 +109,44 @@ In addition to the ``system`` block, it also reads the ``basis`` block:
 * The ``basis.val_aov`` block specifies the number of valence orbitals to include for each partial wave in the all-order computations. 
 * The ``basis.val_energies`` block specifies the energies of the valence orbitals. ``kval=1`` is the default choice, where energies are set to the DHF energy of the lowest valence :math:`n` for the particular partial wave. In this case, the field ``energies`` can be safely ignored. ``kval=2`` allows specified energies of the valence orbitals, but is only used when the all-order valence energies are severely divergent. 
 
-In addition, the script will read the ``optional`` block:
+Additionally, if running pure CI calculations, there are two optional fields for ``basis.orbitals`` to allow better customization of orbital creation. The following is a snippet from a pure CI calculation of Fe XVII:
+
+.. code-block::
+
+    basis:
+        cavity_radius: 5
+        diagonalized: False
+        orbitals:
+            core: 1s 2s 2p
+            valence: 3s 3p 3d 4s 4p 4d 4f 5g
+            order: 2p 3d / 3s 3p / 4s 4p 4d 4f 5g
+            custom: [
+                4s from hfd,
+                4p from hfd,
+                4d from hfd,
+                4f from hfd,
+                5g from 3p
+            ]
+            nmax: 24
+            lmax: 4
+
+* The ``basis.orbitals.order`` field allows customization on the order to build orbitals with the ``hfd`` program. The sets of orbitals should be separated by a ``/``. In this example, We generate the :math:`2p` and :math:`3d` orbitals first in ``HFD1.INP``, then :math:`3s` and :math:`3p` in ``HFD2.INP``, and finally :math:`4s,4p,4d,4f,5g` in `HFD3.INP`. The program ``hfd`` will then need to be run for each ``HFDn.INP`` file.
+* The ``basis.orbitals.custom`` field allows customization on the method to build specific orbitals with the ``bass`` program. It should be an array of formatted text strings defining where specific orbitals should be constructed from. The format is as follows: ``new_orbital from [orbital or hfd]``. When the orbital is constructed from ``hfd``, a ``HFD.DAT``-formatted input file will be expected containing the relevant orbitals. When it is constructed from a previous ``orbital``, it will simply use the orbital that was previously constructed.
+
+The ``basis.py`` script will also read the ``optional`` block:
 
 .. code-block:: 
 
     optional:
         qed:
             include: False
-            rotate_basis: False
 
         isotope_shifts: 
             include: False
             K_is: 1
             C_is: 0.01
 
-* The ``optional.qed`` block allows users to specify inclusion of QED corrections (this is currently not supported).  
+* The ``optional.qed`` block allows users to specify inclusion of QED corrections.
 * The ``optional.isotope_shifts`` block allows users to specify isotope shift calculations by switching the ``include`` value to ``True`` and specifying keys ``K_is`` and ``C_is``.  
 
 The ``basis.py`` script also writes the standard output of the executables to their respective ``*.out`` files, e.g. ``hfd`` standard output is written to the file ``hfd.out``. 
