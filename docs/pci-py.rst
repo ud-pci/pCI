@@ -15,8 +15,8 @@ The ``config.yml`` file is a YAML-formatted configuration file that defines impo
 * atomic system parameters
 * parameters used by basis programs
 * parameters used by add program
-* parameters used by conf program
-* parameters used by dtm program
+* parameters used by pconf program
+* parameters used by pdtm program
 * parameters used by pol program
 * optional parameters
 
@@ -265,7 +265,7 @@ The ``pol.py`` script automates polarizability calculations. This script reads t
 gen_portal_csv.py
 -----------------
 
-The ``gen_portal_csv.py`` script generates csv-formatted datafiles of atomic energy levels and matrix elements given output files from ``conf`` and ``dtm`` runs. This script reads the ``portal`` block from ``config.yml``:
+The ``gen_portal_csv.py`` script generates csv-formatted datafiles of atomic energy levels and matrix elements given output files from ``pconf`` and ``pdtm`` runs. This script reads the ``portal`` block from ``config.yml``:
 
 .. code-block:: 
 

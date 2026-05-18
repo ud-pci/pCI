@@ -20,13 +20,15 @@ In this section, we will introduce calculations including QED corrections.
             1            # kvar=1-5, Variant of QED potential
             HFD.DAT      # name of file holding basis sets
 
-    The following variants (``kvar``) of QED potentials are available:
+    .. note::
 
-    1. QEDMOD
-    2. Flambaum local potential + QEDMOD non-local correction
-    3. Flambaum local potential
-    4. QEDPOT
-    5. Semi-empirical approach
+        The following variants (``kvar``) of QED potentials are available:
+
+        1. QEDMOD
+        2. Flambaum local potential + QEDMOD non-local correction
+        3. Flambaum local potential
+        4. QEDPOT
+        5. Semi-empirical approach
     
 5. Create a file ``qed.in`` selecting options.
    
@@ -46,7 +48,7 @@ In this section, we will introduce calculations including QED corrections.
 7. ``cp SGC.CON SGC-noQED.CON`` - save a copy of ``SGC.CON`` without QED
 8. Run ``qedpot_conf``
 9. Rename ``SGCqed.CON`` to ``SGC.CON``
-10.  Run ``conf``
+10.  Run ``pconf``
 
 .. collapse:: You can also use the following batch.qed script for steps 3-9, making sure to change inputs relevant to your job.
 

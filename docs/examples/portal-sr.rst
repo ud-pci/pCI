@@ -84,7 +84,7 @@ The ``config.yml`` file defines the entire calculation from beginning to end. Yo
             double: True
             triple: False
 
-    # Parameters used by conf program
+    # Parameters used by pconf program
     conf:
         odd:
             J: 0.0
@@ -101,7 +101,7 @@ The ``config.yml`` file defines the entire calculation from beginning to end. Yo
         include_lsj: True
         write_hij: False
 
-    # Parameters used by dtm program
+    # Parameters used by pdtm program
     dtm:
         include_rpa: True
         DM: 
@@ -221,7 +221,7 @@ Parameters used by add program
             double: True
             triple: False
 
-Parameters used by conf program
+Parameters used by pconf program
 -------------------------------
 
 .. code-block:: 
@@ -242,7 +242,7 @@ Parameters used by conf program
         include_lsj: True
         write_hij: False
 
-Parameters used by dtm program
+Parameters used by pdtm program
 ------------------------------
 
 .. code-block:: 
