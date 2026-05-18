@@ -8,7 +8,7 @@ The following software libraries and tools are required to compile pCI:
 * A Fortran compiler: GNU Fortran ``gfortran`` v12.2+, Intel Fortran Classic ``ifort`` v2020u4+, or LLVM-based Intel Fortran ``ifx``
 * `CMake v3.13+ <https://cmake.org/download>`_
 * `Python v3.9+ <https://www.python.org/downloads/>`_
-* LAPACK and BLAS, or Intel Math Kernel Library (MKL) *(optional — required for* ``pconf``*,* ``ine``*, and* ``pol``*)*
+* LAPACK and BLAS, or Intel Math Kernel Library (MKL) (optional — required for ``pconf``, ``ine``, and ``pol``)
 * `OpenMPI v4.1+ <https://www-lb.open-mpi.org/software/ompi>`_ *(optional — required only for MPI-parallel programs)*
 
 *Older versions may work but the listed versions have been tested.*
