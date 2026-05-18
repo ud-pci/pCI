@@ -106,7 +106,7 @@ For example, to calculate dc polarizabilities, as well as ac polarizabilities fr
 
 The range ``0 0 0`` corresponds to calculations of dc polarizabilities, while ``500 505 0.5`` corresponds to calculating ac polarizabilities from :math:`\lambda=500` nm to :math:`\lambda=505` nm in steps of :math:`0.5` nm.
 
-Before parallel ``pol`` can be run, the parallel matrix files ``CONFp.HIJ`` and ``CONFp.JJJ`` have to be sorted. This can be done using the ``sort`` program. 
+Before parallel ``pol`` can be run, the parallel matrix files ``CONFp.HIJ`` and ``CONFp.JJJ`` have to be sorted. This can be done using the ``sort`` program, which sorts the matrix elements of the operators :math:`H` and :math:`J^2` in order of ascending index (as done in the serial version of ``pconf``). It takes in ``CONFp.JJJ`` or ``CONFp.HIJ`` and writes a sorted serial version of the file, with an additional integer at the start storing the total number of matrix elements.
 
 Running pol
 ~~~~~~~~~~~

@@ -26,7 +26,6 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    pci/index.rst
    extensions/index.rst
    upscaling
-   supplementary
    pci-py
    isotope_shifts
    qed
