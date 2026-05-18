@@ -83,6 +83,24 @@ Build options
 
    $ FC=ifort cmake -DUSE_SCALAPACK=ON -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
 
+Supplementary programs
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``lib/`` directory contains supplementary programs that are built separately using Make. These include the all-order (``allcore-ci``, ``valsd-ci``, ``sdvw-ci``, ``second-ci``), RPA (``rpa``, ``rpa_dtm``), and QED (``qed_rot``, ``qedpot_conf``, ``sgc0``) programs. To compile and install all of them to the ``bin/`` directory:
+
+.. code-block::
+
+   $ cd lib
+   $ make install
+
+Individual packages can also be built separately:
+
+.. code-block::
+
+   $ make rpa        # builds rpa and rpa_dtm
+   $ make qed        # builds qed_rot, qedpot_conf, sgc0
+   $ make all-order  # builds allcore-ci, valsd-ci, sdvw-ci, second-ci, and others
+
 Troubleshooting
 ~~~~~~~~~~~~~~~
 
