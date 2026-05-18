@@ -171,3 +171,4 @@ urllib3==2.2.2
     # via requests
 webencodings==0.5.1
     # via html5lib
+setuptools
