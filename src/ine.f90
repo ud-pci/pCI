@@ -2313,7 +2313,7 @@ Contains
         Integer :: j, j1, num, n, k
         Integer(kind=int64) :: i8
         Real(dp) :: t
-        Real(dp), Allocatable, Dimension(:) :: x, y
+        Real(dp), Allocatable, Dimension(:), Intent(In) :: x, y
         j1=j+1
         i8= 0
         Do k=1,Nd
