@@ -222,7 +222,7 @@ Parameters used by add program
             triple: False
 
 Parameters used by pconf program
--------------------------------
+---------------------------------
 
 .. code-block:: 
 
@@ -243,7 +243,7 @@ Parameters used by pconf program
         write_hij: False
 
 Parameters used by pdtm program
-------------------------------
+--------------------------------
 
 .. code-block:: 
 
