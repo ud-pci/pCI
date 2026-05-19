@@ -94,6 +94,23 @@ If CMake still detects Intel MPI after correcting the paths, clear the CMake cac
 rm -rf build/*
 ```
 
+## Supplementary programs
+
+The `lib/` directory contains supplementary programs that are built separately using Make. These include the all-order (`allcore-ci`, `valsd-ci`, `sdvw-ci`, `second-ci`), RPA (`rpa`, `rpa_dtm`), and QED (`qed_rot`, `qedpot_conf`, `sgc0`) programs. To compile and install all of them to the `bin/` directory:
+
+```
+$ cd lib
+$ make install
+```
+
+Individual packages can also be built separately:
+
+```
+$ make rpa        # builds rpa and rpa_dtm
+$ make qed        # builds qed_rot, qedpot_conf, sgc0
+$ make all-order  # builds allcore-ci, valsd-ci, sdvw-ci, second-ci, and others
+```
+
 ## Running the programs
 
 **Serial programs:**

@@ -1,5 +1,5 @@
-Isotope shift calculations
-==========================
+Isotope shifts
+==============
 
 The transition frequency shift of an isotope :math:`A^\prime` compared to an isotope :math:`A` can be written as
 

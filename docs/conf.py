@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'pci'
-copyright = '2024, pCI Development Team'
+copyright = '2026, pCI Development Team'
 author = 'Charles Cheung'
 
 # -- General configuration ---------------------------------------------------

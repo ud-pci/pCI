@@ -47,4 +47,4 @@ To run parallel ``pbasc``, run the command:
 
 .. code-block:: 
 
-    mpirun -n <nprocs> ./basc
+    mpirun -n <nprocs> pbasc

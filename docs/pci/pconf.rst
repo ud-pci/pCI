@@ -9,8 +9,8 @@ Input Files:
 
 * ``HFD.DAT`` - basis set radial orbitals :math:`\phi_{nlj}` and radial derivatives of the orbitals :math:`\partial_r\phi_{nlj}`
 * ``CONF.DAT`` - basis set radial orbitals :math:`\phi_{nlj}` and functions :math:`\chi_{nlj}=h_\text{HF}^r\phi_{nlj}`, where :math:`h_\text{HF}^r` is the radial part of the Dirac-Fock operator
-* ``CONF.GNT`` - relativistic Gaunt coefficients produced by ``basc``
-* ``CONF.INT`` - relativistic Coulomb coefficients produced by ``basc``
+* ``CONF.GNT`` - relativistic Gaunt coefficients produced by ``pbasc``
+* ``CONF.INT`` - relativistic Coulomb coefficients produced by ``pbasc``
 * ``SGC.CON`` (optional) - one-electron effective radial integrals of the MBPT/all-order corrections
 * ``SCRC.CON`` (optional) - two-electron effective radial integrals of the MBPT/all-order corrections
 * ``CONF.INP`` - list of relativistic configurations and user defined parameters

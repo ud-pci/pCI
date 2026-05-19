@@ -7,7 +7,7 @@ We treat Sr as a divalent ion, constructing the basis set in the :math:`V^{N-2}`
 
 Next, the ``ci.py`` script generates lists of configurations by exciting electrons from the odd-parity :math:`5s 5p` and even-parity :math:`5s^2` configurations to all orbitals up to :math:`17spdfg`, then run the CI computations. The energies and wave functions of the lowest 12 states with :math:`J=1` are calculated for the odd-parity CI run, and the lowest 24 with :math:`J=0` for the even-parity CI run. 
 
-The ``dtm.py`` script is then run to calculate :math:`E1` reduced matrix elements, including RPA corrections. In ``config.yml`` we specify transitions from the first 3 odd states to the first even state. This will compute reduced matrix elements for the :math:`^3P_1^o-\,^1S_0` and :math:`^1P_1^o-\,^1S_0` transitions. Running ``dtm``, we obtain :math:`|\langle ^3P_1^o || E1 || ^1S_0\rangle|=0.155` a.u. and :math:`|\langle ^1P_1^o || E1 || ^1S_0\rangle|=5.275` a.u.
+The ``dtm.py`` script is then run to calculate :math:`E1` reduced matrix elements, including RPA corrections. In ``config.yml`` we specify transitions from the first 3 odd states to the first even state. This will compute reduced matrix elements for the :math:`^3P_1^o-\,^1S_0` and :math:`^1P_1^o-\,^1S_0` transitions. Running ``pdtm``, we obtain :math:`|\langle ^3P_1^o || E1 || ^1S_0\rangle|=0.155` a.u. and :math:`|\langle ^1P_1^o || E1 || ^1S_0\rangle|=5.275` a.u.
 
 Finally, the ``pol.py`` script is run to calculate dc and ac valence polarizabilities for the :math:`^1S_0` state. Doing so, we obtain dc polarizability :math:`\alpha(^1S_0)=192.78` a.u., and ac polarizability :math:`\alpha(^1S_0)=242.97` a.u. at :math:`\lambda=1000` nm. To calculate polarizabilities for the $^3P_0^o$ state, one has to set ``pol.parity`` to ``odd``, then swap the values of ``conf.odd.J`` and ``conf.odd.JM`` with ``conf.even.J`` and ``conf.even.JM``. The ``ci.py`` script is re-run to calculate wave functions in the respective projections, and then ``pol.py`` is re-run to obtain polarizabilities. 
 
@@ -38,7 +38,7 @@ The ``config.yml`` file defines the entire calculation from beginning to end usi
             partition: large-mem
             nodes: 1
             tasks_per_node: 64
-            submit_job = False
+            submit_job: False
 
         # Atomic information
         atom:
@@ -145,5 +145,6 @@ The ``config.yml`` file defines the entire calculation from beginning to end usi
                 include: False
                 K_is: 0
                 C_is: 0
+
 
 |
