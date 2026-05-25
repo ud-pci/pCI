@@ -544,24 +544,26 @@ Contains
 
         Integer :: mype, npes, mpierr
         Integer :: nconf, ncsf, nccj, max_ndcs
-        Integer :: numzero, n0, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
-        Integer :: n1, n2, n, id, k1, k2, k, jd, jc, jc2, ic, iccj, jccj
-        Integer(Kind=int64) :: counter1, counter2, counter3
+        Integer :: numzero, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
+        Integer :: n, k, jc, jc2, ic, m
+        Integer(Kind=int64) :: counter1, counter2
         Integer :: j, mesplit, iconf_local_count
         Integer :: an_id, nnd, num_done, sender, iconf_task
         Integer :: cntarray(2)
         Integer(Kind=int64) :: ih8_max
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer, Allocatable, Dimension(:) :: iconf_processed
+        Integer :: n_processed
+        Integer(Kind=int64) :: val_pos
         Type(IVAccumulator)   :: iva1, iva2
-        Type(RVAccumulator)   :: rva1
-        Integer               :: vaGrowBy, ndGrowBy
-        Integer(Kind=int64)   :: s1, ih8_before
-        Integer(Kind=int64)   :: maxmem, statmem, NumH_running, maxme_running
+        Integer               :: vaGrowBy
+        Integer(Kind=int64)   :: s1, stot, ih8_before
+        Integer(Kind=int64)   :: maxmem, statmem, statmem_copy, NumH_running, maxme_running
         Real(dp) :: Hmin, hij
         Real(dp), Allocatable, Dimension(:) :: ccj, buf
         Real(dp), Allocatable, Dimension(:,:) :: zzc
-        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
+        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, timeStr
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         If (.not. allocated(ccj)) allocate(ccj(nccj))
@@ -571,18 +573,16 @@ Contains
         If (.not. allocated(idet2)) allocate(idet2(Ne))
 
         vaGrowBy = vaBinSize
-        ndGrowBy = 1
+        Call startTimer(stot)
 
         If (mype==0) Then
             Write(counterStr,fmt='(I16)') vaGrowBy
-            Write(counterStr2,fmt='(I16)') ndGrowBy
-            Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
-            print*, '========== Starting calculation stage of FormH =========='
+            Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))
+            print*, '========== Starting comparison stage of FormH_sym =========='
         End If
 
         Call IVAccumulatorInit(iva1, vaGrowBy)
         Call IVAccumulatorInit(iva2, vaGrowBy)
-        Call RVAccumulatorInit(rva1, vaGrowBy)
 
         ! Reading the list of the symmetrized coefficients
         ccj(1:nccj) = ccj_module(1:nccj)
@@ -598,7 +598,6 @@ Contains
         Kherr=0
         Kgerr=0
         numzero=0
-        n0=1
         Hmin=0.d0
         Hamil%minval = 0.d0
         if (Ksig.EQ.2) then
@@ -614,13 +613,14 @@ Contains
                 If (mod(iconf_local_count, mesplit)==0 .and. j < 10) Then
                     Call stopTimer(s1, timeStr)
                     maxmem  = ih8 * (8_int64 + int(type_real, int64))
-                    statmem = memEstimate + memDvdsn - memFormH + maxmem
+                    statmem_copy = memEstimate + maxmem
+                    statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                     Call FormattedMemSize(maxmem, memStr3)
                     Call FormattedMemSize(maxmem, memStr2)
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
                     Write(counterStr,fmt='(I16)') ih8
-                    Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)// '; '// &
+                    Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym comparison stage:', j*10, '% done in '// trim(timeStr)// '; '// &
                                                 Trim(AdjustL(counterStr)) // ' elements'
                     Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
                     If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
@@ -641,58 +641,23 @@ Contains
                     ndj=ndc(jconf)
                     idf=idif(iconf,jconf)
                     if (idf.gt.2) cycle
-                    zzc(1:nci,1:ncj)=0.d0
-                    n1=mdc(iconf)+1
-                    n2=n1+ndc(iconf)-1
-                    do n=n1,n2
-                        id=n-n1+1
-                        idet1(1:Ne)=Iarr(1:Ne,n)
-                        k1=mdc(jconf)+1
-                        k2=k1+ndc(jconf)-1
-                        buf(1:ncj)=0.d0
-                        do k=k1,k2
-                            idet2(1:Ne)=Iarr(1:Ne,k)
-                            if (Kdsig.NE.0) E_k=Diag(k)
-                            call Hmatrix(idf,idet1,idet2,hij)
-                            if (dabs(hij).lt.1.d-20) cycle
-                            jd=k-k1+1
-                            do jc=1,ncj
-                                jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-                                buf(jc)=buf(jc)+hij*ccj(jccj)
-                            end do
-                        end do
-                        do ic=1,nci
-                            iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-                            do jc=1,ncj
-                                zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
-                            end do
-                        end do
-                    end do
                     do ic=1,nci
                         jc2=ncj
                         if (iconf.eq.jconf) jc2=ic
                         do jc=1,jc2
-                            hij=zzc(ic,jc)
+                            ih8=ih8+1
                             n=ic+mdcs(iconf)
                             k=jc+mdcs(jconf)
-                            if (hij.NE.0.d0) then
-                                ih8=ih8+1
-                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
-                                Call IVAccumulatorAdd(iva1, n)
-                                Call IVAccumulatorAdd(iva2, k)
-                                Call RVAccumulatorAdd(rva1, hij)
-                                Hamil%minval = Hmin
-                            else
-                                numzero=numzero+1
-                            end if
+                            Call IVAccumulatorAdd(iva1, n)
+                            Call IVAccumulatorAdd(iva2, k)
                         end do
                     end do
                 end do
             end do
             NumH=ih8
             maxmem  = ih8 * (8_int64 + int(type_real, int64))
-            statmem = memEstimate + memDvdsn - memFormH + maxmem
+            statmem_copy = memEstimate + maxmem
+            statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
             memEstimate = memEstimate + maxmem
             Call stopTimer(s1, timeStr)
             Call FormattedMemSize(maxmem, memStr3)
@@ -702,7 +667,7 @@ Contains
             Call FormattedMemSize(statmem, memStr)
             Call FormattedMemSize(memTotalPerCPU, memTotStr2)
             Write(counterStr,fmt='(I16)') ih8
-            Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)// '; '// &
+            Write(*,'(2X,A,1X,I3,A)') 'FormH_sym comparison stage:', 100, '% done in '//trim(timeStr)// '; '// &
                                         Trim(AdjustL(counterStr)) // ' elements'
             Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
             Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
@@ -746,13 +711,14 @@ Contains
                     If (mod(iconf_local_count, mesplit) == 0 .and. j < 10) Then
                         Call stopTimer(s1, timeStr)
                         maxmem  = maxme_running * (8_int64 + int(type_real, int64))
-                        statmem = memEstimate + memDvdsn - memFormH + maxmem
+                        statmem_copy = memEstimate + maxmem
+                        statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                         Call FormattedMemSize(NumH_running*(8_int64+int(type_real,int64)), memStr3)
                         Call FormattedMemSize(maxmem, memStr2)
                         Call FormattedMemSize(statmem, memTotStr)
                         Call FormattedMemSize(memTotalPerCPU, memTotStr2)
                         Write(counterStr,fmt='(I16)') NumH_running
-                        Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)// '; '// &
+                        Write(*,'(2X,A,1X,I3,A)'), 'FormH_sym comparison stage:', j*10, '% done in '// trim(timeStr)// '; '// &
                                                     Trim(AdjustL(counterStr)) // ' elements'
                         Write(*,'(4X,A)'), 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
                         If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
@@ -772,7 +738,8 @@ Contains
                     End If
                 End Do
                 maxmem  = maxme_running * (8_int64 + int(type_real, int64))
-                statmem = memEstimate + memDvdsn - memFormH + maxmem
+                statmem_copy = memEstimate + maxmem
+                statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                 memEstimate = memEstimate + maxmem
                 Call stopTimer(s1, timeStr)
                 Call FormattedMemSize(NumH_running*(8_int64+int(type_real,int64)), memStr3)
@@ -782,7 +749,7 @@ Contains
                 Call FormattedMemSize(statmem, memStr)
                 Call FormattedMemSize(memTotalPerCPU, memTotStr2)
                 Write(counterStr,fmt='(I16)') NumH_running
-                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '//trim(timeStr)// '; '// &
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym comparison stage:', 100, '% done in '//trim(timeStr)// '; '// &
                                             Trim(AdjustL(counterStr)) // ' elements'
                 Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// trim(memStr2)//')'
                 Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
@@ -802,12 +769,15 @@ Contains
                                             but available memory was not saved to environment'
                 End If
             Else
-                ! Workers: receive iconf rows and compute matrix elements
+                n_processed = 0
+                Allocate(iconf_processed(nconf))
                 Do
                     Call MPI_RECV(iconf_task, 1, MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     If (iconf_task == -1) Exit
 
                     iconf = iconf_task
+                    n_processed = n_processed + 1
+                    iconf_processed(n_processed) = iconf
                     ih8_before = ih8
                     iconf_neq = nc_neq(iconf)
                     nci = ndcs(iconf_neq)
@@ -820,51 +790,15 @@ Contains
                             ndj=ndc(jconf)
                             idf=idif(iconf,jconf)
                             if (idf.gt.2) cycle
-                            zzc(1:nci,1:ncj)=0.d0
-                            n1=mdc(iconf)+1
-                            n2=n1+ndc(iconf)-1
-                            do n=n1,n2
-                                id=n-n1+1
-                                idet1(1:Ne)=Iarr(1:Ne,n)
-                                k1=mdc(jconf)+1
-                                k2=k1+ndc(jconf)-1
-                                buf(1:ncj)=0.d0
-                                do k=k1,k2
-                                    idet2(1:Ne)=Iarr(1:Ne,k)
-                                    if (Kdsig.NE.0) E_k=Diag(k)
-                                    call Hmatrix(idf,idet1,idet2,hij)
-                                    if (dabs(hij).lt.1.d-20) cycle
-                                    jd=k-k1+1
-                                    do jc=1,ncj
-                                        jccj=jd+(jc-1)*ndj+iplace_cj(jconf_neq)
-                                        buf(jc)=buf(jc)+hij*ccj(jccj)
-                                    end do
-                                end do
-                                do ic=1,nci
-                                    iccj=id+(ic-1)*ndi+iplace_cj(iconf_neq)
-                                    do jc=1,ncj
-                                        zzc(ic,jc)=zzc(ic,jc)+buf(jc)*ccj(iccj)
-                                    end do
-                                end do
-                            end do
                             do ic=1,nci
                                 jc2=ncj
                                 if (iconf.eq.jconf) jc2=ic
                                 do jc=1,jc2
-                                    hij=zzc(ic,jc)
+                                    ih8=ih8+1
                                     n=ic+mdcs(iconf)
                                     k=jc+mdcs(jconf)
-                                    if (hij.NE.0.d0) then
-                                        ih8=ih8+1
-                                        if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-                                        if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
-                                        Call IVAccumulatorAdd(iva1, n)
-                                        Call IVAccumulatorAdd(iva2, k)
-                                        Call RVAccumulatorAdd(rva1, hij)
-                                        Hamil%minval = Hmin
-                                    else
-                                        numzero=numzero+1
-                                    end if
+                                    Call IVAccumulatorAdd(iva1, n)
+                                    Call IVAccumulatorAdd(iva2, k)
                                 end do
                             end do
                         end do
@@ -881,28 +815,178 @@ Contains
         Call MPI_AllReduce(ih8, ih8_max, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
 
         Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
-        Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
-        Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
-
         Call IVAccumulatorReset(iva1)
+        Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
         Call IVAccumulatorReset(iva2)
-        Call RVAccumulatorReset(rva1)
+        
+        ! ===================== CALCULATION STAGE =====================
+        Allocate(Hamil%val(ih8))
+        If (mype == 0) Then
+            print*, '========== Starting calculation stage of FormH_sym =========='
+        End If
+
+        j = 1
+        Call startTimer(s1)
+        val_pos = 0_int64
+        Hmin = 0.d0
+        Hamil%minval = 0.d0
+        If (npes == 1) Then
+            do iconf=1,nconf
+                If (ih8 > 0 .and. val_pos * 10 / ih8 >= int(j, int64) .and. j <= 10) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                    j = j + 1
+                End If
+                iconf_neq=nc_neq(iconf)
+                nci=ndcs(iconf_neq)
+                if (nci.eq.0) cycle
+                ndi=ndc(iconf)
+                do jconf=1,iconf
+                    jconf_neq=nc_neq(jconf)
+                    ncj=ndcs(jconf_neq)
+                    if (ncj.eq.0) cycle
+                    ndj=ndc(jconf)
+                    idf=idif(iconf,jconf)
+                    if (idf.gt.2) cycle
+                    Call compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
+                    do ic=1,nci
+                        jc2=ncj
+                        if (iconf.eq.jconf) jc2=ic
+                        do jc=1,jc2
+                            val_pos = val_pos + 1
+                            hij = zzc(ic,jc)
+                            Hamil%val(val_pos) = hij
+                            if (hij.NE.0.d0) then
+                                n=ic+mdcs(iconf)
+                                k=jc+mdcs(jconf)
+                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                Hamil%minval = Hmin
+                            else
+                                numzero=numzero+1
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+        Else If (mype /= 0) Then
+            do m = 1, n_processed
+                iconf = iconf_processed(m)
+                iconf_neq = nc_neq(iconf)
+                nci = ndcs(iconf_neq)
+                if (nci /= 0) Then
+                    ndi = ndc(iconf)
+                    do jconf=1,iconf
+                        jconf_neq=nc_neq(jconf)
+                        ncj=ndcs(jconf_neq)
+                        if (ncj.eq.0) cycle
+                        ndj=ndc(jconf)
+                        idf=idif(iconf,jconf)
+                        if (idf.gt.2) cycle
+                        Call compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
+                        do ic=1,nci
+                            jc2=ncj
+                            if (iconf.eq.jconf) jc2=ic
+                            do jc=1,jc2
+                                val_pos = val_pos + 1
+                                hij = zzc(ic,jc)
+                                Hamil%val(val_pos) = hij
+                                if (hij.NE.0.d0) then
+                                    n=ic+mdcs(iconf)
+                                    k=jc+mdcs(jconf)
+                                    if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                    if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                    Hamil%minval = Hmin
+                                else
+                                    numzero=numzero+1
+                                end if
+                            end do
+                        end do
+                    end do
+                End If
+                If (ih8 == ih8_max .and. ih8 > 0 .and. val_pos * 10 / ih8 >= int(j, int64) .and. j <= 10) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)
+                    j = j + 1
+                End If
+            end do
+            Deallocate(iconf_processed)
+        End If
 
         memEstimate = memEstimate + ih8_max * 16
 
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        If (mype == 0) print*, '========== Formation of Hamiltonian matrix completed =========='
 
         If (mype == 0) Then
-            write(*,*) 'NumH=',NumH
-            write(*,*) 'numzer=',numzero
-            write(*,*) 'Hmin=',Hamil%minval
+            ! Write number of non-zero matrix elements
+            Write(counterStr,fmt='(I16)') NumH-numzero
+            Write( 6,'(4X,"NumH = ",A)') Trim(AdjustL(counterStr))
+            Write(11,'(4X,"NumH = ",A)') Trim(AdjustL(counterStr))
+
+            ! Write number of zero-valued matrix elements
+            Write(counterStr,fmt='(I16)') numzero
+            Write( 6,'(4X,"numzero = ",A)') Trim(AdjustL(counterStr))
+            Write(11,'(4X,"numzero = ",A)') Trim(AdjustL(counterStr))
+
+            ! Write value of lowest matrix element
+            Write(counterStr,fmt='(F14.8)') Hamil%minval
+            Write( 6,'(4X,"Hmin = ",A)') Trim(AdjustL(counterStr))
+            Write(11,'(4X,"Hmin = ",A)') Trim(AdjustL(counterStr))
         End If
 
         deallocate(buf)
         deallocate(zzc)
         deallocate(ccj)
+
+        If (mype == 0) Then
+            Call stopTimer(stot, timeStr)
+            write(*,'(2X,A)') 'TIMING >>> FormH_sym took '// trim(timeStr) // ' to complete'
+        End If
     End Subroutine formh_sym
+
+    Subroutine compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
+        ! Compute the CSF-level matrix element block zzc(nci,ncj) for a given (iconf, jconf) pair.
+        ! Called identically by the comparison and calculation stages of formh_sym.
+        Implicit None
+        
+        Integer,  Intent(In)    :: iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq
+        Real(dp), Intent(In)    :: ccj(:)
+        Real(dp), Intent(Out)   :: zzc(:,:)
+        Real(dp), Intent(InOut) :: buf(:)
+        Integer, Allocatable, Intent(InOut) :: idet1(:), idet2(:)
+        Integer  :: n1, n2, k1, k2, n, k, id, jd, ic, jc, iccj, jccj
+        Real(dp) :: hij
+
+        zzc(1:nci,1:ncj) = 0.d0
+        n1 = mdc(iconf) + 1
+        n2 = n1 + ndc(iconf) - 1
+        do n = n1, n2
+            id = n - n1 + 1
+            idet1(1:Ne) = Iarr(1:Ne,n)
+            k1 = mdc(jconf) + 1
+            k2 = k1 + ndc(jconf) - 1
+            buf(1:ncj) = 0.d0
+            do k = k1, k2
+                idet2(1:Ne) = Iarr(1:Ne,k)
+                if (Kdsig.NE.0) E_k = Diag(k)
+                call Hmatrix(idf, idet1, idet2, hij)
+                if (dabs(hij).lt.1.d-20) cycle
+                jd = k - k1 + 1
+                do jc = 1, ncj
+                    jccj = jd + (jc-1)*ndj + iplace_cj(jconf_neq)
+                    buf(jc) = buf(jc) + hij*ccj(jccj)
+                end do
+            end do
+            do ic = 1, nci
+                iccj = id + (ic-1)*ndi + iplace_cj(iconf_neq)
+                do jc = 1, ncj
+                    zzc(ic,jc) = zzc(ic,jc) + buf(jc)*ccj(iccj)
+                end do
+            end do
+        end do
+    End Subroutine compute_zzc_block
 
     Subroutine Hmatrix(icomp,idet1,idet2,t)
         Use integrals, Only : Hint, Gint

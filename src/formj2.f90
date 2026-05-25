@@ -345,9 +345,12 @@ Module formj2
             End If
         
             Call IVAccumulatorCopy(iva1, Jsq%ind1, counter1)
+            Call IVAccumulatorReset(iva1)
             Call IVAccumulatorCopy(iva2, Jsq%ind2, counter2)
+            Call IVAccumulatorReset(iva2)
             Call RVAccumulatorCopy(rva1, Jsq%val, counter3)
-            
+            Call RVAccumulatorReset(rva1)
+
             If (counter1 == 0) Then
                 Allocate(Jsq%ind1(1))
                 Allocate(Jsq%ind2(1))
@@ -356,10 +359,6 @@ Module formj2
                 Jsq%ind2(1) = 1
                 Jsq%val(1) = 0
             End If
-
-            Call IVAccumulatorReset(iva1)
-            Call IVAccumulatorReset(iva2)
-            Call RVAccumulatorReset(rva1)
     
             Call stopTimer(s1, timeStr)
             !Write(*,'(2X,A,1X,I3,1X,A,I9)'), 'core', mype, 'took '// trim(timeStr)// ' for ij8=', counter1
@@ -374,10 +373,11 @@ Module formj2
         End If
 
         If (mype == 0) Then
+            ! Write number of non-zero J^2 matrix elements
             Write(counterStr,fmt='(I16)') NumJ
             strfmt = '(4X,"NumJ = ",A)'
+            Write( 6,strfmt) Trim(AdjustL(counterStr))
             Write(11,strfmt) Trim(AdjustL(counterStr))
-            Write( *,strfmt) Trim(AdjustL(counterStr))
             Call stopTimer(stot, timeStr)
             write(*,'(2X,A)') 'TIMING >>> FormJ took '// trim(timeStr) // ' to complete'
         End If

@@ -307,7 +307,11 @@ Module davidson
 
         id0=1
         Do ic=1,Nc
-            id1=Ndc(ic)
+            If (kCSF > 0) Then
+                id1=ndcs(nc_neq(ic))
+            Else
+                id1=Ndc(ic)
+            End If
             id2=id0+id1-1
             If (id1 > 0) Then
                 ss=0_type_real

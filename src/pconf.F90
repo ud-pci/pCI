@@ -287,7 +287,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '7.0'
+        version = '8.0'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -1151,7 +1151,7 @@ Contains
         Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
-        Integer(Kind=int64) :: statmem, mem, maxmem, counter1, counter2, counter3
+        Integer(Kind=int64) :: statmem, statmem_copy, mem, maxmem, counter1, counter2, counter3
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
@@ -1293,7 +1293,8 @@ Contains
                             NumH = cntarray(1)
                             mem = NumH * (8_int64+type_real)
                             maxmem = mem
-                            statmem = memEstimate + memDvdsn - memFormH + maxmem
+                            statmem_copy = memEstimate + NumH * (8_int64 + 2_int64 * int(type_real, int64))
+                            statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                             Call FormattedMemSize(statmem, memTotStr)
                             Call FormattedMemSize(memTotalPerCPU, memTotStr2)
                             Call FormattedMemSize(mem, memStr3)
@@ -1319,13 +1320,14 @@ Contains
                     maxme = cntarray(2)
                     mem = NumH * (8_int64+type_real)
                     maxmem = maxme * (8_int64+type_real)
-                    statmem = memEstimate + memDvdsn - memFormH + maxmem
+                    statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                    statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                     memEstimate = memEstimate + maxmem
                     Call FormattedMemSize(NumH*(8_int64+type_real), memStr3)
                     Call FormattedMemSize(maxmem, memStr2)
                     Call FormattedMemSize(memStaticArrays, memStr4)
                     Call FormattedMemSize(memDvdsn, memStr5)
-                    mem = memEstimate + memDvdsn - memFormH + maxmem
+                    mem = statmem
                     Call FormattedMemSize(mem, memStr)
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
@@ -1421,7 +1423,8 @@ Contains
                         maxme = max(cntarray(2),maxme)
                         mem = NumH * (8_int64+type_real)
                         maxmem = maxme * (8_int64+type_real)
-                        statmem = memEstimate + memDvdsn - memFormH + maxmem
+                        statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                        statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                         Call FormattedMemSize(statmem, memTotStr)
                         Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
@@ -1451,10 +1454,13 @@ Contains
                             Call FormattedMemSize(NumH*(8+type_real), memStr3)
                             Call FormattedMemSize(memStaticArrays, memStr4)
                             Call FormattedMemSize(memDvdsn, memStr5)
-                            mem = memEstimate + memDvdsn - memFormH + maxmem
+                            statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                            statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
                             memEstimate = memEstimate + maxmem
+                            mem = statmem
                             Write(counterStr,fmt='(I16)') NumH
                             Call FormattedMemSize(mem, memStr)
+                            Call FormattedMemSize(statmem, memTotStr)
                             Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                         Trim(AdjustL(counterStr)) // ' elements'
                             Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
@@ -1532,11 +1538,10 @@ Contains
             End If
 
             Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
-            Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
-            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
-
             Call IVAccumulatorReset(iva1)
+            Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
             Call IVAccumulatorReset(iva2)
+            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
             If (mype == 0) Call RVAccumulatorReset(rva1)
         
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
