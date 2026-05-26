@@ -869,6 +869,10 @@ Contains
                     end do
                 end do
             end do
+            If (ih8 > 0 .and. j == 10) Then
+                Call stopTimer(s1, timeStr)
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '// trim(timeStr)
+            End If
         Else If (mype /= 0) Then
             do m = 1, n_processed
                 iconf = iconf_processed(m)
@@ -910,6 +914,10 @@ Contains
                     j = j + 1
                 End If
             end do
+            If (ih8 == ih8_max .and. ih8 > 0 .and. j == 10) Then
+                Call stopTimer(s1, timeStr)
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '// trim(timeStr)
+            End If
             Deallocate(iconf_processed)
         End If
 
