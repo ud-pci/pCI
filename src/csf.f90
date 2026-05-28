@@ -549,7 +549,7 @@ Contains
         Integer(Kind=int64) :: counter1, counter2
         Integer :: j, mesplit, iconf_local_count
         Integer :: an_id, nnd, num_done, sender, iconf_task
-        Integer :: cntarray(2)
+        Integer(Kind=int64) :: cntarray(2)
         Integer(Kind=int64) :: ih8_max
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
@@ -702,10 +702,10 @@ Contains
                 End Do
 
                 Do While (num_done < npes - 1)
-                    Call MPI_RECV(cntarray, 2, MPI_INTEGER, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, mpierr)
+                    Call MPI_RECV(cntarray, 2, MPI_INTEGER8, MPI_ANY_SOURCE, return_tag, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
-                    NumH_running  = NumH_running  + int(cntarray(1), int64)
-                    maxme_running = max(maxme_running, int(cntarray(2), int64))
+                    NumH_running  = NumH_running  + cntarray(1)
+                    maxme_running = max(maxme_running, cntarray(2))
 
                     iconf_local_count = iconf_local_count + 1
                     If (mod(iconf_local_count, mesplit) == 0 .and. j < 10) Then
@@ -804,9 +804,9 @@ Contains
                         end do
                     End If
 
-                    cntarray(1) = int(ih8 - ih8_before)
-                    cntarray(2) = int(ih8)
-                    Call MPI_SEND(cntarray, 2, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                    cntarray(1) = ih8 - ih8_before
+                    cntarray(2) = ih8
+                    Call MPI_SEND(cntarray, 2, MPI_INTEGER8, 0, return_tag, MPI_COMM_WORLD, mpierr)
                 End Do
             End If
         End If

@@ -1407,7 +1407,7 @@ Contains
                     j=9
 
                     Do
-                        Call MPI_RECV( cntarray, 3, MPI_INTEGER, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                        Call MPI_RECV( cntarray, 3, MPI_INTEGER8, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                         sender = status%MPI_SOURCE
 
                         If (nnd + ndGrowBy <= Nd) Then
@@ -1532,7 +1532,7 @@ Contains
                         End Do 
 
                         cntarray(3) = nnd
-                        Call MPI_SEND(cntarray, 3, MPI_INTEGER, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                        Call MPI_SEND(cntarray, 3, MPI_INTEGER8, 0, return_tag, MPI_COMM_WORLD, mpierr)
                     End if
                 End Do
             End If
