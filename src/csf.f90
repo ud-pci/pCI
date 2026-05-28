@@ -658,7 +658,6 @@ Contains
             maxmem  = ih8 * (8_int64 + int(type_real, int64))
             statmem_copy = memEstimate + maxmem
             statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
-            memEstimate = memEstimate + maxmem
             Call stopTimer(s1, timeStr)
             Call FormattedMemSize(maxmem, memStr3)
             Call FormattedMemSize(maxmem, memStr2)
@@ -740,7 +739,6 @@ Contains
                 maxmem  = maxme_running * (8_int64 + int(type_real, int64))
                 statmem_copy = memEstimate + maxmem
                 statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
-                memEstimate = memEstimate + maxmem
                 Call stopTimer(s1, timeStr)
                 Call FormattedMemSize(NumH_running*(8_int64+int(type_real,int64)), memStr3)
                 Call FormattedMemSize(maxmem, memStr2)
