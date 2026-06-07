@@ -54,6 +54,29 @@ The ``pol`` program gives both scalar and tensor polarizabilities if the latter 
 
 This program requires several input files from previously run ``pconf`` and ``pdtm`` programs, including ``CONF.DET`` and ``CONF.XIJ`` of the parity of the level of interest (renamed to ``CONF0.DET`` and ``CONF0.XIJ``), ``CONF.INP``, ``CONF.XIJ``, ``CONF.HIJ``, and ``CONF.JJJ`` of the opposite parity, and the file ``DTM.INT`` from ``pdtm``.
 
+Here is a summary of the input and output files used in ``pol``.
+
+Input Files:
+
+* ``CONF.INP`` - list of relativistic configurations and system parameters
+* ``CONF.DAT`` - basis set radial orbitals
+* ``CONF.HIJ`` - sorted Hamiltonian matrix elements (from ``sort`` applied to ``CONFp.HIJ``)
+* ``CONF.JJJ`` - sorted :math:`J^2` matrix elements (from ``sort`` applied to ``CONFp.JJJ``)
+* ``CONF.XIJ`` - eigenvectors and eigenvalues of the opposite-parity state
+* ``CONF0.DET`` - list of determinants for the state whose polarizability is computed
+* ``CONF0.JJJ`` - :math:`J^2` matrix elements for the state whose polarizability is computed
+* ``CONF0.XIJ`` - eigenvectors and eigenvalues for the state whose polarizability is computed
+* ``DTM.INT`` - radial integrals from ``pdtm``
+
+Output Files:
+
+* ``POL.RES`` - scalar and tensor polarizabilities for the requested level and frequency ranges
+* ``POL_E1.RES`` - intermediate E1 matrix elements used in the polarizability sum
+* ``POL_p.XIJ`` - solution vector :math:`|\delta\phi_+\rangle`; written during calculation and re-read when ``Mode = 1``
+* ``POL_m.XIJ`` - solution vector :math:`|\delta\phi_-\rangle`; written during calculation and re-read when ``Mode = 1``
+* ``POL_J_p.XIJ`` - :math:`J`-decomposition of :math:`|\delta\phi_+\rangle`
+* ``POL_J_m.XIJ`` - :math:`J`-decomposition of :math:`|\delta\phi_-\rangle`
+
 For example, if we want to calculate polarizabilities for an even state:
 
 .. code-block:: 
@@ -66,34 +89,34 @@ For example, if we want to calculate polarizabilities for an even state:
     cp CONFodd.HIJ CONF.HIJ
     cp CONFodd.JJJ CONF.JJJ
 
-Note that the ``pconf`` program outputs ``CONFp.HIJ`` and ``CONFp.JJJ`` files, but not the ``CONF.HIJ`` and ``CONF.JJJ`` files. The only difference between these files is that the former are not sorted and require the additional ``sort`` program to process them in the latter. 
+Note that ``pconf`` writes ``CONFp.HIJ`` and ``CONFp.JJJ`` in unsorted parallel format. Before running ``pol``, these must be sorted using the ``sort`` program, which produces the sorted serial files ``CONF.HIJ`` and ``CONF.JJJ`` that ``pol`` expects.
 
 The ``pol`` program requires a list of key-value parameters in a file ``pol.in``:
 
 .. code-block::
 
-    Mode = (0, 1)
+    Mode   = (0, 1)
     Method = (0, 1, 2)
-    Level = (energy level index)
-    Ranges = (list of ranges of wavelengths)
-    IP1 = (dimension of initial matrix)
+    Level  = N
+    Ranges = initial_wavelength final_wavelength step_size [, ...]
+    IP1    = N
 
 The value of ``Mode`` can take the following values:
 
 * ``Mode = 0`` - start a new calculation
-* ``Mode = 1`` - continue the calculation
+* ``Mode = 1`` - continue a previous calculation, reading ``POL_p.XIJ`` and ``POL_m.XIJ`` from disk
 
-The value of ``Method`` cane take the following values:
+The value of ``Method`` can take the following values:
 
-* ``Method = 0`` - invert the matrix and iterate if diverged
-* ``Method = 1`` - only invert the matrix 
-* ``Method = 2`` - modified iteration procedure where computation restarts after every 2 iterations while retaining vectors (used in cases where ``Method = 0`` diverges)
+* ``Method = 0`` - invert the matrix and iterate until convergence; restart with iteration if inversion diverges
+* ``Method = 1`` - invert the matrix only, without iterative refinement
+* ``Method = 2`` - modified iteration that restarts every 2 iterations while retaining solution vectors; use when ``Method = 0`` diverges
 
-The value of ``Levels`` is the ordinal number of the vector in the ``CONF0.XIJ`` file corresponding to the energy level for which the user wants to calculate the polarizability. 
+The value of ``Level`` is the index of the eigenvector in ``CONF0.XIJ`` for which the polarizability is calculated.
 
-The ``Ranges`` field takes in a list of wavelength ranges with step size in the format ``initial_wavelength final_wavelength step_size``, separated by commas.   
+The ``Ranges`` field takes a comma-separated list of wavelength ranges, each specified as ``initial_wavelength final_wavelength step_size`` (in nm). The special range ``0 0 0`` computes the dc (static) polarizability.
 
-The value of ``IP1`` sets the dimension of the initial approximation of the matrix (by default, this is set to ``IP1=15000``).
+The value of ``IP1`` sets the dimension of the initial approximation subspace (default: ``IP1 = 15000``).
 
 For example, to calculate dc polarizabilities, as well as ac polarizabilities from :math:`\lambda=500` nm to :math:`\lambda=505` nm in steps of :math:`0.5` nm, for the first state in ``CONF0.XIJ``, we can use the following ``pol.in``:
 

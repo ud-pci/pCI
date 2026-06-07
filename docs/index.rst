@@ -12,7 +12,7 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
 
 .. toctree::
    :maxdepth: 1
-   :caption: Using pCI
+   :caption: Getting Started
 
    installation
    ud_instructions
@@ -20,17 +20,44 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
 
 .. toctree::
    :maxdepth: 1
-   :caption: pCI Technical Details
+   :caption: Core Programs
 
    theory
-   pci/index.rst
-   extensions/index.rst
-   upscaling
+   pci/index
+   pci/hfd
+   pci/bass
+   pci/add
+   pci/pbasc
+   pci/pconf
+   pci/pdtm
+   pci/pol
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: All-order Programs
+
+   extensions/index
+   extensions/basis
+   extensions/all-order
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Python Tools
+
    pci-py
+   portal_codes
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Advanced Topics
+
    isotope_shifts
    qed
-   portal_codes
    radial_grid
+   upscaling
 
 
 .. toctree:: 

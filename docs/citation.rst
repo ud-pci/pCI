@@ -8,7 +8,7 @@ C\. Cheung, M. G. Kozlov, S. G. Porsev, M. S. Safronova, I. I. Tupitsyn, and A. 
 .. code-block:: bibtex
 
    @article{2025pCI,
-     title = {pCI: A parallel configuration interaction software package for high-precision atomic structure calculations},
+     title = {p{CI}: A parallel configuration interaction software package for high-precision atomic structure calculations},
      journal = {Computer Physics Communications},
      volume = {308},
      pages = {109463},

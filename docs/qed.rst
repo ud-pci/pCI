@@ -1,10 +1,10 @@
-How to include QED corrections
-==============================
+QED corrections
+===============
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 
-Steps to run a QED calculation
-------------------------------
+Running QED calculations
+------------------------
 
 In this section, we will introduce calculations including QED corrections. 
 

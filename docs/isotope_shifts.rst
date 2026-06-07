@@ -5,9 +5,9 @@ The transition frequency shift of an isotope :math:`A^\prime` compared to an iso
 
 .. math::
 
-    \delta \nu_{AA^\prime} = (K_\mathrm{NMS} + K_\mathrm{SMS})(\frac{1}{A}-\frac{1}{A^\prime}) + K_\mathrm{FS} \delta \langle r^2 \rangle^{AA^\prime},
+    \delta \nu_{AA^\prime} = (K_\mathrm{NMS} + K_\mathrm{SMS})\left(\frac{1}{A}-\frac{1}{A^\prime}\right) + K_\mathrm{FS} \delta \langle r^2 \rangle^{AA^\prime},
 
-where :math:`A` and :math:`A^\prime` are mass numbers of the two isotopes and :math:`\langle r^2 \rangle` is the mean-square nuclear radius. The first term on the right represents the mass shift and the second term represents the field shift. The mass shift consists of two parts: a normal mass shift (NMS) and a specific mass shift (SMS). For more detail, see references below :footcite:p:`KorKoz07, SafPorKoz18`.
+where :math:`A` and :math:`A^\prime` are mass numbers of the two isotopes and :math:`\langle r^2 \rangle` is the mean-square nuclear radius. The first term represents the mass shift and the second term represents the field shift. The mass shift consists of two parts: a normal mass shift (NMS) and a specific mass shift (SMS). For more detail, see references below :footcite:p:`KorKoz07, SafPorKoz18`.
 
 Normal mass shift
 ~~~~~~~~~~~~~~~~~
@@ -17,73 +17,86 @@ The normal mass shift coefficient is given by
 
     K_\mathrm{NMS} = \frac{\nu_\mathrm{expt}}{1822.888},
 
-where :math:`\nu_\mathrm{expt}` is the experimental frequency and the factor :math:`1/1822.888` is the electron mass expressed in atomic mass unit.
+where :math:`\nu_\mathrm{expt}` is the experimental frequency and the factor :math:`1/1822.888` is the electron mass in atomic mass units.
 
 Field shift
 ~~~~~~~~~~~
 We use the finite-field method to calculate field shift coefficients, in which the initial Hamiltonian is modified with an arbitrary perturbation coefficient :math:`\lambda`:
 
-.. math:: 
-    
+.. math::
+
     H\rightarrow H_\lambda = H + \lambda H_\textrm{FS},
 
-where the field shift operator :math:`H_\textrm{FS}` modifies the Coulomb potential inside the nucleus. Here, the coefficient :math:`\lambda` has to be chosen to be sufficiently large enough to make the effect of the field shift significantly larger than the numerical uncertainty of the calculations, while also small enough to keep the change in the energy linear with :math:`\lambda`. Typically :math:`\lambda=0.01` meets both criteria. The energy eigenvalues :math:`E` are obtained by diagonalizing :math:`H_\lambda`, and then the field shift coefficient :math:`K_\mathrm{FS}` are found as
+where the field shift operator :math:`H_\textrm{FS}` modifies the Coulomb potential inside the nucleus. The coefficient :math:`\lambda` must be large enough to make the field shift effect significantly larger than the numerical uncertainty, while small enough to keep the energy change linear in :math:`\lambda`. Typically :math:`\lambda=0.01` meets both criteria. The field shift coefficient :math:`K_\mathrm{FS}` is then found as
 
 .. math::
 
     K_\mathrm{FS} = \frac{5}{6R^2} \frac{\partial E}{\partial \lambda}.
 
-The conversion factor from atomic units to SI units used for the coefficient :math:`K_\mathrm{FS}` is :math:`1\,\mathrm{a.u.}=2.3497\times 10^{-3}\, \mathrm{GHz/fm}^2`.
+The conversion factor from atomic units to SI units for :math:`K_\mathrm{FS}` is :math:`1\,\mathrm{a.u.}=2.3497\times 10^{-3}\, \mathrm{GHz/fm}^2.`
 
 Specific mass shift
 ~~~~~~~~~~~~~~~~~~~
 The finite-field approach is also used to calculate the specific mass shift, in which the initial Hamiltonian is modified with the SMS operator:
 
-.. math:: 
-    
+.. math::
+
     H\rightarrow H_\lambda = H + \lambda H_\textrm{SMS}.
 
-The SMS coefficient is given by the corresponding derivative 
+The SMS coefficient is given by the corresponding derivative
 
 .. math::
-    
-    K_\mathrm{SMS}=\partial E /\partial \lambda.
 
-The conversion factor from atomic units to SI units for the coefficient :math:`K_\mathrm{SMS}` is :math:`1\,\mathrm{a.u.}=3609.46\, \mathrm{GHz/amu}`.
+    K_\mathrm{SMS}=\frac{\partial E}{\partial \lambda}.
+
+The conversion factor from atomic units to SI units for :math:`K_\mathrm{SMS}` is :math:`1\,\mathrm{a.u.}=3609.46\, \mathrm{GHz/amu}`.
 
 Running isotope shift calculations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To run isotope-shift (IS) calculations, a few additional keys must be added to the ``HFD.INP``, ``BASS.INP`` and ``CONF.INP`` files before running the CI procedure as usual. The relevant isotope-shift keys are:  
+To run isotope-shift calculations, the following keys must be added to ``HFD.INP``, ``BASS.INP``, and ``CONF.INP`` before running the CI procedure as usual:
 
-* ``K_is`` - selects the type of isotope shift to calculate  
-  
-    * ``K_is = 0`` - no isotope shift
-    * ``K_is = 1`` - field shift (FS)
-    * ``K_is = 2`` - specific mass shift (SMS)
-    * ``K_is = 3`` - normal mass shift (NMS)
-    * ``K_is = 4`` - total mass shift (SMS + NMS)
-  
-* ``C_is`` - scaling parameter :math:`\lambda` used to evaluate IS coefficients in the finite-field method (C_is = dR_nucl/R_nucl)
-* ``Klow`` - lower component key 
+* ``k_is`` - selects the type of isotope shift:
+
+    * ``k_is = 0`` - no isotope shift (default)
+    * ``k_is = 1`` - volume/field shift (VS)
+    * ``k_is = 2`` - specific mass shift (SMS)
+    * ``k_is = 3`` - normal mass shift (NMS)
+    * ``k_is = 4`` - total mass shift (SMS + NMS)
+
+* ``c_is`` - the finite-field scaling parameter :math:`\lambda`. For field shift, this corresponds to :math:`\delta R_\mathrm{nucl}/R_\mathrm{nucl}`.
+
+* ``klow`` - lower component key (controls inclusion of small-component contributions)
 
 .. note::
 
-	For isotope shifts, it is important to recompile ``pbasc`` and ``pconf`` with arrays for 2-electron integrals set to ``double precision`` type. This can be done by setting the flag ``-DUSE_DP_INTEGRALS`` during compilation, or in the ``params.f90`` file by changing the value of ``Integer, Parameter :: type2_real = sp`` from ``sp``  to ``dp``. You can confirm this change in the title of the ``BASC.RES`` and ``CONF.RES`` output files, which should mention ``double precision for 2e integrals``.
+    Isotope shift calculations require ``pbasc`` and ``pconf`` to be compiled with double-precision two-electron integrals. Build with:
+
+    .. code-block::
+
+        cmake -DUSE_DP_INTEGRALS=ON ..
+
+    You can confirm this in the header of ``BASC.RES`` and ``CONF.RES``, which will read ``double precision for 2e integrals``.
 
 via pCI-py scripts
 ------------------
 
-Isotope shift calculations can also be automated using the pCI-py scripts. They generate basis sets and performs the corresponding CI calculations at different values of :math:`\lambda` to obtain :math:`E(\lambda=0)`, :math:`E(\lambda=\pm \delta \lambda)` and :math:`E(\lambda=\pm 2\delta\lambda)`. The field shift coefficient is then calculated using a five-point stencil finite difference formula using these energies.
+Isotope shift calculations can also be automated using the ``isotope_shifts.py`` script. It generates basis sets and performs CI calculations at different values of :math:`\lambda` to obtain :math:`E(\lambda=0)`, :math:`E(\lambda=\pm\delta\lambda)`, and :math:`E(\lambda=\pm 2\delta\lambda)`. The field shift coefficient is then calculated using a five-point stencil finite difference formula.
 
-To do this, set the keys in the ``config.yml`` file. For example, we can set our field shift calculation with ``C_is=0.01``:
+The script requires a completed non-IS calculation in a directory called ``0``, which must contain the relevant ``HFD.INP``, ``BASS.INP``, ``CONF.INP``, ``ci.in``, and job scripts. It reads ``K_is`` and ``C_is`` from the ``optional.isotope_shifts`` block of ``config.yml``:
 
-.. code-block:: 
+.. code-block::
 
     optional:
-        isotope_shifts: 
+        isotope_shifts:
             include: True
             K_is: 1
             C_is: 0.01
+
+The script prompts the user for which mode to run:
+
+* ``basis`` — copies the basis from the ``0`` directory into four IS subdirectories (``minus{c}``, ``plus{c}`` for :math:`c \in \{C\_is/2,\, C\_is\}`) and updates ``K_is`` and ``C_is`` in the input files for each.
+* ``ci`` — submits the CI job script in each IS directory. Requires ``basis`` mode to have been run first.
+* ``analysis`` — reads ``FINAL.RES`` from all five IS directories (including ``0`` for :math:`\lambda = 0`) and computes the IS coefficients using a five-point stencil finite difference formula.
 
 References
 ----------
