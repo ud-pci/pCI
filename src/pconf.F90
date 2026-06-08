@@ -1996,9 +1996,10 @@ Contains
         ! Start timer for Davidson procedure
         Call startTimer(start_time)
 
+        If (Nc4 > Nc) Nc4=Nc
+
         If (mype == 0) Then
             If (Kl4 == 0) Return ! Read CONF.XIJ and make 1 iteration
-            If (Nc4 > Nc) Nc4=Nc
             Write (*,*) 'kl4=',Kl4,'  Nc4=',Nc4,'  Crt4=',Crt4
             Open(77,file='CONF.PRG',status='REPLACE',form='FORMATTED',action='WRITE')
         End If
