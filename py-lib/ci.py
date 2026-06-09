@@ -194,8 +194,8 @@ def create_add_inp(config, parity, J, JM, J_selection, num_energy_levels, num_dv
     
     add = config['add']
     num_val = orb_lib.count_valence(add['ref_configs'])
-    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
     multiplicity = orb_lib.count_excitations(add['excitations'])
+    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'], add['excitations'])
 
     if add['ref_configs'][parity]:
         write_add_inp('ADD.INP', Z, AM, config, multiplicity, num_val, orb_occ, parity, J, JM, J_selection, num_energy_levels, num_dvdsn_iterations, K_is, c)
@@ -219,8 +219,8 @@ def create_add_inp_portal(config, parity, J, JM, J_selection, num_energy_levels,
     
     add = config['add']
     num_val = orb_lib.count_valence(add['ref_configs'])
-    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'])
     multiplicity = orb_lib.count_excitations(add['excitations'])
+    orb_occ = orb_lib.expand_orbitals(add['basis_set'], add['ref_configs'], add['orbitals'], add['excitations'])
 
     if add['ref_configs'][parity]:
         # Create unique filename for portal mode: ADDeven0.INP, ADDeven1.INP, etc.

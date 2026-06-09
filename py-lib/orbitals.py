@@ -276,7 +276,7 @@ def count_excitations(excitations):
             count = count + 1
     return count
 
-def expand_orbitals(basis, ref_configs, orbital_list):
+def expand_orbitals(basis, ref_configs, orbital_list, excitations=None):
     """Return a table of orbitals and occupation numbers"""
 
     orb_occ = {}
@@ -306,6 +306,28 @@ def expand_orbitals(basis, ref_configs, orbital_list):
         nmax = int(nlmax[l])
         if n > nmax:
             orb_occ.pop(orbital)
+
+    # Set occupation bounds for ref config orbitals based on excitation count.
+    # For orbital with ref occupation q and n excitations: max_occ = min(q + n, max_capacity).
+    # Applied before the active list so the active list can still override if needed.
+    if excitations is not None:
+        num_excitations = count_excitations(excitations)
+        ref_occ_map = {}
+        for parity in ['odd', 'even']:
+            if ref_configs.get(parity):
+                for config in ref_configs[parity]:
+                    for orb in config.split():
+                        n = str(int(re.findall('[0-9]+', orb)[0]))
+                        l = re.findall('[spdfghikl]+', orb)[0]
+                        q = int(re.findall('[0-9]+', orb)[-1])
+                        nl = n + l
+                        if nl not in ref_occ_map or q > ref_occ_map[nl]:
+                            ref_occ_map[nl] = q
+        for nl, ref_occ in ref_occ_map.items():
+            l = re.findall('[spdfghikl]+', nl)[0]
+            max_occ = min(ref_occ + num_excitations, maxq_dict[l])
+            if nl in orb_occ:
+                orb_occ[nl] = '0', str(max_occ)
 
     # Add orbitals from active orbital list to table
     orb_occ2 = {}
