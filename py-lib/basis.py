@@ -588,7 +588,10 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
     nmax = basis['orbitals']['nmax']
     lmax = basis['orbitals']['lmax']
     codename = atom['code_method']
-    method = basis['method']
+    try:
+        method = basis['method']
+    except KeyError:
+        raise KeyError("'method' not found in basis config. Options: 'b-splines', 'dirac-fock'")
     core = basis['orbitals']['core']
     valence = basis['orbitals']['valence']
     
