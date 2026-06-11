@@ -56,6 +56,7 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
 
    isotope_shifts
    qed
+   rpa
    radial_grid
    upscaling
 
