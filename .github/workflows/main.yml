@@ -77,7 +77,8 @@ jobs:
       - name: Install and build OpenMPI
         if: steps.openmpi-cache.outputs.cache-hit != 'true'
         run: |
-          wget https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
+          curl -fL -o openmpi-${{ matrix.openmpi.version }}.tar.gz \
+            https://download.open-mpi.org/release/open-mpi/v${{ matrix.openmpi.series }}/openmpi-${{ matrix.openmpi.version }}.tar.gz
           tar -xzf openmpi-${{ matrix.openmpi.version }}.tar.gz
           ./openmpi-${{ matrix.openmpi.version }}/configure --prefix=${HOME}/openmpi CC=${CC} CXX=${CXX} FC=${FC}
           make -j$(nproc)
