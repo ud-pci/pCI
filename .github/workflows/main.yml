@@ -43,16 +43,14 @@ jobs:
           path: ~/openmpi
           key: ${{ runner.os }}-openmpi-cache-v${{ matrix.openmpi.version }}
       
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2.0.2
-        with:
-          cmake-version: '3.13'
-
       - name: Setup Intel oneAPI repository
         run: |
           wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt update
+
+      - name: Install CMake
+        run: sudo apt install cmake
 
       - name: Install Intel oneAPI compilers
         run: sudo apt install intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp
