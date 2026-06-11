@@ -19,6 +19,7 @@ atom:
 
 # Parameters used by basis programs
 basis:
+    method: dirac-fock
     cavity_radius: 5
     diagonalized: False
     orbitals:

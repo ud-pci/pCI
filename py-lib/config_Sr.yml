@@ -23,6 +23,7 @@ atom:
 
 # Parameters used by basis programs
 basis:
+    method: b-splines
     cavity_radius: 70
     diagonalized: True
     orbitals:
