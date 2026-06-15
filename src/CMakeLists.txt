@@ -10,6 +10,9 @@ target_link_libraries(hfd PRIVATE pci_serial)
 add_executable(bass bass.f90)
 target_link_libraries(bass PRIVATE pci_serial)
 
+add_executable(bas_info bas_info.f90)
+target_link_libraries(bas_info PRIVATE pci_serial)
+
 add_executable(add add.f90)
 target_link_libraries(add PRIVATE pci_serial)
 
@@ -19,7 +22,7 @@ target_link_libraries(sort PRIVATE pci_serial)
 add_executable(check_matrices check_matrices.f90)
 target_link_libraries(check_matrices PRIVATE pci_serial)
 
-install(TARGETS hfd bass add sort check_matrices DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS hfd bass bas_info add sort check_matrices DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if (LAPACK_AVAILABLE)
     add_executable(ine ine.f90)
