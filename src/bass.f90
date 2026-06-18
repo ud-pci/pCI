@@ -1,14 +1,14 @@
 Program bass
     Use basc_variables, Kbasparam => Kbas, Qqparam => Qq, letparam => let, Rint2param => Rint2
     Use readfff
-    Use utils, Only : DetermineRecordLength
+    Use utils, Only : DetermineRecordLength, CheckRecordLength
     Implicit None
     
     Integer :: irec, Nsint, Kdg, Ksg, Khf, Kkin, Ierr, Norb, Nsv, ni, iort, i, n, &
                 nlst, nr, nmin, idg, ier_A, n11, n1, j1, n3, j3, n4, j4, n5, j5, l, ii3, Ns3
     Real(dp) :: Sf, Emin, Emax
 
-    Logical :: intrpl, success
+    Logical :: intrpl
     Integer, Dimension(IPs) :: Jj3, Nn3, Ll3
     Integer, Dimension(IPs) :: kw, numw, nb, jjw ! PW
     Integer, Allocatable, Dimension(:) :: Kbas
@@ -31,15 +31,11 @@ Program bass
     R3=0_dp
     V3=0_dp
 
-    Call DetermineRecordLength(Mrec, success)
-    If (.not. success) Then
-        Write(*,*) 'ERROR: record length could not be determined'
-        Stop
-    End If
+    Call DetermineRecordLength(Mrec)
 
     MaxT=9           !### length of expansion at the origin
     kout=1           !### output details
-    irec=2*IP6*Mrec  !### record length in DAT files
+    irec=IP6*Mrec    !### record length in DAT files
     small=1.d-8
     FNAME='BAS_A.DAT'
     Kt1=0            !### used as Kt for Breit integrals
@@ -59,6 +55,7 @@ Program bass
     Nsv=N_orb(n4,ch4,j4) !### last "frozen" orbital
     if (Ns.GT.Nsv) then  !### Orthogonalization of existing orbitals
         open(12,file=FNAME,status='OLD',access='DIRECT',recl=irec)
+        call CheckRecordLength(12, FNAME, irec)
         do ni=Nsv+1,Ns
             call Ort(ni,Ns+Norb,iort)
             if (iort.GE.10) then
@@ -72,9 +69,11 @@ Program bass
     end if
 
     open(12,file=FNAME,status='OLD',access='DIRECT',recl=irec)
+    call CheckRecordLength(12, FNAME, irec)
     if (Norb.GT.0) call Fbas(Norb)  !### forms new orbitals
 
     open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=irec)
+    call CheckRecordLength(13, 'HFD.DAT', irec)
     do ni=1,2*Ns+4
         call ReadF (12,ni,P,Q,2)
         call WriteF(13,ni,P,Q,2)
@@ -167,6 +166,7 @@ Program bass
         nlst=N_orb(n5,ch5,j5) !### last orbital to be kept in the set
         if (nlst.GT.0.AND.nlst.LT.Ns) then
             open(12,file='HFD.DAT',status='OLD',access='DIRECT',recl=irec)
+            call CheckRecordLength(12, 'HFD.DAT', irec)
             open(13,file=FNAME,status='NEW',access='DIRECT',recl=irec)
             call ReadF (12,1,P,Q,2)
             P(2)=nlst
@@ -426,13 +426,14 @@ Contains
         Mj=2*dabs(Jm)+0.01d0
         Qw=0_dp
 
-        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file HFD.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'HFD.DAT', IP6*Mrec)
 
         Call ReadF (12,1,P,Q,2)
         Call ReadF (12,2,R,V,2)
@@ -586,7 +587,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file=FNAME,status='UNKNOWN',access='DIRECT',recl=2*IP6*Mrec)
+        Open(13,file=FNAME,status='UNKNOWN',access='DIRECT',recl=IP6*Mrec)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -618,7 +619,8 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        open(12,file=FNAME,status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+        open(12,file=FNAME,status='OLD',access='DIRECT',recl=IP6*Mrec)
+        call CheckRecordLength(12, FNAME, IP6*Mrec)
         Ecore=0.d0
         Hcore=0.d0
         ih=2-kt
@@ -1458,9 +1460,11 @@ Contains
         sg=0.d0               !### ME of Sigma
         br=0.d0               !### Breit ME
         nx = ns - Nsv + 1     !### parameter for indexation of integrals
-        irec=2*IP6*Mrec
+        irec=IP6*Mrec
         open(12,file=FNAME,status='OLD',access='DIRECT',recl=irec)
+        call CheckRecordLength(12, FNAME, irec)
         open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=irec)
+        call CheckRecordLength(13, 'HFD.DAT', irec)
         call ReadF (12,1,Pa,Qa,2)
         call WriteF(13,1,Pa,Qa,2)   !### now Ecore is written to HFD.DAT
         ih=2-Kt
@@ -1833,7 +1837,7 @@ Contains
         zmax=1.d-2                !### max |H_ik/(E_i-E_k)| gor idg=2
         trd=1.d-8                 !### convergence threshold
         nw=0
-        irec=2*IP6*Mrec
+        irec=IP6*Mrec
         nmin=Nsv+1
         nmin=max(nmin,N_orb(n1,ch1,j1)) !### define diagonalization domain
                                         !### if kdg=0, then energies are
@@ -1842,7 +1846,9 @@ Contains
         call Count_PW(nmin,nw)    !### counting partial waves
   
         open(12,file='HFD.DAT',status='OLD',access='DIRECT',recl=irec)
+        call CheckRecordLength(12, 'HFD.DAT', irec)
         open(13,file=FNAME,status='OLD',access='DIRECT',recl=irec)
+        call CheckRecordLength(13, FNAME, irec)
         do ni=1,2*Ns+4
             call ReadF (12,ni,p,q,2)
             call WriteF (13,ni,p,q,2)
@@ -2525,12 +2531,13 @@ Contains
   
         write(*,*) ' Give file name for additional orbitals: '
         read(*,'(A12)') FNAME3
-        open(16,file=FNAME3,access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        open(16,file=FNAME3,access='DIRECT',status='OLD',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             write( *,*) ' No file ',FNAME3
             write(11,*) ' No file ',FNAME3
             stop
         End If
+        call CheckRecordLength(16, FNAME3, IP6*Mrec)
   
         c1=0.01d0
   

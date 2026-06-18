@@ -164,7 +164,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, err_stat, &
                                        nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
@@ -176,7 +176,7 @@ Contains
         Integer, Dimension(33)      :: nnn, jjj, nqq
         Character(Len=1)            :: Let(9), lll(33)
         Character(Len=512)          :: strfmt, err_msg
-        Logical                     :: longbasis, success
+        Logical                     :: longbasis
 
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
@@ -186,19 +186,16 @@ Contains
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
 
         Read(12,rec=1) p
         Read(12,rec=2) q

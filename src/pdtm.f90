@@ -409,7 +409,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
         ! This subroutine reads the head of the file CONF.DAT
         Implicit None
 
@@ -420,7 +420,7 @@ Contains
         Real(dp), Dimension(4*IP6):: PQ
         Character(Len=1) :: let(6)
         Character(Len=512) :: strfmt
-        logical :: longbasis, success
+        logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
@@ -432,13 +432,10 @@ Contains
         Cl=DPcl
         Mj=2*dabs(Jm)+0.01d0
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open (12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,err=700)
+        Open (12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec,err=700)
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
         Call ReadF(12,1,P,Q,2)
         Call ReadF(12,3,P1,Q1,2)
         Z1  =PQ(1)
@@ -794,7 +791,8 @@ Contains
         Call calcNint
         dn=0.d0
         If (Kl == 1) Write(11,'(4X,"===== RADIAL INTEGRALS =====")')
-        Open(unit=12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+        Open(unit=12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
         If (.not. Allocated(Rnt)) Allocate(Rnt(Nint))
         If (.not. Allocated(Intg)) Allocate(Intg(Nint))
         Nint=0

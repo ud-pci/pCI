@@ -42,7 +42,7 @@ Program pconf
     !   Ne      - number of valence electrons
     !   Nec     - number of core electrons
     !   Ecore   - core energy
-    !   IPmr    - equivalent of 4 Bytes for the DIRECT files
+    !   IPmr    - file storage units per Real(dp) for the DIRECT files
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   main arrays:
     !   Nn(i)   - principal quantum number n (i=1,Ns)
@@ -384,7 +384,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
 
         Implicit None
         Integer  :: ic, n, j, imax, ni, ni2, kkj, llj, nnj, i, nj, nr, nf, &
@@ -395,7 +395,7 @@ Contains
         Integer, Dimension(0:33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
         Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(0:33):: lll, lll1, lll2
-        Logical :: longbasis, success
+        Logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
         Real(dp), Dimension(IPs)  :: Qq1
         Character(Len=256) :: strfmt, err_msg
@@ -418,19 +418,16 @@ Contains
         lll1=''
         lll2=''
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
-        End If
+        End If  
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
 
         Read(12,rec=1) p
         Read(12,rec=2) q

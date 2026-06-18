@@ -1,12 +1,11 @@
 program bas_info         ! this code calculates rms radii and tests the sum rule <a|r|n><n|r|a>=<a|r^2|a>
     use params
     use basc_variables, r2old => r2
-    use utils, only : DetermineRecordLength
+    use utils, only : DetermineRecordLength, CheckRecordLength
 
     implicit none
 
     integer :: iyes, num
-    logical :: success
     real(dp) :: rrc(5,IPs), r2(IPs)
 
     let(1:9) = ['s','p','d','f','g','h','i','k','l']
@@ -70,7 +69,7 @@ contains
         real(dp), parameter :: round_offset = 0.01d0   ! added before int truncation of packed reals
         character(len=12)   :: fname
 
-        call DetermineRecordLength(Mrec, success)
+        call DetermineRecordLength(Mrec)
         MaxT = 9
 
         write(*,*)
@@ -91,11 +90,12 @@ contains
         close(11, status='DELETE')
         open(11, file='BAS_INFO.RES', status='NEW')
 
-        open(12, file=fname, access='DIRECT', status='OLD', recl=2*IP6*Mrec, iostat=ios)
+        open(12, file=fname, access='DIRECT', status='OLD', recl=IP6*Mrec, iostat=ios)
         if (ios /= 0) then
             write(*,*) ' No file ', fname, ' SORRY!'
             stop
         end if
+        call CheckRecordLength(12, fname, IP6*Mrec)
         write(11,*) ' >>>> Basis set from ', fname, ' <<<<'
         write(*,*)  ' Output see in "BAS_INFO.RES" file'
 

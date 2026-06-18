@@ -1,6 +1,6 @@
 Program hfd
     Use params, Ncc => Nc, Nqparams => Nq, Nnparams => Nn, Llparams => Ll, Kkparams => Kk, Jjparams => Jj
-    Use utils, Only : DetermineRecordLength
+    Use utils, Only : DetermineRecordLength, CheckRecordLength
 
     Implicit None
 
@@ -17,7 +17,6 @@ Program hfd
     Real(dp), Allocatable, Dimension(:) :: Qq, Qw, Zat
     Character(Len=1) :: let(5), str(4)*8, str1(2)*5, name(16)
     Character(Len=256) :: strfmt
-    Logical :: success
     
     let(1)='S'
     let(2)='P'
@@ -67,11 +66,7 @@ Program hfd
     M3=0
     
     Call OpenFS('HFD.RES',11,1)
-    Call DetermineRecordLength(Mrec, success)
-    If (.not. success) Then
-        Write(*,*) 'ERROR: record length could not be determined'
-        Stop
-    End If
+    Call DetermineRecordLength(Mrec)
     Call INPUT
 
     eps0=1.d-7         !### eps0 defines covergence criterion
@@ -265,7 +260,7 @@ Contains
         Character*(*) :: fnam
         Character(Len=256) :: strfmt, err_msg
 
-        lrec=2*lr*Mrec
+        lrec=lr*Mrec
         nblo=0
 
         IF (nrec.NE.0) Then
@@ -290,6 +285,7 @@ Contains
                 Write(11,strfmt) nblo,fnam
                 Stop
             End If
+            Call CheckRecordLength(kan, fnam, lrec)
         End If
 
         Return

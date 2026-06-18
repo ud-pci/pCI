@@ -11,7 +11,6 @@ Program pbasc
     Integer :: Norb, nsx, nsx2, lsx
     Integer(kind=int64) :: start_time
     Character(Len=16) :: timeStr
-    Logical :: success
 
     Type(MPI_Datatype) :: mpi_type2_real
 
@@ -103,7 +102,7 @@ Contains
 
     Subroutine Init(Norb)
         Use readfff
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
         Implicit None
         Integer, Intent(Out) :: Norb
 
@@ -128,19 +127,16 @@ Contains
         Mj=2*dabs(Jm)+0.01d0
         Qw=0_dp
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file HFD.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'HFD.DAT', IP6*Mrec)
 
         Call ReadF (12,1,P,Q,2)
         Call ReadF (12,2,R,V,2)
@@ -292,7 +288,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=2*IP6*Mrec)
+        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=IP6*Mrec)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -360,7 +356,8 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
         Ecore=0.d0
         Hcore=0.d0
         Ebcore=0.d0
@@ -922,7 +919,8 @@ Contains
             Continue
         Else
             If (mype == 0) Then
-                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+                Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
                 ih=2-Kt
                 nmin=Nso+1
 
@@ -1159,7 +1157,8 @@ Contains
  
             ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             If (K_is >= 2) Then
-                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+                Call CheckRecordLength(13, 'HFD.DAT', IP6*Mrec)
                 Call Rint_MS(nsx,lsx,num_is)
                 Close(13)
             End If

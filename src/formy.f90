@@ -2,6 +2,7 @@ program formy
     use params
     use determinants, only : Dinit, Jterm
     use str_fmt, only : startTimer, stopTimer, FormattedTime
+    use utils, only : DetermineRecordLength, CheckRecordLength
     use mpi_f08
     implicit none
 
@@ -389,50 +390,16 @@ contains
         Return
     End Subroutine Init_Char
 
-    Subroutine recunit
-        ! This Subroutine determines the record unit
-        Implicit None
-
-        Integer          :: lrec, Iflag, nbytes
-        Character(Len=8) :: d1, t1, d2, t2
-
-        t1='abcdefgh'
-        d1='        '
-        t2='hgfedcba'
-        d2='        '
-        lrec=0
-        Iflag=1
-200     lrec=lrec+1
-        If (lrec.gt.8) Then
-          Write(*,*)  'lrec > 8'
-          Stop
-        End If
-        Open(unit=13,file='test.tmp',status='unknown',access='direct',recl=lrec)
-        Write(13,rec=1,err=210) t1
-        Write(13,rec=2,err=210) t2
-        Read(13,rec=1,err=210) d1
-        Read(13,rec=2,err=210) d2
-        If (d1.ne.t1) goto 210
-        If (d2.ne.t2) goto 210
-        Iflag=0
-210     Close(unit=13,status='delete')
-        If (Iflag.ne.0) goto 200
-        nbytes=8/lrec
-        ipmr=4/nbytes
-
-        Return
-    End Subroutine recunit
-
     Subroutine Input
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
-    
+
         Integer :: i
         character(Len=5), Dimension(5) :: str
         Character(Len=128) :: strfmt
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
-        Call recunit
+        Call DetermineRecordLength(ipmr)
         Call Init_Char(Let,Alet,Blet)
         
         Open(unit=11,status='UNKNOWN',file='FORMY.RES')
@@ -517,13 +484,14 @@ contains
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*IPmr,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*IPmr)
         Read(12,rec=1) p
         Read(12,rec=2) q
         Read(12,rec=5) p1
