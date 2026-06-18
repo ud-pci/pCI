@@ -765,7 +765,8 @@ Contains
         Return
     End Subroutine calcNint
 
-    Subroutine Rint     
+    Subroutine Rint
+        Use utils, Only : CheckRecordLength
         Use wigner
         ! this subroutine calculates radial integrals for one-electron operators
         Implicit None

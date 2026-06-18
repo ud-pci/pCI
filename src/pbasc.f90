@@ -340,6 +340,7 @@ Contains
     End Subroutine Fill_N_l
 
     Subroutine Core
+        Use utils, Only : CheckRecordLength
         Use wigner
         Use readfff
         Use sintg
@@ -850,6 +851,7 @@ Contains
     End Subroutine countNgint
 
     Subroutine Rint(nsx,nsx2,lsx,mype,npes)
+        Use utils, Only : CheckRecordLength
         Use mpi_f08
         Use breit
         Use readfff
