@@ -229,10 +229,10 @@ def get_energy_guess(deg_ion, n, n0, l):
     if l == 's' or l == 'p':
         if deg_ion > 1 and deg_ion < 10:
             energy = initial_guess[l]*((deg_ion*0.8)**2)/(scaling_factor[l]**qn_diff)
-        elif deg_ion > 10:
-            energy = initial_guess[l]*((deg_ion*0.5)**2)/(scaling_factor[l]**qn_diff)
-        elif deg_ion > 20:
+        elif deg_ion >= 20:
             energy = initial_guess[l]*((deg_ion*0.4)**2)/(scaling_factor[l]**qn_diff)
+        elif deg_ion >= 10:
+            energy = initial_guess[l]*((deg_ion*0.5)**2)/(scaling_factor[l]**qn_diff)
     elif l == 'd':
         energy = initial_guess[l]*((deg_ion*0.7)**2)/(scaling_factor[l]**qn_diff)
 
