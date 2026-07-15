@@ -31,6 +31,7 @@ To learn how to use pCI, there are walk-through guides and smaller examples that
    pci/pconf
    pci/pdtm
    pci/pol
+   pci/bas_info
 
 
 .. toctree::
