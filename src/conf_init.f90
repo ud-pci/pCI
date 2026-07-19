@@ -139,7 +139,7 @@ Module conf_init
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat
-        character(len=10) :: key
+        character(len=10) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
         logical :: equals_in_str
@@ -165,30 +165,31 @@ Module conf_init
                 equals_in_str = .false.
             Else
                 index_equals = index(string=line, substring="=")
-                key = line(1:index_equals-1)
+                key = trim(adjustl(line(1:index_equals-1)))
                 val = line(index_equals+1:len(line))
-                
+
                 index_hashtag = index(string=val, substring="#") ! account for comments
                 If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
-                Select Case(key)
-                Case('Kl')
+                key_upper = ToUpperString(key)
+                Select Case(key_upper)
+                Case('KL')
                     ! Kl = 0 - new computation
                     ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
                     ! Kl = 2 - new computation with MBPT
                     ! Kl = 3 - extending computation with new configurations (not implemented yet)
                     ! Kl = 4 - compute minimum memory requirements for pconf
                     Read(val, *) Kl
-                Case('Ksig')
+                Case('KSIG')
                     ! If starting new computation with MBPT
                     ! Ksig = 0 - no MBPT included (same as Kl = 0)
-                    ! Ksig = 1 - include 1-electron MBPT corrections 
+                    ! Ksig = 1 - include 1-electron MBPT corrections
                     ! Ksig = 2 - include 1-electron and 2-electron MBPT corrections
                     Read(val, *) Ksig
-                Case('Kdsig')
+                Case('KDSIG')
                     ! Kdsig = 0 - automatic approximation of the energy dependence of Sigma
                     ! Kdsig = 1 - manually include energy dependence of Sigma
                     Read(val, *) Kdsig
-                Case('Kw')
+                Case('KW')
                     ! Kw determines whether CONF.HIJ will be written or not
                     ! Kw=0 - CONF.HIJ will not be written
                     ! Kw=1 - CONF.HIJ will be written
@@ -198,21 +199,20 @@ Module conf_init
                     ! KLSJ=0 - LSJ will not be written in FINAL.RES
                     ! KLSJ=1 - LSJ will be written FINAL.RES
                     Read(val, *) KLSJ
-                Case('K_sms')
+                Case('K_SMS')
                     ! SMS to include 1-e (1), 2-e (2), or both (3)
                     Read(val, *) K_sms
-                    ! Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
                 Case('KXIJ')
                     ! KXIJ determines the interval in which CONF.XIJ will be written
                     ! e.g. KXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
                     Read(val, *) KXIJ
-                Case('KWeights')
+                Case('KWEIGHTS')
                     ! KWeights determines whether CONF.WGT is written (1) or not (0)
                     Read(val, *) KWeights
-                Case('MaxNd0')
+                Case('MAXND0')
                     ! MaxNd0 determines the size of the initial approximation in determinants
                     Read(val, *) MaxNd0
-                Case('kCSF')
+                Case('KCSF')
                     ! kCSF=0 - use determinant basis; kCSF=1 - use CSF basis
                     Read(val, *) kCSF
                 End Select
