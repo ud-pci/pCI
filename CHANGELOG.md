@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-07-18
+## [1.4.0] - 2026-07-19
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks for scalable large-scale CI
 - matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 → Matrix%row/col throughout
 - matrix_io.f90 - add RedistributeHamCSR subroutine to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row freed after CSR build (row implicit in rowptr)
@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.F90 - three-phase peak tracking (formH, redistribution, Davidson) with GauntLUT memory accounting; parallel estimates labeled as "per rank"
 - pconf.F90, integrals.f90, conf_variables.F90 - optimize FormH: O(1) GauntLUT replacing O(Ngaunt) linear search; eliminate redundant iconf1 recomputation in inner loop (now precomputed once per outer row)
 - pconf.F90 - speed up calcLSJ: row cache for lsj_det, direct Mdc lookup, early-out for zero contributions
+- pconf.F90 - memory accounting: move Nvc/Nc0 from memFormH to memStaticArrays (never freed); unconditionally free Iarr in DeAllocateFormHArrays; inline sizeof(ArrB) in memDvdsn
+- pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
+- pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly during initialization
+- conf_init.f90 - ReadCiIn: normalize keys to uppercase to make ci.in keys case-insensitive
+- matrix_io.f90 - RedistributeHamCSR: guard Deallocate(Hamil%col/row) with Allocated() checks
 - pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 
