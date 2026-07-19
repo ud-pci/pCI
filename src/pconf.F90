@@ -247,11 +247,6 @@ Program pconf
         End If
         If (mype == 0) Then
             Call unsym(ncsf,Nc,nccj)
-            Allocate(Iarr_orig(Ne,Nd))
-            Call Det_List(Iarr_orig)
-            Call reorder_det(Nc, Iarr, Iarr_orig)
-            Call Wdet('CONF.DET')
-            Deallocate(Iarr_orig)
             Call WriteXIJ
         End If
     End If
@@ -280,9 +275,9 @@ Program pconf
 
     ! Call LSJ routines if kLSJ=1
     If (KLSJ == 1) Then
+        Call AllocateLSJArrays(mype)
         If (mype == 0) Call Rdet('CONF.DET')
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call AllocateLSJArrays(mype)
         Call InitLSJ(mype)
         Call lsj(ArrB,xj,xl,xs,mype,npes)
     End If
@@ -983,7 +978,8 @@ Contains
         memStaticArrays = memStaticArrays! + 209700000_int64 ! static "buffer" of 200 MiB 
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
-                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize
+                        + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize &
+                        + sizeof(Nvc)+sizeof(Nc0)
 
     End Subroutine calcMemStaticArrays
 
@@ -991,8 +987,7 @@ Contains
         Implicit None
 
         memFormH = 0_int64
-        memFormH = sizeof(Nvc)+sizeof(Nc0) &
-            + sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
+        memFormH = sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
             + sizeof(IntOrd)
         if (use_bit_rep) memFormH = memFormH + sizeof(Barr)
         If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
@@ -1783,7 +1778,7 @@ Contains
         If (Allocated(I_is)) Deallocate(I_is)
         If (Allocated(IntOrd)) Deallocate(IntOrd)
         If (Allocated(IntOrdS)) Deallocate(IntOrdS)
-        If (kLSJ == 0 .and. kCSF == 0 .and. Allocated(Iarr)) Deallocate(Iarr)
+        If (Allocated(Iarr)) Deallocate(Iarr)
         If (Allocated(Scr)) Deallocate(Scr)
         If (allocated(Barr)) Deallocate(Barr)
         If (Allocated(GauntLUT)) Deallocate(GauntLUT)
@@ -1794,8 +1789,7 @@ Contains
         Use str_fmt, Only : FormattedMemSize
         Implicit None
         Integer :: mpierr, mype, npes, r
-        Character(Len=16) :: memStr, memStr2, memTotStr
-        Integer(Kind=Int64) :: arrb_bytes
+        Character(Len=16) :: memStr, memTotStr
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1846,21 +1840,15 @@ Contains
 
         If (mype==0) Then
             memDvdsn = 0_int64
-            ! ArrB is distributed: each rank holds nd_local*IPlv*type_real bytes.
-            ! Use rank 0's nd_local (largest due to any rounding) for conservative estimate.
-            arrb_bytes = int(nd_local,int64) * int(IPlv,int64) * int(type_real,int64)
-            memDvdsn = arrb_bytes+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
+            memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B1_loc)+sizeof(B2)+sizeof(Z1)+sizeof(E1)+sizeof(Jt) &
                 + sizeof(Diag) &
                 + 2_int64 * int(Nd,int64) * int(type_real,int64)  ! col_in+col_out peak per Mxmpy call
             If (kLSJ == 1) memDvdsn = memDvdsn + sizeof(xj)+sizeof(xl)+sizeof(xs)
             Call FormattedMemSize(memDvdsn, memStr)
-            Call FormattedMemSize(arrb_bytes, memStr2)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' per rank'
-            Write(*,'(A,A,A)') '  (ArrB distributed: ',Trim(memStr2),' each, ~Nd/npes rows per rank)'
-            memEstimate = memEstimate - memFormH + memDvdsn + sizeof(Nvc) + sizeof(Nc0) &
+            memEstimate = memEstimate - memFormH + memDvdsn &
                 - int(Nd,int64) * int(type_real,int64)
-            If (kLSJ /= 0 .or. kCSF /= 0) memEstimate = memEstimate + sizeof(Iarr)
             Call FormattedMemSize(memEstimate, memStr)
             Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' per rank'
             Call FormattedMemSize(memTotalPerCPU, memTotStr)
