@@ -6,12 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### CSF (Configuration State Function) support - in development
-- csf.f90 - new module with formh_sym, hmatrix, F_J2, jbasis_init, reorder_det subroutines for CSF-basis Hamiltonian construction
-- pconf.F90 - kCSF key (ci.in) to select determinant (kCSF=0) or CSF (kCSF=1) basis
-- pconf.F90 - CSF mode: formh_sym builds Hamiltonian in CSF basis; unsym/reorder_det convert back to determinants after diagonalization
-- conf_variables.F90 - CSF variables (nconf_neq, atom, ndcs, mdc, mdcs, idt, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf)
-- davidson.f90 - skip J^2 averaging in CSF mode (Jm is exact)
+## [1.4.0] - 2026-07-18
+- pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks for scalable large-scale CI
+- matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 → Matrix%row/col throughout
+- matrix_io.f90 - add RedistributeHamCSR subroutine to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row freed after CSR build (row implicit in rowptr)
+- davidson.f90 - ArrB, Diag, B2 distributed across ranks; B1 split into replicated B1(Nd0) and local B1_loc(nd_local); AvgDiag and Hmin AllReduce run on all ranks; batch AllReduces; DGEMM/DGEMV for Mxmpy; DiagInitApprox switched to DSYEVD
+- pconf.F90 - three-phase peak tracking (formH, redistribution, Davidson) with GauntLUT memory accounting; parallel estimates labeled as "per rank"
+- pconf.F90, integrals.f90, conf_variables.F90 - optimize FormH: O(1) GauntLUT replacing O(Ngaunt) linear search; eliminate redundant iconf1 recomputation in inner loop (now precomputed once per outer row)
+- pconf.F90 - speed up calcLSJ: row cache for lsj_det, direct Mdc lookup, early-out for zero contributions
+- pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
+- CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
+
+## [1.3.0] - 2026-05-15
+- pconf v8.0 - CSF (Configuration State Function) support: Hamiltonian built and diagonalized in CSF basis; kCSF key (ci.in) selects determinant (0) or CSF (1) basis
+- csf.f90 - new module with formh_sym, hmatrix, F_J2, jbasis_init, reorder_det for CSF-basis Hamiltonian construction and eigenvector back-transformation to determinants
+- conf_variables.F90 - CSF variables: nconf_neq, ndcs, mdc, mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
+- davidson.f90 - J^2 averaging skipped in CSF mode (Jm exact); DSYEVD for J^2 matrices below ScaLAPACK threshold
+- pconf.F90 - Kl=4 memory estimation before FormH; bitstring comparison in FormH calculation stage; FORCE_BIT_DET/FORCE_INT_DET environment variables; CONFSTR.RES written only when kLSJ=1
+- conf_init.f90 - case-insensitive configuration key parsing
+- bas_info - new program for basis set information
+- pbasc - fix NaN in Breit_Core for light atoms; AllReduce entire Ro array
+- matrix_io.f90 - INQUIRE for record length detection; CheckRecordLength for DIRECT access files
+- CMakeLists.txt - refactored build system: MPI and LAPACK optional; removed redundant flags
+- removed deprecated files and IPbr dependence
 
 ## [1.2.0] - 2025-03-24
 - pconf v7.0 - implemented bit representation for determinant comparisons (initial version uses both bitstring and integer representation for faster computations)

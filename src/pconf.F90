@@ -60,9 +60,10 @@ Program pconf
     Use csf, Only : jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det
     use determinants, only : Wdet, calcNd0, Dinit, Det_Number, Det_List, Jterm, Rdet, bits_per_int, &
                             Barr, FormBarr, convert_int_rep_to_bit_rep, num_ints_bit_rep
-    Use integrals, only : Rint
+    Use integrals, only : Rint, BuildGauntLUT
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
+    Use matrix_io, Only : RedistributeHamCSR
     Use env_var
 
     Implicit None
@@ -179,9 +180,8 @@ Program pconf
             Else
                 use_bit_rep = .false.
                 if (Ne < num_ints_bit_rep) Then
-                    Write(memStr1, *) Ne
-                    Write(memStr2, *) num_ints_bit_rep
-                    print*, 'bitstring determinants not used: Ne < num_ints_bit_rep: ', Trim(memStr1), ' < ', Trim(memStr2)
+                    Write(*,'(A,I0,A,I0)') 'bitstring determinants not used: Ne < num_ints_bit_rep: ', &
+                        Ne, ' < ', num_ints_bit_rep
                 End If
                 if (.not. mem_check_passed) Then
                     Call FormattedMemSize(mem_int, memStr1)
@@ -208,15 +208,19 @@ Program pconf
     If (mype == 0) Call calcMemReqs
 
     If (kCSF > 0) Then
-        ! Formation of symmetrized Hamiltonian matrix
+        ! Formation of symmetrized Hamiltonian matrix (CSF basis, size ncsf x ncsf)
         Call formh_sym(Nc,ncsf,nccj,max_ndcs,mype,npes)
+        ! Redistribute by row so Mxmpy can use CSR SpMV.
+        Call RedistributeHamCSR(npes, mype, mpi_type_real)
     Else
         ! Formation of Hamiltonian matrix
         Call FormH(npes,mype)
 
-        ! Formation of J^2 matrix
-        Call FormJ(mype, npes)   
+        ! Redistribute Hamiltonian by row and build CSR for efficient SpMV.
+        Call RedistributeHamCSR(npes, mype, mpi_type_real)
 
+        ! Formation of J^2 matrix
+        Call FormJ(mype, npes)
     End If
 
     ! Deallocate arrays that are no longer used in FormH
@@ -226,7 +230,7 @@ Program pconf
     Call AllocateDvdsnArrays(mype)
     
     ! Davidson diagonalization
-    Call Diag4(mype,npes) 
+    Call Diag4(mype,npes)
 
     ! Print table of final energies
     If (kCSF > 0) Then
@@ -250,6 +254,28 @@ Program pconf
             Deallocate(Iarr_orig)
             Call WriteXIJ
         End If
+    End If
+
+    ! If ArrB is still distributed (kCSF==0 path skipped the reallocation above),
+    ! gather all Nlv eigenvector columns from distributed (nd_local,IPlv) to
+    ! full-size (Nd,Nlv) on all ranks so LSJ and PrintWeights can access them.
+    If (Allocated(ArrB) .and. size(ArrB, 1) /= Nd) Then
+        Block
+            Real(type_real), Allocatable :: tmp(:,:)
+            Integer :: jj, mpierr2
+            Allocate(tmp(Nd, Nlv))
+            tmp = 0_type_real
+            Do jj = 1, Nlv
+                tmp(nd_start+1:nd_end, jj) = ArrB(1:nd_local, jj)
+                Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, tmp(:,jj), &
+                                    nd_counts_all, nd_displs_all, mpi_type_real, &
+                                    MPI_COMM_WORLD, mpierr2)
+            End Do
+            Deallocate(ArrB)
+            Allocate(ArrB(Nd, Nlv))
+            ArrB = tmp
+            Deallocate(tmp)
+        End Block
     End If
 
     ! Call LSJ routines if kLSJ=1
@@ -287,7 +313,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '8.0'
+        version = '9.0'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -350,6 +376,11 @@ Contains
         ! If Kv = 3, then K_prj = 1 - use selection of states with projection of J
         ! If Kv = 4, then K_prj = 0 - no selection of states with projection of J
         If (Kv == 3) Then
+            If (kCSF > 0) Then
+                Write(*,'(A)') 'ERROR: Kv=3 (J-projection) is not compatible with kCSF>0. ' // &
+                               'CSFs already have definite J; FormJ/Jsq are not built for kCSF runs. Use Kv=4.'
+                Stop
+            End If
             K_prj=1
             Write( *,'(4X,"Selection of states with J =",F5.1)') XJ_av
             Write(11,'(4X,"Selection of states with J =",F5.1)') XJ_av
@@ -983,8 +1014,8 @@ Contains
     
         Call calcMemStaticArrays
         Call FormattedMemSize(memStaticArrays, memStr)
-        Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ',Trim(memStr), &
-                            ' of memory per core. (These will not be deallocated)' 
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating static arrays will require at least ', &
+                            Trim(memStr), ' per rank'
 
         Call calcMemFormHArrays
         If (kCSF > 0) Then
@@ -992,29 +1023,34 @@ Contains
         Else
             Call FormattedMemSize(memFormH, memStr)
         End If
-        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ',Trim(memStr), &
-                            ' of memory per core'
+        Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for FormH will require at least ', &
+                            Trim(memStr), ' per rank'
         
         memEstimate = memFormH + memStaticArrays
     
-        mem = bytesReal * Nd * IPlv        & ! ArrB
+        ! ArrB, B2, B1_loc distributed: each rank holds ~Nd/npes rows.
+        mem = bytesReal * (Nd/npes) * IPlv & ! ArrB (distributed ~Nd/npes rows per rank)
             + bytesReal * Nlv * 2_int64    & ! Tk,Tj
             + bytesReal * IPlv * IPlv      & ! P
             + bytesReal * IPlv * 2_int64   & ! D,E
-            + bytesReal * Nd * 2_int64     & ! B1,B2
+            + bytesReal * Nd0              & ! B1(Nd0): Z1 accumulator
+            + bytesReal * (Nd/npes)        & ! B1_loc(nd_local): local preconditioner rows
+            + bytesReal * (Nd/npes)        & ! B2 (distributed: nd_local rows only)
             + bytesReal * Nd0 * Nd0        & ! Z1
-            + bytesReal * Nd0                ! E1
-    
+            + bytesReal * Nd0              & ! E1
+            + bytesReal * Nd * 2_int64     & ! col_in,col_out peak during each Mxmpy call
+            + 4_int64 * int(Njd, int64)      ! Jt(Njd) integer array
+
         memDvdsn = mem
         Call FormattedMemSize(mem, memStr)
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
-                            Trim(memStr),' of memory per core' 
-        
+                            Trim(memStr),' per rank'
+
         If (Kl == 4) Then
             mem = memEstimate + memDvdsn
             Call FormattedMemSize(mem, memStr)
             Write(*,'(A,A,A)') 'calcMemReqs: Total memory required WITHOUT accounting for H and J^2 matrices is ', &
-                            Trim(memStr),' of memory per core'
+                            Trim(memStr),' per rank'
             Return
         End If
     
@@ -1022,7 +1058,7 @@ Contains
         If (memTotalPerCPU == 0) Then
             Write(*,'(A)') 'calcMemReqs: Available memory was not saved to the environment.'
         Else
-            Write(*,'(A,A,A)') 'calcMemReqs: Total memory available to the job is ',Trim(memStr),' of memory per core' 
+            Write(*,'(A,A,A)') 'calcMemReqs: Total memory available to the job is ', Trim(memStr),' per rank'
         End If
         Return
     End Subroutine calcMemReqs
@@ -1125,13 +1161,15 @@ Contains
             Call MPI_Bcast(IntOrdS, Nx*Nx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Return
+
+        Call BuildGauntLUT
+        memFormH = memFormH + sizeof(GauntLUT)
     End subroutine InitFormH
 
     Subroutine FormH(npes, mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize, FormattedTime
-        Use determinants, Only : calcNd0, Gdet, CompCD, Rspq_phase1, Rspq_phase2, &
+        Use determinants, Only : calcNd0, Gdet, CompD, Rspq_phase1, Rspq_phase2, &
                                     bits_per_int, bdet1, bdet2, Barr, print_bits, &
                                     convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, &
                                     compare_bit_dets, get_det_indexes
@@ -1148,8 +1186,10 @@ Contains
         Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
-        Integer(Kind=int64) :: statmem, statmem_copy, mem, maxmem, counter1, counter2, counter3
-        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, counterStr2, timeStr
+        Integer(Kind=int64) :: statmem, statmem_copy, mem, maxmem, maxmem_csr
+        Integer(Kind=int64) :: peak_formH, peak_redist, peak_dvdsn, counter1, counter2, counter3
+        Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memStr6, memStr7, &
+                                 memTotStr, memTotStr2, counterStr, counterStr2, timeStr
         Integer :: iSign, iIndexes(3), jIndexes(3), nnd
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
@@ -1184,7 +1224,7 @@ Contains
         ! If Hamiltonian has already been fully constructed
         If (Kl == 1) Then 
             ! Read the Hamiltonian from file CONFp.HIJ
-            Call ReadMatrix(Hamil%ind1,Hamil%ind2,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
+            Call ReadMatrix(Hamil%row,Hamil%col,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
             numzero = Count(Hamil%val(1:ih4) == 0)
 
             ! Add maximum memory per core from storing H to total memory count
@@ -1252,13 +1292,15 @@ Contains
                     Call startTimer(s1)
                     Do n = Nd_prev+1, Nd
                         Call Gdet(n,idet1)
+                        iconf1(1:Ne) = Nh(idet1(1:Ne))
                         k=0
                         Do ic=1,Nc
                             kx=Ndc(ic)
                             If (k+kx > n) kx=n-k
                             If (kx /= 0) Then
                                 Call Gdet(k+1,idet2)
-                                Call CompCD(idet1,idet2,icomp)
+                                iconf2(1:Ne) = Nh(idet2(1:Ne))
+                                Call CompD(iconf1,iconf2,icomp)
                                 If (icomp > 2) Then
                                     k=k+kx
                                 Else
@@ -1316,12 +1358,15 @@ Contains
                     NumH = cntarray(1)
                     maxme = cntarray(2)
                     mem = NumH * (8_int64+type_real)
-                    maxmem = maxme * (8_int64+type_real)
-                    statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
-                    statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
+                    maxmem     = maxme * (8_int64 + int(type_real, int64))   ! COO 16B (row+col+val)
+                    maxmem_csr = maxme * (4_int64 + int(type_real, int64))   ! CSR 12B (col+val)
+                    peak_formH  = memStaticArrays + memFormH + maxmem
+                    peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                    peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
+                    statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
                     memEstimate = memEstimate + maxmem
                     Call FormattedMemSize(NumH*(8_int64+type_real), memStr3)
-                    Call FormattedMemSize(maxmem, memStr2)
+                    Call FormattedMemSize(maxmem_csr, memStr2)
                     Call FormattedMemSize(memStaticArrays, memStr4)
                     Call FormattedMemSize(memDvdsn, memStr5)
                     mem = statmem
@@ -1333,7 +1378,7 @@ Contains
                                                 Trim(AdjustL(counterStr)) // ' elements'
                     Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
                                         trim(memStr2)//')'
-                    Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                    Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) &
                                         // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
                     If (memTotalPerCPU /= 0) Then
                         If (statmem > memTotalPerCPU) Then
@@ -1357,13 +1402,15 @@ Contains
 
                     n=Nd_prev+1
                     Call Gdet(n,idet1)
+                    iconf1(1:Ne) = Nh(idet1(1:Ne))
                     k=0
                     Do ic=1,Nc
                         kx=Ndc(ic)
                         If (k+kx > n) kx=n-k
                         If (kx /= 0) Then
                             Call Gdet(k+1,idet2)
-                            Call CompCD(idet1,idet2,icomp)
+                            iconf2(1:Ne) = Nh(idet2(1:Ne))
+                            Call CompD(iconf1,iconf2,icomp)
                             If (icomp > 2) Then
                                 k=k+kx
                             Else
@@ -1436,7 +1483,7 @@ Contains
                             Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
                                                 trim(memStr2)//')'
                             If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
                                                         Trim(memTotStr2) ,' is available.'
                                 Stop
                             End If
@@ -1446,35 +1493,39 @@ Contains
 
                         If (num_done == npes-1) Then
                             Call stopTimer(s1, timeStr)
-                            Call FormattedMemSize(mem, memStr)
-                            Call FormattedMemSize(maxmem, memStr2)
-                            Call FormattedMemSize(NumH*(8+type_real), memStr3)
-                            Call FormattedMemSize(memStaticArrays, memStr4)
-                            Call FormattedMemSize(memDvdsn, memStr5)
-                            statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
-                            statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
+                            maxmem     = maxme * (8_int64 + int(type_real, int64))
+                            maxmem_csr = maxme * (4_int64 + int(type_real, int64))
+                            peak_formH  = memStaticArrays + memFormH + maxmem
+                            peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                            peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
+                            statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
                             memEstimate = memEstimate + maxmem
                             mem = statmem
                             Write(counterStr,fmt='(I16)') NumH
+                            Call FormattedMemSize(NumH*(8+type_real), memStr3)
+                            Call FormattedMemSize(maxmem, memStr2)
+                            Call FormattedMemSize(memStaticArrays, memStr4)
+                            Call FormattedMemSize(memDvdsn, memStr5)
                             Call FormattedMemSize(mem, memStr)
                             Call FormattedMemSize(statmem, memTotStr)
                             Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
                                                         Trim(AdjustL(counterStr)) // ' elements'
                             Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
                                                 trim(memStr2)//')'
-                            Write(*,'(A)') 'SUMMARY - (total = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                            Call FormattedMemSize(maxmem_csr, memStr2)
+                            Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) & 
                                                 // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
                             If (memTotalPerCPU /= 0) Then
                                 If (statmem > memTotalPerCPU) Then
-                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
                                                             Trim(memTotStr2) ,' is available.'
                                     Stop
                                 Else If (statmem < memTotalPerCPU) Then
-                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , &
+                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, and ' , &
                                                             Trim(memTotStr2) ,' is available.'
                                 End If
                             Else
-                                Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, &
+                                Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, &
                                                             but available memory was not saved to environment'
                             End If
                             Exit
@@ -1497,13 +1548,15 @@ Contains
                         Do n=nnd,endnd
                             Call Gdet(n,idet1)
                             If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
+                            iconf1(1:Ne) = Nh(idet1(1:Ne))
                             k=0
-                            Do ic=1,Nc 
+                            Do ic=1,Nc
                                 kx=Ndc(ic)
                                 If (k+kx > n) kx=n-k
                                 If (kx /= 0) Then
                                     Call Gdet(k+1,idet2)
-                                    Call CompCD(idet1,idet2,icomp)
+                                    iconf2(1:Ne) = Nh(idet2(1:Ne))
+                                    Call CompD(iconf1,iconf2,icomp)
                                     If (icomp > 2) Then
                                         k=k+kx
                                     Else
@@ -1534,9 +1587,9 @@ Contains
                 End Do
             End If
 
-            Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
+            Call IVAccumulatorCopy(iva1, Hamil%row, counter1)
             Call IVAccumulatorReset(iva1)
-            Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
+            Call IVAccumulatorCopy(iva2, Hamil%col, counter2)
             Call IVAccumulatorReset(iva2)
             If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
             If (mype == 0) Call RVAccumulatorReset(rva1)
@@ -1558,8 +1611,8 @@ Contains
                 Call startTimer(s2)
                 If (Kl == 3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
                 Do n8=ih4+1,counter1
-                    nn=Hamil%ind1(n8)
-                    kk=Hamil%ind2(n8)
+                    nn=Hamil%row(n8)
+                    kk=Hamil%col(n8)
                     
                     If (use_bit_rep) Then
                         bdet1 = Barr(1:num_ints_bit_rep, nn)
@@ -1606,8 +1659,9 @@ Contains
         ! Write Hamiltonian to file CONFp.HIJ
         If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
-        ! give all cores Hmin, the minimum matrix element value
-        Call MPI_AllReduce(Hamil%val(1:ih8), Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        ! give all cores Hmin, the minimum matrix element value (local min first, then global reduce)
+        Hamil%minval = minval(Hamil%val(1:ih8))
+        Call MPI_AllReduce(MPI_IN_PLACE, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype == 0) Then
             ! Write number of non-zero matrix elements
@@ -1706,7 +1760,7 @@ Contains
         
         If (mype==0) Then
             Call FormattedMemSize(memFormH, memStr)
-            Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' of memory per core from arrays for FormH'  
+            Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' per rank from arrays for FormH'
         End If
     
         !If (Allocated(Nvc)) Deallocate(Nvc)
@@ -1732,26 +1786,52 @@ Contains
         If (kLSJ == 0 .and. kCSF == 0 .and. Allocated(Iarr)) Deallocate(Iarr)
         If (Allocated(Scr)) Deallocate(Scr)
         If (allocated(Barr)) Deallocate(Barr)
-
+        If (Allocated(GauntLUT)) Deallocate(GauntLUT)
     End Subroutine DeAllocateFormHArrays
 
     Subroutine AllocateDvdsnArrays(mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
         Implicit None
-        Integer :: mpierr, mype
-        Character(Len=16) :: memStr, memTotStr
+        Integer :: mpierr, mype, npes, r
+        Character(Len=16) :: memStr, memStr2, memTotStr
+        Integer(Kind=Int64) :: arrb_bytes
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,IPlv))
+        Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
+
+        ! Distribute ArrB evenly: each rank owns rows nd_start+1...nd_end (its Hamil CSR range).
+        ! All ranks allocate their local slice.
+        nd_local = nd_end - nd_start
+
+        ! Shrink Diag from Nd to nd_local: Davidson only needs the preconditioner diagonal for owned rows.
+        If (Allocated(Diag)) Then
+            Block
+                Real(type_real), Allocatable :: dtmp(:)
+                Allocate(dtmp(nd_local))
+                dtmp(:) = Diag(nd_start+1:nd_end)
+                Deallocate(Diag)
+                Call Move_Alloc(dtmp, Diag)
+            End Block
+        End If
+        If (.not. Allocated(nd_counts_all)) Allocate(nd_counts_all(0:npes-1))
+        If (.not. Allocated(nd_displs_all)) Allocate(nd_displs_all(0:npes-1))
+        Call MPI_Allgather(nd_local, 1, MPI_INTEGER, nd_counts_all, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
+        nd_displs_all(0) = 0
+        Do r = 1, npes-1
+            nd_displs_all(r) = nd_displs_all(r-1) + nd_counts_all(r-1)
+        End Do
+
+        If (.not. Allocated(ArrB)) Allocate(ArrB(nd_local, IPlv))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
         If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
         If (.not. Allocated(E)) Allocate(E(2*Nlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(Nlv))
-        If (.not. Allocated(B1)) Allocate(B1(Nd))
-        If (.not. Allocated(B2)) Allocate(B2(Nd))
+        If (.not. Allocated(B1)) Allocate(B1(Nd0))
+        If (.not. Allocated(B1_loc)) Allocate(B1_loc(nd_local))
+        If (.not. Allocated(B2)) Allocate(B2(nd_local))
         If (.not. Allocated(Z1)) Allocate(Z1(Nd0,Nd0))
         If (.not. Allocated(E1)) Allocate(E1(Nd0))
         If (.not. Allocated(Jt)) Allocate(Jt(Njd))
@@ -1766,13 +1846,23 @@ Contains
 
         If (mype==0) Then
             memDvdsn = 0_int64
-            memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
-                + sizeof(Iconverge)+sizeof(B1)+sizeof(B2)+sizeof(Z1)+sizeof(E1)
+            ! ArrB is distributed: each rank holds nd_local*IPlv*type_real bytes.
+            ! Use rank 0's nd_local (largest due to any rounding) for conservative estimate.
+            arrb_bytes = int(nd_local,int64) * int(IPlv,int64) * int(type_real,int64)
+            memDvdsn = arrb_bytes+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
+                + sizeof(Iconverge)+sizeof(B1)+sizeof(B1_loc)+sizeof(B2)+sizeof(Z1)+sizeof(E1)+sizeof(Jt) &
+                + sizeof(Diag) &
+                + 2_int64 * int(Nd,int64) * int(type_real,int64)  ! col_in+col_out peak per Mxmpy call
+            If (kLSJ == 1) memDvdsn = memDvdsn + sizeof(xj)+sizeof(xl)+sizeof(xs)
             Call FormattedMemSize(memDvdsn, memStr)
-            Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' of memory per core'  
-            memEstimate = memEstimate - memFormH + memDvdsn
+            Call FormattedMemSize(arrb_bytes, memStr2)
+            Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' per rank'
+            Write(*,'(A,A,A)') '  (ArrB distributed: ',Trim(memStr2),' each, ~Nd/npes rows per rank)'
+            memEstimate = memEstimate - memFormH + memDvdsn + sizeof(Nvc) + sizeof(Nc0) &
+                - int(Nd,int64) * int(type_real,int64)
+            If (kLSJ /= 0 .or. kCSF /= 0) memEstimate = memEstimate + sizeof(Iarr)
             Call FormattedMemSize(memEstimate, memStr)
-            Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' of memory per core' 
+            Write(*,'(A,A,A)') 'Total memory estimate for Davidson procedure is ',Trim(memStr),' per rank'
             Call FormattedMemSize(memTotalPerCPU, memTotStr)
             If (memTotalPerCPU /= 0) Then
                 If (memEstimate > memTotalPerCPU) Then
@@ -1787,7 +1877,7 @@ Contains
                 Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memStr), ' is required to finish conf, &
                                             but available memory was not saved to environment'
             End If
-        End If   
+        End If
 
     End Subroutine AllocateDvdsnArrays
 
@@ -1798,7 +1888,7 @@ Contains
 
         Implicit None
 
-        External :: SSYEV, DSYEV
+        External :: SSYEVD, DSYEVD
 #ifdef USE_SCALAPACK
         External :: INFOG2L, PDELGET, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, BLACS_GRIDEXIT, &
                     BLACS_EXIT, NUMROC, DESCINIT, PDELSET, PDSYEVD, PSSYEVD, PSELSET
@@ -1834,7 +1924,7 @@ Contains
         ! Start timer for initial diagonalization
         Call startTimer(s1)
 
-        ! If running in serial or size of initial approximation is below threshold, use DSYEV
+        ! If running in serial or size of initial approximation is below threshold, use DSYEVD
         If (.not. shouldForceScalapack .and. (npes == 1 .or. Nd0 <= scalapackThreshold .or. shouldForceSerial)) Then
             If (mype==0) Then
                 If (npes==1 .or. shouldForceSerial) Then
@@ -1845,21 +1935,22 @@ Contains
             End If
             Select Case(type_real)
             Case(sp)
-                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                Call SSYEVD('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,itmp,-1,ifail)
             Case(dp)
-                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,ifail)
+                Call DSYEVD('V','U',Nd0,Z1,Nd0,E1,realtmp,-1,itmp,-1,ifail)
             End Select
             lwork = Nint(realtmp(1))
-            Allocate(W(lwork))
-            If (mype==0 .and. isVerbose) Write(*,"(A,I12)") "DiagInitApprox: Work array allocated, real=", lwork
+            LIWORK = itmp(1)
+            Allocate(W(lwork), IWORK(LIWORK))
+            If (mype==0 .and. isVerbose) Write(*,"(A,I12,A,I12)") "DiagInitApprox: Work arrays allocated, real=", lwork, ", integer=", LIWORK
             Select Case(type_real)
             Case(sp)
-                Call SSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                Call SSYEVD('V','U',Nd0,Z1,Nd0,E1,W,lwork,IWORK,LIWORK,ifail)
             Case(dp)
-                Call DSYEV('V','U',Nd0,Z1,Nd0,E1,W,lwork,ifail)
+                Call DSYEVD('V','U',Nd0,Z1,Nd0,E1,W,lwork,IWORK,LIWORK,ifail)
             End Select
             If (mype==0 .and. isVerbose) Write(*,"(A)") "DiagInitApprox: Eigenvalues and -vectors calculated"
-            Deallocate(W)
+            Deallocate(W, IWORK)
         Else
 #ifdef USE_SCALAPACK
             If (mype==0) Write(*,"(A,I5,A)") "DiagInitApprox: ScaLAPACK used, will distribute across ", npes, " cpus"
@@ -1974,9 +2065,10 @@ Contains
         Implicit None
         External :: DSYEV, SSYEV
 
-        Integer  :: k1, k, i, n1, kx, i1, it, mype, npes, mpierr, ifail, lwork
+        Integer  :: k1, k, i, n, n1, kx, i1, it, mype, npes, mpierr, ifail, lwork
         Real(kind=type_real), Dimension(4) :: realtmp
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
+        Real(type_real), Allocatable :: col(:), col_pwdvdsn(:,:)
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax
         Real(dp) :: cnx
@@ -2004,192 +2096,198 @@ Contains
         ! Construct initial approximation from Hamiltonian matrix
         Call Init4(mype, mpi_type_real)
 
-        ! Diagonalize the initial approximation 
+        ! Diagonalize the initial approximation
         Call DiagInitApprox(mype, npes)
 
         ! Write initial approximation to file CONF.XIJ
         Call FormB0(mype, mpi_type_real)
         
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
-        If (mype == 0) Then
-            n1 = 2*Nlv
-            Select Case(type_real)
-            Case(sp)
-                Call SSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
-            Case(dp)
-                Call DSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
-            End Select
-            lwork = Nint(realtmp(1))
-            Allocate(W(lwork))
-        End If
+        n1 = 2*Nlv
+        Select Case(type_real)
+        Case(sp)
+            Call SSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
+        Case(dp)
+            Call DSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
+        End Select
+        lwork = Nint(realtmp(1))
+        Allocate(W(lwork))
 
         ! Davidson loop:
         kdavidson = 0
         If (mype==0) Write(*,*) 'Start with kdavidson =', kdavidson
 
         Do it=1,N_it
-            If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' ==========' 
-            ! Compare lowest admixture of an unconverged vector to convergence criteria
+            If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' =========='
             If (ax > crit) Then
                 If (mype == 0) Then
                     strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
                     Write( 6,strfmt) it,Nlv
                     Write(11,strfmt) it,Nlv
                 End if
+
                 ! Orthonormalization of Nlv probe vectors
+                Call startTimer(s1)
+                Do i=1,Nlv
+                    Call Ortn(i, ifail, mpi_type_real, mype)
+                    If (ifail /= 0) Then
+                        If (mype==0) Write(*,*)' Fail of orthogonalization for ',i
+                        Stop
+                    End If
+                End Do
                 If (mype==0) Then
-                    Call startTimer(s1)
-                    Do i=1,Nlv
-                        Call Ortn(i,ifail)
-                        If (ifail /= 0) Then
-                            Write(*,*)' Fail of orthogonalization for ',i
-                            Stop
-                        End If
-                    End Do
                     Call stopTimer(s1, timeStr)
                     Write(77,*) 'Orthonormalization of Nlv probe vectors took ' // timeStr
                     Call startTimer(s1)
                 End If
 
-                ! Formation of the left-upper block of the energy matrix P
+                ! Mxmpy1 + FormP1
                 Call Mxmpy(1, mpi_type_real, mype)
-                If (mype==0) Then 
+                Call FormP(1, vmax, mpi_type_real)
+                If (it == 1 .and. K_prj == 1) Call AvgDiag(mpi_type_real, mype)
+                If (mype==0) Then
                     Call stopTimer(s1, timeStr)
-                    Write(77,*) 'Mxmpy1 took ' // timeStr
-                    Call startTimer(s1)
-                    Call FormP(1, vmax)
+                    Write(77,*) 'Mxmpy1+FormP1 took ' // timeStr
+                End If
+
+                ! Formation of Nlv additional probe vectors
+                Call startTimer(s1)
+                cnx=0.d0
+                Do i=1,Nlv
+                    i1=i+Nlv
+                    Call Dvdsn(i, cnx, mpi_type_real, mype)
+                    If (Iconverge(i)==0) Then
+                        Call Ortn(i1, ifail, mpi_type_real, mype)
+                        If (ifail /= 0) Then
+                            If (mype==0) Write(*,*)' Fail of orthogonalization for ',i1
+                            Stop
+                        End If
+                    End If
+                End Do
+                If (mype==0) Then
                     Call stopTimer(s1, timeStr)
-                    Write(77,*) 'FormP1 took ' // timeStr
-                    ! Average initial diagonal over relativistic configurations if projecting J
-                    If (it == 1 .and. K_prj == 1) Call AvgDiag
-                    
-                    ! Formation of Nlv additional probe vectors
+                    Write(77,*) 'Formation of Nlv additional probe vectors took ' // timeStr
+                End If
+
+                If (K_prj == 1) Then
+                    Call Prj_J(Nlv+1, Nlv, 2*Nlv+1, 1.d-5, mpi_type_real, mype)
                     Call startTimer(s1)
-                    cnx=0.d0
-                    Do i=1,Nlv
-                        i1=i+Nlv
-                        Call Dvdsn(i,cnx)
-                        If (Iconverge(i)==0) Then
-                            Call Ortn(i1,ifail)
+                    Do i=Nlv+1, 2*Nlv
+                        If (Iconverge(i-Nlv)==0) Then
+                            Call Ortn(i, ifail, mpi_type_real, mype)
                             If (ifail /= 0) Then
-                                Write(*,*)' Fail of orthogonalization for ',i1
-                                Stop
+                                If (mype==0) Write(*,*)' Fail of orthogonalization 2 for ',i1
+                                If (kdavidson==1) Then
+                                    Stop
+                                Else
+                                    kdavidson=1
+                                    If (mype==0) Write(*,*) ' change kdavidson to ', kdavidson
+                                    ifail=0
+                                    Exit
+                                End If
                             End If
                         End If
                     End Do
-                    Call stopTimer(s1, timeStr)
-                    Write(77,*) 'Formation of Nlv additional probe vectors took' // timeStr
-                End If
-                
-                If (K_prj == 1) Then
-                    Call Prj_J(Nlv+1,Nlv,2*Nlv+1,1.d-5,mpi_type_real, mype)
-                    If (mype == 0) Then
-                        Call startTimer(s1)
-                        Do i=Nlv+1,2*Nlv
-                            If (Iconverge(i-Nlv)==0) Then
-                                Call Ortn(i,ifail)
-                                If (ifail /= 0) Then
-                                    If (mype == 0) Write(*,*)' Fail of orthogonalization 2 for ',i1
-                                    If (kdavidson==1) Then
-                                        Stop
-                                    Else
-                                        kdavidson=1
-                                        If (mype == 0) Write(*,*) ' change kdavidson to ', kdavidson
-                                        ifail=0
-                                        Exit
-                                    End If
-                                End If
-                            End If
-                        End Do
+                    If (mype==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(77,*) 'Orthogonalization of Nlv additional probe vectors took ' // timeStr
                     End If
                 End If
-                
-                Call MPI_Bcast(cnx, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+
                 If (cnx > Crt4) Then
-                    ! Formation of other three blocks of the matrix P:
+                    ! Mxmpy2 + FormP2
                     Call startTimer(s1)
                     Call Mxmpy(2, mpi_type_real, mype)
+                    Call FormP(2, vmax, mpi_type_real)
                     If (mype==0) Then
                         Call stopTimer(s1, timeStr)
-                        Write(77,*) 'Mxmpy2 took ' // timeStr
-                        Call startTimer(s1)
-                        Call FormP(2, vmax)
-                        Call stopTimer(s1, timeStr)
-                        Write(77,*) 'FormP2 took ' // timeStr
-
-                        ! Evaluation of Nlv eigenvectors:
-                        Call startTimer(s1)
-                        Select Case(type_real)
-                        Case(sp)
-                            Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-                        Case(dp)
-                            Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-                        End Select
-                        Call stopTimer(s1, timeStr)
-                        Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
-                        
-                        ax=0.d0
-                        vmax=-1.d10
-                        Do i=1,Nlv
-                            xx=0.d0
-                            Do k=1,Nlv
-                                k1=k+Nlv
-                                x=dabs(P(k1,i))
-                                If (xx <= x) Then
-                                    xx=x
-                                    kx=k
-                                End If
-                            End Do
-                            If (ax < xx) ax=xx
-                            If (vmax < E(i)) vmax=E(i)
-                            strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
-                            Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
-                            Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
-                            ax_array(i) = xx
-                        End Do
+                        Write(77,*) 'Mxmpy2+FormP2 took ' // timeStr
                     End If
                     
-                    Call MPI_Bcast(ax, 1, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                    ! Write intermediate CONF.XIJ in frequency of KXIJ
+                    ! Diagonalize P
+                    If (mype==0) Call startTimer(s1)
+                    Select Case(type_real)
+                    Case(sp)
+                        Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                    Case(dp)
+                        Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                    End Select
+                    If (mype==0) Then
+                        Call stopTimer(s1, timeStr)
+                        Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
+                    End If
+                    
+                    ! Compute per-level admixture xx = max component of eigenvector in the correction-vector block;
+                    ! ax = max over all levels to indicate convergence
+                    ! vmax = largest eigenvector - used in FormP to shift converged levels
+                    ax=0.d0
+                    vmax=-1.d10
+                    strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
+                    Do i=1,Nlv
+                        xx=0.d0
+                        Do k=1,Nlv
+                            k1=k+Nlv
+                            x=dabs(P(k1,i))
+                            If (xx <= x) Then
+                                xx=x
+                                kx=k
+                            End If
+                        End Do
+                        If (ax < xx) ax=xx
+                        If (vmax < E(i)) vmax=E(i)
+                        If (mype==0) Then
+                            Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
+                            Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
+                        End If
+                        ax_array(i) = xx
+                    End Do
+
                     Call startTimer(s1)
                     If (KXIJ > 0) Then
-                        ! Only write each KXIJ iteration
-                        If (mod(it, KXIJ) == 0) Then 
-                            ! Calculate J for each energy level
+                        If (mod(it, KXIJ) == 0) Then
+                            ! J_av requires the full eigenvector column on all ranks.
+                            ! Allgatherv assembles full col on all ranks before J_av is called.
+                            Allocate(col(Nd))
                             Do n=1,Nlv
                                 If (kCSF == 0) Then
-                                    Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                                    Call J_av(ArrB(1,n),Nd,Tj(n),mpi_type_real,ierr)  ! calculates expectation values for J^2
+                                    col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
+                                    Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
+                                                        nd_counts_all, nd_displs_all, &
+                                                        mpi_type_real, MPI_COMM_WORLD, mpierr)
+                                    Call J_av(col(1), Nd, Tj(n), mpi_type_real, ierr)
                                 Else
                                     Tj(n) = Jm
                                 End If
                             End Do
-                            If (mype == 0) Then
-                                Call FormB
-                                Call PrintEnergiesDvdsn(it)
-                                If (kCSF == 0) Call PrintWeightsDvdsn(it)
+                            Deallocate(col)
+                            Call FormB(mpi_type_real, mype)
+                            If (mype==0) Call PrintEnergiesDvdsn(it)
+                            If (kCSF == 0) Then
+                                Allocate(col_pwdvdsn(Nd, Nlv))
+                                Do n=1,Nlv
+                                    col_pwdvdsn(nd_start+1:nd_end, n) = ArrB(1:nd_local, n)
+                                    Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
+                                                        col_pwdvdsn(:,n), nd_counts_all, nd_displs_all, &
+                                                        mpi_type_real, MPI_COMM_WORLD, mpierr)
+                                End Do
+                                If (mype==0) Call PrintWeightsDvdsn(it, col_pwdvdsn)
+                                Deallocate(col_pwdvdsn)
                             End If
                         Else
-                            If (mype == 0) Call FormBskip
+                            Call FormBskip(mype)
                         End If
-                    ! Else skip writing intermediate CONF.XIJ
                     Else
-                        Call FormBskip
+                        Call FormBskip(mype)
                     End If
                     Call stopTimer(s1, timeStr)
-                    If (mype == 0) Write(77,*) 'Formation of next iteration of eigenvectors took ' // timeStr
-                ! Davidson procedure is converged - write message and exit loop
+                    If (mype==0) Write(77,*) 'Formation of next iteration of eigenvectors took ' // timeStr
                 Else
-                    If (mype == 0) Then
+                    If (mype==0) Then
                         strfmt = '(" Davidson procedure converged")'
                         Write( 6,strfmt)
                         Write(11,strfmt)
-                        ! Assign energies to array Tk for case when Davidson procedure is already converged 
-                        If (it == 1) Tk=E(1:Nlv) 
+                        If (it == 1) Tk=E(1:Nlv)
                     End If
-                    
                     Exit
                 End If
             End If
@@ -2205,15 +2303,15 @@ Contains
         End If
 
         If (allocated(W)) Deallocate(W)
-        If (allocated(Hamil%ind1)) Deallocate(Hamil%ind1)
-        If (allocated(Hamil%ind2)) Deallocate(Hamil%ind2)
+        If (allocated(Hamil%col)) Deallocate(Hamil%col)
         If (allocated(Hamil%val)) Deallocate(Hamil%val)
-        If (allocated(Jsq%ind1)) Deallocate(Jsq%ind1)
-        If (allocated(Jsq%ind2)) Deallocate(Jsq%ind2)
+        If (allocated(Jsq%row)) Deallocate(Jsq%row)
+        If (allocated(Jsq%col)) Deallocate(Jsq%col)
         If (allocated(Jsq%val)) Deallocate(Jsq%val)
         If (allocated(Diag)) Deallocate(Diag)
         If (allocated(P)) Deallocate(P)
         If (allocated(B1)) Deallocate(B1)
+        If (allocated(B1_loc)) Deallocate(B1_loc)
         If (allocated(B2)) Deallocate(B2)
         If (allocated(Z1)) Deallocate(Z1)
         If (allocated(E1)) Deallocate(E1)
@@ -2304,10 +2402,12 @@ Contains
         Close(81)
     End Subroutine PrintEnergiesDvdsn
 
-    Subroutine PrintWeightsDvdsn(iter)
-        ! This subroutine prints the weights of configurations
+    Subroutine PrintWeightsDvdsn(iter, ArrB_col)
+        ! This subroutine prints the weights of configurations.
+        ! ArrB_col(Nd, Nlv) is the full gathered eigenvector array passed in since ArrB itself is distributed.
         Implicit None
         Integer :: j, k, ic, i, i1, l, n0, n1, n2, ni, ndk, m1, nspaces, nspacesg, nconfs, iter
+        Real(type_real), Intent(In) :: ArrB_col(Nd, Nlv)
         Real(dp) :: wsum
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
@@ -2353,7 +2453,7 @@ Contains
         nspacesg = 0
         Wsave = 0_dp
         Do j=1,Nlv
-            C(1:Nd)=ArrB(1:Nd,j)
+            C(1:Nd)=ArrB_col(1:Nd,j)
             i=0
             Do ic=1,Nc
                 Weights(ic,j)=0.d0
@@ -2529,23 +2629,29 @@ Contains
         Use formj2, Only : J_av
         Implicit None
         Integer :: i, n, ierr, mype, mpierr
+        Real(type_real), Allocatable :: col(:)
 
         If (mype == 0) Then
             ! open(unit=17,file='CONF.XIJ',status='OLD',form='UNFORMATTED')
             Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
         End If
-        
+
+        ! Allgatherv assembles each ArrB column on all ranks.
+        Allocate(col(Nd))
         Do n=1,Nlv
+            col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
+            Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
+                                nd_counts_all, nd_displs_all, mpi_type_real, MPI_COMM_WORLD, mpierr)
             If (kCSF == 0) Then
-                Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
-                Call J_av(ArrB(1,n),Nd,Tj(n),mpi_type_real,ierr)  ! calculates expectation values for J^2
+                Call J_av(col(1), Nd, Tj(n), mpi_type_real, ierr)
             Else
                 Tj(n) = Jm
             End If
             If (mype==0) Then
-                write(17) Tk(n),Tj(n),Nd,(ArrB(i,n),i=1,Nd)
+                write(17) Tk(n),Tj(n),Nd,(col(i),i=1,Nd)
             End If
         End Do
+        Deallocate(col)
 
         If (mype==0) Then
             Print*, 'Final CONF.XIJ has been written'
@@ -2590,7 +2696,6 @@ Contains
         If (.not. Allocated(xs)) Allocate(xs(Nlv))
         If (.not. Allocated(ArrB)) Allocate(ArrB(Nd,Nlv))
 
-        If (mype == 0) print*, 'LSJ arrays allocated'
 
     End Subroutine AllocateLSJArrays
 
@@ -2606,6 +2711,8 @@ Contains
 
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        If (.not. Allocated(Mdc)) Allocate(Mdc(Nc))
+        Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh0, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -2621,7 +2728,6 @@ Contains
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         End Do
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        If (mype == 0) print*, 'LSJ arrays initialized'
 
         Return
     End subroutine InitLSJ
@@ -2651,7 +2757,9 @@ Contains
         allocate(pll(nst,nst))
         allocate(p0l(nst,nst))
         
-        If (mype == 0) write(*,*) ' calculating ME of l, s, & j...'
+        If (mype == 0) Then
+            write(*,'(2X,A)') 'lsj: computing one-electron matrix elements of LSJ...'
+        End If
         do i=1,nst
             do j=1,nst
                plj(i,j)=plus_j(i,j)
@@ -2661,7 +2769,6 @@ Contains
                p0l(i,j)=p0_l(i,j)
             end do
         end do
-        If (mype == 0) write(*,*) '              ... done'
 
         xj=0.d0
         xl=0.d0
@@ -2672,7 +2779,9 @@ Contains
         ! If only 1 processor is available (serial job)
         If (npes == 1) Then
             Call calcLSJ(1,Nc,cc,xj,xl,xs,plj,pls,p0s,pll,p0l)
-        ! If more than 1 processor is available 
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> L,S,J calculation done in ' // Trim(timeStr)
+        ! If more than 1 processor is available
         Else
             n=0 
             ncGrowBy = 1
@@ -2740,6 +2849,10 @@ Contains
             Call MPI_AllReduce(MPI_IN_PLACE, xl, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, xs, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            If (mype == 0) Then
+                Call stopTimer(s1, timeStr)
+                Write(*,'(2X,A)') 'TIMING >>> L,S,J calculation done in ' // Trim(timeStr)
+            End If
         End If
 
         Deallocate(plj, pls, p0s, pll, p0l)        
@@ -2761,18 +2874,20 @@ Contains
         Integer :: ic1, ic2, n1, ndn, n, k, k1n, ndk, k1, icomp
         Real(dp) :: ckn, tj, tl, ts
         real(dp), dimension(:,:), allocatable :: plj, pls, p0s, pll, p0l
-
+        real(dp), allocatable :: cc_n(:), cc_k(:)
 
         if (.not. allocated(idet1)) Allocate(idet1(Ne))
         if (.not. allocated(idet2)) Allocate(idet2(Ne))
         if (.not. allocated(iconf1)) Allocate(iconf1(Ne))
         if (.not. allocated(iconf2)) Allocate(iconf2(Ne))
+        Allocate(cc_n(Nlv), cc_k(Nlv))
         Do ic1=startnc, endnc
             ndn=Ndc(ic1)
-            n=sum(Ndc(1:ic1-1))
+            n=Mdc(ic1)
             Do n1=1,ndn
                 n=n+1
                 call Gdet(n,idet1)
+                cc_n(1:Nlv) = cc(n, 1:Nlv)
                 k=n-1
                 Do ic2=ic1,Nc
                     ndk=Ndc(ic2)
@@ -2793,8 +2908,10 @@ Contains
                         k=k+1
                         call Gdet(k,idet2)
                         call lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
+                        if (tj==0.d0 .and. tl==0.d0 .and. ts==0.d0) Cycle
+                        cc_k(1:Nlv) = cc(k, 1:Nlv)
                         do m=1,Nlv
-                            ckn=cc(n,m)*cc(k,m)
+                            ckn=cc_n(m)*cc_k(m)
                             if (n.ne.k) ckn=2*ckn
                             xj(m)=xj(m)+ckn*tj
                             xl(m)=xl(m)+ckn*tl
@@ -2804,6 +2921,7 @@ Contains
                 End Do
             End Do
         End Do
+        Deallocate(cc_n, cc_k)
     End Subroutine calcLSJ
 
     Subroutine lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
@@ -3384,15 +3502,24 @@ Contains
             If (KLSJ == 1) Then
                 ! Write column names if first iteration
                 If (j == 1) Then
-                    num_blanks = max(0, maxlenconfig-3)
-                    Write(99, '(A)') '  n' // '  ' // repeat(' ', num_blanks) // 'conf  term     E_n (a.u.)   DEL (cm^-1) &
-                                        S     L     J     gf     conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                    Write(99, '(A)') &
+                        '  n' // '   ' // &
+                        repeat(' ', max(0, maxlenconfig-3)) // 'conf' // &
+                        '  term' // &
+                        '     E_n (a.u.)' // &
+                        '   DEL (cm^-1)' // &
+                        '     S' // '     L' // '     J' // &
+                        '     gf' // &
+                        '     conf%' // &
+                        '  converged' // &
+                        '  ' // repeat(' ', max(0, maxlenconfig-4)) // 'conf2' // &
+                        '   conf2%'
                 End If
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 num_blanks = max(0, maxlenconfig-len_trim(strcsave(1,j))+1)
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
-                    strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f4.1,"%",5X,A,2X,A,3X,f5.1,"%")'
+                    strfmt = '(I3,3X,A,A,1X,f14.8,f14.1,2X,f4.2,2x,f4.2,2x,f4.2,2x,A,4x,f5.1,"%",5X,A,2X,A,3X,f5.1,"%")'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), AdjustR(strterm), Tk(j), &
                                      (Tk(1)-Tk(j))*2*DPRy, Xs(j), Xl(j), Tj(j), strgf, Wsave(1,j)*100, strconverged, &
                                      repeat(' ', num_blanks2) // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100
@@ -3407,16 +3534,23 @@ Contains
             Else
                 ! Write column names if first iteration
                 If (j == 1) Then
-                    num_blanks = max(0, maxlenconfig-3)
-                    Write(99, '(A)') '  n ' // '  ' // repeat(' ', num_blanks) // 'conf       J         E_n (a.u.)  &
-                                         DEL (cm^-1)    conf%  converged'// repeat(' ', num_blanks) // ' conf2  conf2%'
+                    Write(99, '(A)') &
+                        '  n' // '    ' // &
+                        repeat(' ', max(0, maxlenconfig-3)) // 'conf' // &
+                        '       J' // &
+                        '         E_n (a.u.)' // &
+                        '   DEL (cm^-1)' // &
+                        '    conf%' // &
+                        '  converged' // &
+                        '  ' // repeat(' ', max(0, maxlenconfig-4)) // 'conf2' // &
+                        '   conf2%'
                 End If
 
                 ! If main configuration has weight of less than 0.7, we have to include a secondary configuration
                 num_blanks = max(0, maxlenconfig-len_trim(strcsave(1,j))+1)
                 If (Wsave(1,j) < 0.7) Then
                     num_blanks2 = max(0, maxlenconfig-len_trim(strcsave(2,j))+1)
-                    strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f4.1,"%",,5X,A,2X,A,3X,f5.1,"%")'
+                    strfmt = '(I3,4X,A,4X,f4.2,5x,f14.8,f14.1,3X,f5.1,"%",5X,A,2X,A,3X,f5.1,"%")'
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), &
                                         (Tk(1)-Tk(j))*2*DPRy, Wsave(1,j)*100, strconverged, repeat(' ', num_blanks2) &
                                         // Trim(AdjustL(strcsave(2,j))), Wsave(2,j)*100

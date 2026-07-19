@@ -812,9 +812,9 @@ Contains
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(ih8, ih8_max, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
 
-        Call IVAccumulatorCopy(iva1, Hamil%ind1, counter1)
+        Call IVAccumulatorCopy(iva1, Hamil%row, counter1)
         Call IVAccumulatorReset(iva1)
-        Call IVAccumulatorCopy(iva2, Hamil%ind2, counter2)
+        Call IVAccumulatorCopy(iva2, Hamil%col, counter2)
         Call IVAccumulatorReset(iva2)
         
         ! ===================== CALCULATION STAGE =====================

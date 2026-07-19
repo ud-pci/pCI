@@ -95,7 +95,7 @@ Module formj2
         ! If continuing from previous calculation or J^2 matrix has already been constructed
         If (Kl == 1) Then 
             ! Read the matrix J^2 from file CONFp.JJJ
-            Call ReadMatrix(Jsq%ind1,Jsq%ind2,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+            Call ReadMatrix(Jsq%row,Jsq%col,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
             ij8=ij4
 
             ! Add maximum memory per core from storing J^2 to total memory count
@@ -105,7 +105,7 @@ Module formj2
         ! If continuing calculation and Hamiltonian is to be extended with more configurations
         !Else If (Kl == 3) Then
         !    ! Read the matrix J^2 from file CONFp.JJJ
-        !    Call ReadMatrix(Jsq%ind1,Jsq%ind2,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
+        !    Call ReadMatrix(Jsq%row,Jsq%col,Jsq%val,ij4,NumJ,'CONFp.JJJ',mype,npes,mpierr) 
 
         !    ! Add maximum memory per core from storing J^2 to total memory count
         !    Call MPI_AllReduce(ij4, ijmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
@@ -344,19 +344,19 @@ Module formj2
                 End Do
             End If
         
-            Call IVAccumulatorCopy(iva1, Jsq%ind1, counter1)
+            Call IVAccumulatorCopy(iva1, Jsq%row, counter1)
             Call IVAccumulatorReset(iva1)
-            Call IVAccumulatorCopy(iva2, Jsq%ind2, counter2)
+            Call IVAccumulatorCopy(iva2, Jsq%col, counter2)
             Call IVAccumulatorReset(iva2)
             Call RVAccumulatorCopy(rva1, Jsq%val, counter3)
             Call RVAccumulatorReset(rva1)
 
             If (counter1 == 0) Then
-                Allocate(Jsq%ind1(1))
-                Allocate(Jsq%ind2(1))
+                Allocate(Jsq%row(1))
+                Allocate(Jsq%col(1))
                 Allocate(Jsq%val(1))
-                Jsq%ind1(1) = 1
-                Jsq%ind2(1) = 1
+                Jsq%row(1) = 1
+                Jsq%col(1) = 1
                 Jsq%val(1) = 0
             End If
     
@@ -398,8 +398,8 @@ Module formj2
         ierr=0
         xj=0_type_real
         Do i=1,ij8
-            n=Jsq%ind1(i)
-            k=Jsq%ind2(i)
+            n=Jsq%row(i)
+            k=Jsq%col(i)
             t=Jsq%val(i)
             If (max(k,n) <= nx) Then
                 r=t*X1(k)*X1(n)

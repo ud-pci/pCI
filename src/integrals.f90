@@ -6,7 +6,7 @@ Module integrals
 
     Private
 
-    Public :: Rint, Hint, HintS, Gint, GintS, Find_VS, Find_SMS, Gaunt
+    Public :: Rint, Hint, HintS, Gint, GintS, Find_VS, Find_SMS, Gaunt, BuildGauntLUT
 
   Contains
 
@@ -609,7 +609,7 @@ Module integrals
 
     Real(dp) Function Gaunt(k,xj1,xm1,xj2,xm2)
         Implicit None
-        Integer  :: i, is, ind, ib1, ib2, im, k, ij
+        Integer  :: is, ind, ib1, ib2, im, k, ij
         Real(dp)   :: g, x, xj1, xj2, xm1, xm2, j1, j2, m1, m2
 
         j1=xj1
@@ -645,14 +645,11 @@ Module integrals
                 ib1=2*Nlx+1
                 ib2=ib1*ib1
                 ind = Int(ib2*(ib2*k+2*(ib1*j1+j2))+ib1*(j1+m1)+(j2+m2))
-                ! TODO - use num_gaunts_per_partial_wave to start looking for gaunt factors in their respective blocks of l
-                Do i=1,Ngaunt
-                   If(In(i) == ind) Then
-                      g = Gnt(i)
-                      gaunt = g*is
-                      Return
-                   End If
-                End Do
+                If (ind >= 0 .and. ind <= ubound(GauntLUT,1)) Then
+                    g = GauntLUT(ind)
+                    gaunt = g*is
+                    Return
+                End If
             End If
         End If
         If (K_gnt == 1) Then
@@ -663,5 +660,20 @@ Module integrals
         gaunt = g*is
         Return
     End Function Gaunt
+
+    Subroutine BuildGauntLUT
+        ! Build a direct-lookup table for Gaunt coefficients. 
+        ! In(ig) encodes the quantum numbers (k, j1, m1, j2, m2) as a single integer index; 
+        ! GauntLUT maps that index to Gnt(ig), replacing an O(Ngaunt) linear scan in Gaunt() with an O(1) array lookup. 
+        Implicit None
+        Integer :: ig, max_ind_g
+
+        max_ind_g = maxval(In(1:Ngaunt))
+        If (.not. Allocated(GauntLUT)) Allocate(GauntLUT(0:max_ind_g))
+        GauntLUT = 0.0_dp
+        Do ig = 1, Ngaunt
+            GauntLUT(In(ig)) = Gnt(ig)
+        End Do
+    End Subroutine BuildGauntLUT
 
 End Module integrals

@@ -60,7 +60,11 @@ if(MPI_FOUND)
     endif()
 
     add_executable(conf_lsj matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 conf_lsj.f90)
-    target_link_libraries(conf_lsj PUBLIC pci_common)
+    if (LAPACK_AVAILABLE)
+        target_link_libraries(conf_lsj PUBLIC pci_common mkl_sequential)
+    else()
+        target_link_libraries(conf_lsj PUBLIC pci_common)
+    endif()
 
     add_executable(conf_pt conf_pt.f90)
     target_link_libraries(conf_pt PUBLIC pci_common)

@@ -24,7 +24,7 @@ Module conf_variables
     Integer,  Allocatable, Dimension(:)    :: IntOrdS, Iconverge, iconf1, iconf2, In, Nrnrc
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Integer,  Allocatable, Dimension(:)    :: num_gaunts_per_partial_wave ! counts number of gaunt factors calculated in each partial wave
-    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D
+    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D, GauntLUT
     Real(dp), Allocatable, Dimension(:,:)  :: W
 
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
@@ -42,16 +42,25 @@ Module conf_variables
     
     Real(type_real),  Allocatable, Dimension(:,:) :: ArrB, P, Z1
     Real(type_real),  Allocatable, Dimension(:) :: Diag, Tj, Tk, E, E1
-    Real(type_real), Allocatable, Dimension(:) :: B1, B2
+    Real(type_real), Allocatable, Dimension(:) :: B1, B1_loc, B2
 
     Type :: Matrix(knd)
         Integer, kind :: knd
         Real(kind=knd) :: minval
-        Integer,  Allocatable, Dimension(:) :: ind1, ind2
+        Integer,  Allocatable, Dimension(:) :: row, col
         Real(kind=knd), Allocatable, Dimension(:) :: val
     End Type Matrix
 
     Type(Matrix(type_real)) :: Hamil, Jsq
+
+    ! CSR storage for Hamil after RedistributeHamCSR.
+    ! nd_start/nd_end define a rank's row range [nd_start+1 : nd_end].
+    ! HamilCSR_rowptr(r) = cumulative nonzero count through local row r (0-based), so nonzeros for local row r occupy positions
+    ! HamilCSR_rowptr(r-1)+1 ... HamilCSR_rowptr(r).
+    Integer :: nd_start=0, nd_end=0, nd_local=0
+    Integer, Allocatable, Dimension(:) :: HamilCSR_rowptr
+    ! MPI_Allgatherv metadata for distributed ArrB column operations (set in AllocateDvdsnArrays)
+    Integer, Allocatable, Dimension(:) :: nd_counts_all, nd_displs_all
 
     Save
     
