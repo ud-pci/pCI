@@ -394,7 +394,7 @@ Module matrix_io
             send_col(ipos) = Hamil%col(i)
             tmp_pos(r) = tmp_pos(r) + 1
         End Do
-        Deallocate(Hamil%col)
+        If (Allocated(Hamil%col)) Deallocate(Hamil%col)
         Allocate(recv_col(new_ih8))
         Call MPI_Alltoallv(send_col, send_cnts, send_disp, MPI_INTEGER, &
                            recv_col,  recv_cnts, recv_disp, MPI_INTEGER, &
@@ -428,7 +428,8 @@ Module matrix_io
             send_row(ipos) = Hamil%row(i)
             tmp_pos(r) = tmp_pos(r) + 1
         End Do
-        Deallocate(tmp_pos, rank_of_row, Hamil%row)
+        Deallocate(tmp_pos, rank_of_row)
+        If (Allocated(Hamil%row)) Deallocate(Hamil%row)
         Allocate(recv_row(new_ih8))
         Call MPI_Alltoallv(send_row, send_cnts, send_disp, MPI_INTEGER, &
                            recv_row,  recv_cnts, recv_disp, MPI_INTEGER, &
