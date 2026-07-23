@@ -5,7 +5,7 @@
 *.a
 
 # Executables
-bin/
+bin*/
 basc
 conf
 conf_pt

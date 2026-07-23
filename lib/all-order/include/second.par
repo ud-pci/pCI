@@ -8,7 +8,7 @@
       PARAMETER (NXX=35,NK=15,NN=24,KK=15,NCH1=36000,NCH2=27000)
       PARAMETER (NXX1=30,NK1=15,IPX=440,NSIG=423000000)
 *     parameters for the all-order merge
-      PARAMETER (NZ=100,NVWH=140000)
+      PARAMETER (NZ=100,NVWH=800000)
 ***********************************************************************
 *     LINE 1                                                          *
 *                                                                     *

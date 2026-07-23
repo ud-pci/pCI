@@ -1,6 +1,6 @@
       include "all.par"
-      PARAMETER (NZ=100,NVWH=140000)
-      PARAMETER (NVH2=83000,NXV2=45000,NXCN=118000)		  
+      PARAMETER (NZ=100,NVWH=800000)
+      PARAMETER (NVH2=200000,NXV2=100000,NXCN=118000)		  
 ***********************************************************************
 *     Additional parameter file for sdvw-ci.f                         *
 *********************************************************************** 
