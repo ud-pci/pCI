@@ -922,7 +922,11 @@ Contains
         memEstimate = memEstimate + ih8_max * 16
 
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        Call MPI_AllReduce(Hamil%minval, Hamil%minval, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, mpierr)
+
+        ! give all cores Hmin, the minimum matrix element value (local min first, then global reduce)
+        Hamil%minval = minval(Hamil%val(1:ih8))
+        Call MPI_AllReduce(MPI_IN_PLACE, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
+        
         If (mype == 0) print*, '========== Formation of Hamiltonian matrix completed =========='
 
         If (mype == 0) Then
