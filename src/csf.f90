@@ -565,6 +565,13 @@ Contains
         Real(dp), Allocatable, Dimension(:,:) :: zzc
         Character(Len=16)     :: memStr, memStr2, memStr3, memStr4, memStr5, memTotStr, memTotStr2, counterStr, timeStr
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
+        Type(MPI_Datatype) :: mpi_type_real
+
+        If (type_real == sp) Then
+            mpi_type_real = MPI_REAL
+        Else
+            mpi_type_real = MPI_DOUBLE_PRECISION
+        End If
 
         If (.not. allocated(ccj)) allocate(ccj(nccj))
         If (.not. allocated(zzc)) allocate(zzc(max_ndcs,max_ndcs))
