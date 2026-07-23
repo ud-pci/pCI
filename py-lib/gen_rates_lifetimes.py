@@ -835,8 +835,8 @@ def main():
     """Main function to process command line arguments and run the script."""
 
     if len(sys.argv) < 2:
-        print("Usage: python generate_transition_rates.py <atom_name>")
-        print("Example: python generate_transition_rates.py Ba1")
+        print("Usage: python gen_rates_lifetimes.py <atom_name>")
+        print("Example: python gen_rates_lifetimes.py Ba1")
         print("\nThis script expects the following files to exist:")
         print("  - {atom_name}_Energies.csv")
         print("  - {atom_name}_Matrix_Elements_Theory.csv")
