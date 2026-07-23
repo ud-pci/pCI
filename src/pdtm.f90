@@ -653,9 +653,9 @@ Contains
             If (is == 0) Then
                 Read (13) (ki(i),i=1,13)
                 Read (13) (Rnt(i),Intg(i),i=1,Nint)
-                Write (6,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I5," ) ###", &
+                Write (6,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
                        /(4X,A4," calculated by ",A4))') Nint,(Alet(i),Blet(ki(i)),i=1,13)
-                Write (11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I5," ) ###", &
+                Write (11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
                        /(4X,A4," calculated by ",A4))') Nint,(Alet(i),Blet(ki(i)),i=1,13)
                 Close (13)
                 nsu1=0
