@@ -803,9 +803,12 @@ Module matrix_io
 
     End Subroutine WriteMatrixCSR
 
-    Subroutine ReadMatrixCSR(mat_col, mat_val, mat_rowptr, filename, mype, npes)
-        ! Read a global CSR file (written by WriteMatrixCSR) and distribute to MPI ranks
-        ! using the same greedy nnz-balanced row assignment as RedistributeHamCSR.
+    Subroutine ReadMatrixCSR(mat_col, mat_val, mat_rowptr, filename, mype, npes, nd_start_in, nd_end_in)
+        ! Read a global CSR file (written by WriteMatrixCSR) and distribute to MPI ranks.
+        !
+        ! If nd_start_in/nd_end_in are provided, their row assignment is used directly
+        ! (skipping the greedy step); use this for J^2 so it shares H's row ranges.
+        ! Otherwise, greedy nnz-balanced assignment is computed from row_ptr.
         !
         ! All ranks read the full row_ptr; each rank then seeks directly to its col/val slice.
         ! Sets module variables nd_start, nd_end, ih8 on exit.
@@ -818,6 +821,7 @@ Module matrix_io
         Integer, Allocatable, Intent(Out) :: mat_rowptr(:)
         Character(Len=*), Intent(In) :: filename
         Integer, Intent(In) :: mype, npes
+        Integer, Intent(In), Optional :: nd_start_in, nd_end_in
 
         Integer(Kind=int64), Allocatable :: row_ptr(:)
         Integer(Kind=int64) :: Nd_file, total_nnz, local_nnz, nnz_offset
@@ -857,20 +861,25 @@ Module matrix_io
         Call MPI_FILE_READ_AT_ALL(fh, disp, row_ptr, Int(Nd8 + 1_int64), &
                                   MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
 
-        ! --- Greedy nnz-balanced row assignment ---
-        ! row_ptr(n) == cumulative nnz through row n, so it plays the role of cumsum.
-        r        = 0
-        nd_start = 0
-        nd_end   = -1
-        Do n = 1, Nd
-            If (r < mype)  nd_start = n
-            If (r == mype) nd_end   = n
-            If (r < npes-1) Then
-                If (row_ptr(n) * Int(npes, Kind=int64) >= Int(r+1, Kind=int64) * total_nnz) &
-                    r = r + 1
-            End If
-        End Do
-        If (nd_end < 0) nd_end = nd_start
+        ! --- Row assignment: use forced values or greedy nnz-balanced scan ---
+        If (Present(nd_start_in)) Then
+            nd_start = nd_start_in
+            nd_end   = nd_end_in
+        Else
+            ! row_ptr(n) == cumulative nnz through row n, so it plays the role of cumsum.
+            r        = 0
+            nd_start = 0
+            nd_end   = -1
+            Do n = 1, Nd
+                If (r < mype)  nd_start = n
+                If (r == mype) nd_end   = n
+                If (r < npes-1) Then
+                    If (row_ptr(n) * Int(npes, Kind=int64) >= Int(r+1, Kind=int64) * total_nnz) &
+                        r = r + 1
+                End If
+            End Do
+            If (nd_end < 0) nd_end = nd_start
+        End If
 
         nd_loc     = nd_end - nd_start
         nnz_offset = row_ptr(nd_start)
