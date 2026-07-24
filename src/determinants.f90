@@ -468,9 +468,9 @@ Module determinants
         Integer :: i
         Character(Len=*) :: str
 
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
         Open (16,file=str,status='OLD',form='UNFORMATTED')
         Read(16) Nd,Nsu
+        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
         Do i=1,Nd
            Read(16,end=710) Iarr(1:Ne,i)
         End Do
