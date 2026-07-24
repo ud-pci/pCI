@@ -758,8 +758,7 @@ Module davidson
         !     aj = sqrt(1+sj) - 1 to the target jav = 2*XJ_av. 
         ! The iteration stops when the largest error over all vectors drops below the threshold `trsd`.
         !
-        ! J^2 is stored in COO format (Jsq) and applied as a symmetric SpMV, similar to Mxmpy. 
-        ! Full-size col_in/col_out buffers are used since Jsq is not redistributed.
+        ! J^2 is applied as a symmetric SpMV using the redistributed CSR form (JsqCSR_rowptr + Jsq%col/val).
         Use mpi_f08
         Use determinants, Only : Gdet
         Implicit None
@@ -815,16 +814,18 @@ Module davidson
                     Do i=1,num
                         col_out(:,i)=0_type_real
                     End Do
-                    Do j8=1,ij8
-                        n=Jsq%row(j8)
-                        k=Jsq%col(j8)
-                        t=Jsq%val(j8)
-                        Do i=1,num
-                            proceed=(lin-1)*Iconverge(i)==0
-                            If (proceed) Then
-                                col_out(n,i)=col_out(n,i)+t*col_in(k,i)
-                                If (n /= k) col_out(k,i)=col_out(k,i)+t*col_in(n,i)
-                            End If
+                    Do n=1,nd_local
+                        Do j8=Int(JsqCSR_rowptr(n-1),int64)+1_int64, Int(JsqCSR_rowptr(n),int64)
+                            k=Jsq%col(j8)
+                            t=Jsq%val(j8)
+                            Do i=1,num
+                                proceed=(lin-1)*Iconverge(i)==0
+                                If (proceed) Then
+                                    col_out(nd_start+n,i)=col_out(nd_start+n,i)+t*col_in(k,i)
+                                    If (nd_start+n /= k) &
+                                        col_out(k,i)=col_out(k,i)+t*col_in(nd_start+n,i)
+                                End If
+                            End Do
                         End Do
                     End Do
 
