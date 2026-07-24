@@ -27,6 +27,15 @@ Module conf_variables
     Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D, GauntLUT
     Real(dp), Allocatable, Dimension(:,:)  :: W
 
+    ! Integral lookup tables and hash tables
+    Integer(Kind=Int64) :: GintHashCap=0_int64
+    Integer             :: GintSHashCap=0
+    Integer(Kind=Int64), Allocatable, Dimension(:) :: GintHashPos
+    Integer,  Allocatable, Dimension(:)    :: HintSPosLUT
+    Integer,  Allocatable, Dimension(:)    :: GintHashIac, GintHashIbd
+    Integer,  Allocatable, Dimension(:)    :: GintSHashPos, GintSHashIac, GintSHashIbd
+    Real(dp), Allocatable, Dimension(:)    :: HintLUT, ISLUT
+
     ! Set type_real to determine whether to use single precision (sp) or double precision (dp) for Hamiltonian
     Integer, Parameter :: type_real=dp
 
@@ -58,7 +67,8 @@ Module conf_variables
     ! HamilCSR_rowptr(r) = cumulative nonzero count through local row r (0-based), so nonzeros for local row r occupy positions
     ! HamilCSR_rowptr(r-1)+1 ... HamilCSR_rowptr(r).
     Integer :: nd_start=0, nd_end=0, nd_local=0
-    Integer, Allocatable, Dimension(:) :: HamilCSR_rowptr
+    Integer, Allocatable, Dimension(:) :: HamilCSR_rowptr, JsqCSR_rowptr
+    
     ! MPI_Allgatherv metadata for distributed ArrB column operations (set in AllocateDvdsnArrays)
     Integer, Allocatable, Dimension(:) :: nd_counts_all, nd_displs_all
 

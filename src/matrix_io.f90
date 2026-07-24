@@ -9,7 +9,8 @@ Module matrix_io
 
     Private
 
-    Public :: WriteMatrix, ReadMatrix, RedistributeHamCSR
+    Public :: WriteMatrix, ReadMatrix, RedistributeHamCSR, RedistributeJsqCSR, &
+              WriteMatrixCSR, ReadMatrixCSR
 
   Contains
 
@@ -342,7 +343,7 @@ Module matrix_io
         Deallocate(row_cnts_g)
 
         ! nd_start is the global-to-local offset used throughout Davidson:
-        !   loc_row = global_row - nd_start   (1-based local, range 1..nd_loc)
+        !   loc_row = global_row - nd_start   (1-based local, range 1...nd_loc)
         ! nd_start is the last global row assigned to ranks < mype (0-based exclusive),
         ! nd_end is the last global row assigned to mype (1-based inclusive = nd_start+nd_loc).
         nd_start = 0
@@ -441,8 +442,8 @@ Module matrix_io
         ih8 = new_ih8
 
         ! --- Step 7: counting sort into CSR ---
-        ! loc_row = row(i) - nd_start converts a global 1-based row index to a 1-based local index (1..nd_loc).
-        ! HamilCSR_rowptr is the CSR prefix sum: elements for local row i are at positions rowptr(i-1)+1 .. rowptr(i).
+        ! loc_row = row(i) - nd_start converts a global 1-based row index to a 1-based local index (1...nd_loc).
+        ! HamilCSR_rowptr is the CSR prefix sum: elements for local row i are at positions rowptr(i-1)+1 ... rowptr(i).
         Allocate(row_cnt(nd_loc))
         row_cnt = 0
         Do i = 1, ih8
@@ -498,5 +499,435 @@ Module matrix_io
         End If
 
     End Subroutine RedistributeHamCSR
+
+    Subroutine RedistributeJsqCSR(npes, mype, mpi_type_real)
+        ! Redistribute Jsq from COO (unordered element partition) to CSR row order,
+        ! using the same row ranges (nd_start/nd_end) established by RedistributeHamCSR.
+        ! Must be called AFTER RedistributeHamCSR so nd_start/nd_end are valid.
+        !
+        ! Row ranges are intentionally shared with H.
+        ! ArrB is distributed over nd_start/nd_end, so J^2 SpMV output must land in the same local rows. 
+        ! A separate nnz-balanced assignment for J^2 would misalign with ArrB and require extra communication.
+        !
+        ! After this call:
+        !   Jsq%col/val are in CSR row order for rows [nd_start+1 : nd_end]
+        !   JsqCSR_rowptr(0:nd_loc) is the local CSR prefix sum
+        !   ij8 = post-redistribution local element count
+        !   Jsq%row is freed
+        Use mpi_f08
+        Implicit None
+
+        Integer, Intent(In) :: npes, mype
+        Type(MPI_Datatype), Intent(In) :: mpi_type_real
+
+        Integer :: r, n, mpierr, nd_loc, loc_row, ipos
+        Integer(Kind=Int64) :: i, new_ij8, NumJ_total, ij8_max
+        Integer, Allocatable, Dimension(:) :: send_cnts, recv_cnts, send_disp, recv_disp
+        Integer, Allocatable, Dimension(:) :: send_row, send_col, recv_row, recv_col
+        Real(type_real), Allocatable, Dimension(:) :: send_val, recv_val
+        Integer, Allocatable, Dimension(:) :: tmp_pos, row_cnt, tmp_col, rank_of_row, nd_ends_all
+        Real(type_real), Allocatable, Dimension(:) :: tmp_val
+        Integer(Kind=Int64) :: s1
+        Character(Len=16) :: timeStr
+
+        If (ij8 > Int(Huge(0), Int64)) Then
+            If (mype == 0) Write(*,'(A,I0,A)') &
+                'RedistributeJsqCSR: local ij8 (', ij8, ') exceeds Int32 limit.'
+            Call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
+        End If
+
+        If (mype == 0) Then
+            Call startTimer(s1)
+            Write(*,'(2X,A)') 'RedistributeJsqCSR: redistributing J^2 by row...'
+        End If
+
+        nd_loc = nd_end - nd_start
+
+        ! --- Build rank_of_row from the nd_end values set by RedistributeHamCSR ---
+        ! Row n belongs to the rank r whose nd_end is the smallest nd_ends_all(r) >= n.
+        Allocate(nd_ends_all(0:npes-1), rank_of_row(Nd))
+        Call MPI_Allgather(nd_end, 1, MPI_INTEGER, nd_ends_all, 1, MPI_INTEGER, MPI_COMM_WORLD, mpierr)
+        r = 0
+        Do n = 1, Nd
+            Do While (n > nd_ends_all(r))
+                r = r + 1
+            End Do
+            rank_of_row(n) = r
+        End Do
+        Deallocate(nd_ends_all)
+
+        ! --- Exchange element counts ---
+        Allocate(send_cnts(0:npes-1), recv_cnts(0:npes-1))
+        send_cnts = 0
+        Do i = 1, ij8
+            r = rank_of_row(Jsq%row(i))
+            send_cnts(r) = send_cnts(r) + 1
+        End Do
+        Call MPI_Alltoall(send_cnts, 1, MPI_INTEGER, recv_cnts, 1, MPI_INTEGER, &
+                          MPI_COMM_WORLD, mpierr)
+
+        Allocate(send_disp(0:npes-1), recv_disp(0:npes-1))
+        send_disp(0) = 0
+        recv_disp(0) = 0
+        Do r = 1, npes-1
+            send_disp(r) = send_disp(r-1) + send_cnts(r-1)
+            recv_disp(r) = recv_disp(r-1) + recv_cnts(r-1)
+        End Do
+        new_ij8 = Int(recv_disp(npes-1), Int64) + recv_cnts(npes-1)
+
+        ! --- Pack and exchange col ---
+        Allocate(send_col(ij8), tmp_pos(0:npes-1))
+        tmp_pos = send_disp + 1
+        Do i = 1, ij8
+            r    = rank_of_row(Jsq%row(i))
+            ipos = tmp_pos(r)
+            send_col(ipos) = Jsq%col(i)
+            tmp_pos(r) = tmp_pos(r) + 1
+        End Do
+        If (Allocated(Jsq%col)) Deallocate(Jsq%col)
+        Allocate(recv_col(new_ij8))
+        Call MPI_Alltoallv(send_col, send_cnts, send_disp, MPI_INTEGER, &
+                           recv_col,  recv_cnts, recv_disp, MPI_INTEGER, &
+                           MPI_COMM_WORLD, mpierr)
+        Deallocate(send_col)
+        Call Move_Alloc(recv_col, Jsq%col)
+
+        ! --- Pack and exchange val ---
+        tmp_pos = send_disp + 1
+        Allocate(send_val(ij8))
+        Do i = 1, ij8
+            r    = rank_of_row(Jsq%row(i))
+            ipos = tmp_pos(r)
+            send_val(ipos) = Jsq%val(i)
+            tmp_pos(r) = tmp_pos(r) + 1
+        End Do
+        Deallocate(Jsq%val)
+        Allocate(recv_val(new_ij8))
+        Call MPI_Alltoallv(send_val, send_cnts, send_disp, mpi_type_real, &
+                           recv_val,  recv_cnts, recv_disp, mpi_type_real, &
+                           MPI_COMM_WORLD, mpierr)
+        Deallocate(send_val)
+        Call Move_Alloc(recv_val, Jsq%val)
+
+        ! --- Pack and exchange row ---
+        tmp_pos = send_disp + 1
+        Allocate(send_row(ij8))
+        Do i = 1, ij8
+            r    = rank_of_row(Jsq%row(i))
+            ipos = tmp_pos(r)
+            send_row(ipos) = Jsq%row(i)
+            tmp_pos(r) = tmp_pos(r) + 1
+        End Do
+        Deallocate(tmp_pos, rank_of_row)
+        If (Allocated(Jsq%row)) Deallocate(Jsq%row)
+        Allocate(recv_row(new_ij8))
+        Call MPI_Alltoallv(send_row, send_cnts, send_disp, MPI_INTEGER, &
+                           recv_row,  recv_cnts, recv_disp, MPI_INTEGER, &
+                           MPI_COMM_WORLD, mpierr)
+        Deallocate(send_row)
+        Call Move_Alloc(recv_row, Jsq%row)
+
+        Deallocate(send_cnts, send_disp, recv_cnts, recv_disp)
+        ij8 = new_ij8
+
+        ! --- Counting sort into CSR ---
+        Allocate(row_cnt(nd_loc))
+        row_cnt = 0
+        Do i = 1, ij8
+            loc_row = Jsq%row(i) - nd_start
+            row_cnt(loc_row) = row_cnt(loc_row) + 1
+        End Do
+
+        If (Allocated(JsqCSR_rowptr)) Deallocate(JsqCSR_rowptr)
+        Allocate(JsqCSR_rowptr(0:nd_loc))
+        JsqCSR_rowptr(0) = 0
+        Do r = 1, nd_loc
+            JsqCSR_rowptr(r) = JsqCSR_rowptr(r-1) + row_cnt(r)
+        End Do
+        Deallocate(row_cnt)
+
+        Allocate(tmp_pos(nd_loc), tmp_col(ij8))
+        tmp_pos(1:nd_loc) = JsqCSR_rowptr(0:nd_loc-1) + 1
+        Do i = 1, ij8
+            loc_row       = Jsq%row(i) - nd_start
+            ipos          = tmp_pos(loc_row)
+            tmp_col(ipos) = Jsq%col(i)
+            tmp_pos(loc_row) = ipos + 1
+        End Do
+        Deallocate(Jsq%col)
+        Call Move_Alloc(tmp_col, Jsq%col)
+
+        tmp_pos(1:nd_loc) = JsqCSR_rowptr(0:nd_loc-1) + 1
+        Allocate(tmp_val(ij8))
+        Do i = 1, ij8
+            loc_row       = Jsq%row(i) - nd_start
+            ipos          = tmp_pos(loc_row)
+            tmp_val(ipos) = Jsq%val(i)
+            tmp_pos(loc_row) = ipos + 1
+        End Do
+        Deallocate(Jsq%row, Jsq%val, tmp_pos)
+        Call Move_Alloc(tmp_val, Jsq%val)
+
+        ! --- Print load balance ---
+        NumJ_total = ij8
+        Call MPI_AllReduce(MPI_IN_PLACE, NumJ_total, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        ij8_max = ij8
+        Call MPI_AllReduce(MPI_IN_PLACE, ij8_max, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+
+        If (mype == 0) Then
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A,F5.1,A)') 'RedistributeJsqCSR: J^2*v load balance: ', &
+                100.0_dp * Real(NumJ_total, dp) / Real(Int(npes, Int64) * ij8_max, dp), &
+                '% efficiency (avg/max element count per rank)'
+            Write(*,'(2X,A)') 'TIMING >>> RedistributeJsqCSR done in ' // Trim(timeStr)
+        End If
+
+    End Subroutine RedistributeJsqCSR
+
+    Subroutine WriteMatrixCSR(mat_rowptr, mat_col, mat_val, nd_loc, filename, mype, npes)
+        ! Write a distributed CSR matrix to a single file in global CSR format.
+        !
+        ! File layout (unformatted stream, no Fortran record wrappers):
+        !   bytes  0– 7:                  int64  Nd              global row count
+        !   bytes  8–15:                  int64  total_nnz       total stored elements
+        !   bytes 16 – 16+(Nd+1)*8-1:     int64  row_ptr(0:Nd)
+        !   next total_nnz*4 bytes:       int32  col(total_nnz)
+        !   next total_nnz*type_real:     real   val(total_nnz)
+        !
+        ! Must be called after RedistributeHamCSR (or analogous) so nd_start/nd_end
+        ! are set and mat_rowptr/mat_col/mat_val are in CSR row order.
+        ! nd_loc = nd_end - nd_start.
+        Use mpi_f08
+        Implicit None
+
+        Integer, Intent(In) :: nd_loc, mype, npes
+        Integer, Intent(In) :: mat_rowptr(0:nd_loc)
+        Integer, Intent(In) :: mat_col(:)
+        Real(type_real), Intent(In) :: mat_val(:)
+        Character(Len=*), Intent(In) :: filename
+
+        Integer(Kind=int64) :: local_nnz, total_nnz, nnz_offset
+        Integer(Kind=int64), Allocatable :: local_rp(:), all_nnz(:)
+        Integer(Kind=MPI_OFFSET_KIND) :: disp
+        Integer(Kind=int64) :: Nd8, rp_bytes, col_bytes
+        Integer :: mpierr, r
+        Type(MPI_File) :: fh
+        Integer(Kind=int64) :: s1
+        Character(Len=16) :: timeStr
+
+        local_nnz = Int(mat_rowptr(nd_loc), Kind=int64)
+
+        ! Gather per-rank nnz; compute each rank's global offset into col/val
+        Allocate(all_nnz(0:npes-1))
+        Call MPI_Allgather(local_nnz, 1, MPI_INTEGER8, all_nnz, 1, MPI_INTEGER8, &
+                           MPI_COMM_WORLD, mpierr)
+        total_nnz = Sum(all_nnz)
+        nnz_offset = 0_int64
+        Do r = 0, mype-1
+            nnz_offset = nnz_offset + all_nnz(r)
+        End Do
+        Deallocate(all_nnz)
+
+        If (mype == 0) Then
+            Call startTimer(s1)
+            Write(*,'(2X,A,I0)') 'WriteMatrixCSR: total_nnz = ', total_nnz
+        End If
+
+        ! Build this rank's slice of the global row_ptr.
+        ! Each rank covers non-overlapping positions nd_start...nd_start+nd_loc-1.
+        ! Rank 0 writes the sentinel row_ptr(Nd) = total_nnz separately (see below).
+        Allocate(local_rp(0:nd_loc-1))
+        Do r = 0, nd_loc-1
+            local_rp(r) = nnz_offset + Int(mat_rowptr(r), Kind=int64)
+        End Do
+
+        Nd8      = Int(Nd, Kind=int64)
+        rp_bytes = (Nd8 + 1_int64) * 8_int64
+        col_bytes = total_nnz * 4_int64
+
+        Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, &
+                           MPI_MODE_WRONLY + MPI_MODE_CREATE, &
+                           MPI_INFO_NULL, fh, mpierr)
+        Call MPIErrHandle(mpierr)
+
+        ! Header and sentinel are written by rank 0 only.
+        ! Header at byte 0: Nd (int64)
+        ! Header at byte 8: total_nnz (int64)
+        ! Sentinel at byte 16+Nd*8: row_ptr(Nd) = total_nnz
+        If (mype == 0) Then
+            disp = 0_MPI_OFFSET_KIND
+            Call MPI_FILE_WRITE_AT(fh, disp, Nd8, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+            disp = 8_MPI_OFFSET_KIND
+            Call MPI_FILE_WRITE_AT(fh, disp, total_nnz, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+            disp = 16_MPI_OFFSET_KIND + Nd8 * 8_MPI_OFFSET_KIND
+            Call MPI_FILE_WRITE_AT(fh, disp, total_nnz, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+        End If
+
+        ! row_ptr body: each rank writes nd_loc values at its global slice
+        If (nd_loc > 0) Then
+            disp = 16_MPI_OFFSET_KIND + Int(nd_start, Kind=MPI_OFFSET_KIND) * 8_MPI_OFFSET_KIND
+            Call MPI_FILE_WRITE_AT(fh, disp, local_rp, nd_loc, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+        End If
+        Deallocate(local_rp)
+
+        ! col: each rank writes its int32 column indices at the appropriate global offset
+        If (local_nnz > 0) Then
+            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+            Call MPI_FILE_WRITE_AT(fh, disp, mat_col, Int(local_nnz), MPI_INTEGER, &
+                                   MPI_STATUS_IGNORE, mpierr)
+        End If
+
+        ! val: each rank writes its type_real values at the appropriate global offset
+        If (local_nnz > 0) Then
+            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * Int(type_real, Kind=MPI_OFFSET_KIND)
+            Select Case(type_real)
+            Case(sp)
+                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_REAL, &
+                                       MPI_STATUS_IGNORE, mpierr)
+            Case(dp)
+                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_DOUBLE_PRECISION, &
+                                       MPI_STATUS_IGNORE, mpierr)
+            End Select
+        End If
+
+        Call MPI_FILE_CLOSE(fh, mpierr)
+
+        If (mype == 0) Then
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> WriteMatrixCSR: ' // Trim(filename) // &
+                               ' written in ' // Trim(timeStr)
+        End If
+
+    End Subroutine WriteMatrixCSR
+
+    Subroutine ReadMatrixCSR(mat_col, mat_val, mat_rowptr, filename, mype, npes)
+        ! Read a global CSR file (written by WriteMatrixCSR) and distribute to MPI ranks
+        ! using the same greedy nnz-balanced row assignment as RedistributeHamCSR.
+        !
+        ! All ranks read the full row_ptr; each rank then seeks directly to its col/val slice.
+        ! Sets module variables nd_start, nd_end, ih8 on exit.
+        ! nd_loc = nd_end - nd_start; mat_rowptr is allocated (0:nd_loc).
+        Use mpi_f08
+        Implicit None
+
+        Integer, Allocatable, Intent(Out) :: mat_col(:)
+        Real(type_real), Allocatable, Intent(Out) :: mat_val(:)
+        Integer, Allocatable, Intent(Out) :: mat_rowptr(:)
+        Character(Len=*), Intent(In) :: filename
+        Integer, Intent(In) :: mype, npes
+
+        Integer(Kind=int64), Allocatable :: row_ptr(:)
+        Integer(Kind=int64) :: Nd_file, total_nnz, local_nnz, nnz_offset
+        Integer(Kind=MPI_OFFSET_KIND) :: disp
+        Integer(Kind=int64) :: Nd8, rp_bytes, col_bytes
+        Integer :: mpierr, r, n, nd_loc
+        Integer(Kind=int64) :: ih8_max
+        Type(MPI_File) :: fh
+        Integer(Kind=int64) :: s1
+        Character(Len=16) :: timeStr
+
+        If (mype == 0) Then
+            Call startTimer(s1)
+            Write(*,'(2X,A)') 'ReadMatrixCSR: reading ' // Trim(filename) // '...'
+        End If
+
+        Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, fh, mpierr)
+        Call MPIErrHandle(mpierr)
+
+        ! --- Read header (collective: all ranks get the same two values) ---
+        disp = 0_MPI_OFFSET_KIND
+        Call MPI_FILE_READ_AT_ALL(fh, disp, Nd_file, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+        disp = 8_MPI_OFFSET_KIND
+        Call MPI_FILE_READ_AT_ALL(fh, disp, total_nnz, 1, MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+
+        If (Int(Nd_file) /= Nd) Then
+            If (mype == 0) Write(*,'(A,I0,A,I0)') &
+                'ReadMatrixCSR ERROR: file Nd (', Nd_file, ') /= conf Nd (', Nd, ')'
+            Call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
+        End If
+
+        ! --- Read full global row_ptr on every rank (collective read, same data) ---
+        ! Enables direct seek to each rank's col/val slice without any Alltoall.
+        Nd8 = Int(Nd, Kind=int64)
+        Allocate(row_ptr(0:Nd))
+        disp = 16_MPI_OFFSET_KIND
+        Call MPI_FILE_READ_AT_ALL(fh, disp, row_ptr, Int(Nd8 + 1_int64), &
+                                  MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+
+        ! --- Greedy nnz-balanced row assignment ---
+        ! row_ptr(n) == cumulative nnz through row n, so it plays the role of cumsum.
+        r        = 0
+        nd_start = 0
+        nd_end   = -1
+        Do n = 1, Nd
+            If (r < mype)  nd_start = n
+            If (r == mype) nd_end   = n
+            If (r < npes-1) Then
+                If (row_ptr(n) * Int(npes, Kind=int64) >= Int(r+1, Kind=int64) * total_nnz) &
+                    r = r + 1
+            End If
+        End Do
+        If (nd_end < 0) nd_end = nd_start
+
+        nd_loc     = nd_end - nd_start
+        nnz_offset = row_ptr(nd_start)
+        local_nnz  = row_ptr(nd_end) - row_ptr(nd_start)
+        ih8        = local_nnz
+
+        ! --- Build local CSR row pointer (0-based local offsets into mat_col/mat_val) ---
+        Allocate(mat_rowptr(0:nd_loc))
+        Do r = 0, nd_loc
+            mat_rowptr(r) = Int(row_ptr(nd_start + r) - nnz_offset)
+        End Do
+        Deallocate(row_ptr)
+
+        rp_bytes  = (Nd8 + 1_int64) * 8_int64
+        col_bytes =  total_nnz * 4_int64
+
+        ! --- Read col slice (independent: each rank reads a different offset) ---
+        Allocate(mat_col(local_nnz))
+        If (local_nnz > 0) Then
+            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+            Call MPI_FILE_READ_AT(fh, disp, mat_col, Int(local_nnz), &
+                                  MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
+        End If
+
+        ! --- Read val slice ---
+        Allocate(mat_val(local_nnz))
+        If (local_nnz > 0) Then
+            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
+                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * Int(type_real, Kind=MPI_OFFSET_KIND)
+            Select Case(type_real)
+            Case(sp)
+                Call MPI_FILE_READ_AT(fh, disp, mat_val, Int(local_nnz), &
+                                      MPI_REAL, MPI_STATUS_IGNORE, mpierr)
+            Case(dp)
+                Call MPI_FILE_READ_AT(fh, disp, mat_val, Int(local_nnz), &
+                                      MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr)
+            End Select
+        End If
+
+        Call MPI_FILE_CLOSE(fh, mpierr)
+
+        ! --- Load balance report ---
+        ih8_max = local_nnz
+        Call MPI_AllReduce(MPI_IN_PLACE, ih8_max, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+
+        If (mype == 0) Then
+            Call stopTimer(s1, timeStr)
+            Write(*,'(2X,A,I0,A,F5.1,A)') 'ReadMatrixCSR: total_nnz = ', total_nnz, &
+                '; H*v load balance: ', &
+                100.0_dp * Real(total_nnz, dp) / Real(Int(npes, Int64) * ih8_max, dp), &
+                '% efficiency'
+            Write(*,'(2X,A)') 'TIMING >>> ReadMatrixCSR: ' // Trim(filename) // &
+                               ' read in ' // Trim(timeStr)
+        End If
+
+    End Subroutine ReadMatrixCSR
 
 End Module matrix_io

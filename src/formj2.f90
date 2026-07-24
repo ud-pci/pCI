@@ -385,31 +385,31 @@ Module formj2
 
     End Subroutine FormJ
     
-    Subroutine J_av(X1, nx, xj, mpi_rtype, ierr)    !# <x1|J**2|x1>
+    Subroutine J_av(X1, nx, xj, mpi_rtype, ierr)
+        ! <x1|J**2|x1>
         Use mpi_f08
         Implicit None
 
         Type(MPI_Datatype) :: mpi_rtype
         Integer :: ierr, k, n, nx, mpierr
-        Integer(Kind=int64) :: i
+        Integer(Kind=int64) :: l8
         Real(type_real) :: r, t, xj
         Real(type_real), dimension(nx) :: X1
 
         ierr=0
         xj=0_type_real
-        Do i=1,ij8
-            n=Jsq%row(i)
-            k=Jsq%col(i)
-            t=Jsq%val(i)
-            If (max(k,n) <= nx) Then
-                r=t*X1(k)*X1(n)
-                If (n /= k) r=r+r
-                xj=xj+r
-            Else
-                Cycle
-            End If
+        Do n = nd_start+1, nd_end
+            If (n > nx) Cycle
+            Do l8 = Int(JsqCSR_rowptr(n-nd_start-1), Int64)+1, Int(JsqCSR_rowptr(n-nd_start), Int64)
+                k = Jsq%col(l8)
+                t = Jsq%val(l8)
+                If (k <= nx) Then
+                    r = t * X1(k) * X1(n)
+                    If (n /= k) r = r + r
+                    xj = xj + r
+                End If
+            End Do
         End Do
-        ! MPI Reduce sum all xj to master core here 
         Call MPI_AllReduce(MPI_IN_PLACE, xj, 1, mpi_rtype, MPI_SUM, MPI_COMM_WORLD, mpierr)
         xj=0.5d0*(sqrt(1.d0+xj)-1.d0)
 

@@ -6,20 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-07-19
-- pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks for scalable large-scale CI
-- matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 → Matrix%row/col throughout
-- matrix_io.f90 - add RedistributeHamCSR subroutine to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row freed after CSR build (row implicit in rowptr)
-- davidson.f90 - ArrB, Diag, B2 distributed across ranks; B1 split into replicated B1(Nd0) and local B1_loc(nd_local); AvgDiag and Hmin AllReduce run on all ranks; batch AllReduces; DGEMM/DGEMV for Mxmpy; DiagInitApprox switched to DSYEVD
-- pconf.F90 - three-phase peak tracking (formH, redistribution, Davidson) with GauntLUT memory accounting; parallel estimates labeled as "per rank"
+## [1.4.0] - 2026-07-23
+- pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction
+- matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 -> Matrix%row/col throughout
+- matrix_io.f90 - add RedistributeHamCSR and RedistributeJsqCSR subroutines to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row and Jsq%row freed after CSR build (row implicit in rowptr)
+- matrix_io.f90 - add WriteMatrixCSR: writes global CSR after RedistributeHamCSR; add ReadMatrixCSR: reads and distributes global CSR  using same greedy nnz-balanced row assignment
+- davidson.f90 - ArrB, Diag, B2 distributed across ranks; B1 split into replicated B1(Nd0) and local B1_loc(nd_local); AvgDiag and Hmin AllReduce run on all ranks; batch AllReduces; 
+- davidson.f90 - DGEMM/DGEMV for Mxmpy; DiagInitApprox switched to DSYEVD
+- davidson.f90 - Prj_J: replace COO Jsq loop (Jsq%row) with CSR loop over JsqCSR_rowptr
+- conf_variables.F90 - add HamilCSR_rowptr and JsqCSR_rowptr; add LUT/hash variables
+- conf_init.f90 - ReadCiIn: normalize keys to uppercase with ToUpperString and trim/adjustl; ci.in keys are now case-insensitive
+- integrals.f90 - replace O(Nhint/NhintS) linear scan in Hint/HintS with O(1) direct-index/position LUT (BuildHintLUT/BuildHintSLUT)
+- integrals.f90 - replace forward scan in Gint/GintS with O(1) hash table lookup (BuildGintHash,FindGint/BuildGintSHash,FindGintS)
+- integrals.f90 - replace binary search in Find_VS/Find_SMS with O(1) direct-index LUT (BuildISLUT)
+- formj2.f90 - Jsq%row is freed by RedistributeJsqCSR before J_av runs; replace COO loop with CSR loop over JsqCSR_rowptr/Jsq%col/Jsq%val
+- pconf.F90 - three-phase peak tracking (formH, redistribution, Davidson) with LUT/HashMap memory accounting; parallel estimates relabeled as "per rank"
 - pconf.F90, integrals.f90, conf_variables.F90 - optimize FormH: O(1) GauntLUT replacing O(Ngaunt) linear search; eliminate redundant iconf1 recomputation in inner loop (now precomputed once per outer row)
-- pconf.F90 - speed up calcLSJ: row cache for lsj_det, direct Mdc lookup, early-out for zero contributions
+- pconf.F90 - FormH npes=1: add use_bit_rep in inner determinant loop
+- pconf.F90 - call WriteMatrixCSR (pCONF.HIJ) for H after RedistributeHamCSR and for J^2 (pCONF.JJJ) after RedistributeJsqCSR
+- pconf.F90 - speed up calcLSJ: row cache for lsj_det, direct mdc lookup, early-out for zero contributions
 - pconf.F90 - memory accounting: move Nvc/Nc0 from memFormH to memStaticArrays (never freed); unconditionally free Iarr in DeAllocateFormHArrays; inline sizeof(ArrB) in memDvdsn
 - pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
-- pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly during initialization
-- conf_init.f90 - ReadCiIn: normalize keys to uppercase to make ci.in keys case-insensitive
-- matrix_io.f90 - RedistributeHamCSR: guard Deallocate(Hamil%col/row) with Allocated() checks
+- pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly before Davidson
 - pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
+- conf_pt.f90 - move Hint and Gint out of integrals module into local contained functions using original linear-scan implementations
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 
 ## [1.3.0] - 2026-05-15

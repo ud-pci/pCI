@@ -60,10 +60,10 @@ Program pconf
     Use csf, Only : jbasis_init, jbasis, nonequiv_conf, formh_sym, unsym, reorder_det
     use determinants, only : Wdet, calcNd0, Dinit, Det_Number, Det_List, Jterm, Rdet, bits_per_int, &
                             Barr, FormBarr, convert_int_rep_to_bit_rep, num_ints_bit_rep
-    Use integrals, only : Rint, BuildGauntLUT
+    Use integrals, only : Rint, BuildGauntLUT, BuildHintLUT, BuildHintSLUT, BuildGintHash, BuildGintSHash, BuildISLUT
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
-    Use matrix_io, Only : RedistributeHamCSR
+    Use matrix_io, Only : RedistributeHamCSR, RedistributeJsqCSR, WriteMatrixCSR
     Use env_var
 
     Implicit None
@@ -219,8 +219,19 @@ Program pconf
         ! Redistribute Hamiltonian by row and build CSR for efficient SpMV.
         Call RedistributeHamCSR(npes, mype, mpi_type_real)
 
+        ! Write global CSR file for MPI ine (npes-agnostic; replaces CONFp.HIJ + sort).
+        If (Kl /= 1 .and. Kw == 1) &
+            Call WriteMatrixCSR(HamilCSR_rowptr, Hamil%col, Hamil%val, &
+                                nd_end-nd_start, 'pCONF.HIJ', mype, npes)
+
         ! Formation of J^2 matrix
         Call FormJ(mype, npes)
+
+        ! Redistribute J² by row (same row ranges as H) and write global CSR for MPI ine.
+        Call RedistributeJsqCSR(npes, mype, mpi_type_real)
+        If (Kl /= 1 .and. Kw == 1) &
+            Call WriteMatrixCSR(JsqCSR_rowptr, Jsq%col, Jsq%val, &
+                                nd_end-nd_start, 'pCONF.JJJ', mype, npes)
     End If
 
     ! Deallocate arrays that are no longer used in FormH
@@ -1141,6 +1152,8 @@ Contains
         If (K_is /= 0) Then
             Call MPI_Bcast(R_is, num_is, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call BuildISLUT
+            memFormH = memFormH + sizeof(ISLUT)
         End If
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
@@ -1154,11 +1167,19 @@ Contains
             Call MPI_Bcast(Dint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(Eint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(IntOrdS, Nx*Nx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+            Call BuildHintSLUT
+            memFormH = memFormH + sizeof(HintSPosLUT)
+            Call BuildGintSHash
+            memFormH = memFormH + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
         End If
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
         Call BuildGauntLUT
         memFormH = memFormH + sizeof(GauntLUT)
+        Call BuildHintLUT
+        memFormH = memFormH + sizeof(HintLUT)
+        Call BuildGintHash
+        memFormH = memFormH + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd)
     End subroutine InitFormH
 
     Subroutine FormH(npes, mype)
@@ -1287,6 +1308,7 @@ Contains
                     Call startTimer(s1)
                     Do n = Nd_prev+1, Nd
                         Call Gdet(n,idet1)
+                        If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                         iconf1(1:Ne) = Nh(idet1(1:Ne))
                         k=0
                         Do ic=1,Nc
@@ -1301,21 +1323,41 @@ Contains
                                 Else
                                     Do k1=1,kx
                                         k=k+1
-                                        Call Gdet(k,idet2)
-                                        Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                        If (diff <= 2) Then
-                                            nn=n
-                                            kk=k
-                                            Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                            If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                                            tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                            If (tt /= 0_type_real) Then
-                                                cntarray = cntarray + 1
-                                                Call IVAccumulatorAdd(iva1, nn)
-                                                Call IVAccumulatorAdd(iva2, kk)
-                                                Call RVAccumulatorAdd(rva1, tt)
-                                            Else
-                                                numzero = numzero + 1
+                                        If (use_bit_rep) Then
+                                            bdet2 = Barr(1:num_ints_bit_rep, k)
+                                            diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                                            If (diff <= 2) Then
+                                                nn=n
+                                                kk=k
+                                                Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                                                If (Kdsig /= 0) E_k=Diag(kk)
+                                                tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                                If (tt /= 0_type_real) Then
+                                                    cntarray = cntarray + 1
+                                                    Call IVAccumulatorAdd(iva1, nn)
+                                                    Call IVAccumulatorAdd(iva2, kk)
+                                                    Call RVAccumulatorAdd(rva1, tt)
+                                                Else
+                                                    numzero = numzero + 1
+                                                End If
+                                            End If
+                                        Else
+                                            Call Gdet(k,idet2)
+                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            If (diff <= 2) Then
+                                                nn=n
+                                                kk=k
+                                                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                                If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
+                                                tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                                If (tt /= 0_type_real) Then
+                                                    cntarray = cntarray + 1
+                                                    Call IVAccumulatorAdd(iva1, nn)
+                                                    Call IVAccumulatorAdd(iva2, kk)
+                                                    Call RVAccumulatorAdd(rva1, tt)
+                                                Else
+                                                    numzero = numzero + 1
+                                                End If
                                             End If
                                         End If
                                     End Do
@@ -1782,6 +1824,11 @@ Contains
         If (Allocated(Scr)) Deallocate(Scr)
         If (allocated(Barr)) Deallocate(Barr)
         If (Allocated(GauntLUT)) Deallocate(GauntLUT)
+        If (Allocated(HintLUT)) Deallocate(HintLUT)
+        If (Allocated(HintSPosLUT)) Deallocate(HintSPosLUT)
+        If (Allocated(GintHashPos)) Deallocate(GintHashIac, GintHashIbd, GintHashPos)
+        If (Allocated(GintSHashPos)) Deallocate(GintSHashIac, GintSHashIbd, GintSHashPos)
+        If (Allocated(ISLUT)) Deallocate(ISLUT)
     End Subroutine DeAllocateFormHArrays
 
     Subroutine AllocateDvdsnArrays(mype)
