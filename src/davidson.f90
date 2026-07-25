@@ -870,7 +870,6 @@ Module davidson
                     End If
 
                 End If
-                Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             End Do
 
             Deallocate(col_in, col_out)

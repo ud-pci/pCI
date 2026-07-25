@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-07-23
+## [1.4.0] - 2026-07-25
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction
 - matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 -> Matrix%row/col throughout
 - matrix_io.f90 - add RedistributeHamCSR and RedistributeJsqCSR subroutines to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row and Jsq%row freed after CSR build (row implicit in rowptr)
@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
 - pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly before Davidson
 - pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
+- pconf.F90 - remove Kl=3 functionality; update Kl=1 functionality to read new CSR-based pCONF.HIJ and pCONF.JJJ files
 - conf_pt.f90 - move Hint and Gint out of integrals module into local contained functions using original linear-scan implementations
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 

@@ -11,9 +11,6 @@ Program pconf
     !            Kl=0 - everything is calculated.
     !            Kl=1 - information from CONF.* files is used.
     !            Kl=2 - same as Kl=0, but with Sigma and Screening.
-    !            Kl=3 - same as Kl=1, but status of CONF.HIJ is
-    !                   changed. That allows to add configurations
-    !                   to the previous calculation.
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   Kv - key for the variant:
     !              Kv=1 - direct diagonalization and J selection
@@ -63,7 +60,7 @@ Program pconf
     Use integrals, only : Rint, BuildGauntLUT, BuildHintLUT, BuildHintSLUT, BuildGintHash, BuildGintSHash, BuildISLUT
     use formj2, only : FormJ
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
-    Use matrix_io, Only : RedistributeHamCSR, RedistributeJsqCSR, WriteMatrixCSR
+    Use matrix_io, Only : RedistributeHamCSR, RedistributeJsqCSR, WriteMatrixCSR, ReadMatrixCSR
     Use env_var
 
     Implicit None
@@ -81,6 +78,7 @@ Program pconf
     Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
 
     Logical :: use_bit_rep = .false., mem_check_passed = .false., shouldForceBitDet, bitDetEnvSet
+    Logical :: hij_exists = .false.
 
     Type(MPI_Datatype) :: mpi_type_real
     Type(MPI_Datatype) :: mpi_type2_real
@@ -201,40 +199,39 @@ Program pconf
         Stop
     End If
 
-    ! Allocate global arrays used in formation of Hamiltonian
+    ! Allocate and broadcast all arrays needed by FormH and Davidson.
     Call AllocateFormHArrays(mype)
-    Call InitFormH 
+    Call InitFormH
     Call calcNd0(Nc1, Nd0)
     If (mype == 0) Call calcMemReqs
 
-    If (kCSF > 0) Then
-        ! Formation of symmetrized Hamiltonian matrix (CSF basis, size ncsf x ncsf)
-        Call formh_sym(Nc,ncsf,nccj,max_ndcs,mype,npes)
-        ! Redistribute by row so Mxmpy can use CSR SpMV.
-        Call RedistributeHamCSR(npes, mype, mpi_type_real)
-    Else
-        ! Formation of Hamiltonian matrix
-        Call FormH(npes,mype)
-
-        ! Redistribute Hamiltonian by row and build CSR for efficient SpMV.
-        Call RedistributeHamCSR(npes, mype, mpi_type_real)
-
-        ! Write global CSR file for MPI ine (npes-agnostic; replaces CONFp.HIJ + sort).
-        If (Kl /= 1 .and. Kw == 1) &
-            Call WriteMatrixCSR(HamilCSR_rowptr, Hamil%col, Hamil%val, &
-                                nd_end-nd_start, 'pCONF.HIJ', mype, npes)
-
-        ! Formation of J^2 matrix
-        Call FormJ(mype, npes)
-
-        ! Redistribute J² by row (same row ranges as H) and write global CSR for MPI ine.
-        Call RedistributeJsqCSR(npes, mype, mpi_type_real)
-        If (Kl /= 1 .and. Kw == 1) &
-            Call WriteMatrixCSR(JsqCSR_rowptr, Jsq%col, Jsq%val, &
-                                nd_end-nd_start, 'pCONF.JJJ', mype, npes)
+    If (Kl == 1) Then
+        ! Probe for prebuilt CSR files; if missing, hij_exists=.false. falls through to FormH/FormJ.
+        If (mype == 0) Inquire(file='pCONF.HIJ', exist=hij_exists)
+        Call MPI_Bcast(hij_exists, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpierr)
     End If
 
-    ! Deallocate arrays that are no longer used in FormH
+    If (Kl == 1 .and. hij_exists) Then
+        ! pCONF.HIJ/JJJ found: read prebuilt CSR matrices directly, skip FormH/FormJ.
+        Call ReadMatrixCSR(Hamil%col, Hamil%val, HamilCSR_rowptr, 'pCONF.HIJ', mype, npes)
+        Call ReadMatrixCSR(Jsq%col, Jsq%val, JsqCSR_rowptr, 'pCONF.JJJ', mype, npes, nd_start, nd_end)
+    Else If (kCSF > 0) Then
+        ! CSF basis: build symmetrized H (ncsf x ncsf) then redistribute into CSR.
+        Call formh_sym(Nc, ncsf, nccj, max_ndcs, mype, npes)
+        Call RedistributeHamCSR(npes, mype, mpi_type_real)
+    Else
+        ! Kl=0/2 (or Kl=1 with no prebuilt files): build H and J^2 from scratch.
+        Call FormH(npes, mype)
+
+        Call RedistributeHamCSR(npes, mype, mpi_type_real)
+        If (Kw == 1) Call WriteMatrixCSR(HamilCSR_rowptr, Hamil%col, Hamil%val, nd_end-nd_start, 'pCONF.HIJ', mype, npes)
+
+        Call FormJ(mype, npes)
+        Call RedistributeJsqCSR(npes, mype, mpi_type_real)
+        If (Kw == 1) Call WriteMatrixCSR(JsqCSR_rowptr, Jsq%col, Jsq%val, nd_end-nd_start, 'pCONF.JJJ', mype, npes)
+    End If
+
+    ! Deallocate FormH-specific arrays (integrals, Iarr, etc.) no longer needed.
     Call DeAllocateFormHArrays(mype)
     
     ! Allocate arrays that are used in Davidson procedure
@@ -354,16 +351,9 @@ Contains
             If (Ksig /= 0) Then
                 Write(*,'(1X," Energy dependence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
             End If
-            Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
+            Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT)",I1)') Kl
             Kecp=0
             Kl=0
-        Else If (Kl == 3) Then
-            Write(*,'(1X," Ksig = (0,1,2): ",I1)') Ksig 
-            If (Ksig /= 0) Then
-                Write(*,'(1X," Energy dependence of Sigma (1-Yes,0-No)? ",I1)') Kdsig
-            End If
-            Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
-            Kecp=0
         Else
             Ksig=0
         End If
@@ -1079,7 +1069,6 @@ Contains
         Integer :: mpierr
         Integer(Kind=int64) :: count
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KXIJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KWeights, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1172,7 +1161,6 @@ Contains
             Call BuildGintSHash
             memFormH = memFormH + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
         End If
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
         Call BuildGauntLUT
         memFormH = memFormH + sizeof(GauntLUT)
@@ -1189,18 +1177,17 @@ Contains
                                     bits_per_int, bdet1, bdet2, Barr, print_bits, &
                                     convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, &
                                     compare_bit_dets, get_det_indexes
-        Use matrix_io
         Use vaccumulator
 
         Implicit None
 
         Integer :: npes, mype, mpierr
-        Integer :: k1, kx, n, ic, j, k, diff, icomp, ih4, ihmax
+        Integer :: k1, kx, n, ic, j, k, diff, icomp
         Integer :: nn, kk, msg, sender, num_done, an_id, endnd
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
-        Integer(Kind=int64)     :: stot, s1, s2, numzero=0, nz0, maxme, maxNumElementsPerCore, mesplit, n8
+        Integer(Kind=int64)     :: stot, s1, s2, numzero=0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
         Integer(Kind=int64) :: statmem, statmem_copy, mem, maxmem, maxmem_csr
         Integer(Kind=int64) :: peak_formH, peak_redist, peak_dvdsn, counter1, counter2, counter3
@@ -1223,43 +1210,7 @@ Contains
             If (.not. allocated(bdet2)) allocate(bdet2(num_ints_bit_rep))
         End If
 
-        ! Read number of processors
-        If (Kl == 3) Then
-            Open(66,file='progress.conf',status='UNKNOWN',form='UNFORMATTED',access='stream')
-            Read(66) Nc_prev, Nd_prev
-            Close(66) 
-            If (Nd == Nd_prev) Then
-                Kl = 1
-                If (mype == 0) Then
-                    print*, 'previously: Nc=',Nc_prev, ' Nd=', Nd_prev
-                    print*, 'No new configurations to include'
-                End If
-            End If
-        End If
-
-        ! If Hamiltonian has already been fully constructed
-        If (Kl == 1) Then 
-            ! Read the Hamiltonian from file CONFp.HIJ
-            Call ReadMatrix(Hamil%row,Hamil%col,Hamil%val,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-            numzero = Count(Hamil%val(1:ih4) == 0)
-
-            ! Add maximum memory per core from storing H to total memory count
-            Call MPI_AllReduce(ih4, ihmax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            memEstimate = memEstimate + ihmax*(8_int64+type_real)
-
-        ! If Hamiltonian has not been fully constructed
-        Else 
-            ! If Kl = 3, read the previous Hamiltonian from file CONFp.HIJ
-            If (Kl == 3) Then
-                Call ReadMatrix(iva1%vAccum,iva2%vAccum,rva1%vAccum,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
-
-                nz0 = count(rva1%vAccum==0)
-                Call MPI_AllReduce(MPI_IN_PLACE, nz0, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            
-                If (mype == 0) print*, 'previously: Nc=',Nc_prev, ' Nd=', Nd_prev, ' NumH=', NumH-nz0, ' numzero=', nz0
-            End If
-
-            Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(3))
+        Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(3))
             vaGrowBy = vaBinSize
             ndGrowBy = 1
 
@@ -1277,36 +1228,22 @@ Contains
             cntarray=0
 
             ! Get accumulator vectors setup (or re-setup if this is rank 0):
-            If (Kl == 3) Then
-                Call IVAccumulatorContinue(iva1, vaGrowBy)
-                Call IVAccumulatorContinue(iva2, vaGrowBy)
-                If (mype == 0) Call RVAccumulatorContinue(rva1, vaGrowBy)
-            Else
-                Call IVAccumulatorInit(iva1, vaGrowBy)
-                Call IVAccumulatorInit(iva2, vaGrowBy)
-                If (mype==0) Call RVAccumulatorInit(rva1, vaGrowBy)
-                Nd_prev = 0
-                ih4=0
-                NumH=0_int64
-                counter1=1_int64
-                counter2=1_int64
-                counter3=1_int64
-            End If
-        
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+            Call IVAccumulatorInit(iva1, vaGrowBy)
+            Call IVAccumulatorInit(iva2, vaGrowBy)
+            If (mype==0) Call RVAccumulatorInit(rva1, vaGrowBy)
+            NumH=0_int64
+            counter1=1_int64
+            counter2=1_int64
+            counter3=1_int64
 
             If (mype == 0) Then
                 If (npes == 1) Then
                     ! Single process: no workers, loop over all determinants directly.
-                    If (Kl == 3) Then
-                        ndsplit = (Nd-Nd_prev+1)/10
-                    Else
-                        ndsplit = Nd/10
-                    End If
-                    ndcnt = Nd_prev+1+ndsplit
+                    ndsplit = Nd/10
+                    ndcnt = 1+ndsplit
                     j=9
                     Call startTimer(s1)
-                    Do n = Nd_prev+1, Nd
+                    Do n = 1, Nd
                         Call Gdet(n,idet1)
                         If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                         iconf1(1:Ne) = Nh(idet1(1:Ne))
@@ -1433,11 +1370,11 @@ Contains
                 Else
                     ! Multi-process: distribute work to workers, then coordinate.
                     Do an_id = 1, npes - 1
-                       nnd = Nd_prev + 1 + ndGrowBy*(an_id-1) + 1
+                       nnd = ndGrowBy*(an_id-1) + 2
                        Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
                     End Do
 
-                    n=Nd_prev+1
+                    n=1
                     Call Gdet(n,idet1)
                     iconf1(1:Ne) = Nh(idet1(1:Ne))
                     k=0
@@ -1477,13 +1414,8 @@ Contains
 
                     NumH =  NumH + cntarray(1)
                     num_done = 0
-                    If (Kl == 3) Then
-                        ndsplit = (Nd-Nd_prev+1)/10
-                        ndcnt = Nd_prev+1+ndsplit
-                    Else
-                        ndsplit = Nd/10
-                        ndcnt = ndsplit
-                    End If
+                    ndsplit = Nd/10
+                    ndcnt = ndsplit
                     maxme = cntarray(2)
                     j=9
 
@@ -1570,7 +1502,7 @@ Contains
                     End Do
                 End If
             Else
-                cntarray=Int(ih4, kind=int64)
+                cntarray=0_int64
                 Do 
                     Call MPI_RECV ( nnd, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     If (nnd == -1) Then
@@ -1630,24 +1562,18 @@ Contains
             Call IVAccumulatorReset(iva2)
             If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
             If (mype == 0) Call RVAccumulatorReset(rva1)
-        
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
             Call startTimer(s1)
 
             Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            If (Kl == 3) Then
-                mesplit = (maxNumElementsPerCore-ih4+1)/10
-            Else
-                mesplit = maxNumElementsPerCore/10
-            End If
+            mesplit = maxNumElementsPerCore/10
             numzero=0_int64
             j=1
 
             If (mype /= 0) Then
                 Allocate(Hamil%val(counter1))
                 Call startTimer(s2)
-                If (Kl == 3) Hamil%val(1:ih4) = rva1%vAccum(1:ih4)
-                Do n8=ih4+1,counter1
+                Do n8=1,counter1
                     nn=Hamil%row(n8)
                     kk=Hamil%col(n8)
                     
@@ -1668,7 +1594,7 @@ Contains
                     t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
                     Hamil%val(n8)=t
 
-                    If (Kl /= 3 .and. t == 0) numzero=numzero+1
+                    If (t == 0) numzero=numzero+1
                     If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
                         Call stopTimer(s1, timeStr)
                         Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
@@ -1679,22 +1605,15 @@ Contains
             Else
                 If (npes /= 1) print*, '========== Starting calculation stage of FormH =========='
             End If
-            If (Kl == 3) numzero = count(Hamil%val==0)
             Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             If (mype == 0) print*, '========== Formation of Hamiltonian matrix completed =========='
-        End If
 
         ih8=size(Hamil%val, kind=int64)
-        ih4=Int(ih8, kind=int32)
-        
+
         Call MPI_AllReduce(ih8, NumH, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(MPI_IN_PLACE, numzero, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(MPI_IN_PLACE, iscr, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
         Call MPI_AllReduce(MPI_IN_PLACE, xscr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        
-        ! Write Hamiltonian to file CONFp.HIJ
-        If (Kl /= 1 .and. Kw == 1)  Call WriteMatrix(Hamil,ih4,NumH,'CONFp.HIJ',mype,npes,mpierr)
         
         ! give all cores Hmin, the minimum matrix element value (local min first, then global reduce)
         Hamil%minval = minval(Hamil%val(1:ih8))
@@ -1793,8 +1712,6 @@ Contains
         Integer :: mpierr, mype
         Character(Len=16) :: memStr
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        
         If (mype==0) Then
             Call FormattedMemSize(memFormH, memStr)
             Write(*,'(A,A,A)') 'De-allocating ',Trim(memStr),' per rank from arrays for FormH'
@@ -1838,7 +1755,6 @@ Contains
         Integer :: mpierr, mype, npes, r
         Character(Len=16) :: memStr, memTotStr
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Comm_size(MPI_COMM_WORLD, npes, mpierr)
 
@@ -2084,8 +2000,6 @@ Contains
             Call stopTimer(s1, timeStr)
             Write(*,"(2X,A,A,A)") "TIMING >>> Initial diagonalization took ", trim(timeStr), " to complete"
         End If
-
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
     End Subroutine DiagInitApprox
 
@@ -2703,7 +2617,6 @@ Contains
         Integer, Intent(In) :: mype
         Integer :: mpierr
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
@@ -2744,7 +2657,6 @@ Contains
         Integer :: n, mype, mpierr
         Integer(Kind=int64) :: count
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         If (.not. Allocated(Mdc)) Allocate(Mdc(Nc))
         Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -2762,7 +2674,6 @@ Contains
         Do n=1,Nlv
             Call MPI_Bcast(ArrB(1:Nd,n), Nd, mpi_type_real, 0, MPI_COMM_WORLD, mpierr)
         End Do
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
 
         Return
     End subroutine InitLSJ
@@ -2880,10 +2791,11 @@ Contains
                     End If
                 End Do
             End If
+
             Call MPI_AllReduce(MPI_IN_PLACE, xj, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, xl, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, xs, Nlv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+
             If (mype == 0) Then
                 Call stopTimer(s1, timeStr)
                 Write(*,'(2X,A)') 'TIMING >>> L,S,J calculation done in ' // Trim(timeStr)
