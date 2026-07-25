@@ -9,7 +9,7 @@ Program pconf
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   Kl - key:
     !            Kl=0 - everything is calculated.
-    !            Kl=1 - information from CONF.* files is used.
+    !            Kl=1 - read prebuilt H/J^2 from pCONF.HIJ/pCONF.JJJ (build+write if missing).
     !            Kl=2 - same as Kl=0, but with Sigma and Screening.
     ! - - - - - - - - - - - - - - - - - - - - - - - - -
     !   Kv - key for the variant:
@@ -192,13 +192,6 @@ Program pconf
         End If
     End If
 
-    If (Kl == 4) Then
-        If (mype == 0) Call calcMemReqs
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
-        Call MPI_Finalize(mpierr)
-        Stop
-    End If
-
     ! Allocate and broadcast all arrays needed by FormH and Davidson.
     Call AllocateFormHArrays(mype)
     Call InitFormH
@@ -217,18 +210,22 @@ Program pconf
         Call ReadMatrixCSR(Jsq%col, Jsq%val, JsqCSR_rowptr, 'pCONF.JJJ', mype, npes, nd_start, nd_end)
     Else If (kCSF > 0) Then
         ! CSF basis: build symmetrized H (ncsf x ncsf) then redistribute into CSR.
-        Call formh_sym(Nc, ncsf, nccj, max_ndcs, mype, npes)
+        Call formh_sym(Nc,ncsf,nccj,max_ndcs,mype,npes)
         Call RedistributeHamCSR(npes, mype, mpi_type_real)
     Else
         ! Kl=0/2 (or Kl=1 with no prebuilt files): build H and J^2 from scratch.
-        Call FormH(npes, mype)
+        Call FormH(npes,mype)
 
         Call RedistributeHamCSR(npes, mype, mpi_type_real)
-        If (Kw == 1) Call WriteMatrixCSR(HamilCSR_rowptr, Hamil%col, Hamil%val, nd_end-nd_start, 'pCONF.HIJ', mype, npes)
+        If (Kw == 1) &
+            Call WriteMatrixCSR(HamilCSR_rowptr, Hamil%col, Hamil%val, &
+                                nd_end-nd_start, 'pCONF.HIJ', mype, npes)
 
         Call FormJ(mype, npes)
         Call RedistributeJsqCSR(npes, mype, mpi_type_real)
-        If (Kw == 1) Call WriteMatrixCSR(JsqCSR_rowptr, Jsq%col, Jsq%val, nd_end-nd_start, 'pCONF.JJJ', mype, npes)
+        If (Kw == 1) &
+            Call WriteMatrixCSR(JsqCSR_rowptr, Jsq%col, Jsq%val, &
+                                nd_end-nd_start, 'pCONF.JJJ', mype, npes)
     End If
 
     ! Deallocate FormH-specific arrays (integrals, Iarr, etc.) no longer needed.
@@ -1042,14 +1039,6 @@ Contains
         Write(*,'(A,A,A)') 'calcMemReqs: Allocating arrays for Davidson procedure will require at least ', &
                             Trim(memStr),' per rank'
 
-        If (Kl == 4) Then
-            mem = memEstimate + memDvdsn
-            Call FormattedMemSize(mem, memStr)
-            Write(*,'(A,A,A)') 'calcMemReqs: Total memory required WITHOUT accounting for H and J^2 matrices is ', &
-                            Trim(memStr),' per rank'
-            Return
-        End If
-    
         Call FormattedMemSize(memTotalPerCPU, memStr)
         If (memTotalPerCPU == 0) Then
             Write(*,'(A)') 'calcMemReqs: Available memory was not saved to the environment.'

@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
 - pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly before Davidson
 - pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
-- pconf.F90 - remove Kl=3 functionality; update Kl=1 functionality to read new CSR-based pCONF.HIJ and pCONF.JJJ files
+- pconf.F90 - remove Kl=3,4 functionalities; update Kl=1 functionality to read new CSR-based pCONF.HIJ and pCONF.JJJ files
 - conf_pt.f90 - move Hint and Gint out of integrals module into local contained functions using original linear-scan implementations
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 
