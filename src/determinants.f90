@@ -461,23 +461,39 @@ Module determinants
         Return
     End Subroutine Wdet
 
-    Subroutine Rdet(str)
+    Subroutine Rdet(str, arr, nd_out)
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
-        !
+        ! Without optional args: fills the module Iarr and sets global Nd.
+        ! With arr: fills arr instead and, if nd_out is present, sets nd_out without touching the global Nd.
         Implicit None
-        Integer :: i
-        Character(Len=*) :: str
+        Character(Len=*), Intent(In)    :: str
+        Integer, Allocatable, Optional, Intent(InOut) :: arr(:,:)
+        Integer, Optional, Intent(Out)   :: nd_out
+        Integer :: i, nd_loc, nsu_loc, err_stat
 
-        Open (16,file=str,status='OLD',form='UNFORMATTED')
-        Read(16) Nd,Nsu
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
-        Do i=1,Nd
-           Read(16,end=710) Iarr(1:Ne,i)
-        End Do
-        close(16)
-        Return
-710     write(*,*)' Rdet: end of CONF.DET for idet=',i
-        stop
+        Open(16, file=str, status='OLD', form='UNFORMATTED')
+        Read(16) nd_loc, nsu_loc
+        If (Present(arr)) Then
+            If (Present(nd_out)) nd_out = nd_loc
+            If (.not. Allocated(arr)) Allocate(arr(Ne, nd_loc))
+            Do i = 1, nd_loc
+                Read(16, iostat=err_stat) arr(1:Ne, i)
+                If (err_stat /= 0) Exit
+            End Do
+        Else
+            Nd  = nd_loc
+            Nsu = nsu_loc
+            If (.not. Allocated(Iarr)) Allocate(Iarr(Ne, Nd))
+            Do i = 1, Nd
+                Read(16, iostat=err_stat) Iarr(1:Ne, i)
+                If (err_stat /= 0) Exit
+            End Do
+        End If
+        Close(16)
+        If (err_stat /= 0) Then
+            Write(*,*) ' Rdet: premature end of file in ', Trim(str), ' at idet=', i
+            Stop
+        End If
     End Subroutine Rdet
 
     Subroutine Rspq(id1,id2,is,nf,i1,j1,i2,j2)
