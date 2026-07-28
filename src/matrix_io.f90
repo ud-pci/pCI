@@ -284,12 +284,13 @@ Module matrix_io
         Integer, Intent(In) :: npes, mype
         Type(MPI_Datatype), Intent(In) :: mpi_type_real
 
-        Integer :: r, n, mpierr, nd_loc, loc_row, ipos
-        Integer(Kind=Int64) :: i, new_ih8, NumH_total, cumsum, ih8_max
+        Integer :: r, n, mpierr, nd_loc, loc_row
+        Integer(Kind=Int64) :: i, ipos, new_ih8, NumH_total, cumsum, ih8_max
         Integer, Allocatable, Dimension(:) :: send_cnts, recv_cnts, send_disp, recv_disp
         Integer, Allocatable, Dimension(:) :: send_row, send_col, recv_row, recv_col
         Real(type_real), Allocatable, Dimension(:) :: send_val, recv_val
-        Integer, Allocatable, Dimension(:) :: tmp_pos, row_cnt, tmp_col, row_cnts_g, rank_of_row
+        Integer, Allocatable, Dimension(:) :: row_cnt, tmp_col, row_cnts_g, rank_of_row
+        Integer(Kind=Int64), Allocatable, Dimension(:) :: tmp_pos
         Real(type_real), Allocatable, Dimension(:) :: tmp_val
         Integer(Kind=Int64) :: s1
         Character(Len=16) :: timeStr
@@ -520,12 +521,13 @@ Module matrix_io
         Integer, Intent(In) :: npes, mype
         Type(MPI_Datatype), Intent(In) :: mpi_type_real
 
-        Integer :: r, n, mpierr, nd_loc, loc_row, ipos
-        Integer(Kind=Int64) :: i, new_ij8, NumJ_total, ij8_max
+        Integer :: r, n, mpierr, nd_loc, loc_row
+        Integer(Kind=Int64) :: i, ipos, new_ij8, NumJ_total, ij8_max
         Integer, Allocatable, Dimension(:) :: send_cnts, recv_cnts, send_disp, recv_disp
         Integer, Allocatable, Dimension(:) :: send_row, send_col, recv_row, recv_col
         Real(type_real), Allocatable, Dimension(:) :: send_val, recv_val
-        Integer, Allocatable, Dimension(:) :: tmp_pos, row_cnt, tmp_col, rank_of_row, nd_ends_all
+        Integer, Allocatable, Dimension(:) :: row_cnt, tmp_col, rank_of_row, nd_ends_all
+        Integer(Kind=Int64), Allocatable, Dimension(:) :: tmp_pos
         Real(type_real), Allocatable, Dimension(:) :: tmp_val
         Integer(Kind=Int64) :: s1
         Character(Len=16) :: timeStr
@@ -701,7 +703,7 @@ Module matrix_io
         Implicit None
 
         Integer, Intent(In) :: nd_loc, mype, npes
-        Integer, Intent(In) :: mat_rowptr(0:nd_loc)
+        Integer(Kind=int64), Intent(In) :: mat_rowptr(0:nd_loc)
         Integer, Intent(In) :: mat_col(:)
         Real(type_real), Intent(In) :: mat_val(:)
         Character(Len=*), Intent(In) :: filename
@@ -715,7 +717,7 @@ Module matrix_io
         Integer(Kind=int64) :: s1
         Character(Len=16) :: timeStr
 
-        local_nnz = Int(mat_rowptr(nd_loc), Kind=int64)
+        local_nnz = mat_rowptr(nd_loc)
 
         ! Gather per-rank nnz; compute each rank's global offset into col/val
         Allocate(all_nnz(0:npes-1))
@@ -738,16 +740,14 @@ Module matrix_io
         ! Rank 0 writes the sentinel row_ptr(Nd) = total_nnz separately (see below).
         Allocate(local_rp(0:nd_loc-1))
         Do r = 0, nd_loc-1
-            local_rp(r) = nnz_offset + Int(mat_rowptr(r), Kind=int64)
+            local_rp(r) = nnz_offset + mat_rowptr(r)
         End Do
 
-        Nd8      = Int(Nd, Kind=int64)
+        Nd8 = Int(Nd, Kind=int64)
         rp_bytes = (Nd8 + 1_int64) * 8_int64
         col_bytes = total_nnz * 4_int64
 
-        Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, &
-                           MPI_MODE_WRONLY + MPI_MODE_CREATE, &
-                           MPI_INFO_NULL, fh, mpierr)
+        Call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh, mpierr)
         Call MPIErrHandle(mpierr)
 
         ! Header and sentinel are written by rank 0 only.
@@ -774,22 +774,18 @@ Module matrix_io
         If (local_nnz > 0) Then
             disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
                    Int(nnz_offset, Kind=MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
-            Call MPI_FILE_WRITE_AT(fh, disp, mat_col, Int(local_nnz), MPI_INTEGER, &
-                                   MPI_STATUS_IGNORE, mpierr)
+            Call MPI_FILE_WRITE_AT(fh, disp, mat_col, Int(local_nnz), MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
         End If
 
         ! val: each rank writes its type_real values at the appropriate global offset
         If (local_nnz > 0) Then
-            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
-                   Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
+            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
                    Int(nnz_offset, Kind=MPI_OFFSET_KIND) * Int(type_real, Kind=MPI_OFFSET_KIND)
             Select Case(type_real)
             Case(sp)
-                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_REAL, &
-                                       MPI_STATUS_IGNORE, mpierr)
+                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_REAL, MPI_STATUS_IGNORE, mpierr)
             Case(dp)
-                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_DOUBLE_PRECISION, &
-                                       MPI_STATUS_IGNORE, mpierr)
+                Call MPI_FILE_WRITE_AT(fh, disp, mat_val, Int(local_nnz), MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr)
             End Select
         End If
 
@@ -797,8 +793,7 @@ Module matrix_io
 
         If (mype == 0) Then
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A)') 'TIMING >>> WriteMatrixCSR: ' // Trim(filename) // &
-                               ' written in ' // Trim(timeStr)
+            Write(*,'(2X,A)') 'TIMING >>> WriteMatrixCSR: ' // Trim(filename) // ' written in ' // Trim(timeStr)
         End If
 
     End Subroutine WriteMatrixCSR
@@ -818,7 +813,7 @@ Module matrix_io
 
         Integer, Allocatable, Intent(Out) :: mat_col(:)
         Real(type_real), Allocatable, Intent(Out) :: mat_val(:)
-        Integer, Allocatable, Intent(Out) :: mat_rowptr(:)
+        Integer(Kind=int64), Allocatable, Intent(Out) :: mat_rowptr(:)
         Character(Len=*), Intent(In) :: filename
         Integer, Intent(In) :: mype, npes
         Integer, Intent(In), Optional :: nd_start_in, nd_end_in
@@ -827,6 +822,8 @@ Module matrix_io
         Integer(Kind=int64) :: Nd_file, total_nnz, local_nnz, nnz_offset
         Integer(Kind=MPI_OFFSET_KIND) :: disp
         Integer(Kind=int64) :: Nd8, rp_bytes, col_bytes
+        Integer(Kind=int64) :: chunk_off, chunk
+        Integer(Kind=int64), Parameter :: chunk_max = Int(Huge(0), Kind=int64)
         Integer :: mpierr, r, n, nd_loc
         Integer(Kind=int64) :: ih8_max
         Type(MPI_File) :: fh
@@ -889,37 +886,39 @@ Module matrix_io
         ! --- Build local CSR row pointer (0-based local offsets into mat_col/mat_val) ---
         Allocate(mat_rowptr(0:nd_loc))
         Do r = 0, nd_loc
-            mat_rowptr(r) = Int(row_ptr(nd_start + r) - nnz_offset)
+            mat_rowptr(r) = row_ptr(nd_start + r) - nnz_offset
         End Do
         Deallocate(row_ptr)
 
         rp_bytes  = (Nd8 + 1_int64) * 8_int64
         col_bytes =  total_nnz * 4_int64
 
-        ! --- Read col slice (independent: each rank reads a different offset) ---
+        ! --- Read col slice ---
         Allocate(mat_col(local_nnz))
-        If (local_nnz > 0) Then
-            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
-                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
-            Call MPI_FILE_READ_AT(fh, disp, mat_col, Int(local_nnz), &
-                                  MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
-        End If
+        chunk_off = 0_int64
+        Do While (chunk_off < local_nnz)
+            chunk = Min(local_nnz - chunk_off, chunk_max)
+            disp  = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
+                    Int(nnz_offset + chunk_off, Kind=MPI_OFFSET_KIND) * 4_MPI_OFFSET_KIND
+            Call MPI_FILE_READ_AT(fh, disp, mat_col(chunk_off+1), Int(chunk), MPI_INTEGER, MPI_STATUS_IGNORE, mpierr)
+            chunk_off = chunk_off + chunk
+        End Do
 
         ! --- Read val slice ---
         Allocate(mat_val(local_nnz))
-        If (local_nnz > 0) Then
-            disp = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + &
-                   Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
-                   Int(nnz_offset, Kind=MPI_OFFSET_KIND) * Int(type_real, Kind=MPI_OFFSET_KIND)
+        chunk_off = 0_int64
+        Do While (chunk_off < local_nnz)
+            chunk = Min(local_nnz - chunk_off, chunk_max)
+            disp  = 16_MPI_OFFSET_KIND + Int(rp_bytes, Kind=MPI_OFFSET_KIND) + Int(col_bytes, Kind=MPI_OFFSET_KIND) + &
+                    Int(nnz_offset + chunk_off, Kind=MPI_OFFSET_KIND) * Int(type_real, Kind=MPI_OFFSET_KIND)
             Select Case(type_real)
             Case(sp)
-                Call MPI_FILE_READ_AT(fh, disp, mat_val, Int(local_nnz), &
-                                      MPI_REAL, MPI_STATUS_IGNORE, mpierr)
+                Call MPI_FILE_READ_AT(fh, disp, mat_val(chunk_off+1), Int(chunk), MPI_REAL, MPI_STATUS_IGNORE, mpierr)
             Case(dp)
-                Call MPI_FILE_READ_AT(fh, disp, mat_val, Int(local_nnz), &
-                                      MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr)
+                Call MPI_FILE_READ_AT(fh, disp, mat_val(chunk_off+1), Int(chunk), MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE, mpierr)
             End Select
-        End If
+            chunk_off = chunk_off + chunk
+        End Do
 
         Call MPI_FILE_CLOSE(fh, mpierr)
 
@@ -929,12 +928,9 @@ Module matrix_io
 
         If (mype == 0) Then
             Call stopTimer(s1, timeStr)
-            Write(*,'(2X,A,I0,A,F5.1,A)') 'ReadMatrixCSR: total_nnz = ', total_nnz, &
-                '; H*v load balance: ', &
-                100.0_dp * Real(total_nnz, dp) / Real(Int(npes, Int64) * ih8_max, dp), &
-                '% efficiency'
-            Write(*,'(2X,A)') 'TIMING >>> ReadMatrixCSR: ' // Trim(filename) // &
-                               ' read in ' // Trim(timeStr)
+            Write(*,'(2X,A,I0,A,F5.1,A)') 'ReadMatrixCSR: total_nnz = ', total_nnz,'; H*v load balance: ', &
+                100.0_dp * Real(total_nnz, dp) / Real(Int(npes, Int64) * ih8_max, dp), '% efficiency'
+            Write(*,'(2X,A)') 'TIMING >>> ReadMatrixCSR: ' // Trim(filename) // ' read in ' // Trim(timeStr)
         End If
 
     End Subroutine ReadMatrixCSR

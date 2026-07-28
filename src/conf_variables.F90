@@ -67,8 +67,8 @@ Module conf_variables
     ! HamilCSR_rowptr(r) = cumulative nonzero count through local row r (0-based), so nonzeros for local row r occupy positions
     ! HamilCSR_rowptr(r-1)+1 ... HamilCSR_rowptr(r).
     Integer :: nd_start=0, nd_end=0, nd_local=0
-    Integer, Allocatable, Dimension(:) :: HamilCSR_rowptr, JsqCSR_rowptr
-    
+    Integer(Kind=Int64), Allocatable, Dimension(:) :: HamilCSR_rowptr, JsqCSR_rowptr
+
     ! MPI_Allgatherv metadata for distributed ArrB column operations (set in AllocateDvdsnArrays)
     Integer, Allocatable, Dimension(:) :: nd_counts_all, nd_displs_all
 

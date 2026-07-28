@@ -367,7 +367,7 @@ Module formj2
         xj=0_type_real
         Do n = nd_start+1, nd_end
             If (n > nx) Cycle
-            Do l8 = Int(JsqCSR_rowptr(n-nd_start-1), Int64)+1, Int(JsqCSR_rowptr(n-nd_start), Int64)
+            Do l8 = JsqCSR_rowptr(n-nd_start-1)+1_int64, JsqCSR_rowptr(n-nd_start)
                 k = Jsq%col(l8)
                 t = Jsq%val(l8)
                 If (k <= nx) Then

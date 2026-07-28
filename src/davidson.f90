@@ -51,7 +51,7 @@ Module davidson
                 If (Kl /= 1 .And. Kl /= 3) Exit
                 Cycle
             End If
-            Do l8=Int(HamilCSR_rowptr(n-nd_start-1),Int64)+1,Int(HamilCSR_rowptr(n-nd_start),Int64)
+            Do l8=HamilCSR_rowptr(n-nd_start-1)+1_int64, HamilCSR_rowptr(n-nd_start)
                 k=Hamil%col(l8)
                 t=Hamil%val(l8)
                 If (n == k) t=t-Hamil%minval
@@ -624,8 +624,7 @@ Module davidson
             ! with n/=k contributes to both output row n and output row k (symmetric scatter).
             col_out_cache(:) = Real(0, kind=type_real)
             Do n = nd_start+1, nd_end
-                Do l8 = Int(HamilCSR_rowptr(n-nd_start-1), Int64)+1, &
-                        Int(HamilCSR_rowptr(n-nd_start),   Int64)
+                Do l8 = HamilCSR_rowptr(n-nd_start-1)+1_int64, HamilCSR_rowptr(n-nd_start)
                     k = Hamil%col(l8)
                     t = Hamil%val(l8)
                     If (n == k) Then
@@ -638,8 +637,7 @@ Module davidson
             End Do
 
             ! Step 3-4: sum scatter contributions across ranks; store local output slice.
-            Call MPI_Allreduce(MPI_IN_PLACE, col_out_cache, Nd, mpi_type_real, MPI_SUM, &
-                               MPI_COMM_WORLD, mpierr)
+            Call MPI_Allreduce(MPI_IN_PLACE, col_out_cache, Nd, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
             ArrB(1:nd_local, i2min+iv) = col_out_cache(nd_start+1:nd_end)
         End Do
 
@@ -815,7 +813,7 @@ Module davidson
                         col_out(:,i)=0_type_real
                     End Do
                     Do n=1,nd_local
-                        Do j8=Int(JsqCSR_rowptr(n-1),int64)+1_int64, Int(JsqCSR_rowptr(n),int64)
+                        Do j8=JsqCSR_rowptr(n-1)+1_int64, JsqCSR_rowptr(n)
                             k=Jsq%col(j8)
                             t=Jsq%val(j8)
                             Do i=1,num
