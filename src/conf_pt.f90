@@ -174,15 +174,13 @@ Contains
         Real(dp), Dimension(IPs)    :: Qq1
         Integer, Dimension(4*IPs)   :: IQN
         Integer, Dimension(33)      :: nnn, jjj, nqq
-        Character(Len=1)            :: Let(9), lll(33)
+        Character(Len=1)            :: lll(33)
         Character(Len=512)          :: strfmt, err_msg
         Logical                     :: longbasis
 
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                     (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        data Let/'s','p','d','f','g','h','i','k','l'/
-
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
 
@@ -308,7 +306,7 @@ Contains
         Write(11,'(1X,71("="))')
         Do ni=1,Nso
             l =Ll(ni)+1
-            lll(ni)=let(l)
+            lll(ni)=OrbLabels(l)
         End Do
         If (Kout > 1) Then
         Write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
@@ -331,7 +329,7 @@ Contains
                 i1=i-n1+1
                 ni=Nip(i)
                 l=Ll(ni)+1
-                lll(i1)=let(l)
+                lll(i1)=OrbLabels(l)
                 jjj(i1)=Jj(ni)
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)

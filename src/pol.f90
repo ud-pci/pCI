@@ -61,7 +61,6 @@ Program pol
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok = .True.
 
-    Character(Len=1), Dimension(9)          :: Let
     Character(Len=4), Dimension(13)         :: Alet
     Character(Len=4), Dimension(5)          :: Blet
 
@@ -194,20 +193,12 @@ Contains
 
     End Subroutine SetParams
 
-    Subroutine Init_Char(Let,Alet,Blet)
+    Subroutine Init_Char(Alet,Blet)
         Implicit None
-    
-        Character(Len=1), Dimension(6) :: Let
+
         Character(Len=4), Dimension(13) :: Alet
         Character(Len=4), Dimension(5) :: Blet
-    
-        Let(1)= 's'
-        Let(2)= 'p'
-        Let(3)= 'd'
-        Let(4)= 'f'
-        Let(5)= 'g'
-        Let(6)= 'h'
-    
+
         Alet(1)= 'A_hf'
         Alet(2)= 'B_hf'
         Alet(3)= 'E1_L'
@@ -345,7 +336,7 @@ Contains
         Character(Len=128) :: strfmt
 
         Call DetermineRecordLength(ipmr)
-        Call Init_Char(Let,Alet,Blet)
+        Call Init_Char(Alet,Blet)
         
         Open(unit=11,status='UNKNOWN',file='POL.RES')
         Close(unit=11,status='DELETE')
