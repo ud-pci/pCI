@@ -4,7 +4,7 @@ Program pdtm
     Use mpi_f08
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
-    Use amp_ops, Only : Rnt, Intg, Alet, Let
+    Use amp_ops, Only : Rnt, Intg
     Implicit None
     
     Integer :: mpierr, mype, npes
@@ -89,32 +89,33 @@ Program pdtm
 Contains
 
     Subroutine SetKey(str_key)
+        Use utils, Only : ToUpperString
         Implicit None
-        Integer :: err_stat
-        Character(Len=4) :: str_key
-        
-        err_stat = 0
+        Character(Len=4), Intent(In) :: str_key
+        Character(Len=4) :: key_upper
+
+        key_upper = ToUpperString(str_key)
         Select Case(Kl1)
         Case(1)
-            Select Case(str_key)
-                Case('A_hf')
+            Select Case(key_upper)
+                Case('A_HF')
                     Keys%A_hf = 1
                     Call OpenFS('A_hf.RES',0,106,1)
-                Case('B_hf')
+                Case('B_HF')
                     Keys%B_hf = 1
                     Call OpenFS('B_hf.RES',0,107,1)
                 Case('GF')
                     Keys%GF = 1
                     Call OpenFS('GF.RES',0,112,1)
-                Case('gQED')
+                Case('GQED')
                     Keys%gQED = 1
                     Call OpenFS('gQED.RES',0,113,1)
                 Case Default
-                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for DM.'
+                    Write(*,*) 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for DM.'
                     Return
             End Select
         Case(2)
-            Select Case(str_key)
+            Select Case(key_upper)
                 Case('E1')
                     Keys%E1_L = 1
                     Keys%E1_V = 1
@@ -153,11 +154,11 @@ Contains
                     Keys%MQM = 1
                     Call OpenFS('MQM.RES',0,111,1)
                 Case Default
-                    print*, 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for TM.'
+                    Write(*,*) 'WARNING: "', Trim(AdjustL(str_key)), '" is not a valid key for TM.'
                     Return
             End Select
         End Select
-            
+
     End Subroutine SetKey
 
     Subroutine CloseKeys
@@ -213,36 +214,11 @@ Contains
     
     End Subroutine CloseKeys
 
-    Subroutine Init_Char(Let,Alet,Blet,yes,chm1)
+    Subroutine Init_Char(Blet,yes,chm1)
         Implicit None
 
-        Character(Len=1), Dimension(6) :: Let
-        Character(Len=4), Dimension(15) :: Alet
         Character(Len=4), Dimension(5) :: Blet
         Character(Len=4), Dimension(2) :: yes*3, chm1
-
-        Let(1)= 's'
-        Let(2)= 'p'
-        Let(3)= 'd'
-        Let(4)= 'f'
-        Let(5)= 'g'
-        Let(6)= 'h'
-
-        Alet(1)= 'A_hf'
-        Alet(2)= 'B_hf'
-        Alet(3)= 'E1_L'
-        Alet(4)= 'EDM '
-        Alet(5)= 'PNC '
-        Alet(6)= 'E1_V'
-        Alet(7)= 'AM  '
-        Alet(8)= 'MQM '
-        Alet(9)= 'M1  '
-        Alet(10)='E2  '
-        Alet(11)='E3  '
-        Alet(12)='M2  '
-        Alet(13)='M3  '
-        Alet(14)='gQ_P'
-        Alet(15)='gQ_Q'
 
         Blet(1)= 'Rint'
         Blet(2)= 'RPA1'
@@ -288,63 +264,62 @@ Contains
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat, i, num_ops
-        character(len=10) :: key
+        character(len=10) :: key, key_upper
         character(len=80) :: val
         character(len=80) :: line
-        character(len=4), dimension(:), allocatable :: keyList 
-        logical :: equals_in_str
+        character(len=4), dimension(:), allocatable :: keyList
 
-        Open(unit=99, file='dtm.in', status='OLD')
+        Open(unit=99, file='dtm.in', status='OLD', iostat=err_stat)
+        If (err_stat /= 0) Call WriteSkeleton('dtm.in', [Character(len=90) :: &
+            'Mode=     # DM=density matrix, TM=transition matrix, Init=form DTM.INT', &
+            'Levels=   # for DM: i j; for TM: i if j jf',                            &
+            'Operators=# comma-separated operator keys (e.g. E1,M1,E2)'])
 
-        ! read parameters (lines with "=")
-        equals_in_str = .true.
-        Do While (equals_in_str)
+        Do
             Read(99, '(A)', iostat=err_stat) line
-            If (index(string=line, substring="=") == 0 .or. err_stat /= 0) Then
-                equals_in_str = .false.
-            Else
-                index_equals = index(string=line, substring="=")
-                key = line(1:index_equals-1)
-                val = line(index_equals+1:len(line))
-                
-                index_hashtag = index(string=val, substring="#") ! account for comments
-                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
-                Select Case(key)
-                Case('Mode')
-                    If (Trim(AdjustL(val)) == 'DM') Then
-                        Kl1 = 1
-                    Else If (Trim(AdjustL(val)) == 'TM') Then
-                        Kl1 = 2
-                    Else If (Trim(AdjustL(val)) == 'Init') Then
-                        Kl1 = 3
-                    Else
-                        print*, 'ERROR: Value "', Trim(AdjustL(val)), '" for key Mode is not supported.'
-                        Stop
-                    End If
-                Case('Levels')
-                    If (Kl1 == 1) Then 
-                        Read(val, *) nterm1, nterm2
-                    Else If (Kl1 == 2) Then
-                        Read(val, *) nterm1, nterm1f, nterm2, nterm2f
-                    Else
-                        Continue
-                    End If
-                Case('Operators')
-                    num_ops = CountSubstr(val, ',') + 1
-                    Allocate(keyList(num_ops))
-                    Read(val, *, iostat=err_stat) (keyList(i), i=1,num_ops)
-                    If (err_stat /= 0) Then
-                        print*, 'ERROR: list of operators could not be read.'
-                        Exit
-                    End If
-                    Do i=1, num_ops
-                        Call SetKey(keyList(i))
-                    End Do
-                    Deallocate(keyList)
+            If (err_stat /= 0) Exit
+            If (index(string=line, substring='=') == 0) Cycle
+            If (index(AdjustL(line), '#') == 1) Cycle
+            index_equals = index(string=line, substring='=')
+            key = line(1:index_equals-1)
+            val = line(index_equals+1:len(line))
+            index_hashtag = index(string=val, substring='#')
+            If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+            key_upper = ToUpperString(key)
+            Select Case(key_upper)
+            Case('MODE')
+                Select Case(ToUpperString(Trim(AdjustL(val))))
+                Case('DM')
+                    Kl1 = 1
+                Case('TM')
+                    Kl1 = 2
+                Case('INIT')
+                    Kl1 = 3
                 Case Default
-                    print*, 'WARNING: The key "', Trim(AdjustL(key)), '" is not supported.'
+                    Write(*,*) 'ERROR: Value "', Trim(AdjustL(val)), '" for key Mode is not supported.'
+                    Stop
                 End Select
-            End If
+            Case('LEVELS')
+                If (Kl1 == 1) Then
+                    Read(val, *) nterm1, nterm2
+                Else If (Kl1 == 2) Then
+                    Read(val, *) nterm1, nterm1f, nterm2, nterm2f
+                End If
+            Case('OPERATORS')
+                num_ops = CountSubstr(val, ',') + 1
+                Allocate(keyList(num_ops))
+                Read(val, *, iostat=err_stat) (keyList(i), i=1,num_ops)
+                If (err_stat /= 0) Then
+                    Write(*,*) 'ERROR: Operators= could not be read from dtm.in.'
+                    Stop
+                End If
+                Do i=1, num_ops
+                    Call SetKey(keyList(i))
+                End Do
+                Deallocate(keyList)
+            Case Default
+                Write(*,*) 'WARNING: unsupported key "', Trim(AdjustL(key)), '" in dtm.in'
+            End Select
         End Do
 
         Close(99)
@@ -383,7 +358,7 @@ Contains
                 Stop
         End Select
 
-        Call Init_Char(Let, Alet, Blet, yes, chm1)
+        Call Init_Char(Blet, yes, chm1)
 
         Trd=1.d-10
         Kdm=0
@@ -652,9 +627,9 @@ Contains
                 Read (13) (ki(i),i=1,13)
                 Read (13) (Rnt(i),Intg(i),i=1,Nint)
                 Write (6,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
-                       /(4X,A4," calculated by ",A4))') Nint,(Alet(i),Blet(ki(i)),i=1,13)
+                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
                 Write (11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
-                       /(4X,A4," calculated by ",A4))') Nint,(Alet(i),Blet(ki(i)),i=1,13)
+                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
                 Close (13)
                 nsu1=0
                 Do i=1,Nint
@@ -1112,8 +1087,8 @@ Contains
                     "Type",4X,"final",3X,"init.",4X,"Nuc.Int_0",5X, &
                     "Nuc.Int",5X,"Tot.Int",/2x,68("-"))')
             Write(11,'(1X,I6,3X,A4,2X,I2,A1,1X,I1,"/2",1X, &
-                    I2,A1,1X,I1,"/2",3E13.5)') Nint,Alet(ir), &
-                    nna,Let(la+1),ja,nnb,Let(lb+1),jb,Dint,dn,tab
+                    I2,A1,1X,I1,"/2",3E13.5)') Nint,OpLabels(ir), &
+                    nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb,Dint,dn,tab
         End If
         Return
     End Subroutine AddRint

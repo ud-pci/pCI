@@ -40,6 +40,10 @@ Module params
     ! Spectroscopic orbital labels
     Character(len=1), Parameter, Dimension(9) :: OrbLabels = ['s','p','d','f','g','h','i','k','l']
 
+    ! Operator labels
+    Character(Len=4), Parameter, Dimension(15) :: OpLabels = &
+        ['A_hf','B_hf','E1_L','EDM ','PNC ','E1_V','AM  ','MQM ','M1  ','E2  ','E3  ','M2  ','M3  ','gQ_P','gQ_Q']
+
     ! Global arrays
     Integer, Allocatable, Dimension(:)    :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0

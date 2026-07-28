@@ -74,7 +74,6 @@ Program ine
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok
 
-    Character(Len=4), Dimension(13)         :: Alet
     Character(Len=4), Dimension(5)          :: Blet
 
     Integer(Kind=int64) :: start_time
@@ -224,26 +223,11 @@ Contains
 
     End Subroutine SetParams
 
-    Subroutine Init_Char(Alet,Blet)
+    Subroutine Init_Char(Blet)
         Implicit None
 
-        Character(Len=4), Dimension(13) :: Alet
         Character(Len=4), Dimension(5) :: Blet
 
-        Alet(1)= 'A_hf'
-        Alet(2)= 'B_hf'
-        Alet(3)= 'E1_L'
-        Alet(4)= 'EDM '
-        Alet(5)= 'PNC '
-        Alet(6)= 'E1_V'
-        Alet(7)= 'AM  '
-        Alet(8)= 'MQM '
-        Alet(9)= 'M1  '
-        Alet(10)='E2  '
-        Alet(11)='E3  '
-        Alet(12)='M2  '
-        Alet(13)='M3  '
-    
         Blet(1)= 'Rint'
         Blet(2)= 'RPA1'
         Blet(3)= 'RPA2'
@@ -263,7 +247,7 @@ Contains
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
         Call DetermineRecordLength(ipmr)
-        Call Init_Char(Alet,Blet)
+        Call Init_Char(Blet)
         
         Open(unit=11,status='UNKNOWN',file='INE.RES')
         Close(unit=11,status='DELETE')
@@ -532,8 +516,8 @@ Contains
                 Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
-                Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
-                Write(11,strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
+                Write(6, strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
+                Write(11,strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
                 Close(13)
                 Deallocate(l1)
                 Return
