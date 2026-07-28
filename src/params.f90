@@ -41,6 +41,7 @@ Module params
     Character(len=1), Parameter, Dimension(9) :: OrbLabels = ['s','p','d','f','g','h','i','k','l']
 
     ! Operator labels
+    Character(Len=4), Parameter, Dimension(5)  :: CorrLabels = ['Rint','RPA1','RPA2','RPA3','RPA4']
     Character(Len=4), Parameter, Dimension(15) :: OpLabels = &
         ['A_hf','B_hf','E1_L','EDM ','PNC ','E1_V','AM  ','MQM ','M1  ','E2  ','E3  ','M2  ','M3  ','gQ_P','gQ_Q']
 

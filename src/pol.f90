@@ -61,8 +61,6 @@ Program pol
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok = .True.
 
-    Character(Len=4), Dimension(5)          :: Blet
-
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
 
@@ -192,20 +190,6 @@ Contains
 
     End Subroutine SetParams
 
-    Subroutine Init_Char(Blet)
-        Implicit None
-
-        Character(Len=4), Dimension(5) :: Blet
-
-        Blet(1)= 'Rint'
-        Blet(2)= 'RPA1'
-        Blet(3)= 'RPA2'
-        Blet(4)= 'RPA3'
-        Blet(5)= 'RPA4'
-
-        Return
-    End Subroutine Init_Char
-
     Subroutine ReadPolIn
         Use utils
         ! This subroutine reads job parameters from file c.in
@@ -313,7 +297,6 @@ Contains
         Character(Len=128) :: strfmt
 
         Call DetermineRecordLength(ipmr)
-        Call Init_Char(Blet)
         
         Open(unit=11,status='UNKNOWN',file='POL.RES')
         Close(unit=11,status='DELETE')
@@ -520,8 +503,8 @@ Contains
                 Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
-                Write(6, strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
-                Write(11,strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
+                Write(6, strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
+                Write(11,strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Close(13)
                 Deallocate(l1)
                 Return

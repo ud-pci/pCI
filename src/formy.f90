@@ -21,7 +21,6 @@ program formy
     Real(dp), Allocatable, Dimension(:) :: Z1, X0, X1, X2, YY1, YY2, Rnt, Ev, Diag, E1
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
-    Character(Len=4), Dimension(5)          :: Blet
     logical :: ok
 
     call MPI_Init(mpierr)
@@ -351,20 +350,6 @@ contains
 
     End Subroutine SetParams
 
-    Subroutine Init_Char(Blet)
-        Implicit None
-
-        Character(Len=4), Dimension(5) :: Blet
-
-        Blet(1)= 'Rint'
-        Blet(2)= 'RPA1'
-        Blet(3)= 'RPA2'
-        Blet(4)= 'RPA3'
-        Blet(5)= 'RPA4'
-
-        Return
-    End Subroutine Init_Char
-
     Subroutine Input
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
@@ -375,7 +360,6 @@ contains
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
         Call DetermineRecordLength(ipmr)
-        Call Init_Char(Blet)
         
         Open(unit=11,status='UNKNOWN',file='FORMY.RES')
         Close(unit=11,status='DELETE')
@@ -635,8 +619,8 @@ contains
                 Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
-                Write(6, strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
-                Write(11,strfmt) Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
+                Write(6, strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
+                Write(11,strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Close(13)
                 Deallocate(l1)
                 Return

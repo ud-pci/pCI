@@ -17,7 +17,6 @@ Program pdtm
     Real(dp), Allocatable, Dimension(:,:) :: ArrB2, Ro, Rro
     Integer(kind=int64) :: start_time
     Character(Len=4), Dimension(2) :: chm1
-    Character(Len=4), Dimension(5) :: Blet
     Character(Len=16)   :: timeStr
     Character(Len=64), Allocatable, Dimension(:) :: strc1, strc2
     Character(Len=6), Allocatable, Dimension(:) :: strt1, strt2
@@ -214,17 +213,10 @@ Contains
     
     End Subroutine CloseKeys
 
-    Subroutine Init_Char(Blet,yes,chm1)
+    Subroutine Init_Char(yes,chm1)
         Implicit None
 
-        Character(Len=4), Dimension(5) :: Blet
         Character(Len=4), Dimension(2) :: yes*3, chm1
-
-        Blet(1)= 'Rint'
-        Blet(2)= 'RPA1'
-        Blet(3)= 'RPA2'
-        Blet(4)= 'RPA3'
-        Blet(5)= 'RPA4'
 
         yes(1)= 'No '
         yes(2)= 'Yes'
@@ -358,7 +350,7 @@ Contains
                 Stop
         End Select
 
-        Call Init_Char(Blet, yes, chm1)
+        Call Init_Char(yes, chm1)
 
         Trd=1.d-10
         Kdm=0
@@ -627,9 +619,9 @@ Contains
                 Read (13) (ki(i),i=1,13)
                 Read (13) (Rnt(i),Intg(i),i=1,Nint)
                 Write (6,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
-                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
+                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Write (11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
-                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),Blet(ki(i)),i=1,13)
+                       /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Close (13)
                 nsu1=0
                 Do i=1,Nint
