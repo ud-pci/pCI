@@ -174,16 +174,16 @@ Module breit
             End Do
             If (kout > 2) Then
                 strfmt='(2X,"contribution of ",I2,A1,I1,"/2 :",E12.5)'
-                Write( *,strfmt) Nn(nc),let(lc+1),jc,s
-                Write(11,strfmt) Nn(nc),let(lc+1),jc,s
+                Write( *,strfmt) Nn(nc),OrbLabels(lc+1),jc,s
+                Write(11,strfmt) Nn(nc),OrbLabels(lc+1),jc,s
             End If
             a_ab=a_ab+s
         End Do
 
         If (kout > 2) Then
             strfmt='(/2X,"<",I2,A1,I1,"/2| V_B^core |",I2,A1,I1,"/2> = ",E12.5)'
-            Write( *,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
-            Write(11,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
+            Write( *,strfmt) Nn(na),OrbLabels(la+1),ja,Nn(nb),OrbLabels(lb+1),jb,a_ab
+            Write(11,strfmt) Nn(na),OrbLabels(la+1),ja,Nn(nb),OrbLabels(lb+1),jb,a_ab
         End If
         Br_core=a_ab
 

@@ -37,6 +37,9 @@ Module params
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, Nx
     Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm, Crt4
 
+    ! Spectroscopic orbital labels
+    Character(len=1), Parameter, Dimension(9) :: OrbLabels = ['s','p','d','f','g','h','i','k','l']
+
     ! Global arrays
     Integer, Allocatable, Dimension(:)    :: Jt, Njt
     Integer, Dimension(IPs)               :: Nn, Kk, Ll, Jj, Nf0

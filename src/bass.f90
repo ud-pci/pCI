@@ -1,5 +1,5 @@
 Program bass
-    Use basc_variables, Kbasparam => Kbas, Qqparam => Qq, letparam => let, Rint2param => Rint2
+    Use basc_variables, Kbasparam => Kbas, Qqparam => Qq, Rint2param => Rint2
     Use readfff
     Use utils, Only : DetermineRecordLength, CheckRecordLength
     Implicit None
@@ -15,10 +15,9 @@ Program bass
     Integer, Dimension(IP6) :: Nintrpl
     Real(dp), Dimension(IP6) :: Y, CP, CQ, CA, CB, A, B, R3, V3
     Real(dp), Allocatable, Dimension(:) :: Qnl1, Qq, Rint2
-    Character(Len=1) :: let(9), ch1, ch3, ch4, ch5, FNAME*12, str_is(4)*3, ltr(IPs), FNAME3*12
+    Character(Len=1) :: ch1, ch3, ch4, ch5, FNAME*12, str_is(4)*3, ltr(IPs), FNAME3*12
     Character(Len=256) :: strfmt
 
-    data let /'s','p','d','f','g','h','i','k','l'/
     data str_is /' VS','SMS','NMS',' MS'/
 
     Y=0_dp
@@ -189,8 +188,8 @@ Program bass
     end if
 
     strfmt = '(/25x,"Basis set is formed:",/5(i6,i3,a1,i2,"/2"))'
-    write( *,strfmt) (i,Nn(i),let(LL(i)+1),JJ(i),i=1,Ns)
-    write(11,strfmt) (i,Nn(i),let(LL(i)+1),JJ(i),i=1,Ns)
+    write( *,strfmt) (i,Nn(i),OrbLabels(LL(i)+1),JJ(i),i=1,Ns)
+    write(11,strfmt) (i,Nn(i),OrbLabels(LL(i)+1),JJ(i),i=1,Ns)
 
     if (ier_A+Ierr.GT.0) then
         strfmt = '(/" Constuction of orbitals:",I4," warnings;"/" Rotation of orbitals:   ",I4," warnings.")'
@@ -222,12 +221,12 @@ Contains
         N_orb=0
         do i=1,9
             l=i-1
-            if(ch.EQ.Let(i)) goto 200
+            if(ch.EQ.OrbLabels(i)) goto 200
         end do
         strfmt = '(/4X,"N_orb error for input: n=",i3,", ch= ",a1,", j=",i3/ &
               4X,"no l associated with letter ",A1,/4X,"Known letters are:",9A2)'
-        write( *,strfmt) n,ch,j,ch,Let
-        write(11,strfmt) n,ch,j,ch,Let
+        write( *,strfmt) n,ch,j,ch,OrbLabels
+        write(11,strfmt) n,ch,j,ch,OrbLabels
         stop
 
 200     do i=1,Ns
@@ -338,8 +337,8 @@ Contains
             read (10,'(5a1,a)') (str1(i),i=1,5),str2
             read (str2,*) nmax(l)
             strfmt = '(4x,a1,"-wave; n_max = ",i2)'
-            write ( *,strfmt) let(l+1),nmax(l)
-            write (11,strfmt) let(l+1),nmax(l)
+            write ( *,strfmt) OrbLabels(l+1),nmax(l)
+            write (11,strfmt) OrbLabels(l+1),nmax(l)
         end do
   
         ngen=0
@@ -379,7 +378,7 @@ Contains
                         Qnl(Nsp)=-x
                         Qnl1(Nsp)=-y
                         Kbas(Nsp)=0
-                        write (*,strfmt) Nsp,n,let(l+1),2*l-1,Qnl(Nsp),Kbas(Nsp),Qnl1(Nsp)
+                        write (*,strfmt) Nsp,n,OrbLabels(l+1),2*l-1,Qnl(Nsp),Kbas(Nsp),Qnl1(Nsp)
                         Nc=Nc+1
                         Nsp=Nsp+1
                     end if
@@ -387,7 +386,7 @@ Contains
                     Qnl1(Nsp)=y
                     Kbas(Nsp)=0
                   
-                    write (*,strfmt) Nsp,n,let(l+1),2*l+1,Qnl(Nsp),Kbas(Nsp),Qnl1(Nsp)
+                    write (*,strfmt) Nsp,n,OrbLabels(l+1),2*l+1,Qnl(Nsp),Kbas(Nsp),Qnl1(Nsp)
                 end if
             end do
         end do
@@ -1298,8 +1297,8 @@ Contains
             Ierr=Ierr+dlog(s1/small)+ir1+ir2
             
             strfmt = '(4X,I2,A1,I2,"/2 (E=",F12.6,"): ||Q|| =",F10.6," ||dQ||/||Q||=",F10.6)'
-            write( *,strfmt) n,let(l1),j,ep,dsqrt(s),s1
-            write(11,strfmt) n,let(l1),j,ep,dsqrt(s),s1
+            write( *,strfmt) n,OrbLabels(l1),j,ep,dsqrt(s),s1
+            write(11,strfmt) n,OrbLabels(l1),j,ep,dsqrt(s),s1
         end if
         Return
     End Subroutine Change_Q
@@ -1672,8 +1671,8 @@ Contains
                 iwx=iw
                 kkk=-(jjk-2*llk)*((jjk+1)/2)
                 strfmt = '(/" >> ",I3,": Forming",I3,A1,I2,"/2 from",I3,A1,I2,"/2")'
-                write( *,strfmt) ni,nnj,let(llj+1),jjj,nnk,let(llk+1),jjk
-                write(11,strfmt) ni,nnj,let(llj+1),jjj,nnk,let(llk+1),jjk
+                write( *,strfmt) ni,nnj,OrbLabels(llj+1),jjj,nnk,OrbLabels(llk+1),jjk
+                write(11,strfmt) ni,nnj,OrbLabels(llj+1),jjj,nnk,OrbLabels(llk+1),jjk
                 nim=ni-1
                 do i=1,nim
                     nk=i
@@ -1689,8 +1688,8 @@ Contains
 
             if (kbk.EQ.1.OR.kbk.EQ.2) then        ! B-spline is used 
                 strfmt = '(/" >> ",I3,": Forming",I3,A1,I2,"/2 from "," B-spline ",I3,"[",I2,"/",I1,"]")'
-                write( *,strfmt) ni,nnj,let(llj+1),jjj,nnk,nbk,llk
-                write(11,strfmt) ni,nnj,let(llj+1),jjj,nnk,nbk,llk
+                write( *,strfmt) ni,nnj,OrbLabels(llj+1),jjj,nnk,nbk,llk
+                write(11,strfmt) ni,nnj,OrbLabels(llj+1),jjj,nnk,nbk,llk
                 iwx=iw+5
                 call Grid_Bspl(llk,nbk,m1,mx,R,ii)    !Forms mx grid nodes Ro from R and defines multiplier m1
                 call FormBspl(llk,nbk,m1,mx,nnk,P,ii)
@@ -1980,7 +1979,7 @@ Contains
         nw=1                      !### p.w. number
         kw(1)=Kk(nmin)
         jjw(1)=jj(nmin)
-        ltr(1)=let(Ll(nmin)+1)
+        ltr(1)=OrbLabels(Ll(nmin)+1)
         numw(1)=1
         do ni=nmin+1,Ns
             n=0
@@ -1996,10 +1995,10 @@ Contains
                 kw(nw)=ki
                     if(ki.LT.0) then
                         jjw(nw)= -2*ki-1
-                        ltr(nw)= let(iabs(ki))
+                        ltr(nw)= OrbLabels(iabs(ki))
                     else
                         jjw(nw)= 2*ki-1
-                        ltr(nw)= let(ki+1)
+                        ltr(nw)= OrbLabels(ki+1)
                     end if
                 numw(nw)=1
             else
@@ -2735,8 +2734,8 @@ Contains
         end do
         
         strfmt = '(4X,"Can not find orbital ",I3,A1,I2,"/2 in ",A12)'
-        write( *,strfmt) na,let(la+1),ja,FNAME3
-        write(11,strfmt) na,let(la+1),ja,FNAME3
+        write( *,strfmt) na,OrbLabels(la+1),ja,FNAME3
+        write(11,strfmt) na,OrbLabels(la+1),ja,FNAME3
         stop
   
 200     call ReadF(16,n+4,P,P,1)
@@ -2783,8 +2782,8 @@ Contains
         end if
 
         strfmt = '(/4X,"Orbital ",I3,A1,I2,"/2 is taken from ",A12," changes: ",A13)'
-        write( *,strfmt) na,let(la+1),ja,FNAME3,lcase(ind)
-        write(11,strfmt) na,let(la+1),ja,FNAME3,lcase(ind)
+        write( *,strfmt) na,OrbLabels(la+1),ja,FNAME3,lcase(ind)
+        write(11,strfmt) na,OrbLabels(la+1),ja,FNAME3,lcase(ind)
 
         Return
     End Subroutine OrbitF
@@ -2804,8 +2803,8 @@ Contains
         end do
         
         strfmt = '(4X,"Can not find orbital ",I3,A1,I2,"/2 in ",A12)'
-        write( *,strfmt) na,let(la+1),ja,FNAME3
-        write(11,strfmt) na,let(la+1),ja,FNAME3
+        write( *,strfmt) na,OrbLabels(la+1),ja,FNAME3
+        write(11,strfmt) na,OrbLabels(la+1),ja,FNAME3
         stop
   
 200     call ReadF(16,n+4,P,Q,2)
@@ -2820,8 +2819,8 @@ Contains
             call Dif(Q,B,R,V,gj,ii,kt,MaxT,h)
         end if
         strfmt = '(/4X,"Orbital ",I3,A1,I2,"/2 is taken from ",A12," (both P & Q)")'
-        write( *,strfmt) na,let(la+1),ja,FNAME3
-        write(11,strfmt) na,let(la+1),ja,FNAME3
+        write( *,strfmt) na,OrbLabels(la+1),ja,FNAME3
+        write(11,strfmt) na,OrbLabels(la+1),ja,FNAME3
 
         Return
     End Subroutine OrbitFG
@@ -2913,8 +2912,8 @@ Contains
         end do
    
         strfmt = '(1X,"Tail(",I3,A1,I2,"/2): P(ii) old",E12.5," new",E12.5)'
-        write( *,strfmt) nn(ni),let(ll(ni)+1),jj(ni),pi,P(ii)
-        write(11,strfmt) nn(ni),let(ll(ni)+1),jj(ni),pi,P(ii)
+        write( *,strfmt) nn(ni),OrbLabels(ll(ni)+1),jj(ni),pi,P(ii)
+        write(11,strfmt) nn(ni),OrbLabels(ll(ni)+1),jj(ni),pi,P(ii)
         ierr=ierr+dlog(1.d0+dabs(pi)/small)
    
         call WriteF (12,ni+4,P,Q,2)

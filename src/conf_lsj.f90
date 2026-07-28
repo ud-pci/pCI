@@ -116,7 +116,6 @@ Contains
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
         Integer, Dimension(33)  ::  nnn ,jjj ,nqq 
-        Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
@@ -125,7 +124,6 @@ Contains
 
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        Data Let/'s','p','d','f','g','h','i','k','l'/
 
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
@@ -264,7 +262,7 @@ Contains
 
         Do ni=1,Nso
             l =Ll(ni)+1
-            lll(ni)=let(l)
+            lll(ni)=OrbLabels(l)
         End Do
 
         strfmt = '(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"), &
@@ -283,7 +281,7 @@ Contains
                 i1=i-n1+1
                 ni=Nip(i)
                 l=Ll(ni)+1
-                lll(i1)=let(l)
+                lll(i1)=OrbLabels(l)
                 jjj(i1)=Jj(ni)
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
@@ -419,7 +417,6 @@ Contains
         Integer :: mpierr, i
         Integer(Kind=int64) :: count
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(rec1, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(rec2, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -484,7 +481,6 @@ Contains
             Call MPI_Bcast(B1h(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         End Do
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Return
     End subroutine InitLSJ
 
@@ -661,7 +657,6 @@ Contains
             Call MPI_AllReduce(MPI_IN_PLACE, xj, nlvs, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, xl, nlvs, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, xs, nlvs, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         End If
 
         Deallocate(plj, pls, p0s, pll, p0l)        

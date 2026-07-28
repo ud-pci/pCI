@@ -18,9 +18,7 @@ Module pi_pk
 
         Integer :: ja, jb, la, lb, na, nb, kan, jc, lc
         Real(dp) :: a_ab, z12, z00, f0, s1
-        Character(Len=1), Dimension(9) :: let 
         Character(Len=512) :: strfmt
-        data let /'s','p','d','f','g','h','i','k','l'/
 
         a_ab=0.d0
         If (Nso.EQ.0) Then
@@ -54,14 +52,14 @@ Module pi_pk
             Call ReadF(kan,na+4,Pa,Qa,2)
             s1=-s1*P_eff(jc,lc,ja,la,Pc,Qc,Pa,Qa)
             If (kout.GE.2) write(*,'(4X,"contribution of ",I2,A1,I1,"/2 =",E12.5)') &
-                              Nn(nc),let(lc+1),jc,s1
+                              Nn(nc),OrbLabels(lc+1),jc,s1
             a_ab=a_ab+s1
         End Do
 
         If (kout.GE.1) Then
             strfmt='(/2X,"<",I2,A1,I2,"/2| V_SMS^core |",I2,A1,I2,"/2> = ",E12.5)'
-            write( *,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
-            write(11,strfmt) Nn(na),let(la+1),ja,Nn(nb),let(lb+1),jb,a_ab
+            write( *,strfmt) Nn(na),OrbLabels(la+1),ja,Nn(nb),OrbLabels(lb+1),jb,a_ab
+            write(11,strfmt) Nn(na),OrbLabels(la+1),ja,Nn(nb),OrbLabels(lb+1),jb,a_ab
         End If
 
         SMS_core = a_ab

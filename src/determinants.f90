@@ -503,8 +503,6 @@ Module determinants
         Integer  :: i, n, ic, is, ni, nj, i2, j2, nf, j, l0, l1, l2, nn0, nn1, &
                     ll0, ll1, jj0, jj1, ndi, k, iconf, i1, j1
         Integer, Allocatable, dimension(:)   :: id1, id2
-        Character(Len=1), Dimension(5) :: let
-        data let/'s','p','d','f','g'/
 
         is=1
         ni=0
@@ -535,7 +533,7 @@ Module determinants
                     If (ndi >= Ndr) Then
                         write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
                                 " and ",I2,A1,I2,"/2 in configuration ",I5)') &
-                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                                nn0,OrbLabels(ll0+1),jj0,nn1,OrbLabels(ll1+1),jj1,iconf
                         write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
                         write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
                         Stop
@@ -613,8 +611,6 @@ Module determinants
         
         Integer                                           :: l0, l1, l2, ni, nj, n, ic, nn0, &
                                                              nn1, ll0, ll1, jj0, jj1, ndi, iconf
-        Character(Len=1), Dimension(5) :: let
-        data let/'s','p','d','f','g'/
 
         is=1
         nf=3
@@ -649,7 +645,7 @@ Module determinants
                     If (ndi >= Ndr) Then
                         write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
                                 " and ",I2,A1,I2,"/2 in configuration ",I5)') &
-                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                                nn0,OrbLabels(ll0+1),jj0,nn1,OrbLabels(ll1+1),jj1,iconf
                         write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
                         write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
                         Stop

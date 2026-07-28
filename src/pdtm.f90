@@ -418,7 +418,6 @@ Contains
         Real(dp) :: C1, C2, Z1, r1, r2, rmax, Bt, Al, d
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: PQ
-        Character(Len=1) :: let(6)
         Character(Len=512) :: strfmt
         logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
@@ -426,7 +425,6 @@ Contains
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                 (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        data let/'s','p','d','f','g','h'/
 
         C1=0.01d0
         Cl=DPcl
@@ -572,10 +570,10 @@ Contains
                 If (Nq(i) > j+1) Then 
                     Write( 6,'(/2X,"Wrong number of electrons "/ &
                         2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
-                        " (",F6.3,")")') ni,n,let(l),k,qi
+                        " (",F6.3,")")') ni,n,OrbLabels(l),k,qi
                     Write(11,'(/2X,"Wrong number of electrons "/ &
                         2X,"for the shell:",I3,3X,I2,A1,I2,"/2", &
-                        " (",F6.3,")")') ni,n,let(l),k,qi
+                        " (",F6.3,")")') ni,n,OrbLabels(l),k,qi
                  Stop
                 End If
             End Do

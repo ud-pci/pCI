@@ -417,7 +417,6 @@ Contains
         Real(dp), Dimension(IP6)  :: p, q, p1, q1 
         Real(dp), Dimension(4*IP6):: pq
         Integer, Dimension(0:33)  ::  nnn ,jjj ,nqq, nnn1, qqq1, nnn2, qqq2
-        Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(0:33):: lll, lll1, lll2
         Logical :: longbasis
         Integer, Dimension(4*IPs) :: IQN
@@ -426,7 +425,6 @@ Contains
 
         Equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         Equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        Data Let/'s','p','d','f','g','h','i','k','l'/
 
         c1 = 0.01d0
         mj = Int(2*dabs(Jm)+0.01d0)
@@ -578,7 +576,7 @@ Contains
 
         Do ni=1,Nso
             l =Ll(ni)+1
-            lll(ni)=let(l)
+            lll(ni)=OrbLabels(l)
         End Do
 
         strfmt = '(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"), &
@@ -603,7 +601,7 @@ Contains
                 i1=i-n1+1
                 ni=Nip(i)
                 l=Ll(ni)+1
-                lll(i1)=let(l)
+                lll(i1)=OrbLabels(l)
                 jjj(i1)=Jj(ni)
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
@@ -2354,7 +2352,6 @@ Contains
         Character(Len=512), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq
         Integer, Dimension(0:33)  ::  nnn, nqq 
-        Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(0:33):: lll
         Type WeightTable
             Character(Len=512), Allocatable, Dimension(:) :: strconfs, strconfsave
@@ -2362,7 +2359,6 @@ Contains
             Real(dp), Allocatable, Dimension(:) :: wgt, wgtsave
         End Type WeightTable
         Type(WeightTable) :: wgtconfs
-        Data Let/'s','p','d','f','g','h','i','k','l'/
         nconfs = 100
         strsp = ''
         If (.not. Allocated(C)) Allocate(C(Nd))
@@ -2428,7 +2424,7 @@ Contains
                     i1=i-n1+1
                     ni=Nip(i)
                     l=Ll(ni)+1
-                    lll(i1)=let(l)
+                    lll(i1)=OrbLabels(l)
                     nnn(i1)=Nn(ni)
                     nqq(i1)=Nq(i)
                 End Do
@@ -3254,7 +3250,6 @@ Contains
         Character(Len=3) :: strc, strq
         Character(Len=6) :: strterm, strconverged
         Integer, Dimension(33)  ::  nnn, nqq 
-        Character(Len=1), Dimension(9) :: Let 
         Character(Len=1), Dimension(33):: lll
         Character(Len=5) :: strgf, strconfadd2
         Character(Len=5), Allocatable, Dimension(:) :: strconfadd
@@ -3267,7 +3262,6 @@ Contains
         End Type WeightTable
         Type(WeightTable) :: wgtconfs
         data st1/11*'='/, st2/11*'-'/
-        Data Let/'s','p','d','f','g','h','i','k','l'/
 
         nconfs = 100
         strsp = ''
@@ -3357,7 +3351,7 @@ Contains
                     i1=i-n1+1
                     ni=Nip(i)
                     l=Ll(ni)+1
-                    lll(i1)=let(l)
+                    lll(i1)=OrbLabels(l)
                     nnn(i1)=Nn(ni)
                     nqq(i1)=Nq(i)
                 End Do

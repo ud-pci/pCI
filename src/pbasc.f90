@@ -873,9 +873,7 @@ Contains
         Integer(kind=int64) :: start_time
         Character(Len=16) :: timeStr
         Character(Len=512) :: strfmt
-        Character(Len=1) :: let(9)
         Logical*1  ::  l_br
-        data let/'s','p','d','f','g','h','i','k','l'/
 
         ! nsx and lsx are used to eliminate integrals
         small=1.d-8
@@ -967,7 +965,7 @@ Contains
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
                         Write(11,'(I6,8X,I3,A1,I2,"/2",2X,I3,A1,I2,"/2",3F15.8)') &
-                            nhint,nna,let(lla),jja,nnd,let(lld),jjd,tad,tad_br,fis
+                            nhint,nna,OrbLabels(lla),jja,nnd,OrbLabels(lld),jjd,tad,tad_br,fis
                         Rint1(nhint)=tad+tad_br
                         Iint1(nhint)=nad
                         R_is(nhint)=fis
@@ -1213,8 +1211,6 @@ Contains
         Integer(Kind=int64) :: ngint
         Logical*1  ::  l_br
         Character(Len=256) :: strfmt
-        Character(Len=1) :: let(9)
-        data let/'s','p','d','f','g','h','i','k','l'/
 
         ngint=0
         n0=Nso+1
@@ -1263,15 +1259,15 @@ Contains
                                             "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
                                         If (l_br) Then
-                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
-                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write (*,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write(11,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
                                         Else
-                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
-                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write (*,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write(11,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),0.0_dp
                                         End If
                                     End If
                                 End Do
@@ -1341,10 +1337,9 @@ Contains
 
         Integer :: nsx, lsx, num_is, nmin, na, nna, lla, jja, nb, nnb, llb, jjb
         Real(dp) :: tab
-        character(Len=1) :: let(9), case*5,chms(3)*3
+        character(Len=1) :: case*5,chms(3)*3
         logical*1 one_e,two_e
         Character(Len=512) :: strfmt
-        data let/'s','p','d','f','g','h','i','k','l'/
         data chms/'SMS','NMS','MS '/
 
         If (nsx == Nso.OR.K_is <= 1) Return
@@ -1390,8 +1385,8 @@ Contains
                 num_is=num_is+1
                 
                 strfmt='(I6,2X,A5,1X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",F17.7)'
-                Write( *,strfmt) num_is,case,nna,let(lla+1),jja,nnb,let(llb+1),jjb,tab
-                Write(11,strfmt) num_is,case,nna,let(lla+1),jja,nnb,let(llb+1),jjb,tab
+                Write( *,strfmt) num_is,case,nna,OrbLabels(lla+1),jja,nnb,OrbLabels(llb+1),jjb,tab
+                Write(11,strfmt) num_is,case,nna,OrbLabels(lla+1),jja,nnb,OrbLabels(llb+1),jjb,tab
                 R_is(num_is)=tab
                 I_is(num_is)=IPx*(na-Nso-1)+(nb-Nso)
             End Do

@@ -8,8 +8,6 @@ program bas_info         ! this code calculates rms radii and tests the sum rule
     integer :: iyes, num
     real(dp) :: rrc(5,IPs), r2(IPs)
 
-    let(1:9) = ['s','p','d','f','g','h','i','k','l']
-
     call init_basis
     call print_rms_radii             !### rms radii of orbitals
     call check_unity_expansion       !### Check sum of orbitals in p.w.
@@ -196,9 +194,9 @@ contains
             x       = sqrt(x)                      ! R_rms
             s       = sqrt(s)                      ! sqrt(norm)
 
-            write(11,fmt_orb) ni, Nn(ni), let(Ll(ni)+1), Jj(ni), -P(ii+1), P(ii+5), Q(ii+5), x, num_nodes
+            write(11,fmt_orb) ni, Nn(ni), OrbLabels(Ll(ni)+1), Jj(ni), -P(ii+1), P(ii+5), Q(ii+5), x, num_nodes
             if (abs(s - 1.d0) > 1.d-3) then
-                write(*,fmt_warn) ni, Nn(ni), let(Ll(ni)+1), Jj(ni), -P(ii+1), s, x
+                write(*,fmt_warn) ni, Nn(ni), OrbLabels(Ll(ni)+1), Jj(ni), -P(ii+1), s, x
                 read(*,*)
             end if
         end do
@@ -242,7 +240,7 @@ contains
                 jx = min(Jj(ni)+2,   2*il+1)
                 do ij = jn, jx, 2                  ! intermediate 2j
                     ik = ik + 1
-                    lk_chan(ik,ni) = let(il+1)
+                    lk_chan(ik,ni) = OrbLabels(il+1)
                     jk_chan(ik,ni) = ij
                     s = 0.d0
                     do nk = 1, Ns
@@ -267,7 +265,7 @@ contains
         do ni = 1, Ns
             li  = Ll(ni) + 1
             ikx = numk(ni)
-            write(11,fmt_row) Nn(ni), let(li), Jj(ni), &
+            write(11,fmt_row) Nn(ni), OrbLabels(li), Jj(ni), &
                 (lk_chan(ik,ni), jk_chan(ik,ni), rrc(ik,ni), ik=1,ikx)
         end do
     end subroutine check_closure
@@ -323,7 +321,7 @@ contains
             C(ii+4) = P(ii+4)*2 - 1.d0
             call Sint1(x1)                         ! integral using numerical derivatives
 
-            write(11,fmt_row) ni, Nn(ni), let(Ll(ni)+1), Jj(ni), x1/fx, x/fx
+            write(11,fmt_row) ni, Nn(ni), OrbLabels(Ll(ni)+1), Jj(ni), x1/fx, x/fx
         end do
         write(11,fmt_sep)
     end subroutine check_derivative
@@ -448,7 +446,7 @@ contains
                "/4X,'i',8X,'R',12X,'P',12X,'Q')"
         character(len=*), parameter :: fmt_row = "(2X,I3,3E13.5)"
 
-        write(11,fmt_hdr) ni, Nn(ni), let(Ll(ni)+1), Jj(ni)
+        write(11,fmt_hdr) ni, Nn(ni), OrbLabels(Ll(ni)+1), Jj(ni)
         call ReadF(12, ni+4, P, Q, 2)
         write(11,fmt_row) (i, R(i), P(i), Q(i), i=1,ii)
     end subroutine print_orbital
@@ -533,7 +531,7 @@ contains
 
         do ni = 1, Ns
             call ReadF(12, ni+mi, P, Q, 2)
-            write(11,fmt_orb) name, ni, Nn(ni), let(Ll(ni)+1), Jj(ni)
+            write(11,fmt_orb) name, ni, Nn(ni), OrbLabels(Ll(ni)+1), Jj(ni)
             call test_taylor_expansion(P, Q, P(ii+4))
             call Test_Origin(name, P, R, MaxT, ii, 1.d-3, ierr)
         end do
