@@ -251,8 +251,8 @@ Contains
     End Subroutine OpenFS
 
     Subroutine ReadDtmIn
+        ! Read job parameters from dtm.in
         Use utils
-        ! This subroutine reads job parameters from file c.in
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat, i, num_ops
@@ -260,12 +260,22 @@ Contains
         character(len=80) :: val
         character(len=80) :: line
         character(len=4), dimension(:), allocatable :: keyList
+        Character(len=90), Parameter, Dimension(7) :: skeleton = [ &
+            'Mode=       # DM=density matrix, TM=transition matrix, Init=form DTM.INT', &
+            'Levels=     # for DM: i j; for TM: i if j jf',                             &
+            'Operators=  # comma-separated operator keys (e.g. E1,M1,E2)',              &
+            '',                                                                         &
+            '#Anuc=      # nuclear mass number A (overrides Am= in CONF.INP if set)',   &
+            '#K_M1=2     # M1 operator form: 1=non-relativistic, 2=relativistic',       &
+            '#Trd=1e-10  # integral cutoff threshold']
+
+        ! Defaults
+        Trd  = 1.d-10
+        K_M1 = 2
+        Anuc = 0.d0
 
         Open(unit=99, file='dtm.in', status='OLD', iostat=err_stat)
-        If (err_stat /= 0) Call WriteSkeleton('dtm.in', [Character(len=90) :: &
-            'Mode=     # DM=density matrix, TM=transition matrix, Init=form DTM.INT', &
-            'Levels=   # for DM: i j; for TM: i if j jf',                            &
-            'Operators=# comma-separated operator keys (e.g. E1,M1,E2)'])
+        If (err_stat /= 0) Call WriteSkeleton('dtm.in', skeleton)
 
         Do
             Read(99, '(A)', iostat=err_stat) line
@@ -309,6 +319,12 @@ Contains
                     Call SetKey(keyList(i))
                 End Do
                 Deallocate(keyList)
+            Case('ANUC')
+                Read(val, *) Anuc
+            Case('K_M1')
+                Read(val, *) K_M1
+            Case('TRD')
+                Read(val, *) Trd
             Case Default
                 Write(*,*) 'WARNING: unsupported key "', Trim(AdjustL(key)), '" in dtm.in'
             End Select
@@ -352,9 +368,7 @@ Contains
 
         Call Init_Char(yes, chm1)
 
-        Trd=1.d-10
         Kdm=0
-        K_M1=2
 
         Write ( 6,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
         Write (11,strfmt) Trd, yes(Kl+1), yes(Kdm+1), Kl1
@@ -364,12 +378,7 @@ Contains
 
         Kl=Kout                    !# Kl is used in DTM instead of Kout
 
-        If (Am < 1.d0) Then
-            Write(6,*) ' Give nuclear parameter A: '
-            Read(*,*) Anuc
-        Else
-            Anuc=Am
-        End If
+        If (Anuc < 1.d0) Anuc = Am
         Write( 6,'(4X,"Anuc=",F6.1,", Gnuc =",F10.5,", Qnuc =",F10.5)') Anuc,Gnuc,Qnuc
         Write(11,'(4X,"Anuc=",F6.1,", Gnuc =",F10.5,", Qnuc =",F10.5)') Anuc,Gnuc,Qnuc
         Return

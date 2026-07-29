@@ -7,7 +7,7 @@ Module utils
 
     Private
 
-    Public :: CountSubstr, DetermineRecordLength, CheckRecordLength, ToUpperString
+    Public :: CountSubstr, DetermineRecordLength, CheckRecordLength, ToUpperString, WriteSkeleton
 
 Contains
 
@@ -84,5 +84,21 @@ Contains
             End If
         End Do
     End Function ToUpperString
+
+    Subroutine WriteSkeleton(filename, lines)
+        ! Write a skeleton key=value input file when the file is not found,
+        ! then stop so the user can fill it in and rerun.
+        Character(Len=*), Intent(In) :: filename
+        Character(Len=*), Intent(In) :: lines(:)
+        Integer :: i, u
+        
+        Open(newunit=u, file=filename, status='REPLACE')
+        Do i = 1, Size(lines)
+            Write(u, '(A)') Trim(lines(i))
+        End Do
+        Close(u)
+        Write(*,'(3A)') Trim(filename), ' not found — wrote a skeleton. Fill it in and rerun.'
+        Stop
+    End Subroutine WriteSkeleton
 
 End Module utils
