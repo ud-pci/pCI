@@ -850,13 +850,16 @@ Module matrix_io
             Call MPI_Abort(MPI_COMM_WORLD, 1, mpierr)
         End If
 
-        ! --- Read full global row_ptr on every rank (collective read, same data) ---
+        ! --- Read full global row_ptr on rank 0, then Bcast ---
         ! Enables direct seek to each rank's col/val slice without any Alltoall.
         Nd8 = Int(Nd, Kind=int64)
         Allocate(row_ptr(0:Nd))
-        disp = 16_MPI_OFFSET_KIND
-        Call MPI_FILE_READ_AT_ALL(fh, disp, row_ptr, Int(Nd8 + 1_int64), &
+        If (mype == 0) Then
+            disp = 16_MPI_OFFSET_KIND
+            Call MPI_FILE_READ_AT(fh, disp, row_ptr, Int(Nd8 + 1_int64), &
                                   MPI_INTEGER8, MPI_STATUS_IGNORE, mpierr)
+        End If
+        Call MPI_Bcast(row_ptr, Int(Nd8 + 1_int64), MPI_INTEGER8, 0, MPI_COMM_WORLD, mpierr)
 
         ! --- Row assignment: use forced values or greedy nnz-balanced scan ---
         If (Present(nd_start_in)) Then
