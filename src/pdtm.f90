@@ -4,7 +4,7 @@ Program pdtm
     Use mpi_f08
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime
-    Use amp_ops, Only : Rnt, Intg
+    Use amp_ops, Only : RintVal, RintKey
     Implicit None
     
     Integer :: mpierr, mype, npes
@@ -594,8 +594,8 @@ Contains
         Real(dp) :: z2, rn2
         Real(dp) :: z1, rn1, x
         Integer, Dimension(IPs) :: l1,l2
-        Integer, Allocatable, Dimension(:) :: Intg2
-        Real (dp), Allocatable, Dimension(:) :: Rnt2
+        Integer, Allocatable, Dimension(:) :: RintKey2
+        Real (dp), Allocatable, Dimension(:) :: RintVal2
         Integer, Dimension(13) :: ki, ki2
 
         Nsu=0              !### Nsu is used to eliminate integrals
@@ -619,14 +619,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x < 1.d-6) Then
             Read (13) Nint,(l1(i),i=1,ns1)
-            Allocate(Rnt(Nint), Intg(Nint))
+            Allocate(RintVal(Nint), RintKey(Nint))
             is=0
             Do i=1,Ns
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is == 0) Then
                 Read (13) (ki(i),i=1,13)
-                Read (13) (Rnt(i),Intg(i),i=1,Nint)
+                Read (13) (RintVal(i),RintKey(i),i=1,Nint)
                 Write (6,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
                        /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Write (11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
@@ -634,7 +634,7 @@ Contains
                 Close (13)
                 nsu1=0
                 Do i=1,Nint
-                    ix=Intg(i)
+                    ix=RintKey(i)
                     ik=ix/(IPx*IPx)
                     ia=(ix-IPx*IPx*ik)/IPx+Nso
                     ib=(ix-IPx*IPx*ik-IPx*ia)+Nso
@@ -649,14 +649,14 @@ Contains
         x=iabs(ns1-Ns)+iabs(nso1-Nso)+iabs(km1-K_M1)+dabs(z1-Z)+dabs(rn1-Rnuc)
         If (x < 1.d-6) Then
             Read (13) Nint2,(l2(i),i=1,ns2)
-            Allocate(Rnt2(Nint2), Intg2(Nint2))
+            Allocate(RintVal2(Nint2), RintKey2(Nint2))
             is=0
             Do i=1,Ns
                 is=is+iabs(Ll(i)-l1(i))
             End Do
             If (is == 0) Then
                 Read (13) (ki2(i),i=1,13)
-                Read (13) (Rnt2(i),Intg2(i),i=1,Nint2)
+                Read (13) (RintVal2(i),RintKey2(i),i=1,Nint2)
                 Close (13)
             End If
         End If
@@ -670,7 +670,7 @@ Contains
         Write(13) Ns,Nso,Z,Rnuc,K_M1
         Write(13) Nint,(Ll(i),i=1,Ns)
         Write(13) (1,i=1,13)
-        Write(13) (Rnt(i),Intg(i),i=1,Nint)
+        Write(13) (RintVal(i),RintKey(i),i=1,Nint)
         Write(13) IPx
         Write(6, '(/5X,"### Radial integrals saved in DTM.INT ###")')
         Write(11,'(/5X,"### Radial integrals saved in DTM.INT ###")')
@@ -768,8 +768,8 @@ Contains
         If (Kl == 1) Write(11,'(4X,"===== RADIAL INTEGRALS =====")')
         Open(unit=12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
         Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
-        If (.not. Allocated(Rnt)) Allocate(Rnt(Nint))
-        If (.not. Allocated(Intg)) Allocate(Intg(Nint))
+        If (.not. Allocated(RintVal)) Allocate(RintVal(Nint))
+        If (.not. Allocated(RintKey)) Allocate(RintKey(Nint))
         Nint=0
         Call ReadF(12,2,R,V,2)
         ih=2-Kt
@@ -1081,8 +1081,8 @@ Contains
         jb=Jj(nb)
         Nint=Nint+1
         nab1=ir*IPx*IPx+IPx*(na-Nso)+(nb-Nso)
-        Rnt(Nint)=tab
-        Intg(Nint)=nab1
+        RintVal(Nint)=tab
+        RintKey(Nint)=nab1
         If (Kl == 1) Then
             If (Nint == 1) Write (11,'(/2X,68("="),/2X,"Nint",3X, &
                     "Type",4X,"final",3X,"init.",4X,"Nuc.Int_0",5X, &
@@ -1119,7 +1119,7 @@ Contains
         Use mpi_f08
         Use mpi_utils
         Implicit None
-        Integer :: mype, mpierr, i
+        Integer :: mype, mpierr
         Integer(Kind=int64) :: count
 
         Call MPI_Bcast(e2s(1:nlvs), nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1127,10 +1127,7 @@ Contains
         If (mype/=0) Allocate(Iarr(Ne,Nd))
         count = Ne*Int(Nd,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,nlvs
-            Call MPI_Bcast(ArrB2(1:Nd,i), Nd, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        End Do
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(ArrB2, Nd*nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Return
     End Subroutine BcastDMArrays
 
@@ -1144,9 +1141,9 @@ Contains
         Implicit None
         Integer :: ntr, lf, n, k, i, iq, j, ju, iu, nf, is, k1, icomp, err_stat, &
                    ic2, kx, n1, ic1, imin, n2, Ndpt, j1, j2, i1, iab2, l, &
-                   imax, nn, ntrm, ntrm1, start, end, mpierr, sizebin
+                   imax, nn, ntrm, ntrm1, start, end, mpierr
         Integer :: npes,mype
-        Integer*8 :: mem, memsum, count
+        Integer(kind=int64) :: mem, memsum, count, total_work, cumndc_i64, wk, wk_s, wk_e
         Real(dp) :: s, bn, bk, Tj, Etrm
         Character(Len=16)     :: memStr, npesStr, err_msg
         Integer, Allocatable, Dimension(:) :: idet1, idet2
@@ -1158,10 +1155,10 @@ Contains
         ntrm1=nterm2
         nlvs=ntrm1-ntrm+1
         Allocate(B1(Nd),ArrB2(Nd,nlvs),e2s(nlvs),tj2s(nlvs))
-        mem = sizeof(Iarr)+sizeof(B1)+sizeof(ArrB2)
-        ! Sum all the mem sizes to get a total...
+        ! Iarr(Ne,Nd) + B1(Nd) + ArrB2(Nd,nlvs) + RintVal + RintKey + Rro(IPx,IPx) + Ro
+        mem = sizeof(Iarr) + sizeof(B1) + sizeof(ArrB2) + &
+              sizeof(RintVal) + sizeof(RintKey) + sizeof(Rro) + sizeof(Ro)
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        ! ...before overwriting mem with the maximum value across all workers:
         Call MPI_AllReduce(MPI_IN_PLACE, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
         If (mype==0) Then
             Write(npesStr,fmt='(I16)') npes
@@ -1220,18 +1217,25 @@ Contains
             Call WriteHeaders
         End If
     
-        ! Divide workload into npes
-        If (mype==0) Then
-            start=1
-        Else
-            start=mype*(Nc/npes)+1
-        End If
-        If (mype==npes-1) Then
-            end = Nc
-        Else
-            end = (mype+1)*(Nc/npes)
-        End If
-        sizebin=end-start+1
+        ! Balanced assignment: distribute ic1 by cumulative work Ndc(ic1)*cumNdc(ic1)
+        cumndc_i64 = 0_int64
+        total_work  = 0_int64
+        Do ic1=1,Nc
+            cumndc_i64 = cumndc_i64 + Ndc(ic1)
+            total_work  = total_work + Int(Ndc(ic1), int64) * cumndc_i64
+        End Do
+        wk_s = total_work * Int(mype, int64)   / Int(npes, int64)
+        wk_e = total_work * Int(mype+1, int64) / Int(npes, int64)
+        cumndc_i64 = 0_int64
+        wk = 0_int64
+        start = 1
+        end = Nc
+        Do ic1=1,Nc-1
+            cumndc_i64 = cumndc_i64 + Ndc(ic1)
+            wk = wk + Int(Ndc(ic1), int64) * cumndc_i64
+            If (wk < wk_s) start = ic1 + 1
+            If (wk < wk_e .and. mype < npes-1) end = ic1
+        End Do
 
         lf=0
         iab2=0
@@ -1277,7 +1281,7 @@ Contains
                                     k=k+1
                                     bk=B1(k)
                                     If (dabs(bn*bk) > Trd) Then
-                                        Call Gdet(k,idet2)
+                                        If (k1 > 1) Call Gdet(k,idet2)
                                         Call Rspq(idet1,idet2,is,nf,iu,ju,i,j)
                                         If (nf == 0) Then        !### DETERMINANTS ARE EQUAL
                                             nn=2
@@ -1304,7 +1308,6 @@ Contains
                     End If
                 End Do
             End Do
-            Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
             Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
 
@@ -1336,7 +1339,6 @@ Contains
         Implicit None
         Integer :: mpierr, num_val_positions
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1356,8 +1358,8 @@ Contains
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
-        If (.not. Allocated(Rnt)) Allocate(Rnt(Nint))
-        If (.not. Allocated(Intg)) Allocate(Intg(Nint))
+        If (.not. Allocated(RintVal)) Allocate(RintVal(Nint))
+        If (.not. Allocated(RintKey)) Allocate(RintKey(Nint))
         If (.not. Allocated(Rro)) Allocate(Rro(IPx, IPx))
         Call MPI_Bcast(Nn, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Jz, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1367,8 +1369,8 @@ Contains
         Call MPI_Bcast(Jj, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nf0, IPs, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Rnt, Nint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(Intg, Nint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(RintVal, Nint, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(RintKey, Nint, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
 
         Npo=Nf0(Nso+1)   !### - Last position of the core orbitals
         If (mype == 0) num_val_positions = maxval(Iarr)-Npo
@@ -1381,7 +1383,7 @@ Contains
         Use mpi_f08
         Use mpi_utils
         Implicit None
-        Integer :: mype, mpierr, i
+        Integer :: mype, mpierr
         Integer(Kind=int64) :: count
 
         Call MPI_Bcast(tj1, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
@@ -1390,12 +1392,9 @@ Contains
         If (mype /= 0) Allocate(Iarr(Ne,Nd1))
         count = Ne*Int(Nd1,kind=int64)
         Call BroadcastI(Iarr, count, 0, 0, MPI_COMM_WORLD, mpierr)
-        count = Ne*Int(Nd2,kind=int64) 
+        count = Ne*Int(Nd2,kind=int64)
         Call BroadcastI(Iarr2, count, 0, 0, MPI_COMM_WORLD, mpierr)
-        Call MPI_Bcast(B1(1:Nd1), Nd1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        Do i=1,nlvs
-            Call MPI_Bcast(ArrB2(1:Nd2,i), Nd2, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
-        End Do
+        Call MPI_Bcast(ArrB2, Nd2*nlvs, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Return
     End Subroutine BcastTMArrays
 
@@ -1410,8 +1409,8 @@ Contains
         Integer :: lf, imax, k, i, l1, l2, i1, n2, n21, n22, k1, icomp, ic, &
                   iq, j, ju, iu, nf, is, kx, ks, kxx, ixx, j1, j2, &
                   imin, n, n1, ndpt, n20, jt, iab2, start, end
-        Integer :: mype, npes, mpierr, sizebin, err_stat, err_stat2
-        Integer*8 :: mem, memsum, count
+        Integer :: mype, npes, mpierr, err_stat, err_stat2
+        Integer(kind=int64) :: mem, memsum, count
         Real(dp) :: tj2, bn, bk, rc, rxx, s, ms, e1, e2
         Integer, Allocatable, Dimension(:) :: idet1, idet2
         Character(Len=16)     :: memStr, npesStr, err_msg, err_msg2
@@ -1496,10 +1495,10 @@ Contains
             Call WriteHeaders
         End If
 
-        mem = sizeof(Iarr)+sizeof(Iarr2)+sizeof(B1)+sizeof(B2)+sizeof(ArrB2)
-        ! Sum all the mem sizes to get a total...
+        ! Iarr(Ne,Nd1) + Iarr2(Ne,Nd2) + B1(Nd1) + B2(Nd2) + ArrB2(Nd2,nlvs) + RintVal + RintKey + Rro(IPx,IPx) + Ro
+        mem = sizeof(Iarr) + sizeof(Iarr2) + sizeof(B1) + sizeof(B2) + sizeof(ArrB2) + &
+              sizeof(RintVal) + sizeof(RintKey) + sizeof(Rro) + sizeof(Ro)
         Call MPI_AllReduce(mem, memsum, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mpierr)
-        ! ...before overwriting mem with the maximum value across all workers:
         Call MPI_AllReduce(MPI_IN_PLACE, mem, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
         If (mype==0) Then
             Write(npesStr,fmt='(I16)') npes
@@ -1510,7 +1509,6 @@ Contains
                                     Trim(AdjustL(npesStr)),' cores'
         End If
 
-        Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         Call BcastTMArrays(mype)
 
         ! Divide workload by npes
@@ -1524,18 +1522,23 @@ Contains
         Else
             end = (mype+1)*(Nd2/npes)
         End If
-        sizebin=end-start+1
-
         l1=0
+        If (mype == 0) Then
+            Call OpenFS('CONF.XIJ',1,16,0)
+            Do n=1,nterm1-1
+                Read (16)
+            End Do
+        End If
         Do n1=nterm1,nterm1f
             l1=l1+1
-            ! Read in wavefunctions of CONF.XIJ
-            Call OpenFS('CONF.XIJ',1,16,0)
-            Do n=1,n1
+            ! Read next record from CONF.XIJ (rank 0 only; broadcast to all)
+            If (mype == 0) Then
                 Read (16) e1,tj1,ndpt,(B1(i),i=1,Nd1)
                 e1=e1+4.d0*Gj*tj1*(tj1+1.d0)
-            End Do
-            Close (16)
+            End If
+            Call MPI_Bcast(e1,  1,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(tj1, 1,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+            Call MPI_Bcast(B1,  Nd1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
             jt=2*tj1+0.1
             tj1=jt/2.d0
             lf=0
@@ -1579,7 +1582,7 @@ Contains
                                       k=k+1          !### - init. state
                                       bk=B1(k)
                                         If (dabs(bk*bn) > Trd) Then
-                                            Call Gdet(k,idet1)
+                                            If (k1 > 1) Call Gdet(k,idet1)
                                             Call Rspq(idet2,idet1,is,nf,iu,ju,i,j)
                                             If (nf == 0) Then
                                                 Do iq=1,Ne
@@ -1602,7 +1605,6 @@ Contains
                             End Do
                         End If
                     End Do
-                    Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imin, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, mpierr)
                     Call MPI_AllReduce(MPI_IN_PLACE, imax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpierr)
         
@@ -1635,6 +1637,7 @@ Contains
                 End If
             End Do
         End Do
+        If (mype == 0) Close(16)
         Close(100)
         Deallocate(idet1,idet2,iconf1,iconf2)
         Return
@@ -1682,11 +1685,12 @@ Contains
         Implicit None
         Integer :: k, kmax, no, i, imin1, imax1, lf, n1, n2, k1, k2, nspaces1, nspaces2, &
                    nspaces01, nspaces02, lk, jk, ik2, ik1, imin, imax, l, ml, il, &
-                   mk, ik, mc, lll, l1, icc, nok, il1, il2, nol, jl
+                   mk, ik, mc, lll, l1, icc, nok, il1, il2, nol, jl, il_idx
         Real(dp) :: ppl, delE, delEcm, q12, tm1, tj2, tj1, e1, e2, &
                    s, xjk, c, tl, AM3, AM2, AE3, AE2, QM, PNC, EDM, &
                    G, A, B, AE1, x, tme, xml, xmk, xjl, xg, EDM1, QM1, &
                    AM1, Wc, PNC1, g1, wl, tr
+        Real(dp) :: fj3_tab(20, 20)
         Integer, Dimension(3*IPx) :: ind
         Integer, Dimension(IPx) :: i1, i2
         Character(Len=512) :: strfmt, strsp
@@ -1771,35 +1775,37 @@ Contains
                         jl=Jj(nol)
                         xjl=jl/2.d0
                         lll=Ll(nol)
-                        mc=Jz(ik1)-2
-                        Do ik=ik1,ik2     !### - loop over Jz
-                            mk=Jz(ik)
-                            If (mk-mc /= 2) Then
-                                Write(*,*)' RdcTM: WRONG DEFINITION OF THE SHELL',k
-                                Write(*,*) 'IND-S=',ik1,ik2,' SHELLS=',nok,Nh(ik2)
-                                Stop
-                            End If
-                            mc=mk
-                            xmk=mk/2.d0
-                            Do il=il1,il2   !### - loop over Jz'
-                                ml=Jz(il)
-                                xml=ml/2.d0
-                                x=Ro(ik-Npo,il-Npo)
-                                If (x /= 0.d0) Then
-                                    s=s+Isgn((jl-ml)/2)*Fj3(xjl,tl,xjk,-xml,q12,xmk)*x
+                        If (mod(lk+lll,2) == (1-Iprt)/2) Then
+                            ! Precompute Isgn*Fj3 table for this (k,l,l1) triple
+                            mc=Jz(ik1)-2
+                            Do ik=ik1,ik2
+                                mk=Jz(ik)
+                                If (mk-mc /= 2) Then
+                                    Write(*,*)' RdcTM: WRONG DEFINITION OF THE SHELL',k
+                                    Write(*,*) 'IND-S=',ik1,ik2,' SHELLS=',nok,Nh(ik2)
+                                    Stop
                                 End If
+                                mc=mk
+                                xmk=mk/2.d0
+                                Do il=il1,il2
+                                    ml=Jz(il)
+                                    xml=ml/2.d0
+                                    fj3_tab(ik-ik1+1, il-il1+1) = Isgn((jl-ml)/2) * Fj3(xjl,tl,xjk,-xml,q12,xmk)
+                                End Do
                             End Do
-                        End Do
-                        If (l1 == 1) s=s*dsqrt(2*xjk+1)
-                        tme=s/c
-                        If (mod(lk+lll,2) /= (1-Iprt)/2) Then
-                            If (dabs(tme) > 1.d-5) Then
-                                Write(*,*)' RdcTM: big ME of wrong parity'
-                                Write(*,*)' lk=',lk,' ll=',lll,' Rro=',tme
-                                Read(*,*)
-                            End If
-                            tme=0.d0
+                            ! Accumulate: il outer, ik inner for cache-friendly Ro and fj3_tab access
+                            Do il=il1,il2
+                                il_idx = il - il1 + 1
+                                Do ik=ik1,ik2
+                                    x = Ro(ik-Npo, il-Npo)
+                                    If (x /= 0.d0) Then
+                                        s = s + fj3_tab(ik-ik1+1, il_idx) * x
+                                    End If
+                                End Do
+                            End Do
+                            If (l1 == 1) s=s*dsqrt(2*xjk+1)
                         End If
+                        tme=s/c
                         Rro(k,l)=tme            !### k = init, l = final
                         If (tme /= 0.d0) Then
                         ! Parity = - 1
@@ -2311,29 +2317,22 @@ Contains
                         jl=Jj(nol)
                         xjl=jl/2.d0
                         lll=Ll(nol)
-                        Do ik=ik1,ik2      !###  LOOP OVER JZ
-                            mk=Jz(ik)
-                            xmk=mk/2.d0
-                            Do il=il1,il2    !###  LOOP OVER JZ'
-                                ml=Jz(il)
-                                If (ml == mk) Then
+                        If (mod(lk+lll,2) == 0) Then
+                            ! q=0 DM: for each ik, at most one il satisfies Jz(il)==Jz(ik)
+                            Do ik=ik1,ik2
+                                mk=Jz(ik)
+                                il = il1 + (mk - Jz(il1)) / 2
+                                If (il >= il1 .and. il <= il2) Then
                                     x=Ro(ik-Npo,il-Npo)
                                     If (x /= 0.d0) Then
-                                      s = s + Isgn((jl-ml)/2) * Fj3(xjl,tl,xjk,-xmk,0.d0,xmk) * x
+                                        xmk=mk/2.d0
+                                        s = s + Isgn((jl-mk)/2) * Fj3(xjl,tl,xjk,-xmk,0.d0,xmk) * x
                                     End If
                                 End If
                             End Do
-                        End Do
-                        If (l1 == 1) s=s*dsqrt(2*xjk+1)
-                        dme=s/c
-                        If (mod(lk+lll,2) /= 0) Then
-                            If (dabs(dme) > 1.d-5) Then
-                                Write(*,*)' RdcDM: large ME of wrong parity'
-                                Write(*,*)' lk=',lk,' ll=',lll,' Rro=',dme
-                                Read(*,*)
-                            End If
-                            dme=0.d0
+                            If (l1 == 1) s=s*dsqrt(2*xjk+1)
                         End If
+                        dme=s/c
                         Rro(k,l)=dme
                         ! HFS CONSTANTS AND G-FACTOR:
                         If (dme /= 0.d0) Then

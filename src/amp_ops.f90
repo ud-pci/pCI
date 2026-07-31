@@ -23,8 +23,8 @@ Module amp_ops
     Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
     Public :: gQED
 
-    Integer, Allocatable, Dimension(:), Public      :: Intg
-    Real(dp), Allocatable, Dimension(:), Public     :: Rnt
+    Integer, Allocatable, Dimension(:), Public      :: RintKey
+    Real(dp), Allocatable, Dimension(:), Public     :: RintVal
     Real(dp), Public :: AE1V
 
   Contains 
@@ -44,9 +44,9 @@ Module amp_ops
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
 
-        Do i=1,size(Intg, 1)
-            If (ind == Intg(i)) Then
-                Fint=Rnt(i)*isg
+        Do i=1,size(RintKey, 1)
+            If (ind == RintKey(i)) Then
+                Fint=RintVal(i)*isg
                 Return
             End If
         End Do

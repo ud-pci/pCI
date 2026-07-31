@@ -6,11 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-07-25
+## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction
 - matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 -> Matrix%row/col throughout
 - matrix_io.f90 - add RedistributeHamCSR and RedistributeJsqCSR subroutines to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row and Jsq%row freed after CSR build (row implicit in rowptr)
-- matrix_io.f90 - add WriteMatrixCSR: writes global CSR after RedistributeHamCSR; add ReadMatrixCSR: reads and distributes global CSR  using same greedy nnz-balanced row assignment
+- matrix_io.f90 - add WriteMatrixCSR: writes global CSR after RedistributeHamCSR; add ReadMatrixCSR: reads and distributes global CSR using same greedy nnz-balanced row assignment
 - davidson.f90 - ArrB, Diag, B2 distributed across ranks; B1 split into replicated B1(Nd0) and local B1_loc(nd_local); AvgDiag and Hmin AllReduce run on all ranks; batch AllReduces; 
 - davidson.f90 - DGEMM/DGEMV for Mxmpy; DiagInitApprox switched to DSYEVD
 - davidson.f90 - Prj_J: replace COO Jsq loop (Jsq%row) with CSR loop over JsqCSR_rowptr
@@ -29,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
 - pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly before Davidson
 - pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
-- pconf.F90 - remove Kl=3,4 functionalities; update Kl=1 functionality to read new CSR-based pCONF.HIJ and pCONF.JJJ files
+- params.f90 - centralize label string arrays OrbLabels, OpLabels, CorrLabels and replace local, per-program Let, Alet, Blet arrays
+- pdtm.f90 - apply FormDM/FormTM MPI communication optimizations: Fj3 table precompute, nnz-balanced load distribution
+- pdtm.f90 - fix memory accounting
+- utils.f90, conf_init.f90, pdtm.f90 - write an input file skeleton if user doesn't provide ci/dtm.in file
 - conf_pt.f90 - move Hint and Gint out of integrals module into local contained functions using original linear-scan implementations
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 
