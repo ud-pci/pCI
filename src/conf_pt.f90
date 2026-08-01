@@ -149,10 +149,8 @@ Contains
         End If
         Nc = Ncpt
 
-        ! Read job parameters from file pt.in
-        Open(unit=21, file='cpt.in')
-        Read(21,*) ktf,kvar
-        Close(21)
+        ! Read job parameters from file cpt.in
+        Call ReadCptIn
     
         If (abs(C_is) < 1.d-6) K_is = 0
         If (K_is == 0) C_is = 0.d0
@@ -1398,6 +1396,55 @@ Contains
         Hmltn=t
         Return
     End function Hmltn
+
+    Subroutine ReadCptIn
+        Use utils, Only : ToUpperString, WriteSkeleton
+        Implicit None
+        Integer :: err_stat, index_equals, index_hashtag
+        Character(Len=10) :: key, key_upper, val
+        Character(Len=80) :: line
+        Character(Len=90), Parameter, Dimension(4) :: skeleton = [ &
+            'ktf=5   # cutoff power 0-9; include NR configs with weight > max_weight / 2^ktf', &
+            'kvar=1  # reordering: 1=all, 2=keep PT block, 3=keep CI space                  ', &
+            '',                                                                                 &
+            '#Cut0=  # wave function tail cutoff (overrides Cut0 in CONF.INP if set)         ']
+
+        ! Defaults
+        ktf  = 5
+        kvar = 1
+
+        Open(unit=99, file='cpt.in', status='OLD', iostat=err_stat)
+        If (err_stat /= 0) Call WriteSkeleton('cpt.in', skeleton)
+
+        Do
+            Read(99, '(A)', iostat=err_stat) line
+            If (err_stat /= 0) Exit
+            If (index(string=line, substring='=') == 0) Cycle
+            If (index(AdjustL(line), '#') == 1) Cycle
+            index_equals = index(string=line, substring='=')
+            key = Trim(AdjustL(line(1:index_equals-1)))
+            val = line(index_equals+1:Len(line))
+            index_hashtag = index(string=val, substring='#')
+            If (index_hashtag /= 0) val = Trim(AdjustL(val(1:index_hashtag-1)))
+            key_upper = ToUpperString(key)
+            Select Case(key_upper)
+            Case('KTF')
+                Read(val, *) ktf
+            Case('KVAR')
+                Read(val, *) kvar
+            Case('CUT0')
+                Read(val, *) Cut0
+            Case Default
+                Write(*,*) 'WARNING: unsupported key "', Trim(AdjustL(key)), '" in cpt.in'
+            End Select
+        End Do
+
+        Close(99)
+
+        Write(*,'(4X,"ktf  =",I3)') ktf
+        Write(*,'(4X,"kvar =",I3)') kvar
+
+    End Subroutine ReadCptIn
 
     Subroutine DiagH(nd0,npes,mype)
     	use mpi_f08

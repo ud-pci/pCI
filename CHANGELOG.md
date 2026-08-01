@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - params.f90 - centralize label string arrays OrbLabels, OpLabels, CorrLabels and replace local, per-program Let, Alet, Blet arrays
 - pdtm.f90 - apply FormDM/FormTM MPI communication optimizations: Fj3 table precompute, nnz-balanced load distribution
 - pdtm.f90 - fix memory accounting
-- utils.f90, conf_init.f90, pdtm.f90 - write an input file skeleton if user doesn't provide ci/dtm.in file
+- utils.f90, conf_init.f90, pdtm.f90, conf_pt.f90 - write an input file skeleton if user doesn't provide ci/dtm.in file
 - conf_pt.f90 - use BuildGauntLUT, BuildHintLUT, BuildGintHash, BuildISLUT on all ranks after BcastPTArrays to match pconf integral initialization
 - CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
 
