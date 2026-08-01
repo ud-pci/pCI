@@ -8,7 +8,7 @@ Program conf_pt
     ! in a smaller space.
     use mpi_f08
     Use conf_variables
-    Use integrals, Only : Rint
+    Use integrals, Only : Rint, Gint, Hint, BuildGauntLUT, BuildHintLUT, BuildGintHash, BuildISLUT
     Use determinants, Only : Dinit, Jterm, Wdet
     Implicit None
     
@@ -75,6 +75,11 @@ Program conf_pt
     Call BcastParams
     Call AllocatePTArrays
     Call BcastPTArrays
+
+    Call BuildGauntLUT
+    Call BuildHintLUT
+    Call BuildGintHash
+    If (K_is /= 0) Call BuildISLUT
 
     Call cpu_time(start_time)
     Call PT_Init(npes, mype)
@@ -381,6 +386,7 @@ Contains
         Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1461,8 +1467,6 @@ Contains
             End If
         End Do
         
-        !print*,'pe=',mype,'has finished working with count=', count
-
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         
         Call MPI_Gatherv(Diag(start:End), size, MPI_DOUBLE_PRECISION, Diag(nd0+1:Nd), &
@@ -1473,199 +1477,8 @@ Contains
         If (mype==0) Then
         Write (*,*) ' Diagonal formed'
     	End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Return
     End Subroutine DiagH
-
-    Real(dp) Function Hint(ia, ib)
-        Use integrals, Only : HintS, Find_VS, Find_SMS
-        Implicit None
-        Integer  :: n, na, nb, n0, ind, i, nab, ia, ib
-        Real(dp) :: e
-        e=0.d0
-        If (Jz(ia) == Jz(ib)) Then
-            na=Nh(ia)
-            nb=Nh(ib)
-            n0=na
-            If (Kk(na) == Kk(nb)) Then
-                If (na > nb) Then
-                    n=na
-                    na=nb
-                    nb=n
-                End If
-                ind=Nx*(na-Nso-1)+(nb-Nso)
-                Do i=1,Nhint
-                    nab=Iint1(i)
-                    If (nab == ind) Then
-                        e=Rint1(i)
-                        If (Ksig /= 0) e = e + HintS(na,nb,n0)
-                        If (C_is /= 0.d0) Then
-                            If (K_is >= 2 .and. K_sms /= 2) e = e + C_is*Find_SMS(na,nb)
-                            If (K_is == 1) e = e + C_is*Find_VS(na,nb)
-                        End If
-                        Hint=e
-                        Return
-                    End If
-                End Do
-                Write( 6,'(/4X,"one electron integral is absent:"/4X,"na=",I3,2X,"nb=",I3/)') na,nb
-                Write(11,'(/4X,"one electron integral is absent:"/4X,"na=",I3,2X,"nb=",I3/)') na,nb
-                Stop
-            End If
-        End If
-        Hint=e
-        Return
-    End Function Hint
-
-    Real(dp) Function Gint(i1, i2, i3, i4)
-        Use integrals, Only : GintS, Find_SMS, Gaunt
-        Implicit None
-        Integer  :: i2, ib, i1, ia, is, la, nd, nc, nb, na, md, mc, mb, ma, &
-                    is_sms, ii, i4, id, i3, ic, iac, k1, is_br, i_br, &
-                    iab, kmax, kmin, ibd0, iac0, k, jd, jc, jb, ja, ibr, i, ld, &
-                    lc, lb, ibd, kac, kbd
-        Integer(Kind=int64) :: i8, mi8, minint8
-        Real(dp) :: e, rabcd
-        Logical  :: l_is, l_br, l_pr
-        Character(Len=256) :: strfmt
-        l_is= .not. (C_is == 0.d0)
-        l_is=l_is .and. (K_is == 2 .or. K_is == 4)
-        l_is=l_is .and. (K_sms >= 2)
-        l_br=Kbrt /= 0
-        minint8=0_int64
-        e=0.d0
-        is=1
-        ia=i1
-        ib=i2
-        ic=i3
-        id=i4
-        Do ii=1,2
-            is_sms=1
-            ma=Jz(ia)
-            mb=Jz(ib)
-            mc=Jz(ic)
-            md=Jz(id)
-            If (ma+mb /= mc+md) Then
-                Write(*,*) ' Gint error: ma+mb=',ma+mb,' mc+md=',mc+md
-                Read(*,*)
-                Stop
-            End If
-            na=Nh(ia)
-            nb=Nh(ib)
-            nc=Nh(ic)
-            nd=Nh(id)
-            la=Ll(na)
-            lb=Ll(nb)
-            lc=Ll(nc)
-            ld=Ll(nd)
-            i=la+lb+lc+ld
-            ibr=0
-            If (i == 2*(i/2)) Then
-                ja=Jj(na)
-                jb=Jj(nb)
-                jc=Jj(nc)
-                jd=Jj(nd)
-                If (na > nc) Then
-                    k =na
-                    na=nc
-                    nc=k
-                    is_sms=-is_sms
-                    ibr=ibr+1
-                End If
-                If (nb > nd) Then
-                    k =nb
-                    nb=nd
-                    nd=k
-                    is_sms=-is_sms
-                    ibr=ibr+1
-                End If
-                If (na > nb) Then
-                    k =na
-                    na=nb
-                    nb=k
-                    k =nc
-                    nc=nd
-                    nd=k
-                End If
-                If (na == nb .and. nc > nd) Then
-                    k =nc
-                    nc=nd
-                    nd=k
-                End If
-                If (ibr == 1) Then
-                    ibr=-1
-                Else
-                    ibr=1
-                End If
-                iac0=Nx*(na-Nso-1)+(nc-Nso)
-                ibd0=Nx*(nb-Nso-1)+(nd-Nso)
-                kmin=iabs(ja-jc)/2+1
-                k=iabs(jb-jd)/2+1
-                If (kmin < k) kmin=k
-                kmax=(ja+jc)/2+1
-                k=(jb+jd)/2+1
-                If (kmax > k) kmax=k
-                iab = Nx*(na-Nso-1)+(nb-Nso)
-                minint8 = IntOrd(iab)
-                i_br=la+lc+kmin-1
-                If (i_br /= 2*(i_br/2)) Then
-                    is_br=ibr
-                Else
-                    is_br=1
-                End If
-                Do k1=kmin,kmax
-                    k=k1-1
-                    i=k+la+lc
-                    l_pr=i == 2*(i/2)
-                    If (l_pr .or. l_br) Then
-                        is_br=is_br*ibr
-                        iac=Nx*Nx*k+iac0
-                        ibd=ibd0
-                        Do i8=minint8,Ngint
-                            mi8=i8
-                            kac=Iint2(i8)
-                            kbd=Iint3(i8)
-                            If (kac == iac .and. kbd == ibd) Then
-                                Exit
-                            Else If (i8 == Ngint) Then
-                                strfmt = '(/4X,"integral is absent:"/4X,"K=",I2,2X,"na=",I3,2X,"nb=",I3,2X,"nc=",I3,2X,"nd=",I3)'
-                                Write( 6,strfmt) k,na,nb,nc,nd
-                                Write(11,strfmt) k,na,nb,nc,nd
-                                Stop
-                            End If
-                        End Do
-                        rabcd=Rint2(1,mi8)
-                        If (l_br) rabcd=rabcd+is_br*Rint2(2,mi8)
-                        If (Ksig >= 2) Then
-                            If (max(na,nb,nc,nd) > nd .or. max(la,lb,lc,ld) > Lmax) Then
-                                If (k < 10) Then
-                                    rabcd=Scr(k+1)*rabcd
-                                    iscr=iscr+1
-                                    xscr=xscr+Scr(k+1)
-                                End If
-                            End If
-                        End If
-                        If (k == 1 .and. l_is .and. l_pr) Then
-                            rabcd=rabcd-is_sms*C_is*Find_SMS(na,nc)*Find_SMS(nb,nd)
-                        End If
-                        e=e+is &
-                            *Gaunt(k,ja*0.5d0,ma*0.5d0,jc*0.5d0,mc*0.5d0) &
-                            *Gaunt(k,jd*0.5d0,md*0.5d0,jb*0.5d0,mb*0.5d0) &
-                            *rabcd
-                        minint8 = mi8 + 1
-                    End If
-                End Do
-            End If
-            k=ic
-            ic=id
-            id=k
-            is=-is
-        End Do
-        If (Ksig >= 2) Then
-            e = e + GintS(i1,i2,i3,i4)
-        End If
-        Gint=e
-        Return
-    End Function Gint
 
 End Program conf_pt
 
