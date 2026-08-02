@@ -710,23 +710,34 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
     f.close()
     print(filename + ' has been written')
 
-def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi):
+def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi, bspline_params=None):
     """ Writes bas_wj.in """
-    with open(filename,'w') as f: 
-        f.write(' ' + symbol + ' ' + str(NS).rjust(4, ' ') + str(int(Z)).rjust(4, ' ') 
+    if bspline_params is None:
+        bspline_params = {}
+    dhf_params = get_dict_value(bspline_params, 'dhf') or {}
+    # xalpha: config overrides atom-specific defaults (Na/Yb need larger values)
+    if get_dict_value(dhf_params, 'xalpha') is not None:
+        xalpha = float(dhf_params['xalpha'])
+    elif symbol == 'Na':
+        xalpha = 1.5
+    elif symbol == 'Yb':
+        xalpha = 2.0
+    else:
+        xalpha = 1.0
+    # r0, h: tdhf/bdhf internal defaults are rdef=5e-4 and hdef=0.03125
+    r0 = float(get_dict_value(dhf_params, 'r0') or 5e-4)
+    h  = float(get_dict_value(dhf_params, 'h')  or 0.03125)
+    # format as fixed-point decimal (avoids scientific notation for small values)
+    r0_str = '{:.7f}'.format(r0).rstrip('0').rstrip('.')
+    with open(filename,'w') as f:
+        f.write(' ' + symbol + ' ' + str(NS).rjust(4, ' ') + str(int(Z)).rjust(4, ' ')
                     + str(int(AM)).rjust(4,' ') + '   0   0   9' + str(NSO+1).rjust(4, ' ')
                     + '   1\n')
         for i in range(len(N)):
             f.write(N[i].rjust(4, ' ') + kappa[i].rjust(4, ' ') + iters[i].rjust(4, ' ') +
                          "{:.2f}".format(energies[i]).rjust(7, ' ') + '\n')
-        if symbol == 'Na':
-            f.write('   1.5\n')
-        elif symbol == 'Yb':
-            f.write('   2.0\n')
-        else:
-            f.write('   1.0\n')
-        grid = '0.00004'
-        f.write(' ' + str(grid).rjust(9, ' ') + '  0.00  500\n')
+        f.write('   ' + str(xalpha) + '\n')
+        f.write(r0_str.rjust(9, ' ') + '  ' + '{:.5f}'.format(h) + '  500\n')
         f.write('   1\n')
         f.write('   0.0000' + str(round(cfermi, 4)).rjust(10, ' ') + '    2.3\n')
         f.write('   0.0')
@@ -808,7 +819,7 @@ def write_ao_inputs(system, K_is, C_is, kvw, basis_method):
         write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
         vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
         write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, K_is, C_is)
-        write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi)
+        write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi, system['basis']['b_splines'])
         write_spl_in('spl.in', system['basis']['cavity_radius'], system['basis']['b_splines'])
     elif basis_method == 'dirac-fock':
         write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)

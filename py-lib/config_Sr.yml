@@ -35,6 +35,10 @@ basis:
         nmax: 40
         lmax: 6
         k: 7
+        dhf:
+            xalpha: 1.5
+            r0: 0.0005
+            h: 0.03
     val_aov:
         s: 5
         p: 5
