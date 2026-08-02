@@ -1,24 +1,34 @@
-How to include QED corrections
-==============================
+QED corrections
+===============
 
 *The following instructions assume familiarity with the main programs of the pCI package.*
 
-Steps to run a QED calculation
-------------------------------
+Running QED calculations
+------------------------
 
 In this section, we will introduce calculations including QED corrections. 
 
 1. Construct basis set by running ``hfd`` and ``bass`` to obtain ``HFD.DAT``
 2. Run ``sgc0`` to form an empty ``SGC.CON`` file
 3. ``cp HFD.DAT HFD-noQED.DAT`` - save a copy of ``HFD.DAT`` without QED
-4. Create a file ``qedpot.inp`` with number corresponding to the variant of the QED potential and the name of the ``HFD.DAT`` file.  
+4. Create a file ``qedpot.inp`` with number corresponding to the variant of the QED potential and the name of the ``HFD.DAT`` file.
 
     .. collapse:: Click here to see a description of qedpot.inp.
 
-        .. code-block:: 
+        .. code-block::
 
             1            # kvar=1-5, Variant of QED potential
             HFD.DAT      # name of file holding basis sets
+
+    .. note::
+
+        The following variants (``kvar``) of QED potentials are available:
+
+        1. QEDMOD
+        2. Flambaum local potential + QEDMOD non-local correction
+        3. Flambaum local potential
+        4. QEDPOT
+        5. Semi-empirical approach
     
 5. Create a file ``qed.in`` selecting options.
    
@@ -38,7 +48,7 @@ In this section, we will introduce calculations including QED corrections.
 7. ``cp SGC.CON SGC-noQED.CON`` - save a copy of ``SGC.CON`` without QED
 8. Run ``qedpot_conf``
 9. Rename ``SGCqed.CON`` to ``SGC.CON``
-10.  Run ``conf``
+10.  Run ``pconf``
 
 .. collapse:: You can also use the following batch.qed script for steps 3-9, making sure to change inputs relevant to your job.
 

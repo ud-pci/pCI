@@ -40,7 +40,7 @@ Program ine
     !   Jm       - projection of total momentum J
     !   Nc       - number of configurations
     !   Nd       - number of dets
-    !   IPmr     - equivalent of 4 Bytes for DIRECT files
+    !   IPmr     - file storage units per Real(dp) for DIRECT files
     !   - - - - - - - - - - - - - - - - - - - - - - - - -
     !   main variables in X0 space:
     !   Jm0      - projection of total momentum J
@@ -54,6 +54,7 @@ Program ine
     Use params
     Use determinants, Only : Dinit, Jterm
     Use str_fmt, Only : startTimer, stopTimer
+    Use utils, Only : DetermineRecordLength, CheckRecordLength
 
     Implicit None
     
@@ -72,10 +73,6 @@ Program ine
     Real(dp), Allocatable, Dimension(:,:) :: X1J, Y2J
     Real(dp), Dimension(2) :: s, ss, s0, s1, s2
     logical :: ok
-
-    Character(Len=1), Dimension(9)          :: Let
-    Character(Len=4), Dimension(13)         :: Alet
-    Character(Len=4), Dimension(5)          :: Blet
 
     Integer(Kind=int64) :: start_time
     Character(Len=16) :: timeStr
@@ -224,88 +221,16 @@ Contains
 
     End Subroutine SetParams
 
-    Subroutine Init_Char(Let,Alet,Blet)
-        Implicit None
-    
-        Character(Len=1), Dimension(6) :: Let
-        Character(Len=4), Dimension(13) :: Alet
-        Character(Len=4), Dimension(5) :: Blet
-    
-        Let(1)= 's'
-        Let(2)= 'p'
-        Let(3)= 'd'
-        Let(4)= 'f'
-        Let(5)= 'g'
-        Let(6)= 'h'
-    
-        Alet(1)= 'A_hf'
-        Alet(2)= 'B_hf'
-        Alet(3)= 'E1_L'
-        Alet(4)= 'EDM '
-        Alet(5)= 'PNC '
-        Alet(6)= 'E1_V'
-        Alet(7)= 'AM  '
-        Alet(8)= 'MQM '
-        Alet(9)= 'M1  '
-        Alet(10)='E2  '
-        Alet(11)='E3  '
-        Alet(12)='M2  '
-        Alet(13)='M3  '
-    
-        Blet(1)= 'Rint'
-        Blet(2)= 'RPA1'
-        Blet(3)= 'RPA2'
-        Blet(4)= 'RPA3'
-        Blet(5)= 'RPA4'
-
-        Return
-    End Subroutine Init_Char
-
-    Subroutine recunit
-        ! This Subroutine determines the record unit
-        Implicit None
-
-        Integer          :: lrec, Iflag, nbytes
-        Character(Len=8) :: d1, t1, d2, t2
-
-        t1='abcdefgh'
-        d1='        '
-        t2='hgfedcba'
-        d2='        '
-        lrec=0
-        Iflag=1
-200     lrec=lrec+1
-        If (lrec.gt.8) Then
-          Write(*,*)  'lrec > 8'
-          Stop
-        End If
-        Open(unit=13,file='test.tmp',status='unknown',access='direct',recl=lrec)
-        Write(13,rec=1,err=210) t1
-        Write(13,rec=2,err=210) t2
-        Read(13,rec=1,err=210) d1
-        Read(13,rec=2,err=210) d2
-        If (d1.ne.t1) goto 210
-        If (d2.ne.t2) goto 210
-        Iflag=0
-210     Close(unit=13,status='delete')
-        If (Iflag.ne.0) goto 200
-        nbytes=8/lrec
-        ipmr=4/nbytes
-
-        Return
-    End Subroutine recunit
-
     Subroutine Input
         Use conf_init, Only : ReadConfInp, ReadConfigurations
         Implicit None
-    
+        
         Integer :: i
         character(Len=5), Dimension(5) :: str
         Character(Len=128) :: strfmt
         data str /'H_pnc','E1(L)','H_am','E1(V)',' E2  '/
 
-        Call recunit
-        Call Init_Char(Let,Alet,Blet)
+        Call DetermineRecordLength(ipmr)
         
         Open(unit=11,status='UNKNOWN',file='INE.RES')
         Close(unit=11,status='DELETE')
@@ -398,13 +323,14 @@ Contains
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*IPmr,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*IPmr,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*IPmr)
         Read(12,rec=1) p
         Read(12,rec=2) q
         Read(12,rec=5) p1
@@ -573,8 +499,8 @@ Contains
                 Read(13) (Rnt(i),Inte(i),i=1,Nint)
                 strfmt = '(/1X,"### Radial integrals from DTM.INT ("," Nint =",I6,") ###", &
                        /(4X,A4," calculated by ",A4))'
-                Write(6, strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
-                Write(11,strfmt) Nint,(Alet(i),Blet(ki(i)),i=1,13)
+                Write(6, strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
+                Write(11,strfmt) Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
                 Close(13)
                 Deallocate(l1)
                 Return
@@ -2313,7 +2239,7 @@ Contains
         Integer :: j, j1, num, n, k
         Integer(kind=int64) :: i8
         Real(dp) :: t
-        Real(dp), Allocatable, Dimension(:) :: x, y
+        Real(dp), Allocatable, Dimension(:), Intent(In) :: x, y
         j1=j+1
         i8= 0
         Do k=1,Nd

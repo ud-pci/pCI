@@ -8,7 +8,7 @@ Program conf_pt
     ! in a smaller space.
     use mpi_f08
     Use conf_variables
-    Use integrals, Only : Rint
+    Use integrals, Only : Rint, Gint, Hint, BuildGauntLUT, BuildHintLUT, BuildGintHash, BuildISLUT
     Use determinants, Only : Dinit, Jterm, Wdet
     Implicit None
     
@@ -75,6 +75,11 @@ Program conf_pt
     Call BcastParams
     Call AllocatePTArrays
     Call BcastPTArrays
+
+    Call BuildGauntLUT
+    Call BuildHintLUT
+    Call BuildGintHash
+    If (K_is /= 0) Call BuildISLUT
 
     Call cpu_time(start_time)
     Call PT_Init(npes, mype)
@@ -144,10 +149,8 @@ Contains
         End If
         Nc = Ncpt
 
-        ! Read job parameters from file pt.in
-        Open(unit=21, file='cpt.in')
-        Read(21,*) ktf,kvar
-        Close(21)
+        ! Read job parameters from file cpt.in
+        Call ReadCptIn
     
         If (abs(C_is) < 1.d-6) K_is = 0
         If (K_is == 0) C_is = 0.d0
@@ -164,7 +167,7 @@ Contains
     End Subroutine Input
 
     Subroutine Init
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
         Implicit None
         Integer                     :: ii, ni, If, nj, i, nnj, llj, jlj, kkj, err_stat, &
                                        nec, imax, j, n, ic, i0, nmin, i1, n2, n1, l
@@ -174,31 +177,26 @@ Contains
         Real(dp), Dimension(IPs)    :: Qq1
         Integer, Dimension(4*IPs)   :: IQN
         Integer, Dimension(33)      :: nnn, jjj, nqq
-        Character(Len=1)            :: Let(9), lll(33)
+        Character(Len=1)            :: lll(33)
         Character(Len=512)          :: strfmt, err_msg
-        Logical                     :: longbasis, success
+        Logical                     :: longbasis
 
         equivalence (IQN(1),PQ(21)),(Qq1(1),PQ(2*IPs+21))
         equivalence (p(1),pq(1)), (q(1),pq(IP6+1)), &
                     (p1(1),pq(2*IP6+1)), (q1(1),pq(3*IP6+1))
-        data Let/'s','p','d','f','g','h','i','k','l'/
-
         c1 = 0.01d0
         mj = 2*abs(Jm)+0.01d0
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file CONF.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
 
         Read(12,rec=1) p
         Read(12,rec=2) q
@@ -311,7 +309,7 @@ Contains
         Write(11,'(1X,71("="))')
         Do ni=1,Nso
             l =Ll(ni)+1
-            lll(ni)=let(l)
+            lll(ni)=OrbLabels(l)
         End Do
         If (Kout > 1) Then
         Write(11,'(1X,"Core:", 6(I2,A1,"(",I1,"/2)",I2,";"),  &
@@ -334,7 +332,7 @@ Contains
                 i1=i-n1+1
                 ni=Nip(i)
                 l=Ll(ni)+1
-                lll(i1)=let(l)
+                lll(i1)=OrbLabels(l)
                 jjj(i1)=Jj(ni)
                 nnn(i1)=Nn(ni)
                 nqq(i1)=Nq(i)
@@ -386,6 +384,7 @@ Contains
         Call MPI_Bcast(Nso, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nx, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ns, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1352,7 +1351,6 @@ Contains
     End Subroutine FormH
 
     Real(dp) function Hmltn(idet1,idet2)
-        Use integrals, Only : Gint, Hint
         Use determinants, Only : Rspq
         Implicit None
         Integer  :: nf, iq, i1, i2, j1, j2, is, jq, jq0
@@ -1364,12 +1362,12 @@ Contains
         If (nf <= 2) Then
             If (nf == 2) Then
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! determinants dIffer by two functions
+        ! determinants differ by two functions
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
                 t=t+Gint(i2,j2,i1,j1)*is !### det_k goes first!
             else If (nf == 1) Then
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-        ! determinants dIffer by one function
+        ! determinants differ by one function
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
                 Do iq=1,Ne
                     i1=idet1(iq)
@@ -1398,6 +1396,55 @@ Contains
         Hmltn=t
         Return
     End function Hmltn
+
+    Subroutine ReadCptIn
+        Use utils, Only : ToUpperString, WriteSkeleton
+        Implicit None
+        Integer :: err_stat, index_equals, index_hashtag
+        Character(Len=10) :: key, key_upper, val
+        Character(Len=80) :: line
+        Character(Len=90), Parameter, Dimension(4) :: skeleton = [ &
+            'ktf=5   # cutoff power 0-9; include NR configs with weight > max_weight / 2^ktf', &
+            'kvar=1  # reordering: 1=all, 2=keep PT block, 3=keep CI space                  ', &
+            '',                                                                                 &
+            '#Cut0=  # wave function tail cutoff (overrides Cut0 in CONF.INP if set)         ']
+
+        ! Defaults
+        ktf  = 5
+        kvar = 1
+
+        Open(unit=99, file='cpt.in', status='OLD', iostat=err_stat)
+        If (err_stat /= 0) Call WriteSkeleton('cpt.in', skeleton)
+
+        Do
+            Read(99, '(A)', iostat=err_stat) line
+            If (err_stat /= 0) Exit
+            If (index(string=line, substring='=') == 0) Cycle
+            If (index(AdjustL(line), '#') == 1) Cycle
+            index_equals = index(string=line, substring='=')
+            key = Trim(AdjustL(line(1:index_equals-1)))
+            val = line(index_equals+1:Len(line))
+            index_hashtag = index(string=val, substring='#')
+            If (index_hashtag /= 0) val = Trim(AdjustL(val(1:index_hashtag-1)))
+            key_upper = ToUpperString(key)
+            Select Case(key_upper)
+            Case('KTF')
+                Read(val, *) ktf
+            Case('KVAR')
+                Read(val, *) kvar
+            Case('CUT0')
+                Read(val, *) Cut0
+            Case Default
+                Write(*,*) 'WARNING: unsupported key "', Trim(AdjustL(key)), '" in cpt.in'
+            End Select
+        End Do
+
+        Close(99)
+
+        Write(*,'(4X,"ktf  =",I3)') ktf
+        Write(*,'(4X,"kvar =",I3)') kvar
+
+    End Subroutine ReadCptIn
 
     Subroutine DiagH(nd0,npes,mype)
     	use mpi_f08
@@ -1467,8 +1514,6 @@ Contains
             End If
         End Do
         
-        !print*,'pe=',mype,'has finished working with count=', count
-
         Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
         
         Call MPI_Gatherv(Diag(start:End), size, MPI_DOUBLE_PRECISION, Diag(nd0+1:Nd), &
@@ -1479,8 +1524,8 @@ Contains
         If (mype==0) Then
         Write (*,*) ' Diagonal formed'
     	End If
-        ! - - - - - - - - - - - - - - - - - - - - - - - - -
         Return
     End Subroutine DiagH
+
 End Program conf_pt
 

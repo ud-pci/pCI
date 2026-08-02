@@ -1,5 +1,6 @@
 import re
 import requests
+import atomic_term_symbol
 
 def strip_text(str, txt_to_remove):
     '''
@@ -12,18 +13,11 @@ def strip_text(str, txt_to_remove):
 
 def scrape_term(configuration):
     '''
-    This function scrapes all possible terms for a given electronic configuration from online term calculator
-    at http://umop.net/spectra/term_calc.php
+    This function calculates all possible terms for a given electronic configuration
     '''
-    url = 'http://umop.net/spectra/term_calc.php?config=' + configuration.replace(' ', '.')
-    r = requests.get(url)
-    
-    reg_str = "<strong>(.*?)</strong>"
-    txt_to_remove = ['<sub>','</sub>','<sup>','</sup>','&nbsp;']
-    scraped_terms = strip_text(re.findall(reg_str, r.text)[0].replace('&deg;',''), txt_to_remove).split()
-    
+    all_terms = atomic_term_symbol.calc_term_symbols(configuration)
     terms = []
-    for term in scraped_terms:
+    for term in all_terms:
         if ',' in term:
             nl = term[:2]
             J_list = term[2:].split(',')

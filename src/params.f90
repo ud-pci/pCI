@@ -27,7 +27,7 @@ Module params
     ! defining Parameters which determine dimensions of main arrays
     !                     Array dimension          Associated variable
     Integer, Parameter :: IPs   =    600         ! Ns - number of orbitals
-    Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals   
+    Integer, Parameter :: IPx   =    440         ! Nx - used for indexation of integrals
 
     ! defining parameters which determine dimensions of main arrays in hfd
     Integer, Parameter :: IP6   =    470         ! record length for DAT files
@@ -36,6 +36,14 @@ Module params
     Integer :: Ns, Nsp, Nso, Nsu, Ne, Nec, Nc, Nc4, Nd, Nlv, Ndr, Njd, Nst, Ncpt, N_it, Ngaunt, M, Mj, Mrec
     Integer :: Kl, Kl4, Klow, Kc, Kv, Kbrt, Kout, Kecp, K_is, Kautobas, Jdel, Nx
     Real(dp) :: Z, H, Gj, gnuc, Rnuc, Qnuc, Cut0, C_is, Am, Jm, Crt4
+
+    ! Spectroscopic orbital labels
+    Character(len=1), Parameter, Dimension(9) :: OrbLabels = ['s','p','d','f','g','h','i','k','l']
+
+    ! Operator labels
+    Character(Len=4), Parameter, Dimension(5)  :: CorrLabels = ['Rint','RPA1','RPA2','RPA3','RPA4']
+    Character(Len=4), Parameter, Dimension(15) :: OpLabels = &
+        ['A_hf','B_hf','E1_L','EDM ','PNC ','E1_V','AM  ','MQM ','M1  ','E2  ','E3  ','M2  ','M3  ','gQ_P','gQ_Q']
 
     ! Global arrays
     Integer, Allocatable, Dimension(:)    :: Jt, Njt

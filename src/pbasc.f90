@@ -11,7 +11,6 @@ Program pbasc
     Integer :: Norb, nsx, nsx2, lsx
     Integer(kind=int64) :: start_time
     Character(Len=16) :: timeStr
-    Logical :: success
 
     Type(MPI_Datatype) :: mpi_type2_real
 
@@ -103,7 +102,7 @@ Contains
 
     Subroutine Init(Norb)
         Use readfff
-        Use utils, Only : DetermineRecordLength
+        Use utils, Only : DetermineRecordLength, CheckRecordLength
         Implicit None
         Integer, Intent(Out) :: Norb
 
@@ -128,19 +127,16 @@ Contains
         Mj=2*dabs(Jm)+0.01d0
         Qw=0_dp
 
-        Call DetermineRecordLength(Mrec, success)
-        If (.not. success) Then
-            Write(*,*) 'ERROR: record length could not be determined'
-            Stop
-        End If
+        Call DetermineRecordLength(Mrec)
 
-        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=2*IP6*Mrec,iostat=err_stat,iomsg=err_msg)
+        Open(12,file='HFD.DAT',access='DIRECT',status='OLD',recl=IP6*Mrec,iostat=err_stat,iomsg=err_msg)
         If (err_stat /= 0) Then
             strfmt='(/2X,"file HFD.DAT is absent"/)'
             Write( *,strfmt)
             Write(11,strfmt)
             Stop
         End If
+        Call CheckRecordLength(12, 'HFD.DAT', IP6*Mrec)
 
         Call ReadF (12,1,P,Q,2)
         Call ReadF (12,2,R,V,2)
@@ -292,7 +288,7 @@ Contains
             n=0
             i=0
         End Do
-        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=2*IP6*Mrec)
+        Open(13,file='CONF.DAT',status='UNKNOWN',access='DIRECT',recl=IP6*Mrec)
         Do ni=1,4
             Call ReadF (12,ni,P,Q,2)
             Call WriteF(13,ni,P,Q,2)
@@ -344,6 +340,7 @@ Contains
     End Subroutine Fill_N_l
 
     Subroutine Core
+        Use utils, Only : CheckRecordLength
         Use wigner
         Use readfff
         Use sintg
@@ -360,7 +357,8 @@ Contains
         Real(dp), Dimension(20) :: dd, ss
         Character(Len=512) :: strfmt
 
-        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+        Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+        Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
         Ecore=0.d0
         Hcore=0.d0
         Ebcore=0.d0
@@ -853,6 +851,7 @@ Contains
     End Subroutine countNgint
 
     Subroutine Rint(nsx,nsx2,lsx,mype,npes)
+        Use utils, Only : CheckRecordLength
         Use mpi_f08
         Use breit
         Use readfff
@@ -874,9 +873,7 @@ Contains
         Integer(kind=int64) :: start_time
         Character(Len=16) :: timeStr
         Character(Len=512) :: strfmt
-        Character(Len=1) :: let(9)
         Logical*1  ::  l_br
-        data let/'s','p','d','f','g','h','i','k','l'/
 
         ! nsx and lsx are used to eliminate integrals
         small=1.d-8
@@ -922,7 +919,8 @@ Contains
             Continue
         Else
             If (mype == 0) Then
-                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+                Open(12,file='CONF.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+                Call CheckRecordLength(12, 'CONF.DAT', IP6*Mrec)
                 ih=2-Kt
                 nmin=Nso+1
 
@@ -967,7 +965,7 @@ Contains
                         nhint=nhint+1
                         nad=nx*(na-nso-1)+(nd-nso)
                         Write(11,'(I6,8X,I3,A1,I2,"/2",2X,I3,A1,I2,"/2",3F15.8)') &
-                            nhint,nna,let(lla),jja,nnd,let(lld),jjd,tad,tad_br,fis
+                            nhint,nna,OrbLabels(lla),jja,nnd,OrbLabels(lld),jjd,tad,tad_br,fis
                         Rint1(nhint)=tad+tad_br
                         Iint1(nhint)=nad
                         R_is(nhint)=fis
@@ -1159,7 +1157,8 @@ Contains
  
             ! >>>>>>>>>>>>>> MS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             If (K_is >= 2) Then
-                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=2*IP6*Mrec)
+                Open(13,file='HFD.DAT',status='OLD',access='DIRECT',recl=IP6*Mrec)
+                Call CheckRecordLength(13, 'HFD.DAT', IP6*Mrec)
                 Call Rint_MS(nsx,lsx,num_is)
                 Close(13)
             End If
@@ -1212,8 +1211,6 @@ Contains
         Integer(Kind=int64) :: ngint
         Logical*1  ::  l_br
         Character(Len=256) :: strfmt
-        Character(Len=1) :: let(9)
-        data let/'s','p','d','f','g','h','i','k','l'/
 
         ngint=0
         n0=Nso+1
@@ -1262,15 +1259,15 @@ Contains
                                             "/2",1X,I3,A1,I2,"/2",1X,I3,A1,I2,"/2",2F13.7)'
                                     If (ngint == (ngint/idel)*idel) Then
                                         If (l_br) Then
-                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
-                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write (*,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
+                                            write(11,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),rint2(2,ngint)
                                         Else
-                                            write (*,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
-                                            write(11,strfmt) ngint,k,nna,let(la+1),ja,nnb,let(lb+1),jb, &
-                                                            nnc,let(lc+1),jc,nnd,let(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write (*,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),0.0_dp
+                                            write(11,strfmt) ngint,k,nna,OrbLabels(la+1),ja,nnb,OrbLabels(lb+1),jb, &
+                                                            nnc,OrbLabels(lc+1),jc,nnd,OrbLabels(ld+1),jd,rint2(1,ngint),0.0_dp
                                         End If
                                     End If
                                 End Do
@@ -1340,10 +1337,9 @@ Contains
 
         Integer :: nsx, lsx, num_is, nmin, na, nna, lla, jja, nb, nnb, llb, jjb
         Real(dp) :: tab
-        character(Len=1) :: let(9), case*5,chms(3)*3
+        character(Len=1) :: case*5,chms(3)*3
         logical*1 one_e,two_e
         Character(Len=512) :: strfmt
-        data let/'s','p','d','f','g','h','i','k','l'/
         data chms/'SMS','NMS','MS '/
 
         If (nsx == Nso.OR.K_is <= 1) Return
@@ -1389,8 +1385,8 @@ Contains
                 num_is=num_is+1
                 
                 strfmt='(I6,2X,A5,1X,I3,A1,1X,I1,"/2",2X,I3,A1,1X,I1,"/2",F17.7)'
-                Write( *,strfmt) num_is,case,nna,let(lla+1),jja,nnb,let(llb+1),jjb,tab
-                Write(11,strfmt) num_is,case,nna,let(lla+1),jja,nnb,let(llb+1),jjb,tab
+                Write( *,strfmt) num_is,case,nna,OrbLabels(lla+1),jja,nnb,OrbLabels(llb+1),jjb,tab
+                Write(11,strfmt) num_is,case,nna,OrbLabels(lla+1),jja,nnb,OrbLabels(llb+1),jjb,tab
                 R_is(num_is)=tab
                 I_is(num_is)=IPx*(na-Nso-1)+(nb-Nso)
             End Do

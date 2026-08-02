@@ -9,8 +9,8 @@ Module determinants
     Private
 
     Public :: calcNd0, Dinit, Jterm, Ndet, Pdet, Wdet, Rdet, Rspq, Rspq_phase1, Rspq_phase2
-    Public :: Gdet, CompC, CompD, CompCD, CompNRC, FormBarr
-    Public :: print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, get_det_indexes
+    Public :: Gdet, CompC, CompD, CompCD, CompNRC, Det_Number, Det_List
+    Public :: FormBarr, print_bits, convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, compare_bit_dets, get_det_indexes
 
     Integer, Parameter, Public :: bits_per_int = 32
     Integer, Public :: num_ints_bit_rep
@@ -22,7 +22,7 @@ Module determinants
     Subroutine calcNd0(ic1, n2)
         Implicit None
         Integer, Intent(out) :: ic1, n2
-        Integer :: ic, n1, n0
+        Integer :: ic, n1, n0, iconf_neq
 
         ic1=0
         n0=MaxNd0+1
@@ -30,12 +30,17 @@ Module determinants
 
         Do ic=1,Nc4
             if (ic > Nc) Exit
-            n1=n1+Ndc(ic)
+            If (kCSF > 0) Then
+                iconf_neq=nc_neq(ic)
+                n1=n1+ndcs(iconf_neq)
+            Else
+                n1=n1+Ndc(ic)
+            End If
             If (n1 < n0) Then
                 n2=n1
                 ic1=ic
             End If
-        End Do    
+        End Do
         
     End Subroutine calcNd0
     
@@ -99,6 +104,84 @@ Module determinants
         Return
     End Subroutine Dinit
 
+    Subroutine Det_Number
+        Implicit None
+
+        Integer :: iconf, ndi
+        Character(Len=256) :: strfmt
+        Integer, Allocatable, Dimension(:) :: idet
+        Logical :: fin
+
+        If (.not. allocated(idet)) allocate(idet(Ne))
+        if (.not. allocated(Mdc)) allocate(Mdc(Nc))
+        If (.not. allocated(Ndc)) Allocate(Ndc(Nc))
+        
+        Nd=0
+        ! list of determinants
+        do iconf=1,Nc
+            Mdc(iconf)=Nd
+            ndi=0
+            fin=.TRUE.
+            call Ndet(iconf,fin,idet)
+            Do While (.not. fin)
+                if (M == Mj) ndi=ndi+1
+                call Ndet(iconf,fin,idet)
+            End Do
+            Nd=Nd+Ndi
+            Ndc(iconf)=Ndi
+        end do
+        if (Nd == 0) then
+            strfmt = '(/2X,"term J =",F5.1,2X,"is absent in all configurations"/)'
+            write( 6,strfmt) Mj/2.d0
+            write(11,strfmt) Mj/2.d0
+           Stop
+        end if
+
+        Deallocate(idet)
+
+    End Subroutine Det_Number
+
+    Subroutine Det_List(idt)
+        Implicit None
+
+        Integer :: Nd0, ic1, ndi, iconf, imax, nd1, im, i
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Integer, Allocatable, Dimension(:,:), Intent(InOut) :: idt
+        Logical :: fin
+
+        If (.not. allocated(idet1)) allocate(idet1(Ne))
+        If (.not. allocated(idet2)) allocate(idet2(Ne))
+        If (.not. allocated(idt)) allocate(idt(Ne,Nd))
+        If (.not. allocated(Jtc)) Allocate(Jtc(Nc))
+
+        Nd0=0
+        ! list of determinants
+        Do ic1=1,Nc
+            ndi=0
+            imax=1
+            fin=.TRUE.
+            call Ndet(ic1,fin,idet1)
+            Do While (.not. fin)
+                if (M.GE.Mj) then
+                    if (M.EQ.Mj) ndi=ndi+1
+                    nd1=nd0+ndi
+                    if (M.EQ.Mj) then
+                        call sort_det(idet1,idet2)
+                        do i=1,ne
+                            idt(i,nd1)=idet2(i)
+                        enddo
+                    end if
+                    im=(M-Mj)/2+1
+                    if (im.GT.imax) imax=im
+                end if
+                call Ndet(ic1,fin,idet1)
+            End Do
+            Ndc(ic1)=ndi
+            Jtc(ic1)=imax
+            Nd0=Nd0+Ndi
+        End Do
+    End Subroutine Det_List
+
     Subroutine Jterm
         Implicit None
 
@@ -107,7 +190,9 @@ Module determinants
         Integer, allocatable, dimension(:) :: idet, nmj
         logical :: fin, swapped
 
-        allocate(idet(Ne),Ndc(Nc),Jtc(Nc))
+        allocate(idet(Ne))
+        if (.not. allocated(Ndc)) allocate(Ndc(Nc))
+        if (.not. allocated(Jtc)) allocate(Jtc(Nc))
 
         Njd=0
         Nd=0
@@ -257,7 +342,7 @@ Module determinants
         write( 6,'(3X,23("="))')
         write(11,'(3X,23("="))')
 
-        Deallocate(idet, Jtc, Nq0, nmj)
+        Deallocate(idet, Jtc, nmj)
 
         Return
     End Subroutine Jterm
@@ -356,7 +441,7 @@ Module determinants
         Integer  ::  n
         Integer, allocatable, dimension(:) :: idet
         !  - - - - - - - - - - - - - - - - - - - - - - - - -
-        Iarr(1:Ne,n)=idet(1:Ne) 
+        Iarr(1:Ne,n)=idet(1:Ne)
         Return
     End Subroutine Pdet
 
@@ -376,23 +461,39 @@ Module determinants
         Return
     End Subroutine Wdet
 
-    Subroutine Rdet(str)
+    Subroutine Rdet(str, arr, nd_out)
         ! This subroutine reads the basis set of determinants from the file CONF.DET.
-        !
+        ! Without optional args: fills the module Iarr and sets global Nd.
+        ! With arr: fills arr instead and, if nd_out is present, sets nd_out without touching the global Nd.
         Implicit None
-        Integer :: i
-        Character(Len=*) :: str
+        Character(Len=*), Intent(In)    :: str
+        Integer, Allocatable, Optional, Intent(InOut) :: arr(:,:)
+        Integer, Optional, Intent(Out)   :: nd_out
+        Integer :: i, nd_loc, nsu_loc, err_stat
 
-        If (.not. Allocated(Iarr)) Allocate(Iarr(Ne,Nd))
-        Open (16,file=str,status='OLD',form='UNFORMATTED')
-        Read(16) Nd,Nsu
-        Do i=1,Nd
-           Read(16,end=710) Iarr(1:Ne,i)
-        End Do
-        close(16)
-        Return
-710     write(*,*)' Rdet: end of CONF.DET for idet=',i
-        stop
+        Open(16, file=str, status='OLD', form='UNFORMATTED')
+        Read(16) nd_loc, nsu_loc
+        If (Present(arr)) Then
+            If (Present(nd_out)) nd_out = nd_loc
+            If (.not. Allocated(arr)) Allocate(arr(Ne, nd_loc))
+            Do i = 1, nd_loc
+                Read(16, iostat=err_stat) arr(1:Ne, i)
+                If (err_stat /= 0) Exit
+            End Do
+        Else
+            Nd  = nd_loc
+            Nsu = nsu_loc
+            If (.not. Allocated(Iarr)) Allocate(Iarr(Ne, Nd))
+            Do i = 1, Nd
+                Read(16, iostat=err_stat) Iarr(1:Ne, i)
+                If (err_stat /= 0) Exit
+            End Do
+        End If
+        Close(16)
+        If (err_stat /= 0) Then
+            Write(*,*) ' Rdet: premature end of file in ', Trim(str), ' at idet=', i
+            Stop
+        End If
     End Subroutine Rdet
 
     Subroutine Rspq(id1,id2,is,nf,i1,j1,i2,j2)
@@ -402,8 +503,6 @@ Module determinants
         Integer  :: i, n, ic, is, ni, nj, i2, j2, nf, j, l0, l1, l2, nn0, nn1, &
                     ll0, ll1, jj0, jj1, ndi, k, iconf, i1, j1
         Integer, Allocatable, dimension(:)   :: id1, id2
-        Character(Len=1), Dimension(5) :: let
-        data let/'s','p','d','f','g'/
 
         is=1
         ni=0
@@ -434,7 +533,7 @@ Module determinants
                     If (ndi >= Ndr) Then
                         write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
                                 " and ",I2,A1,I2,"/2 in configuration ",I5)') &
-                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                                nn0,OrbLabels(ll0+1),jj0,nn1,OrbLabels(ll1+1),jj1,iconf
                         write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
                         write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
                         Stop
@@ -512,8 +611,6 @@ Module determinants
         
         Integer                                           :: l0, l1, l2, ni, nj, n, ic, nn0, &
                                                              nn1, ll0, ll1, jj0, jj1, ndi, iconf
-        Character(Len=1), Dimension(5) :: let
-        data let/'s','p','d','f','g'/
 
         is=1
         nf=3
@@ -548,7 +645,7 @@ Module determinants
                     If (ndi >= Ndr) Then
                         write (*,'(1X,"RSPQ: Wrong order of shells ",I2,A1,I2,"/2", &
                                 " and ",I2,A1,I2,"/2 in configuration ",I5)') &
-                                nn0,let(ll0+1),jj0,nn1,let(ll1+1),jj1,iconf
+                                nn0,OrbLabels(ll0+1),jj0,nn1,OrbLabels(ll1+1),jj1,iconf
                         write (*,'(4X,"Det",I1,": ",15I4)') 1,(Id1(n),n=1,Ne)
                         write (*,'(4X,"Det",I1,": ",15I4)') 2,(Id2(n),n=1,Ne)
                         Stop
@@ -710,6 +807,34 @@ Module determinants
         Call CompD(iconf1,iconf2,icomp)
         Return
     End Subroutine CompNRC
+
+    Subroutine sort_det(idet1, idet2)
+        ! sorts the integer array idet1(i)
+        Implicit None
+        Integer, Allocatable, Dimension(:) :: idet1, idet2
+
+        Integer :: is, i, k, j, k1, j1, iswap
+
+        is=1
+        idet2=idet1
+
+        do i=1,ne-1
+          k=i
+          do j=i+1,ne
+            k1=idet2(k)
+            j1=idet2(j)
+            if (j1.lt.k1) k=j
+          end do
+          if (k.ne.i) then
+            iswap   = idet2(k)
+            idet2(k) = idet2(i)
+            idet2(i) = iswap
+            is=-1
+          end if
+        end do
+
+    End Subroutine sort_det
+
 
     Subroutine FormBarr
         Implicit None

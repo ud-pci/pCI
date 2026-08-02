@@ -1,7 +1,16 @@
 add - creating the configuration list
 -------------------------------------
 
-The ``add`` program constructs a list of configurations to define the CI space by exciting electrons from a set of reference configurations to a set of active non-relativistic shells. It takes in the input file ``ADD.INP``, which specifies the reference configurations, active non-relativistic shells, and minimum and maximum occupation numbers of each shell. It writes the file ``CONF.INP``, which includes a list of user-defined parameters and the list of configurations constructed by exciting electrons from a list of basic configurations.
+The ``add`` program constructs a list of configurations to define the CI space by exciting electrons from a set of reference configurations to a set of active non-relativistic shells. It reads ``ADD.INP``, which specifies the reference configurations, active non-relativistic shells, minimum and maximum occupation numbers of each shell, and a template for the ``CONF.INP`` header. It produces ``CONF.INP``, which contains the system parameters and the list of relativistic configurations generated from the reference configurations.
+
+Input Files:
+
+* ``ADD.INP`` - reference configurations, active shells, occupation limits, and the ``CONF.INP`` header template
+
+Output Files:
+
+* ``CONF.INP`` - list of relativistic configurations and system parameters; used as input to ``pbasc`` and ``pconf``
+* ``CONF_.INP`` - same content as ``CONF.INP`` but without the non-relativistic group index column
 
 The following is a sample input ``ADD.INP`` file. Each line has a description of the respective variable. The third block starting with ``4f  9 14`` is a list of the orbitals and minimum and maximum occupation numbers. For example, ``4f  9 14`` refers to having a minimum of 9 electrons or a maximum of 14 electrons for the 4f orbital. 
 
@@ -52,8 +61,21 @@ The following is a sample input ``ADD.INP`` file. Each line has a description of
 
 .. note::
 
-    The second block listing the basic configurations has a specific formatting ``__nnlee__``, where ``__`` indicate spaces, ``nn`` is the principal quantum number, ``l`` is the angular momentum quantum number as a letter (``s=0``, ``l=1``, ``d=2``, ...), and ``ee`` is the number of electrons in that orbital. 
+    The second block listing the basic configurations has a specific formatting ``__nnlee__``, where ``__`` indicate spaces, ``nn`` is the principal quantum number, ``l`` is the angular momentum quantum number as a letter (``s=0``, ``l=1``, ``d=2``, ...), and ``ee`` is the number of electrons in that orbital.
 
 .. note::
 
     The order in which the configurations and basis orbitals must be listed identically with those from ``BASS.INP``.
+
+.. note::
+
+    If ``Ncpt`` or ``Cut0`` are set in the ``CONF.INP`` header template, ``add`` will interactively ask whether to run in CI mode or CI+PT mode. Enter ``0`` for a pure CI calculation (all generated configurations go into the CI space) or ``1`` for a CI+PT calculation (the reference configurations define the CI space and the remaining configurations define the PT block, with ``Ncpt`` set to the total number of generated configurations).
+
+Running add
+~~~~~~~~~~~
+
+To run ``add``, run the command:
+
+.. code-block::
+
+    add

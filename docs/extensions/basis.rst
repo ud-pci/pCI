@@ -23,7 +23,7 @@ Now we will discuss the steps to build the basis set for CI+all-order and CI+MBP
 1. Produce B-splines
     
 	* ``./tdhf < bas_wj.in`` - solves DHF equations (reads ``bas_wj.in`` and writes ``fort.1``)
-	* ``./nspl40 < spl.in`` - produces B-spline basis (reads ``fort.1`` and writes ``hfspl.1`` and ``hfspl.2``)
+	* ``./nspl < spl.in`` - produces B-spline basis (reads ``fort.1`` and writes ``hfspl.1`` and ``hfspl.2``)
 
 2. Run HFD code
    
@@ -54,7 +54,7 @@ Now we will discuss the steps to build the basis set for CI+all-order and CI+MBP
   
 .. note::
 
-    ``bdhf`` and ``bspl40`` are used in place of ``tdhf`` and ``nspl40`` if Breit corrections are included.
+    ``bdhf`` and ``bspl`` are used in place of ``tdhf`` and ``nspl`` if Breit corrections are included.
 
 .. note::
     

@@ -128,6 +128,24 @@ def gen_key_list(matrix_elements):
                     key_list.append(matrix_element.replace('[','').replace(']','').replace(',',''))
     return key_list
 
+def read_nlv_from_conf(conf_path):
+    """Read the number of levels (Nlv) from CONF.INP header"""
+    conf_file = os.path.join(conf_path, 'CONF.INP')
+    if not os.path.isfile(conf_file):
+        return None
+    
+    try:
+        with open(conf_file, 'r') as f:
+            for line in f:
+                if 'Nlv=' in line:
+                    # Extract number after 'Nlv='
+                    nlv_str = line.split('Nlv=')[1].strip().split()[0]
+                    return int(nlv_str)
+    except (IOError, ValueError, IndexError):
+        return None
+    
+    return None
+
 if __name__ == "__main__":
     # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
@@ -142,6 +160,7 @@ if __name__ == "__main__":
     on_hpc = get_dict_value(system, 'on_hpc')
     bin_dir = get_dict_value(system, 'bin_directory')
     run_codes = get_dict_value(system, 'run_codes')
+    for_portal = get_dict_value(system, 'for_portal')
     
     # hpc parameters
     on_slurm = check_slurm_installed()
@@ -161,10 +180,21 @@ if __name__ == "__main__":
     
     basis = get_dict_value(config, 'basis')
     conf = get_dict_value(config, 'conf')
-    odd_J = get_dict_value(conf['odd'], 'J')
-    even_J = get_dict_value(conf['even'], 'J')
-    conf_odd_path = 'odd' + str(odd_J)[0]
-    conf_even_path = 'even' + str(even_J)[0]
+    
+    if for_portal:
+        # Portal mode: use specific J values for transitions
+        # even0 -> odd1 and odd0 -> even1
+        conf_even0_path = 'even0'
+        conf_even1_path = 'even1'
+        conf_odd0_path = 'odd0'
+        conf_odd1_path = 'odd1'
+        print("Portal mode enabled for DTM - using even0->odd1 and odd0->even1 transitions")
+    else:
+        # Regular mode: use config J values
+        odd_J = get_dict_value(conf['odd'], 'J')
+        even_J = get_dict_value(conf['even'], 'J')
+        conf_odd_path = 'odd' + str(odd_J)[0]
+        conf_even_path = 'even' + str(even_J)[0]
 
     dtm = get_dict_value(config, 'dtm')
     include_rpa = get_dict_value(dtm, 'include_rpa')
@@ -200,13 +230,21 @@ if __name__ == "__main__":
     tm_to = get_dict_value(tm, 'to')
     tm_to_parity = get_dict_value(tm_to, 'parity')
     tm_to_range = get_dict_value(tm_to, 'level_range')
-    include_tm = True if tm_from_range and tm_to_range else False
-    if include_tm:
-        from_level_initial = tm_from_range.split(' ')[0]
-        from_level_final = tm_from_range.split(' ')[1]
-        to_level_initial = tm_to_range.split(' ')[0]
-        to_level_final = tm_to_range.split(' ')[1]
-        dtm_dirs.append('tm')
+    
+    if for_portal:
+        # Portal mode: create directories for both transitions
+        include_tm = True if tm_matrix_elements else False  # Only need matrix elements defined
+        if include_tm:
+            dtm_dirs.extend(['tm_even0_odd1', 'tm_odd0_even1'])  # Two transition directories
+    else:
+        # Regular mode
+        include_tm = True if tm_from_range and tm_to_range else False
+        if include_tm:
+            from_level_initial = tm_from_range.split(' ')[0]
+            from_level_final = tm_from_range.split(' ')[1]
+            to_level_initial = tm_to_range.split(' ')[0]
+            to_level_final = tm_to_range.split(' ')[1]
+            dtm_dirs.append('tm')
     
     # list of keys for dtm operators
     dm_key_list = gen_key_list(dm_matrix_elements)
@@ -224,13 +262,25 @@ if __name__ == "__main__":
             full_path = dir_path
         os.chdir(full_path)
         
-        even_exists, odd_exists = False, False
-        if tm_from_parity == 'even' or tm_to_parity == 'even' or dm_parity == 'even' or dm_parity == 'both':
-            if os.path.isfile(conf_even_path + '/CONF.RES') or os.path.isfile(conf_even_path + '/CONFFINAL.RES'):
-                    even_exists = True
-        if tm_from_parity == 'odd' or tm_to_parity == 'odd' or dm_parity == 'odd' or dm_parity == 'both':
-            if os.path.isfile(conf_odd_path + '/CONF.RES') or os.path.isfile(conf_odd_path + '/CONFFINAL.RES'):
-                    odd_exists = True
+        if for_portal:
+            current_dir = os.getcwd()
+            even0_exists = os.path.isfile(os.path.join(current_dir, conf_even0_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_even0_path, 'CONFFINAL.RES'))
+            even1_exists = os.path.isfile(os.path.join(current_dir, conf_even1_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_even1_path, 'CONFFINAL.RES'))
+            odd0_exists = os.path.isfile(os.path.join(current_dir, conf_odd0_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_odd0_path, 'CONFFINAL.RES'))
+            odd1_exists = os.path.isfile(os.path.join(current_dir, conf_odd1_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_odd1_path, 'CONFFINAL.RES'))
+            
+            portal_exists = even0_exists and even1_exists and odd0_exists and odd1_exists
+            if not portal_exists:
+                print(f'Portal mode in {current_dir}: requires all CI directories: even0({even0_exists}), even1({even1_exists}), odd0({odd0_exists}), odd1({odd1_exists})')
+        else:
+            # Regular mode
+            even_exists, odd_exists = False, False
+            if tm_from_parity == 'even' or tm_to_parity == 'even' or dm_parity == 'even' or dm_parity == 'both':
+                if os.path.isfile(conf_even_path + '/CONF.RES') or os.path.isfile(conf_even_path + '/CONFFINAL.RES'):
+                        even_exists = True
+            if tm_from_parity == 'odd' or tm_to_parity == 'odd' or dm_parity == 'odd' or dm_parity == 'both':
+                if os.path.isfile(conf_odd_path + '/CONF.RES') or os.path.isfile(conf_odd_path + '/CONFFINAL.RES'):
+                        odd_exists = True
         
         # Create dtm directories with dtm input and job script
         for dtm_dir in dtm_dirs:
@@ -256,6 +306,26 @@ if __name__ == "__main__":
                 if dtm_dir == 'tm':
                     levels = from_level_initial + ' ' + from_level_final + ', ' + to_level_initial + ' ' + to_level_final
                     write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                elif dtm_dir == 'tm_even0_odd1':
+                    # Portal mode: even0 -> odd1 transition
+                    # Read Nlv from even0 and odd1 CONF.INP files within current method directory
+                    current_dir = os.getcwd()
+                    even0_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_even0_path))
+                    odd1_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_odd1_path))
+                    if even0_nlv and odd1_nlv:
+                        levels = f'1 {even0_nlv}, 1 {odd1_nlv}'
+                        write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                        print(f'tm_even0_odd1: using levels 1-{even0_nlv} (even0) -> 1-{odd1_nlv} (odd1)')
+                elif dtm_dir == 'tm_odd0_even1':
+                    # Portal mode: odd0 -> even1 transition
+                    # Read Nlv from odd0 and even1 CONF.INP files within current method directory
+                    current_dir = os.getcwd()
+                    odd0_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_odd0_path))
+                    even1_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_even1_path))
+                    if odd0_nlv and even1_nlv:
+                        levels = f'1 {odd0_nlv}, 1 {even1_nlv}'
+                        write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                        print(f'tm_odd0_even1: using levels 1-{odd0_nlv} (odd0) -> 1-{even1_nlv} (even1)')
                 elif dtm_dir == 'dm_even':
                     write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
                 elif dtm_dir =='dm_odd':
@@ -266,45 +336,76 @@ if __name__ == "__main__":
                     run_shell('cp dtm.qs ' + dtm_dir + '/dtm.qs')
             run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
 
-            if not even_exists and not odd_exists:
-                print('ci directories could not be found')
-                sys.exit()
+            if for_portal:
+                if not portal_exists:
+                    print('Portal mode: required CI directories could not be found')
+                    sys.exit()
             else:
-                # if including rpa, generate an initial DTM.INT for rpa programs             
-                if dtm_dir == 'tm':
-                    if tm_from_parity == 'even': 
-                        from_path = conf_even_path
-                    elif tm_from_parity == 'odd':
-                        from_path = conf_odd_path
-                    run_shell('cp ' + from_path  + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                    run_shell('cp ' + from_path  + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                    run_shell('cp ' + from_path  + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                    run_shell('cp ' + from_path  + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                    run_shell('cp ' + from_path  + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                    run_shell('cp ' + from_path  + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+                if not even_exists and not odd_exists:
+                    print('ci directories could not be found')
+                    sys.exit()
+            
+            # Copy CI files to dtm directories
+            if dtm_dir == 'tm':
+                if tm_from_parity == 'even': 
+                    from_path = conf_even_path
+                elif tm_from_parity == 'odd':
+                    from_path = conf_odd_path
+                run_shell('cp ' + from_path  + '/CONF.INP ' + dtm_dir + '/CONF.INP')
+                run_shell('cp ' + from_path  + '/CONF.DET ' + dtm_dir + '/CONF.DET')
+                run_shell('cp ' + from_path  + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
+                run_shell('cp ' + from_path  + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
+                run_shell('cp ' + from_path  + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
+                run_shell('cp ' + from_path  + '/CONF.INT ' + dtm_dir + '/CONF.INT')
 
-                    if tm_to_parity == 'even': 
-                        to_path = conf_even_path
-                    elif tm_to_parity == 'odd':
-                        to_path = conf_odd_path
-                    run_shell('cp ' + to_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
-                    run_shell('cp ' + to_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
-                    run_shell('cp ' + to_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
-                    run_shell('cp ' + to_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
-                elif dtm_dir == 'dm_even':
-                    run_shell('cp ' + conf_even_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                    run_shell('cp ' + conf_even_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                    run_shell('cp ' + conf_even_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                    run_shell('cp ' + conf_even_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                    run_shell('cp ' + conf_even_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                    run_shell('cp ' + conf_even_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
-                elif dtm_dir == 'dm_odd':
-                    run_shell('cp ' + conf_odd_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                    run_shell('cp ' + conf_odd_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                    run_shell('cp ' + conf_odd_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                    run_shell('cp ' + conf_odd_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                    run_shell('cp ' + conf_odd_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                    run_shell('cp ' + conf_odd_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+                if tm_to_parity == 'even': 
+                    to_path = conf_even_path
+                elif tm_to_parity == 'odd':
+                    to_path = conf_odd_path
+                run_shell('cp ' + to_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + to_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + to_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                run_shell('cp ' + to_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
+            elif dtm_dir == 'tm_even0_odd1':
+                # Portal mode: even0 -> odd1 transition - copy files from current method directory
+                run_shell('cp ' + conf_even0_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
+                run_shell('cp ' + conf_even0_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
+                run_shell('cp ' + conf_even0_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
+                run_shell('cp ' + conf_even0_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
+                run_shell('cp ' + conf_even0_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
+                run_shell('cp ' + conf_even0_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+                # Copy odd1 files as CONF1.*
+                run_shell('cp ' + conf_odd1_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + conf_odd1_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + conf_odd1_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                run_shell('cp ' + conf_odd1_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
+            elif dtm_dir == 'tm_odd0_even1':
+                # Portal mode: odd0 -> even1 transition - copy files from current method directory
+                run_shell('cp ' + conf_odd0_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
+                run_shell('cp ' + conf_odd0_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
+                run_shell('cp ' + conf_odd0_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
+                run_shell('cp ' + conf_odd0_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
+                run_shell('cp ' + conf_odd0_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
+                run_shell('cp ' + conf_odd0_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+                # Copy even1 files as CONF1.*
+                run_shell('cp ' + conf_even1_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + conf_even1_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + conf_even1_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                run_shell('cp ' + conf_even1_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
+            elif dtm_dir == 'dm_even':
+                run_shell('cp ' + conf_even_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
+                run_shell('cp ' + conf_even_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
+                run_shell('cp ' + conf_even_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
+                run_shell('cp ' + conf_even_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
+                run_shell('cp ' + conf_even_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
+                run_shell('cp ' + conf_even_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+            elif dtm_dir == 'dm_odd':
+                run_shell('cp ' + conf_odd_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
+                run_shell('cp ' + conf_odd_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
+                run_shell('cp ' + conf_odd_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
+                run_shell('cp ' + conf_odd_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
+                run_shell('cp ' + conf_odd_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
+                run_shell('cp ' + conf_odd_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
         
         # cd into new dtm directories and submit job scripts if run_codes
         if run_codes:
@@ -317,6 +418,22 @@ if __name__ == "__main__":
                         if dtm_dir == 'tm':
                             levels = from_level_initial + ' ' + from_level_final + ', ' + to_level_initial + ' ' + to_level_final
                             write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                        elif dtm_dir == 'tm_even0_odd1':
+                            # Portal mode: even0 -> odd1 transition - re-read Nlv values from current method directory
+                            current_dir_rpa = os.getcwd()
+                            even0_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_even0_path))
+                            odd1_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_odd1_path))
+                            if even0_nlv and odd1_nlv:
+                                levels = f'1 {even0_nlv}, 1 {odd1_nlv}'
+                                write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                        elif dtm_dir == 'tm_odd0_even1':
+                            # Portal mode: odd0 -> even1 transition - re-read Nlv values from current method directory
+                            current_dir_rpa = os.getcwd()
+                            odd0_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_odd0_path))
+                            even1_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_even1_path))
+                            if odd0_nlv and even1_nlv:
+                                levels = f'1 {odd0_nlv}, 1 {even1_nlv}'
+                                write_dtm_in('TM', levels, ', '.join(tm_key_list))
                         elif dtm_dir == 'dm_even':
                             write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
                         elif dtm_dir =='dm_odd':

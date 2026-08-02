@@ -7,6 +7,8 @@ Module basc_variables
 
     Implicit None
 
+    Public
+
     Integer :: MaxT, Kfile, kt, kt1, ii, ipmr, nhint
     Integer, Allocatable, Dimension(:) :: Kbas
     Integer, Dimension(10) :: N_l
@@ -26,9 +28,6 @@ Module basc_variables
     Real(dp) :: xja, xjb, xjc, xjd !### total angular moments of orbitals
     Real(dp) :: xla,xlb,xlc,xld !### orbital angular moments of upper c-s
     Real(dp) :: yla,ylb,ylc,yld !### orbital angular moments of lower c-s
-    Character(len=1), Dimension(9) :: let
-
-    Public 
     
     Save
 

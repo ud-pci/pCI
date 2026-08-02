@@ -1,7 +1,7 @@
 Module conf_init
 
     Use conf_variables
-    Use utils, Only : ToUpperString
+    Use utils, Only : ToUpperString, WriteSkeleton
 
     Implicit None
 
@@ -139,12 +139,24 @@ Module conf_init
         Implicit None
 
         integer :: index_equals, index_hashtag, err_stat
-        character(len=10) :: key
+        character(len=10) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
-        logical :: equals_in_str
+        Character(len=90), Parameter, Dimension(11) :: skeleton = [ &
+            'Kl=0      # 0=new, 1=continue (CONF.HIJ+JJJ), 2=new+MBPT, 4=memory check', &
+            'Kw=0      # 0=do not write CONF.HIJ, 1=write CONF.HIJ',                    &
+            'KLSJ=0    # 0=no LSJ in FINAL.RES, 1=write LSJ',                           &
+            '',                                                                         &
+            '#Ksig=    # MBPT: 0=none, 1=1-electron, 2=1e+2e (default 0)',              &
+            '#Kdsig=   # MBPT energy dependence: 0=auto, 1=manual (default 0)',         &
+            '#K_sms=   # SMS: 1=1-e, 2=2-e, 3=both (default 3)',                        &
+            '#KXIJ=    # write CONF.XIJ every N Davidson iterations (default 10)',      &
+            '#KWeights=# 0=do not write CONF.WGT, 1=write (default 0)',                 &
+            '#MaxNd0=  # initial Davidson approximation size (default 3000)',           &
+            '#kCSF=    # 0=determinant basis, 1=CSF basis (default 0)']
 
-        Open(unit=99, file='ci.in', status='OLD')
+        Open(unit=99, file='ci.in', status='OLD', iostat=err_stat)
+        If (err_stat /= 0) Call WriteSkeleton('ci.in', skeleton)
 
         ! Set default values for keys
         Kl = 0
@@ -156,64 +168,40 @@ Module conf_init
         KWeights = 0
         KXIJ = 10
         MaxNd0 = 3000
-        
-        ! read parameters (lines with "=")
-        equals_in_str = .true.
-        Do While (equals_in_str)
+
+        Do
             Read(99, '(A)', iostat=err_stat) line
-            If (index(string=line, substring="=") == 0 .or. err_stat /= 0) Then
-                equals_in_str = .false.
-            Else
-                index_equals = index(string=line, substring="=")
-                key = line(1:index_equals-1)
-                val = line(index_equals+1:len(line))
-                
-                index_hashtag = index(string=val, substring="#") ! account for comments
-                If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
-                Select Case(key)
-                Case('Kl')
-                    ! Kl = 0 - new computation
-                    ! Kl = 1 - continuing computation with completed CONF.HIJ and CONF.JJJ files
-                    ! Kl = 2 - new computation with MBPT
-                    ! Kl = 3 - extending computation with new configurations (not implemented yet)
-                    ! Kl = 4 - compute minimum memory requirements for pconf
-                    Read(val, *) Kl
-                Case('Ksig')
-                    ! If starting new computation with MBPT
-                    ! Ksig = 0 - no MBPT included (same as Kl = 0)
-                    ! Ksig = 1 - include 1-electron MBPT corrections 
-                    ! Ksig = 2 - include 1-electron and 2-electron MBPT corrections
-                    Read(val, *) Ksig
-                Case('Kdsig')
-                    ! Kdsig = 0 - automatic approximation of the energy dependence of Sigma
-                    ! Kdsig = 1 - manually include energy dependence of Sigma
-                    Read(val, *) Kdsig
-                Case('Kw')
-                    ! Kw determines whether CONF.HIJ will be written or not
-                    ! Kw=0 - CONF.HIJ will not be written
-                    ! Kw=1 - CONF.HIJ will be written
-                    Read(val, *) Kw
-                Case('KLSJ')
-                    ! KLSJ determines whether CONF.HIJ will be written or not
-                    ! KLSJ=0 - LSJ will not be written in FINAL.RES
-                    ! KLSJ=1 - LSJ will be written FINAL.RES
-                    Read(val, *) KLSJ
-                Case('K_sms')
-                    ! SMS to include 1-e (1), 2-e (2), or both (3)
-                    Read(val, *) K_sms
-                    ! Write(*,*) ' SMS to include 1-e (1), 2-e (2), both (3): ', K_sms
-                Case('KXIJ')
-                    ! KXIJ determines the interval in which CONF.XIJ will be written
-                    ! e.g. KXIJ=10 - CONF.XIJ is written every 10 Davidson iterations
-                    Read(val, *) KXIJ
-                Case('KWeights')
-                    ! KWeights determines whether CONF.WGT is written (1) or not (0)
-                    Read(val, *) KWeights
-                Case('MaxNd0')
-                    ! MaxNd0 determines the size of the initial approximation in determinants
-                    Read(val, *) MaxNd0
-                End Select
-            End If
+            If (err_stat /= 0) Exit
+            If (index(string=line, substring='=') == 0) Cycle
+            If (index(AdjustL(line), '#') == 1) Cycle
+            index_equals = index(string=line, substring='=')
+            key = trim(adjustl(line(1:index_equals-1)))
+            val = line(index_equals+1:len(line))
+            index_hashtag = index(string=val, substring='#')
+            If (index_hashtag /= 0) val = trim(adjustl(val(1:index_hashtag-1)))
+            key_upper = ToUpperString(key)
+            Select Case(key_upper)
+            Case('KL')
+                Read(val, *) Kl
+            Case('KSIG')
+                Read(val, *) Ksig
+            Case('KDSIG')
+                Read(val, *) Kdsig
+            Case('KW')
+                Read(val, *) Kw
+            Case('KLSJ')
+                Read(val, *) KLSJ
+            Case('K_SMS')
+                Read(val, *) K_sms
+            Case('KXIJ')
+                Read(val, *) KXIJ
+            Case('KWEIGHTS')
+                Read(val, *) KWeights
+            Case('MAXND0')
+                Read(val, *) MaxNd0
+            Case('KCSF')
+                Read(val, *) kCSF
+            End Select
         End Do
 
         Close(99)
@@ -227,22 +215,20 @@ Module conf_init
     Subroutine ReadConfInp
         ! This subroutine reads input parameters from the header of CONF.INP
         Implicit None
-        
-        Character(Len=1) :: name(16)
 
         ! Optional parameters
-        K_is = 0 
-        C_is = 0.d0 
+        K_is = 0
+        C_is = 0.d0
         Klow = 0
-        Kbrt = 0 
-        Kout = 1 
-        Kecp = 0 
-        Gj   = 0.d0 
-        n_it = 20 
-        Cut0 = 0.001 
-        Ncpt = 0 
-        Gnuc = 1.d0 
-        Qnuc = 1.d0  
+        Kbrt = 0
+        Kout = 1
+        Kecp = 0
+        Gj   = 0.d0
+        n_it = 20
+        Cut0 = 0.001
+        Ncpt = 0
+        Gnuc = 1.d0
+        Qnuc = 1.d0
 
         Open(unit=10,file='CONF.INP',status='OLD')
         Read(10,'(1X,16A1)') name

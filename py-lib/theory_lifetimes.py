@@ -202,12 +202,12 @@ def add_res_to_dict(matrix_element_type, res, expt_dict, lifetime_dict):
         try:
             if len(lifetime_dict[config1]) > 0:
                 for item in lifetime_dict[config1]:
-                    if item[1] == config2:
+                    if item[0] == matrix_element_type and item[1] == config2:
                         match = True
                         break
             if len(lifetime_dict[config2]) > 0:
                 for item in lifetime_dict[config2]:
-                    if item[1] == config1:
+                    if item[0] == matrix_element_type and item[1] == config1:
                         match = True
                         break
         except:

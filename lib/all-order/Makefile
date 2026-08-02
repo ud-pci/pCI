@@ -1,14 +1,20 @@
 # Specify install directory
 PREFIX=../../bin
 
+# Specify Fortran compiler (override with FC=ifort on the command line)
+FC ?= ifx
+
 # Specify include directory
 INCLUDE=-I./include
 INCLUDE_CI=-I../include
 INCLUDE_BASIS=-I./basis
-INCLUDE_LAPACK=-mkl=sequential
 
-# Specify Fortran compiler
-FC=ifort
+# MKL flag differs between ifort (-mkl) and ifx (-qmkl)
+ifeq ($(findstring ifort,$(notdir $(FC))),ifort)
+    INCLUDE_LAPACK = -mkl=sequential
+else
+    INCLUDE_LAPACK = -qmkl=sequential
+endif
 
 # Specify Fortran compiler flags
 FFLAGS=-O -r8

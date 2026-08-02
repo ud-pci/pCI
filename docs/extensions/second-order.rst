@@ -1,10 +1,12 @@
+:orphan:
+
 MBPT package
 ------------
 
-The MBPT part of the package calculates corrections to the bare Hamiltonian due to the core shells using second order MBPT for the CI code ``conf``, but for a much larger part of the Hamiltonian than the all-order code since high accuracy is not required for corrections associated with higher orbitals.  
-The MBPT package consists of a single code ``second-cis``, which can be omitted, but then ``conf`` will not include electronic correlations associated with any of the core shells. If the all-order calculation was carried out, it will overwrite the second-order results with the all-order results where available. Such overlay of the MBPT and the all-order parts drastically improves the efficiency of the method.
+The MBPT part of the package calculates corrections to the bare Hamiltonian due to the core shells using second order MBPT for the CI code ``pconf``, but for a much larger part of the Hamiltonian than the all-order code since high accuracy is not required for corrections associated with higher orbitals.
+The MBPT package consists of a single code ``second-cis``, which can be omitted, but then ``pconf`` will not include electronic correlations associated with any of the core shells. If the all-order calculation was carried out, it will overwrite the second-order results with the all-order results where available. Such overlay of the MBPT and the all-order parts drastically improves the efficiency of the method.
 
-The following code execution reads the files ``hfspl.1``, ``hfspl.2`` and ``HFD.DAT`` (to read the list of orbitals), and writes the files ``SGC.CON`` and ``SCRC.CON`` used by ``conf``. It also takes in the input file ``inf.vw`` and writes the results to the respective ``out.sdvw`` files.
+The following code execution reads the files ``hfspl.1``, ``hfspl.2`` and ``HFD.DAT`` (to read the list of orbitals), and writes the files ``SGC.CON`` and ``SCRC.CON`` used by ``pconf``. It also takes in the input file ``inf.vw`` and writes the results to the respective ``out.sdvw`` files.
 
 .. code-block:: 
 
@@ -39,9 +41,9 @@ The following code execution reads the files ``hfspl.1``, ``hfspl.2`` and ``HFD.
 		Additional explanations about Sigma_1 and Sigma_2 restrictions:
 		(1) Put the first number (Sigma 1) to be the last orbital you plan to list in ADD.INP. 
 		Look up the number in BASS.INP and add the number of core shells. 
-		Here, the last orbital to be included in conf is 21d5/2, so the number is 195. 
+		Here, the last orbital to be included in pconf is 21d5/2, so the number is 195. 
 		Example: Last orbital in BASS.INP:
-		183  2.1201  3  2.1201      # Here, the last orbital to be included in conf is 21d5/2, so the number is 183+12 = 195
+		183  2.1201  3  2.1201      # Here, the last orbital to be included in pconf is 21d5/2, so the number is 183+12 = 195
 		Note: this is inputted twice, keep it the same. 
 		(2) Set 100 as the second value. This was tested a while ago, can increase.
 

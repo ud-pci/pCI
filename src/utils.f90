@@ -1,11 +1,13 @@
 Module utils
     ! This module contains general utility functions and subroutines for the pCI software package
 
+    Use, Intrinsic :: iso_fortran_env, Only : dp => real64, int64
+
     Implicit None
 
     Private
 
-    Public :: CountSubstr, DetermineRecordLength, ToUpperString
+    Public :: CountSubstr, DetermineRecordLength, CheckRecordLength, ToUpperString, WriteSkeleton
 
 Contains
 
@@ -28,49 +30,44 @@ Contains
 
     End Function CountSubstr
 
-    Subroutine DetermineRecordLength(lrec, success)
-        ! Determines the minimum usable record length for direct access files 
+    Subroutine DetermineRecordLength(lrec)
+        ! Determines the minimum usable record length for direct access files
         Integer, intent(Out) :: lrec
-        Logical, intent(Out) :: success
 
-        Integer :: irecl, nbytes, err_stat
-        Character(Len=8) :: test_data, read_data
+        Real(dp) :: tmp
 
-        test_data = 'abcdefgh'
-        irecl = 1
-        success = .false.
-
-        Do
-            ! Open a file to test writing and reading test_data with increasing record length
-            Open(unit=10, file='test.tmp', status='UNKNOWN', access='DIRECT', recl=irecl, iostat=err_stat)
-            If (err_stat /= 0) then
-                Exit
-            End If
-
-            ! Try writing test_data
-            Write(10, rec=1, iostat=err_stat) test_data
-            If (err_stat /= 0) Then
-                Close(unit=10, status='DELETE')
-                irecl = irecl + 1
-                Cycle
-            End If
-
-            ! Try reading read_data
-            Read(10, rec=1, iostat=err_stat) read_data
-            Close(unit=10, status='DELETE')
-            If (err_stat == 0 .and. read_data == test_data) Then
-                success = .true.
-                nbytes = 8/irecl
-                lrec = 8/nbytes
-                Exit
-            End If
-        End Do
-    
-        If (.not. success) Then
-            lrec = -1
-        End If
+        Inquire(IOLENGTH=lrec) tmp
 
     End Subroutine DetermineRecordLength
+
+    Subroutine CheckRecordLength(unit, filename, recl)
+        ! Verifies that the file's size is consistent with the expected record length.
+        ! Throws an error if the file size is not a multiple of the expected record size.
+        Integer, Intent(In) :: unit, recl
+        Character(*), Intent(In) :: filename
+
+        Integer(int64) :: file_size, bytes_per_record
+        Integer :: lrec
+        Real(dp) :: tmp
+
+        Inquire(IOLENGTH=lrec) tmp
+        bytes_per_record = int(recl, int64) * 8_int64 / int(lrec, int64)
+
+        Inquire(unit=unit, SIZE=file_size)
+        If (file_size < 0) Then
+            Write(*,'(2A)') 'ERROR: INQUIRE SIZE not supported, cannot verify record length for ', trim(filename)
+            Stop
+        End If
+
+        If (mod(file_size, bytes_per_record) /= 0) Then
+            Write(*,'(A)')    'ERROR: record length inconsistency'
+            Write(*,'(2A)')   '  File:                  ', trim(filename)
+            Write(*,'(A,I0)') '  File size (bytes):     ', file_size
+            Write(*,'(A,I0)') '  Expected record (bytes):', bytes_per_record
+            Stop
+        End If
+
+    End Subroutine CheckRecordLength
 
     Pure Function ToUpperString(str) Result(upper)
         ! Converts every lowercase letter (a-z) in a string to uppercase (A-Z)
@@ -87,5 +84,21 @@ Contains
             End If
         End Do
     End Function ToUpperString
+
+    Subroutine WriteSkeleton(filename, lines)
+        ! Write a skeleton key=value input file when the file is not found,
+        ! then stop so the user can fill it in and rerun.
+        Character(Len=*), Intent(In) :: filename
+        Character(Len=*), Intent(In) :: lines(:)
+        Integer :: i, u
+        
+        Open(newunit=u, file=filename, status='REPLACE')
+        Do i = 1, Size(lines)
+            Write(u, '(A)') Trim(lines(i))
+        End Do
+        Close(u)
+        Write(*,'(3A)') Trim(filename), ' not found — wrote a skeleton. Fill it in and rerun.'
+        Stop
+    End Subroutine WriteSkeleton
 
 End Module utils

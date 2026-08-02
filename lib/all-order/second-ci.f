@@ -478,7 +478,7 @@ c      stop
 3     format (6(4x,a1,i1,1x,i1,i1,2x))
 5     format (a1,i1,1x,i1,i1)
 ****************** read in core **************************
-      read (1,3) ((nsign(i),n1(i),n2(i),l(i)),i=1,nso)
+      read (1,3) (nsign(i),n1(i),n2(i),l(i),i=1,nso)
 ****************** read set ******************************
       j=nso
       do 6 i=1,nsorb-nso

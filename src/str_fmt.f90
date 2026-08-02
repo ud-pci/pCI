@@ -27,7 +27,7 @@ Module str_fmt
 
         Call system_clock(count_rate=clock_rate)
         Call system_clock(end_time)
-        total_time = (end_time - start_time) / clock_rate
+        total_time = Real(end_time - start_time) / Real(clock_rate)
         Call FormattedTime(total_time, timeStr)
         
     End Subroutine stopTimer

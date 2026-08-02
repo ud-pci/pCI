@@ -6,6 +6,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-31
+- pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction
+- matrix_io.f90, pconf.F90, davidson.f90, conf_variables.F90 - rename Matrix%ind1/ind2 -> Matrix%row/col throughout
+- matrix_io.f90 - add RedistributeHamCSR and RedistributeJsqCSR subroutines to redistribute COO to CSR by row with element-balanced greedy assignment; 3-pass sequential packing (col -> val -> row) with free-before-alloc ordering (caps peak memory at 24B/element); Hamil%row and Jsq%row freed after CSR build (row implicit in rowptr)
+- matrix_io.f90 - add WriteMatrixCSR: writes global CSR after RedistributeHamCSR; add ReadMatrixCSR: reads and distributes global CSR using same greedy nnz-balanced row assignment
+- davidson.f90 - ArrB, Diag, B2 distributed across ranks; B1 split into replicated B1(Nd0) and local B1_loc(nd_local); AvgDiag and Hmin AllReduce run on all ranks; batch AllReduces; 
+- davidson.f90 - DGEMM/DGEMV for Mxmpy; DiagInitApprox switched to DSYEVD
+- davidson.f90 - Prj_J: replace COO Jsq loop (Jsq%row) with CSR loop over JsqCSR_rowptr
+- conf_variables.F90 - add HamilCSR_rowptr and JsqCSR_rowptr; add LUT/hash variables
+- conf_init.f90 - ReadCiIn: normalize keys to uppercase with ToUpperString and trim/adjustl; ci.in keys are now case-insensitive
+- integrals.f90 - replace O(Nhint/NhintS) linear scan in Hint/HintS with O(1) direct-index/position LUT (BuildHintLUT/BuildHintSLUT)
+- integrals.f90 - replace forward scan in Gint/GintS with O(1) hash table lookup (BuildGintHash,FindGint/BuildGintSHash,FindGintS)
+- integrals.f90 - replace binary search in Find_VS/Find_SMS with O(1) direct-index LUT (BuildISLUT)
+- formj2.f90 - Jsq%row is freed by RedistributeJsqCSR before J_av runs; replace COO loop with CSR loop over JsqCSR_rowptr/Jsq%col/Jsq%val
+- pconf.F90 - three-phase peak tracking (formH, redistribution, Davidson) with LUT/HashMap memory accounting; parallel estimates relabeled as "per rank"
+- pconf.F90, integrals.f90, conf_variables.F90 - optimize FormH: O(1) GauntLUT replacing O(Ngaunt) linear search; eliminate redundant iconf1 recomputation in inner loop (now precomputed once per outer row)
+- pconf.F90 - FormH npes=1: add use_bit_rep in inner determinant loop
+- pconf.F90 - call WriteMatrixCSR (pCONF.HIJ) for H after RedistributeHamCSR and for J^2 (pCONF.JJJ) after RedistributeJsqCSR
+- pconf.F90 - speed up calcLSJ: row cache for lsj_det, direct mdc lookup, early-out for zero contributions
+- pconf.F90 - memory accounting: move Nvc/Nc0 from memFormH to memStaticArrays (never freed); unconditionally free Iarr in DeAllocateFormHArrays; inline sizeof(ArrB) in memDvdsn
+- pconf.F90 - kLSJ post-Davidson: call AllocateLSJArrays before Rdet so LSJ arrays are allocated when CONF.DET is read
+- pconf.F90 - kCSF post-Davidson: remove dead reorder_det block; unsym fills ArrB in standard Det_List ordering and CONF.DET is already written correctly before Davidson
+- pconf.F90 - FINAL.RES column alignment: dynamic header width and uniform conf% column formatting
+- params.f90 - centralize label string arrays OrbLabels, OpLabels, CorrLabels and replace local, per-program Let, Alet, Blet arrays
+- pdtm.f90 - apply FormDM/FormTM MPI communication optimizations: Fj3 table precompute, nnz-balanced load distribution
+- pdtm.f90 - fix memory accounting
+- utils.f90, conf_init.f90, pdtm.f90, conf_pt.f90 - write an input file skeleton if user doesn't provide ci/dtm.in file
+- conf_pt.f90 - use BuildGauntLUT, BuildHintLUT, BuildGintHash, BuildISLUT on all ranks after BcastPTArrays to match pconf integral initialization
+- CMakeLists.txt - link BLAS (mkl_sequential) to conf_lsj
+
+## [1.3.0] - 2026-05-15
+- pconf v8.0 - CSF (Configuration State Function) support: Hamiltonian built and diagonalized in CSF basis; kCSF key (ci.in) selects determinant (0) or CSF (1) basis
+- csf.f90 - new module with formh_sym, hmatrix, F_J2, jbasis_init, reorder_det for CSF-basis Hamiltonian construction and eigenvector back-transformation to determinants
+- conf_variables.F90 - CSF variables: nconf_neq, ndcs, mdc, mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
+- davidson.f90 - J^2 averaging skipped in CSF mode (Jm exact); DSYEVD for J^2 matrices below ScaLAPACK threshold
+- pconf.F90 - Kl=4 memory estimation before FormH; bitstring comparison in FormH calculation stage; FORCE_BIT_DET/FORCE_INT_DET environment variables; CONFSTR.RES written only when kLSJ=1
+- conf_init.f90 - case-insensitive configuration key parsing
+- bas_info - new program for basis set information
+- pbasc - fix NaN in Breit_Core for light atoms; AllReduce entire Ro array
+- matrix_io.f90 - INQUIRE for record length detection; CheckRecordLength for DIRECT access files
+- CMakeLists.txt - refactored build system: MPI and LAPACK optional; removed redundant flags
+- removed deprecated files and IPbr dependence
+
 ## [1.2.0] - 2025-03-24
 - pconf v7.0 - implemented bit representation for determinant comparisons (initial version uses both bitstring and integer representation for faster computations)
 - pconf.F90 - added logic to determine whether to use bitstring or integer representation for determinants

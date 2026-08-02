@@ -19,7 +19,7 @@ Module mpi_utils
     
     Private
     
-    Public :: BroadcastI, BroadcastR, BroadcastD, AllReduceI, AllReduceR, AllReduceD
+    Public :: BroadcastI, BroadcastR, BroadcastD, BroadcastD_dp, AllReduceI, AllReduceR, AllReduceD
 
     Integer, Parameter :: MaxStride8Byte = 134217728
     
@@ -120,7 +120,7 @@ Module mpi_utils
         Type(MPI_Comm), Intent(In)                  :: comm
         Integer(Kind=int64), Intent(In)             :: count
         Integer, Intent(In)                         :: stride, rank
-        Real(type2_real), Dimension(*), Intent(InOut)   :: buffer
+        Real(type2_real), Dimension(*), Intent(InOut) :: buffer
         Integer, Intent(InOut)                      :: mpierr
         Character(Len=255)                          :: envvar
         Integer(Kind=int64)                         :: count_remain, i
@@ -147,7 +147,7 @@ Module mpi_utils
         mpierr = 0
         Do While (count_remain .gt. use_stride)
             Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_rtype, rank, comm, mpierr)
-            If (mpierr .ne. 0 ) Then
+            If (mpierr .ne. 0) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
             End If
@@ -157,12 +157,56 @@ Module mpi_utils
         If (count_remain .gt. 0) Then
             count_remain2 = count_remain
             Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_rtype, rank, comm, mpierr)
-            If (mpierr .ne. 0 ) Then
+            If (mpierr .ne. 0) Then
                 Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
                 Return
             End If
         End If
     End Subroutine BroadcastD
+
+    Subroutine BroadcastD_dp(buffer, count, stride, mpi_rtype, rank, comm, mpierr)
+        Use mpi_f08
+        Implicit None
+
+        Type(MPI_Datatype), Intent(In)              :: mpi_rtype
+        Type(MPI_Comm), Intent(In)                  :: comm
+        Integer(Kind=int64), Intent(In)             :: count
+        Integer, Intent(In)                         :: stride, rank
+        Real(dp), Dimension(*), Intent(InOut)       :: buffer
+        Integer, Intent(InOut)                      :: mpierr
+        Character(Len=255)                          :: envvar
+        Integer(Kind=int64)                         :: count_remain, i
+        Integer                                     :: count_remain2, use_stride
+
+        If (stride .le. 0) Then
+            Call get_environment_variable('CONF_BROADCAST_MAX', envvar)
+            Read(envvar, '(i10)') use_stride
+            If (use_stride .le. 0) use_stride = MaxStride8Byte
+        Else
+            use_stride = stride
+        End If
+        If (use_stride .gt. MaxStride8Byte) use_stride = MaxStride8Byte
+        count_remain = count
+        i = 1_int64
+        mpierr = 0
+        Do While (count_remain .gt. use_stride)
+            Call MPI_Bcast(buffer(i:i+use_stride), use_stride, mpi_rtype, rank, comm, mpierr)
+            If (mpierr .ne. 0) Then
+                Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
+                Return
+            End If
+            count_remain = count_remain - use_stride
+            i = i + use_stride
+        End Do
+        If (count_remain .gt. 0) Then
+            count_remain2 = count_remain
+            Call MPI_Bcast(buffer(i:i+count_remain2), count_remain2, mpi_rtype, rank, comm, mpierr)
+            If (mpierr .ne. 0) Then
+                Write(*,*) 'Failure broadcasting real range ',i,':',i+use_stride
+                Return
+            End If
+        End If
+    End Subroutine BroadcastD_dp
 
     Subroutine AllReduceI(buffer, count, stride, op, comm, mpierr)
         Use mpi_f08

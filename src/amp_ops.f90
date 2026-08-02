@@ -23,11 +23,9 @@ Module amp_ops
     Public :: AmpAM, AmpMQM, HfsA, HfsB, Fint, AmpOut
     Public :: gQED
 
-    Integer, Allocatable, Dimension(:), Public      :: Intg
-    Real(dp), Allocatable, Dimension(:), Public     :: Rnt
+    Integer, Allocatable, Dimension(:), Public      :: RintKey
+    Real(dp), Allocatable, Dimension(:), Public     :: RintVal
     Real(dp), Public :: AE1V
-    Character(Len=4), Dimension(15), Public :: Alet
-    Character(Len=1), Dimension(6), Public :: Let
 
   Contains 
 
@@ -46,15 +44,15 @@ Module amp_ops
         End If
         ind=is*IPx*IPx+(na-Nso)*IPx+(nb-Nso)
 
-        Do i=1,size(Intg, 1)
-            If (ind == Intg(i)) Then
-                Fint=Rnt(i)*isg
+        Do i=1,size(RintKey, 1)
+            If (ind == RintKey(i)) Then
+                Fint=RintVal(i)*isg
                 Return
             End If
         End Do
 
-        Write( 6,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
-        Write(11,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') Alet(is),nfin,nini,ind
+        Write( 6,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') OpLabels(is),nfin,nini,ind
+        Write(11,'(1X,"Fint: NO INTEGRAL ",A4,2I4,I8)') OpLabels(is),nfin,nini,ind
         Fint=0.d0
         
         Return
@@ -74,7 +72,7 @@ Module amp_ops
             jl=2*xjl+0.1d0
             jk=2*xjk+0.1d0
             Write(11,'(1X,A4,":",F8.4,I4,A1,I2,"/2  <<",I4,A1,I2,"/2",2E14.4)') &
-             Alet(i),x,nnk,let(lk+1),jk,nnl,let(ll+1),jl,y
+             OpLabels(i),x,nnk,OrbLabels(lk+1),jk,nnl,OrbLabels(ll+1),jl,y
         Return
     End Subroutine AmpOut
 
