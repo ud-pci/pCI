@@ -78,7 +78,6 @@ conf:
 
 # Parameters used by dtm program
 dtm:
-    matrix_elements: E1
     include_rpa: False
     TM:
         matrix_elements: E1
