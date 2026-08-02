@@ -1048,26 +1048,19 @@ def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_met
                     f.write(line)
     
         # run bass until there are no errors in output
-        with open('bass.in','w') as f: 
-            f.write('WJ.DAT')
+        with open('bass.in','w') as f:
+            f.write('WJ.DAT\n')
 
         # check if bass.out exists and remove if it does
         if os.path.isfile('bass.out'):
             run_shell('rm bass.out')
-    
+
         maxNumTries = 5
         nTry = 1
-        needs_hfd_dat = False
-        for orb_build in custom:
-            if 'from hfd' in orb_build:
-                needs_hfd_dat = True
-    
+
         while check_errors('bass.out') > 0:
             print('bass attempt', nTry)
-            if needs_hfd_dat:
-                run_shell(bin_dir + 'bass < bass.in > bass.out')
-            else:
-                run_shell(bin_dir + 'bass > bass.out')
+            run_shell(bin_dir + 'bass < bass.in > bass.out')
             if (nTry >= maxNumTries):
                 print("bass did not converge after", nTry, "attempts")
                 break
@@ -1142,7 +1135,7 @@ if __name__ == "__main__":
     if val_energies: kval = get_dict_value(val_energies, 'kval')
     val_aov = get_dict_value(basis, 'val_aov')
     order = get_dict_value(orbitals, 'order')
-    custom = get_dict_value(orbitals, 'custom')
+    custom = get_dict_value(orbitals, 'custom') or []
     basis_method = get_dict_value(basis, 'method')
 
     # isotope shift parameters
