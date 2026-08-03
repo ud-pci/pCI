@@ -1198,39 +1198,310 @@ Contains
         End If
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(3))
-            vaGrowBy = vaBinSize
-            ndGrowBy = 1
+        vaGrowBy = vaBinSize
+        ndGrowBy = 1
 
-            If (mype==0) Then
-                Write(counterStr,fmt='(I16)') vaGrowBy
-                Write(counterStr2,fmt='(I16)') ndGrowBy
-                Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
-                If (npes == 1) Then
-                    print*, '========== Starting calculation stage of FormH =========='
-                Else
-                    print*, '========== Starting comparison stage of FormH =========='
-                End If
+        If (mype==0) Then
+            Write(counterStr,fmt='(I16)') vaGrowBy
+            Write(counterStr2,fmt='(I16)') ndGrowBy
+            Write(*,'(A)') ' vaGrowBy = '//Trim(AdjustL(counterStr))//', ndGrowBy = '//Trim(AdjustL(counterStr2))
+            If (npes == 1) Then
+                print*, '========== Starting calculation stage of FormH =========='
+            Else
+                print*, '========== Starting comparison stage of FormH =========='
             End If
+        End If
 
-            cntarray=0
+        cntarray=0
 
-            ! Get accumulator vectors setup (or re-setup if this is rank 0):
-            Call IVAccumulatorInit(iva1, vaGrowBy)
-            Call IVAccumulatorInit(iva2, vaGrowBy)
-            If (mype==0) Call RVAccumulatorInit(rva1, vaGrowBy)
-            NumH=0_int64
-            counter1=1_int64
-            counter2=1_int64
-            counter3=1_int64
+        ! Get accumulator vectors setup (or re-setup if this is rank 0):
+        Call IVAccumulatorInit(iva1, vaGrowBy)
+        Call IVAccumulatorInit(iva2, vaGrowBy)
+        If (mype==0) Call RVAccumulatorInit(rva1, vaGrowBy)
+        NumH=0_int64
+        counter1=1_int64
+        counter2=1_int64
+        counter3=1_int64
 
-            If (mype == 0) Then
-                If (npes == 1) Then
-                    ! Single process: no workers, loop over all determinants directly.
-                    ndsplit = Nd/10
-                    ndcnt = 1+ndsplit
-                    j=9
-                    Call startTimer(s1)
-                    Do n = 1, Nd
+        If (mype == 0) Then
+            If (npes == 1) Then
+                ! Single process: no workers, loop over all determinants directly.
+                ndsplit = Nd/10
+                ndcnt = 1+ndsplit
+                j=9
+                Call startTimer(s1)
+                Do n = 1, Nd
+                    Call Gdet(n,idet1)
+                    If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
+                    iconf1(1:Ne) = Nh(idet1(1:Ne))
+                    k=0
+                    Do ic=1,Nc
+                        kx=Ndc(ic)
+                        If (k+kx > n) kx=n-k
+                        If (kx /= 0) Then
+                            Call Gdet(k+1,idet2)
+                            iconf2(1:Ne) = Nh(idet2(1:Ne))
+                            Call CompD(iconf1,iconf2,icomp)
+                            If (icomp > 2) Then
+                                k=k+kx
+                            Else
+                                Do k1=1,kx
+                                    k=k+1
+                                    If (use_bit_rep) Then
+                                        bdet2 = Barr(1:num_ints_bit_rep, k)
+                                        diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                                        If (diff <= 2) Then
+                                            nn=n
+                                            kk=k
+                                            Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                                            If (Kdsig /= 0) E_k=Diag(kk)
+                                            tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                            If (tt /= 0_type_real) Then
+                                                cntarray = cntarray + 1
+                                                Call IVAccumulatorAdd(iva1, nn)
+                                                Call IVAccumulatorAdd(iva2, kk)
+                                                Call RVAccumulatorAdd(rva1, tt)
+                                            Else
+                                                numzero = numzero + 1
+                                            End If
+                                        End If
+                                    Else
+                                        Call Gdet(k,idet2)
+                                        Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                        If (diff <= 2) Then
+                                            nn=n
+                                            kk=k
+                                            Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
+                                            tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                            If (tt /= 0_type_real) Then
+                                                cntarray = cntarray + 1
+                                                Call IVAccumulatorAdd(iva1, nn)
+                                                Call IVAccumulatorAdd(iva2, kk)
+                                                Call RVAccumulatorAdd(rva1, tt)
+                                            Else
+                                                numzero = numzero + 1
+                                            End If
+                                        End If
+                                    End If
+                                End Do
+                            End If
+                        End If
+                    End Do
+                    If (n >= ndcnt .and. j /= 0) Then
+                        Call stopTimer(s1, timeStr)
+                        NumH = cntarray(1)
+                        mem = NumH * (8_int64+type_real)
+                        maxmem = mem
+                        statmem_copy = memEstimate + NumH * (8_int64 + 2_int64 * int(type_real, int64))
+                        statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
+                        Call FormattedMemSize(statmem, memTotStr)
+                        Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                        Call FormattedMemSize(mem, memStr3)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Write(counterStr,fmt='(I16)') NumH
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                                                    Trim(AdjustL(counterStr)) // ' elements'
+                        Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                            trim(memStr2)//')'
+                        flush(6)
+                        If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                                    Trim(memTotStr2) ,' is available.'
+                            Stop
+                        End If
+                        j=j-1
+                        ndcnt=ndcnt+ndsplit
+                    End If
+                End Do
+                ! Final summary
+                Call stopTimer(s1, timeStr)
+                NumH = cntarray(1)
+                maxme = cntarray(2)
+                mem = NumH * (8_int64+type_real)
+                maxmem     = maxme * (8_int64 + int(type_real, int64))   ! COO 16B (row+col+val)
+                maxmem_csr = maxme * (4_int64 + int(type_real, int64))   ! CSR 12B (col+val)
+                peak_formH  = memStaticArrays + memFormH + maxmem
+                peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
+                statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
+                memEstimate = memEstimate + maxmem
+                Call FormattedMemSize(NumH*(8_int64+type_real), memStr3)
+                Call FormattedMemSize(maxmem_csr, memStr2)
+                Call FormattedMemSize(memStaticArrays, memStr4)
+                Call FormattedMemSize(memDvdsn, memStr5)
+                mem = statmem
+                Call FormattedMemSize(mem, memStr)
+                Call FormattedMemSize(statmem, memTotStr)
+                Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+                Write(counterStr,fmt='(I16)') NumH
+                Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                                            Trim(AdjustL(counterStr)) // ' elements'
+                Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                    trim(memStr2)//')'
+                Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) &
+                                    // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
+                If (memTotalPerCPU /= 0) Then
+                    If (statmem > memTotalPerCPU) Then
+                        Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
+                                                Trim(memTotStr2) ,' is available.'
+                        Stop
+                    Else If (statmem < memTotalPerCPU) Then
+                        Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , &
+                                                Trim(memTotStr2) ,' is available.'
+                    End If
+                Else
+                    Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, &
+                                                but available memory was not saved to environment'
+                End If
+            Else
+                ! Multi-process: distribute work to workers, then coordinate.
+                Do an_id = 1, npes - 1
+                   nnd = ndGrowBy*(an_id-1) + 2
+                   Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                End Do
+
+                n=1
+                Call Gdet(n,idet1)
+                iconf1(1:Ne) = Nh(idet1(1:Ne))
+                k=0
+                Do ic=1,Nc
+                    kx=Ndc(ic)
+                    If (k+kx > n) kx=n-k
+                    If (kx /= 0) Then
+                        Call Gdet(k+1,idet2)
+                        iconf2(1:Ne) = Nh(idet2(1:Ne))
+                        Call CompD(iconf1,iconf2,icomp)
+                        If (icomp > 2) Then
+                            k=k+kx
+                        Else
+                            Do k1=1,kx
+                                k=k+1
+                                Call Gdet(k,idet2)
+                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                If (diff <= 2) Then
+                                    nn=n
+                                    kk=k
+                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                    If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
+                                    tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                    If (tt /= 0_type_real) Then
+                                        cntarray = cntarray + 1
+                                        Call IVAccumulatorAdd(iva1, nn)
+                                        Call IVAccumulatorAdd(iva2, kk)
+                                        Call RVAccumulatorAdd(rva1, tt)
+                                    End If
+                                End If
+                            End Do
+                        End If
+                    End If
+                End Do
+
+                Call startTimer(s1)
+
+                NumH =  NumH + cntarray(1)
+                num_done = 0
+                ndsplit = Nd/10
+                ndcnt = ndsplit
+                maxme = cntarray(2)
+                j=9
+
+                Do
+                    Call MPI_RECV( cntarray, 3, MPI_INTEGER8, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                    sender = status%MPI_SOURCE
+
+                    If (nnd + ndGrowBy <= Nd) Then
+                        nnd = nnd + ndGrowBy
+                        Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                    Else
+                        msg = -1
+                        Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        num_done = num_done + 1
+                    End If
+
+                    NumH = NumH + cntarray(1)
+                    maxme = max(cntarray(2),maxme)
+                    mem = NumH * (8_int64+type_real)
+                    maxmem = maxme * (8_int64+type_real)
+                    statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                    statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
+                    Call FormattedMemSize(statmem, memTotStr)
+                    Call FormattedMemSize(memTotalPerCPU, memTotStr2)
+
+                    If (nnd == ndcnt .and. j /= 0) Then
+                        Call stopTimer(s1, timeStr)
+                        Call FormattedMemSize(mem, memStr)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Call FormattedMemSize(NumH*(8+type_real), memStr3)
+                        Write(counterStr,fmt='(I16)') NumH
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                                                    Trim(AdjustL(counterStr)) // ' elements'
+                        Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                            trim(memStr2)//')'
+                        If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
+                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
+                                                    Trim(memTotStr2) ,' is available.'
+                            Stop
+                        End If
+                        j=j-1
+                        ndcnt = ndcnt + ndsplit
+                    End If
+
+                    If (num_done == npes-1) Then
+                        Call stopTimer(s1, timeStr)
+                        maxmem     = maxme * (8_int64 + int(type_real, int64))
+                        maxmem_csr = maxme * (4_int64 + int(type_real, int64))
+                        peak_formH  = memStaticArrays + memFormH + maxmem
+                        peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
+                        peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
+                        statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
+                        memEstimate = memEstimate + maxmem
+                        mem = statmem
+                        Write(counterStr,fmt='(I16)') NumH
+                        Call FormattedMemSize(NumH*(8+type_real), memStr3)
+                        Call FormattedMemSize(maxmem, memStr2)
+                        Call FormattedMemSize(memStaticArrays, memStr4)
+                        Call FormattedMemSize(memDvdsn, memStr5)
+                        Call FormattedMemSize(mem, memStr)
+                        Call FormattedMemSize(statmem, memTotStr)
+                        Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
+                                                    Trim(AdjustL(counterStr)) // ' elements'
+                        Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
+                                            trim(memStr2)//')'
+                        Call FormattedMemSize(maxmem_csr, memStr2)
+                        Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) & 
+                                            // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
+                        If (memTotalPerCPU /= 0) Then
+                            If (statmem > memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
+                                                        Trim(memTotStr2) ,' is available.'
+                                Stop
+                            Else If (statmem < memTotalPerCPU) Then
+                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, and ' , &
+                                                        Trim(memTotStr2) ,' is available.'
+                            End If
+                        Else
+                            Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, &
+                                                        but available memory was not saved to environment'
+                        End If
+                        Exit
+                    End If
+                End Do
+            End If
+        Else
+            cntarray=0_int64
+            Do 
+                Call MPI_RECV ( nnd, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
+                If (nnd == -1) Then
+                      Exit
+                Else
+                    If (Nd - nnd < ndGrowBy) Then
+                        endnd = Nd
+                    Else
+                        endnd = nnd+ndGrowBy-1
+                    End If
+                    cntarray(1)=0
+                    Do n=nnd,endnd
                         Call Gdet(n,idet1)
                         If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                         iconf1(1:Ne) = Nh(idet1(1:Ne))
@@ -1250,350 +1521,78 @@ Contains
                                         If (use_bit_rep) Then
                                             bdet2 = Barr(1:num_ints_bit_rep, k)
                                             diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
-                                            If (diff <= 2) Then
-                                                nn=n
-                                                kk=k
-                                                Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
-                                                If (Kdsig /= 0) E_k=Diag(kk)
-                                                tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                                If (tt /= 0_type_real) Then
-                                                    cntarray = cntarray + 1
-                                                    Call IVAccumulatorAdd(iva1, nn)
-                                                    Call IVAccumulatorAdd(iva2, kk)
-                                                    Call RVAccumulatorAdd(rva1, tt)
-                                                Else
-                                                    numzero = numzero + 1
-                                                End If
-                                            End If
                                         Else
                                             Call Gdet(k,idet2)
-                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                            If (diff <= 2) Then
-                                                nn=n
-                                                kk=k
-                                                Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                                If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                                                tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                                If (tt /= 0_type_real) Then
-                                                    cntarray = cntarray + 1
-                                                    Call IVAccumulatorAdd(iva1, nn)
-                                                    Call IVAccumulatorAdd(iva2, kk)
-                                                    Call RVAccumulatorAdd(rva1, tt)
-                                                Else
-                                                    numzero = numzero + 1
-                                                End If
-                                            End If
+                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)    
+                                        End If
+                                        
+                                        If (diff <= 2) Then
+                                            cntarray = cntarray + 1
+                                            Call IVAccumulatorAdd(iva1, n)
+                                            Call IVAccumulatorAdd(iva2, k)
                                         End If
                                     End Do
                                 End If
                             End If
                         End Do
-                        If (n >= ndcnt .and. j /= 0) Then
-                            Call stopTimer(s1, timeStr)
-                            NumH = cntarray(1)
-                            mem = NumH * (8_int64+type_real)
-                            maxmem = mem
-                            statmem_copy = memEstimate + NumH * (8_int64 + 2_int64 * int(type_real, int64))
-                            statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
-                            Call FormattedMemSize(statmem, memTotStr)
-                            Call FormattedMemSize(memTotalPerCPU, memTotStr2)
-                            Call FormattedMemSize(mem, memStr3)
-                            Call FormattedMemSize(maxmem, memStr2)
-                            Write(counterStr,fmt='(I16)') NumH
-                            Write(*,'(2X,A,1X,I3,A)') 'FormH:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
-                                                        Trim(AdjustL(counterStr)) // ' elements'
-                            Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
-                                                trim(memStr2)//')'
-                            flush(6)
-                            If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
-                                                        Trim(memTotStr2) ,' is available.'
-                                Stop
-                            End If
-                            j=j-1
-                            ndcnt=ndcnt+ndsplit
-                        End If
-                    End Do
-                    ! Final summary
-                    Call stopTimer(s1, timeStr)
-                    NumH = cntarray(1)
-                    maxme = cntarray(2)
-                    mem = NumH * (8_int64+type_real)
-                    maxmem     = maxme * (8_int64 + int(type_real, int64))   ! COO 16B (row+col+val)
-                    maxmem_csr = maxme * (4_int64 + int(type_real, int64))   ! CSR 12B (col+val)
-                    peak_formH  = memStaticArrays + memFormH + maxmem
-                    peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
-                    peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
-                    statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
-                    memEstimate = memEstimate + maxmem
-                    Call FormattedMemSize(NumH*(8_int64+type_real), memStr3)
-                    Call FormattedMemSize(maxmem_csr, memStr2)
-                    Call FormattedMemSize(memStaticArrays, memStr4)
-                    Call FormattedMemSize(memDvdsn, memStr5)
-                    mem = statmem
-                    Call FormattedMemSize(mem, memStr)
-                    Call FormattedMemSize(statmem, memTotStr)
-                    Call FormattedMemSize(memTotalPerCPU, memTotStr2)
-                    Write(counterStr,fmt='(I16)') NumH
-                    Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
-                                                Trim(AdjustL(counterStr)) // ' elements'
-                    Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
-                                        trim(memStr2)//')'
-                    Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) &
-                                        // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
-                    If (memTotalPerCPU /= 0) Then
-                        If (statmem > memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, but only ', &
-                                                    Trim(memTotStr2) ,' is available.'
-                            Stop
-                        Else If (statmem < memTotalPerCPU) Then
-                            Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, and ' , &
-                                                    Trim(memTotStr2) ,' is available.'
-                        End If
-                    Else
-                        Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' is required to finish conf, &
-                                                    but available memory was not saved to environment'
-                    End If
+                    End Do 
+
+                    cntarray(3) = nnd
+                    Call MPI_SEND(cntarray, 3, MPI_INTEGER8, 0, return_tag, MPI_COMM_WORLD, mpierr)
+                End if
+            End Do
+        End If
+
+        Call IVAccumulatorCopy(iva1, Hamil%row, counter1)
+        Call IVAccumulatorReset(iva1)
+        Call IVAccumulatorCopy(iva2, Hamil%col, counter2)
+        Call IVAccumulatorReset(iva2)
+        If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
+        If (mype == 0) Call RVAccumulatorReset(rva1)
+
+        Call startTimer(s1)
+
+        Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
+        mesplit = maxNumElementsPerCore/10
+        numzero=0_int64
+        j=1
+
+        If (mype /= 0) Then
+            Allocate(Hamil%val(counter1))
+            Call startTimer(s2)
+            Do n8=1,counter1
+                nn=Hamil%row(n8)
+                kk=Hamil%col(n8)
+                
+                If (use_bit_rep) Then
+                    bdet1 = Barr(1:num_ints_bit_rep, nn)
+                    bdet2 = Barr(1:num_ints_bit_rep, kk)
+                    diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                    Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                    Call Gdet(nn,idet1) ! more efficient to call Gdet here to get orbital positions
                 Else
-                    ! Multi-process: distribute work to workers, then coordinate.
-                    Do an_id = 1, npes - 1
-                       nnd = ndGrowBy*(an_id-1) + 2
-                       Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
-                    End Do
-
-                    n=1
-                    Call Gdet(n,idet1)
-                    iconf1(1:Ne) = Nh(idet1(1:Ne))
-                    k=0
-                    Do ic=1,Nc
-                        kx=Ndc(ic)
-                        If (k+kx > n) kx=n-k
-                        If (kx /= 0) Then
-                            Call Gdet(k+1,idet2)
-                            iconf2(1:Ne) = Nh(idet2(1:Ne))
-                            Call CompD(iconf1,iconf2,icomp)
-                            If (icomp > 2) Then
-                                k=k+kx
-                            Else
-                                Do k1=1,kx
-                                    k=k+1
-                                    Call Gdet(k,idet2)
-                                    Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                    If (diff <= 2) Then
-                                        nn=n
-                                        kk=k
-                                        Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                                        If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                                        tt=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                                        If (tt /= 0_type_real) Then
-                                            cntarray = cntarray + 1
-                                            Call IVAccumulatorAdd(iva1, nn)
-                                            Call IVAccumulatorAdd(iva2, kk)
-                                            Call RVAccumulatorAdd(rva1, tt)
-                                        End If
-                                    End If
-                                End Do
-                            End If
-                        End If
-                    End Do
-
-                    Call startTimer(s1)
-
-                    NumH =  NumH + cntarray(1)
-                    num_done = 0
-                    ndsplit = Nd/10
-                    ndcnt = ndsplit
-                    maxme = cntarray(2)
-                    j=9
-
-                    Do
-                        Call MPI_RECV( cntarray, 3, MPI_INTEGER8, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                        sender = status%MPI_SOURCE
-
-                        If (nnd + ndGrowBy <= Nd) Then
-                            nnd = nnd + ndGrowBy
-                            Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
-                        Else
-                            msg = -1
-                            Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
-                            num_done = num_done + 1
-                        End If
-
-                        NumH = NumH + cntarray(1)
-                        maxme = max(cntarray(2),maxme)
-                        mem = NumH * (8_int64+type_real)
-                        maxmem = maxme * (8_int64+type_real)
-                        statmem_copy = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
-                        statmem = max(memEstimate + memDvdsn - memFormH + maxmem, statmem_copy)
-                        Call FormattedMemSize(statmem, memTotStr)
-                        Call FormattedMemSize(memTotalPerCPU, memTotStr2)
-
-                        If (nnd == ndcnt .and. j /= 0) Then
-                            Call stopTimer(s1, timeStr)
-                            Call FormattedMemSize(mem, memStr)
-                            Call FormattedMemSize(maxmem, memStr2)
-                            Call FormattedMemSize(NumH*(8+type_real), memStr3)
-                            Write(counterStr,fmt='(I16)') NumH
-                            Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
-                                                        Trim(AdjustL(counterStr)) // ' elements'
-                            Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
-                                                trim(memStr2)//')'
-                            If (memTotalPerCPU /= 0 .and. statmem > memTotalPerCPU) Then
-                                Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
-                                                        Trim(memTotStr2) ,' is available.'
-                                Stop
-                            End If
-                            j=j-1
-                            ndcnt = ndcnt + ndsplit
-                        End If
-
-                        If (num_done == npes-1) Then
-                            Call stopTimer(s1, timeStr)
-                            maxmem     = maxme * (8_int64 + int(type_real, int64))
-                            maxmem_csr = maxme * (4_int64 + int(type_real, int64))
-                            peak_formH  = memStaticArrays + memFormH + maxmem
-                            peak_redist = memEstimate + maxme * (8_int64 + 2_int64 * int(type_real, int64))
-                            peak_dvdsn  = memStaticArrays + memDvdsn + maxmem_csr
-                            statmem = max(peak_formH, max(peak_redist, peak_dvdsn))
-                            memEstimate = memEstimate + maxmem
-                            mem = statmem
-                            Write(counterStr,fmt='(I16)') NumH
-                            Call FormattedMemSize(NumH*(8+type_real), memStr3)
-                            Call FormattedMemSize(maxmem, memStr2)
-                            Call FormattedMemSize(memStaticArrays, memStr4)
-                            Call FormattedMemSize(memDvdsn, memStr5)
-                            Call FormattedMemSize(mem, memStr)
-                            Call FormattedMemSize(statmem, memTotStr)
-                            Write(*,'(2X,A,1X,I3,A)') 'FormH comparison stage:', (10-j)*10, '% done in '// trim(timeStr)// '; '// &
-                                                        Trim(AdjustL(counterStr)) // ' elements'
-                            Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
-                                                trim(memStr2)//')'
-                            Call FormattedMemSize(maxmem_csr, memStr2)
-                            Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) & 
-                                                // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
-                            If (memTotalPerCPU /= 0) Then
-                                If (statmem > memTotalPerCPU) Then
-                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, but only ', &
-                                                            Trim(memTotStr2) ,' is available.'
-                                    Stop
-                                Else If (statmem < memTotalPerCPU) Then
-                                    Write(*,'(A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, and ' , &
-                                                            Trim(memTotStr2) ,' is available.'
-                                End If
-                            Else
-                                Write(*,'(2X,A,A,A,A)') 'At least '// Trim(memTotStr), ' per rank is required to finish conf, &
-                                                            but available memory was not saved to environment'
-                            End If
-                            Exit
-                        End If
-                    End Do
+                    Call Gdet(nn,idet1)
+                    Call Gdet(kk,idet2)
+                    Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
                 End If
-            Else
-                cntarray=0_int64
-                Do 
-                    Call MPI_RECV ( nnd, 1 , MPI_INTEGER, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
-                    If (nnd == -1) Then
-                          Exit
-                    Else
-                        If (Nd - nnd < ndGrowBy) Then
-                            endnd = Nd
-                        Else
-                            endnd = nnd+ndGrowBy-1
-                        End If
-                        cntarray(1)=0
-                        Do n=nnd,endnd
-                            Call Gdet(n,idet1)
-                            If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
-                            iconf1(1:Ne) = Nh(idet1(1:Ne))
-                            k=0
-                            Do ic=1,Nc
-                                kx=Ndc(ic)
-                                If (k+kx > n) kx=n-k
-                                If (kx /= 0) Then
-                                    Call Gdet(k+1,idet2)
-                                    iconf2(1:Ne) = Nh(idet2(1:Ne))
-                                    Call CompD(iconf1,iconf2,icomp)
-                                    If (icomp > 2) Then
-                                        k=k+kx
-                                    Else
-                                        Do k1=1,kx
-                                            k=k+1
-                                            If (use_bit_rep) Then
-                                                bdet2 = Barr(1:num_ints_bit_rep, k)
-                                                diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
-                                            Else
-                                                Call Gdet(k,idet2)
-                                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)    
-                                            End If
-                                            
-                                            If (diff <= 2) Then
-                                                cntarray = cntarray + 1
-                                                Call IVAccumulatorAdd(iva1, n)
-                                                Call IVAccumulatorAdd(iva2, k)
-                                            End If
-                                        End Do
-                                    End If
-                                End If
-                            End Do
-                        End Do 
+                
+                If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
+                t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                Hamil%val(n8)=t
 
-                        cntarray(3) = nnd
-                        Call MPI_SEND(cntarray, 3, MPI_INTEGER8, 0, return_tag, MPI_COMM_WORLD, mpierr)
-                    End if
-                End Do
-            End If
-
-            Call IVAccumulatorCopy(iva1, Hamil%row, counter1)
-            Call IVAccumulatorReset(iva1)
-            Call IVAccumulatorCopy(iva2, Hamil%col, counter2)
-            Call IVAccumulatorReset(iva2)
-            If (mype == 0) Call RVAccumulatorCopy(rva1, Hamil%val, counter3)
-            If (mype == 0) Call RVAccumulatorReset(rva1)
-
-            Call startTimer(s1)
-
-            Call MPI_AllReduce(counter1, maxNumElementsPerCore, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpierr)
-            mesplit = maxNumElementsPerCore/10
-            numzero=0_int64
-            j=1
-
-            If (mype /= 0) Then
-                Allocate(Hamil%val(counter1))
-                Call startTimer(s2)
-                Do n8=1,counter1
-                    nn=Hamil%row(n8)
-                    kk=Hamil%col(n8)
-                    
-                    If (use_bit_rep) Then
-                        bdet1 = Barr(1:num_ints_bit_rep, nn)
-                        bdet2 = Barr(1:num_ints_bit_rep, kk)
-                        diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
-                        Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
-                        Call Gdet(nn,idet1) ! more efficient to call Gdet here to get orbital positions
-                    Else
-                        Call Gdet(nn,idet1)
-                        Call Gdet(kk,idet2)
-                        Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                        Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                    End If
-                    
-                    If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                    t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
-                    Hamil%val(n8)=t
-
-                    If (t == 0) numzero=numzero+1
-                    If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
-                        Call stopTimer(s1, timeStr)
-                        Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
-                        j=j+1
-                    End If
-                End Do
-                Call stopTimer(s2, timeStr)
-            Else
-                If (npes /= 1) print*, '========== Starting calculation stage of FormH =========='
-            End If
-            Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
-            If (mype == 0) print*, '========== Formation of Hamiltonian matrix completed =========='
+                If (t == 0) numzero=numzero+1
+                If (counter1 == maxNumElementsPerCore .and. mod(n8,mesplit)==0) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(*,'(2X,A,1X,I3,A)') 'FormH calculation stage:', j*10, '% done in '// trim(timeStr)
+                    j=j+1
+                End If
+            End Do
+            Call stopTimer(s2, timeStr)
+        Else
+            If (npes /= 1) print*, '========== Starting calculation stage of FormH =========='
+        End If
+        Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
 
         ih8=size(Hamil%val, kind=int64)
 
@@ -1607,6 +1606,7 @@ Contains
         Call MPI_AllReduce(MPI_IN_PLACE, Hamil%minval, 1, mpi_type_real, MPI_MIN, MPI_COMM_WORLD, mpierr)
         
         If (mype == 0) Then
+            print*, '========== Formation of Hamiltonian matrix completed =========='
             ! Write number of non-zero matrix elements
             Write(counterStr,fmt='(I16)') NumH-numzero
             strfmt = '(4X,"NumH = ",A)'
