@@ -42,16 +42,20 @@ bas_wj: ./bas_wj.for
 bas_x: ./bas_x.for
 		$(FC) $(FFLAGS) $(INCLUDE) $(INCLUDE_CI) -o bas_x ./bas_x.for
 
-allcore-ci: ./allcore-ci.f
+PARS_ALL    = ./include/all.par ./include/global.par
+PARS_ALLVW  = $(PARS_ALL) ./include/allvw.par
+PARS_SECOND = $(PARS_ALL) ./include/second.par
+
+allcore-ci: ./allcore-ci.f $(PARS_ALLVW)
 		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o allcore-ci ./allcore-ci.f
 
-sdvw-ci: ./sdvw-ci.f
+sdvw-ci: ./sdvw-ci.f $(PARS_ALLVW)
 		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o sdvw-ci ./sdvw-ci.f
 
-valsd-ci: ./valsd-ci.f
+valsd-ci: ./valsd-ci.f $(PARS_ALLVW)
 		$(FC) $(FFLAGS) $(INCLUDE) -mcmodel=large -o valsd-ci ./valsd-ci.f
 
-second-ci: ./second-ci.f
+second-ci: ./second-ci.f $(PARS_SECOND)
 		$(FC) $(FFLAGS) $(INCLUDE) $(INCLUDE_CI) -mcmodel=large -o second-ci ./second-ci.f
 
 install: all
