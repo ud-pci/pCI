@@ -92,6 +92,7 @@ Contains
         Implicit None
         Character(Len=4), Intent(In) :: str_key
         Character(Len=4) :: key_upper
+        Logical :: tm_open
 
         key_upper = ToUpperString(str_key)
         Select Case(Kl1)
@@ -118,27 +119,43 @@ Contains
                 Case('E1')
                     Keys%E1_L = 1
                     Keys%E1_V = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('E1.RES',0,100,1)
                 Case('E1_L')
                     Keys%E1_L = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('E1_L.RES',0,100,1)
                 Case('E1_V')
                     Keys%E1_V = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('E1_V.RES',0,100,1)
                 Case('E2')
                     Keys%E2 = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('E2.RES',0,101,1)
                 Case('E3')
                     Keys%E3 = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('E3.RES',0,102,1)
                 Case('M1')
                     Keys%M1 = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('M1.RES',0,103,1)
                 Case('M2')
                     Keys%M2 = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('M2.RES',0,104,1)
                 Case('M3')
                     Keys%M3 = 1
+                    Inquire(unit=200, opened=tm_open)
+                    If (.not. tm_open) Call OpenFS('tm.csv', 0, 200, 1)
                     Call OpenFS('M3.RES',0,105,1)
                 Case('EDM')
                     Keys%EDM = 1
@@ -163,29 +180,15 @@ Contains
     Subroutine CloseKeys
         Implicit None
         
-        If (Keys%E1_L == 1 .or. Keys%E1_V == 1) Then
-            Close(100)
-        End If
+        If (Keys%E1_L == 1 .or. Keys%E1_V == 1) Close(100)
+        If (Keys%E2 == 1) Close(101)
+        If (Keys%E3 == 1) Close(102)
+        If (Keys%M1 == 1) Close(103)
+        If (Keys%M2 == 1) Close(104)
+        If (Keys%M3 == 1) Close(105)
 
-        If (Keys%E2 == 1) Then
-            Close(101)
-        End If
-
-        If (Keys%E3 == 1) Then
-            Close(102)
-        End If
-
-        If (Keys%M1 == 1) Then
-            Close(103)
-        End If
-
-        If (Keys%M2 == 1) Then
-            Close(104)
-        End If
-
-        If (Keys%M3 == 1) Then
-            Close(105)
-        End If
+        If (Keys%E1_L==1 .or. Keys%E1_V==1 .or. Keys%E2==1 .or. &
+            Keys%E3==1 .or. Keys%M1==1 .or. Keys%M2==1 .or. Keys%M3==1) Close(200)
 
         If (Keys%EDM == 1) Then
             Close(108)
@@ -346,18 +349,18 @@ Contains
 
         Select Case(Kl1)
             Case(1) ! regime of Density matrix & expectation values
-                strfmt = '(/4X,"Program pdtm v4.3: Density matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.4: Density matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('DM.RES',0,11,1)
                 Iprt=+1      !### parity of the transition
             Case(2) ! regime of Transition matrix & amplitudes
-                strfmt = '(/4X,"Program pdtm v4.3: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.4: Transition matrices",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2)? ",I1)'
                 Call OpenFS('TM.RES',0,11,1)
             Case(3) ! regime to construct DTM.INT
-                strfmt = '(/4X,"Program pdtm v4.3: Init - Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
+                strfmt = '(/4X,"Program pdtm v4.4: Init - Forming DTM.INT",/4X,"Cutoff parameter :",E8.1, &
                     /4X,"Full RES file - ",A3,/4X,"DM0.RES file - ",A3, &
                     /4X,"Do you want DM (1) OR TM (2) OR FORM DTM.INT (3)? ",I1)'
                 Call OpenFS('DTM.RES',0,11,1)
@@ -1682,6 +1685,7 @@ Contains
         ! This subroutine forms reduced transition matrices from Ro
         Use wigner
         Use amp_ops
+        Use utils, Only : CsvReal, CsvSci
         Implicit None
         Integer :: k, kmax, no, i, imin1, imax1, lf, n1, n2, k1, k2, nspaces1, nspaces2, &
                    nspaces01, nspaces02, lk, jk, ik2, ik1, imin, imax, l, ml, il, &
@@ -1946,6 +1950,26 @@ Contains
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                     Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1, AE1V, &
                                     -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_L', &
+                    Trim(CsvReal(AE1, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
+                If (e2 > e1) Then
+                    Write(200,'(I0,",",I0,11(",",A))') &
+                        n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                        Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
+                        Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                        Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), &
+                        Trim(CsvSci((2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1V**2, 4))
+                Else
+                    Write(200,'(I0,",",I0,11(",",A))') &
+                        n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                        Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
+                        Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                        Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), &
+                        Trim(CsvSci((2.02613e18/((2*tj2+1)*(wl*10)**3))*AE1V**2, 4))
+                End If
             End If
         ! Print table for E1_L
         Else If (Keys%E1_L == 1) Then
@@ -1961,6 +1985,11 @@ Contains
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                     Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1, &
                                     -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_L', &
+                    Trim(CsvReal(AE1, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         ! Print table for E1_V
         Else If (Keys%E1_V == 1) Then
@@ -1976,6 +2005,11 @@ Contains
                 Write(100,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                     Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE1V, &
                                     -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
+                    Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for E2
@@ -1992,6 +2026,11 @@ Contains
                 Write(101,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE2, -e1, -e2, -delEcm, &
                                 wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E2', &
+                    Trim(CsvReal(AE2, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for E3
@@ -2008,6 +2047,11 @@ Contains
                 Write(102,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                     Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AE3, &
                                     -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E3', &
+                    Trim(CsvReal(AE3, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for M1
@@ -2023,6 +2067,11 @@ Contains
                 End If
                 Write(103,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), G, -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M1', &
+                    Trim(CsvReal(G, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for M2
@@ -2039,6 +2088,11 @@ Contains
                 Write(104,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                     Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM2, &
                                     -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M2', &
+                    Trim(CsvReal(AM2, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for M3
@@ -2054,6 +2108,11 @@ Contains
                 End If
                 Write(105,strfmt) n1, n2, Trim(AdjustL(strc1(k1))) // strsp(1:nspaces1), AdjustR(strt1(k1)), &
                                 Trim(AdjustL(strc2(k2))) // strsp(1:nspaces2), AdjustR(strt2(k2)), AM3, -e1, -e2, -delEcm, wl, tr
+                Write(200,'(I0,",",I0,11(",",A))') &
+                    n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
+                    Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M3', &
+                    Trim(CsvReal(AM3, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
         ! Print table for EDM
@@ -2224,7 +2283,12 @@ Contains
             If (Keys%B_hf == 1) Write(107,'(A)') ' n  J1       M1      B_hfs (MHz)            E_n (a.u.)'
         End If
 
-    End Subroutine
+        ! CSV header
+        If (Keys%E1_L==1 .or. Keys%E1_V==1 .or. Keys%E2==1 .or. Keys%E3==1 .or. Keys%M1==1 .or. Keys%M2==1 .or. Keys%M3==1) &
+            Write(200,'(A)') 'n1,n2,state_one_configuration,state_one_term,state_two_configuration,' // &
+                'state_two_term,operator,matrix_element_value,state_one_energy_au,state_two_energy_au,' // &
+                'transition_energy_cm,wavelength_nm,transition_rate'
+    End Subroutine WriteHeaders
 
     Subroutine RdcDM (ntrm,k1,Etrm,Tj1,imin,imax,lf)
         ! This subroutine forms reduced density matrices from Ro

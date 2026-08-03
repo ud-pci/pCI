@@ -7,7 +7,8 @@ Module utils
 
     Private
 
-    Public :: CountSubstr, DetermineRecordLength, CheckRecordLength, ToUpperString, WriteSkeleton
+    Public :: CountSubstr, DetermineRecordLength, CheckRecordLength, ToUpperString, WriteSkeleton, &
+              CsvReal, CsvSci
 
 Contains
 
@@ -85,13 +86,34 @@ Contains
         End Do
     End Function ToUpperString
 
+    Function CsvReal(x, d) Result(s)
+        Implicit None
+        Real(dp), Intent(In) :: x
+        Integer, Intent(In) :: d
+        Character(Len=30) :: s, tmp
+        Character(Len=12) :: fmt
+        Write(fmt, '("(F28.",I0,")")') d
+        Write(tmp, fmt) x
+        s = Trim(AdjustL(tmp))
+    End Function CsvReal
+
+    Function CsvSci(x, d) Result(s)
+        Implicit None
+        Real(dp), Intent(In) :: x
+        Integer, Intent(In) :: d
+        Character(Len=30) :: s, tmp
+        Character(Len=12) :: fmt
+        Write(fmt, '("(ES28.",I0,")")') d
+        Write(tmp, fmt) x
+        s = Trim(AdjustL(tmp))
+    End Function CsvSci
+
     Subroutine WriteSkeleton(filename, lines)
         ! Write a skeleton key=value input file when the file is not found,
         ! then stop so the user can fill it in and rerun.
         Character(Len=*), Intent(In) :: filename
         Character(Len=*), Intent(In) :: lines(:)
         Integer :: i, u
-        
         Open(newunit=u, file=filename, status='REPLACE')
         Do i = 1, Size(lines)
             Write(u, '(A)') Trim(lines(i))
