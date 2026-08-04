@@ -8,7 +8,7 @@ The following software libraries and tools are required to compile pCI:
 * A Fortran compiler: GNU Fortran "gfortran" v12.2+, Intel Fortran Classic "ifort" v2020u4+, or LLVM-based Intel Fortran "ifx"
 * CMake v3.13+
 * Python v3.9+
-* LAPACK and BLAS, or Intel Math Kernel Library (MKL) *(optional — required for* ``pconf``*,* ``ine``*, and* ``pol``*)*
+* LAPACK and BLAS, or Intel Math Kernel Library (MKL) *(optional — required for* ``pconf`` *and* ``pine``*)*
 * OpenMPI v4.1+ *(optional — required only for MPI-parallel programs)*
 
 *Older versions may work but the listed versions have been tested.*
@@ -36,7 +36,7 @@ $ make install
 
 For the LLVM-based Intel compiler, replace ``FC=ifort`` with ``FC=ifx``.
 
-If LAPACK/MKL is not available, ``pconf``, ``ine``, ``pol`` will be skipped automatically.
+If LAPACK/MKL is not available, ``pconf`` and ``pine`` will be skipped automatically.
 
 If OpenMPI is not available, omit ``-DMPI_HOME`` and CMake will automatically skip the MPI-parallel programs and build only the serial programs:
 ```
@@ -118,8 +118,6 @@ $ make all-order  # builds allcore-ci, valsd-ci, sdvw-ci, second-ci, and others
 hfd
 bass
 add
-sort
-check_matrices
 ```
 
 **MPI-parallel programs** (specify number of processors with ``-n``):
@@ -128,15 +126,7 @@ mpirun -n <nprocs> pbasc
 mpirun -n <nprocs> pconf
 mpirun -n <nprocs> pdtm
 mpirun -n <nprocs> conf_pt
-mpirun -n <nprocs> conf_lsj
-mpirun -n <nprocs> formy
-```
-
-**OpenMP-parallel programs** (set number of threads before running):
-```
-export OMP_NUM_THREADS=<nthreads>
-ine
-pol
+mpirun -n <nprocs> pine
 ```
 
 ## HPC clusters

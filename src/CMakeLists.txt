@@ -16,23 +16,7 @@ target_link_libraries(bas_info PRIVATE pci_serial)
 add_executable(add add.f90)
 target_link_libraries(add PRIVATE pci_serial)
 
-add_executable(sort sort.f90)
-target_link_libraries(sort PRIVATE pci_serial)
-
-add_executable(check_matrices check_matrices.f90)
-target_link_libraries(check_matrices PRIVATE pci_serial)
-
-install(TARGETS hfd bass bas_info add sort check_matrices DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-if (LAPACK_AVAILABLE)
-    add_executable(ine ine.f90)
-    target_link_libraries(ine PRIVATE pci_serial mkl_parallel)
-
-    add_executable(pol pol.f90)
-    target_link_libraries(pol PRIVATE pci_serial mkl_parallel)
-
-    install(TARGETS ine pol DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+install(TARGETS hfd bass bas_info add DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(MPI_FOUND)
     add_library(pci_common mpi_utils.f90)
@@ -59,21 +43,17 @@ if(MPI_FOUND)
         install(TARGETS pconf DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
 
-    add_executable(conf_lsj matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 conf_lsj.f90)
-    if (LAPACK_AVAILABLE)
-        target_link_libraries(conf_lsj PUBLIC pci_common mkl_sequential)
-    else()
-        target_link_libraries(conf_lsj PUBLIC pci_common)
-    endif()
-
     add_executable(conf_pt conf_pt.f90)
     target_link_libraries(conf_pt PUBLIC pci_common)
 
     add_executable(pdtm amp_ops.f90 pdtm.f90)
     target_link_libraries(pdtm PUBLIC pci_common)
 
-    add_executable(formy formy.f90)
-    target_link_libraries(formy PUBLIC pci_common)
+    if (LAPACK_AVAILABLE)
+        add_executable(pine matrix_io.f90 vaccumulator.f90 pine.f90)
+        target_link_libraries(pine PUBLIC pci_common mkl_sequential)
+        install(TARGETS pine DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 
-    install(TARGETS pbasc conf_lsj pdtm conf_pt formy DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS pbasc pdtm conf_pt DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
