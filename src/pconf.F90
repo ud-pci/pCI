@@ -62,6 +62,7 @@ Program pconf
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
     Use matrix_io, Only : RedistributeHamCSR, RedistributeJsqCSR, WriteMatrixCSR, ReadMatrixCSR
     Use env_var
+    Use utils, Only : CsvReal
 
     Implicit None
 
@@ -313,7 +314,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '9.0'
+        version = '9.1'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -3241,6 +3242,8 @@ Contains
         Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, &
                     nconfs, cnt, nspacesterm, maxlenconfig, num_blanks, num_blanks2
         Real(dp) :: wsum, gfactor, ax_crit, j_crit
+        Character(Len=10) :: strn
+        Character(Len=30) :: str_s, str_l, str_gf
         Integer, Allocatable, Dimension(:,:) :: Wpsave
         Real(dp), Allocatable, Dimension(:)  :: C
         Real(dp), Allocatable, Dimension(:,:)  :: W, W2, Wsave
@@ -3280,7 +3283,9 @@ Contains
 
         Open(99,file='FINAL.RES',status='UNKNOWN')
         Open(98,file='LEVELS.RES',status='UNKNOWN')
+        Open(96,file='pconf.csv',status='UNKNOWN')
         If (KLSJ == 1) Open(97,file='CONFSTR.RES',status='UNKNOWN')
+        Write(96,'(A)') 'n,configuration,term,S,L,J,energy_au,energy_cm,gf,conf%,converged,conf2,conf2%'
 
         ! Form array of booleans of converged levels
         converged = .False.
@@ -3430,6 +3435,13 @@ Contains
 
             ! If L, S, J is needed
             If (KLSJ == 1) Then
+                str_s  = CsvReal(Xs(j), 3)
+                str_l  = CsvReal(Xl(j), 3)
+                If (Nint(Tj(j)) == 0) Then
+                    str_gf = ''
+                Else
+                    str_gf = CsvReal(gfactor, 5)
+                End If
                 ! Write column names if first iteration
                 If (j == 1) Then
                     Write(99, '(A)') &
@@ -3462,6 +3474,10 @@ Contains
                 End If
             ! If L, S, J is not needed
             Else
+                strterm = ''
+                str_s   = ''
+                str_l   = ''
+                str_gf  = ''
                 ! Write column names if first iteration
                 If (j == 1) Then
                     Write(99, '(A)') &
@@ -3490,7 +3506,26 @@ Contains
                     Write(99,strfmt) j, repeat(' ', num_blanks) // Trim(AdjustL(strcsave(1,j))), Tj(j), Tk(j), &
                                         (Tk(1)-Tk(j))*2*DPRy, maxval(W2(1:Nnr,j))*100, strconverged
                 End If
-            End If 
+            End If
+
+            ! Write CSV row to pconf.csv
+            Write(strn, '(I0)') j
+            If (Wsave(1,j) < 0.7) Then
+                Write(96,'(A)') Trim(strn) // ',' // Trim(AdjustL(strcsave(1,j))) // ',' // &
+                    Trim(AdjustL(strterm)) // ',' // Trim(AdjustL(str_s)) // ',' // &
+                    Trim(AdjustL(str_l)) // ',' // Trim(CsvReal(Tj(j), 3)) // ',' // &
+                    Trim(CsvReal(Tk(j), 8)) // ',' // Trim(CsvReal((Tk(1)-Tk(j))*2*DPRy, 2)) // ',' // &
+                    Trim(AdjustL(str_gf)) // ',' // Trim(CsvReal(Wsave(1,j)*100, 5)) // ',' // &
+                    Trim(AdjustL(strconverged)) // ',' // Trim(AdjustL(strcsave(2,j))) // ',' // &
+                    Trim(CsvReal(Wsave(2,j)*100, 5))
+            Else
+                Write(96,'(A)') Trim(strn) // ',' // Trim(AdjustL(strcsave(1,j))) // ',' // &
+                    Trim(AdjustL(strterm)) // ',' // Trim(AdjustL(str_s)) // ',' // &
+                    Trim(AdjustL(str_l)) // ',' // Trim(CsvReal(Tj(j), 3)) // ',' // &
+                    Trim(CsvReal(Tk(j), 8)) // ',' // Trim(CsvReal((Tk(1)-Tk(j))*2*DPRy, 2)) // ',' // &
+                    Trim(AdjustL(str_gf)) // ',' // Trim(CsvReal(Wsave(1,j)*100, 5)) // ',' // &
+                    Trim(AdjustL(strconverged)) // ',,'
+            End If
         End Do
 
         ! Write LEVELS.RES
@@ -3598,6 +3633,7 @@ Contains
         End Do
 
         If (KLSJ == 1) Close(97)
+        Close(96)
         Close(98)
         Close(99)
         If (KWeights == 1) Close(88)
