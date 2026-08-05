@@ -7,11 +7,11 @@ from fractions import Fraction
 from UDRead import *
 from parse_asd import *
 from get_atomic_term import *
-from pathlib import Path
 from subprocess import run
 from compare_res import *
 from glob import glob
 from utils import get_dict_value
+import shutil
 
 def read_yaml(filename):
     """ 
@@ -270,9 +270,6 @@ def write_new_conf_res(name, filepath, data_nist):
         th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
         gs_parity = find_parity(data_nist['Configuration'].iloc[0])
 
-    # TODO - reimplement shift by user-inputted ground state
-    
-    
     # Determine energy shift between odd and even parity lowest energy levels
     ht_to_cm = 219474.63 # hartree to cm-1
     min_energy_even = even_res[0][2]
@@ -767,46 +764,44 @@ def atom_name_to_filename(atom):
         ionization = convert_roman_to_num(suffix)
         return element + str(ionization)
 
-def find_ci_dirs(ci_path):
-    os.chdir(ci_path)
+def _j_suffix(j):
+    f = float(j)
+    i = int(f)
+    return str(i) if f == i else str(f)
+
+def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
+    if not os.path.isdir(method_dir):
+        print(method_dir + ' directory not found, skipping')
+        return
     
-    even_dirs = glob('even*')
-    odd_dirs = glob('odd*')
-    dtm_dirs = glob('tm*')
+    s0 = _j_suffix(j0)
+    s1 = _j_suffix(j1)
+    tm_suffix = ('_' + res_suffix) if res_suffix else ''
+    for parity in ('even', 'odd'):
+        src = method_dir + '/' + parity + s0 + '/pconf.csv'
+        sfx = ('_' + res_suffix) if res_suffix else ''
+        dst = data_raw_path + '/pconf_' + parity + sfx + '.csv'
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
+            print('copied ' + src + ' to ' + dst)
+        else:
+            print(src + ' not found')
+            
+    tm_dirs = [
+        'tm_even' + s0 + '_even' + s1,
+        'tm_even' + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_even' + s1,
+    ]
     
-    if even_dirs and odd_dirs:
-        use_path = input(ci_path + ' directory was found - use data from this directory? ').strip().lower() in ('yes', 'y', 'true')
-    else:
-        use_path = None
-        
-    if not use_path:
-        return None, None, None, None
-    
-    if len(even_dirs) > 1:
-        even_dir = input(str(len(even_dirs)) + ' even directories were found: (' + ', '.join(even_dirs) + ') - which one would you like to use data from? ')
-    else:
-        even_dir = even_dirs[0]
-    if len(odd_dirs) > 1:
-        odd_dir = input(str(len(odd_dirs)) + ' odd directories were found: (' + ', '.join(odd_dirs) + ') - which one would you like to use data from? ')
-    else:
-        odd_dir = odd_dirs[0]
-    if len(dtm_dirs) > 1:
-        dtm_dir1 = input(str(len(dtm_dirs)) + ' dtm directories were found: (' + ', '.join(dtm_dirs) + ') - which one would you like to use data from? ')
-        dtm_dir2 = input('Select another dtm directory if desired: ')
-        if dtm_dir2 not in dtm_dirs:
-            if dtm_dir2 != '':
-                print(dtm_dir2 + ' was not found.')
-            dtm_dir2 = None
-    elif len(dtm_dirs) == 1:
-        dtm_dir1 = dtm_dirs[0]
-        dtm_dir2 = None
-    else:
-        dtm_dir1 = None
-        dtm_dir2 = None
-        
-    os.chdir('..')
-        
-    return even_dir, odd_dir, dtm_dir1, dtm_dir2
+    for tm_label in tm_dirs:
+        src = method_dir + '/' + tm_label + '/tm.csv'
+        dst = data_raw_path + '/' + tm_label + tm_suffix + '.csv'
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
+            print('copied ' + src + ' to ' + dst)
+        else:
+            print(src + ' not found, skipping')
 
 def combine_tm(raw_path, filtered_path):
     """
@@ -936,11 +931,8 @@ if __name__ == "__main__":
         energy_cutoff = float(cutoff_value) if cutoff_value is not None else None
     else:
         atom = input('Input name of atom: ')
-        even_dir = None
-        odd_dir = None
-        tm_dir = None
-        tm_dir1 = None
-        tm_dir2 = None
+        even_J = None
+        odd_J = None
         ignore_g = True
         min_uncertainty = float(input('Enter minimum uncertainty for matrix elements (as % of value): '))
         min_energy_diff_percent = 3.0
@@ -956,48 +948,16 @@ if __name__ == "__main__":
     for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
         os.makedirs(d, exist_ok=True)
     
-    all_order_path = 'ci+all-order'
-    if os.path.isdir(all_order_path):
-        if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + all_order_path)
-        if even_dir and odd_dir:
-            if os.path.isdir(all_order_path + '/' + even_dir):
-                run('cp ci+all-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
-            if os.path.isdir(all_order_path + '/' + odd_dir):   
-                run('cp ci+all-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
-        if tm_dir1 and os.path.isdir(all_order_path + '/' + tm_dir1):   
-            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1a.RES', shell=True)
-            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1.RES', shell=True)
-        if tm_dir2 and os.path.isdir(all_order_path + '/' + tm_dir2):   
-            run('cp ci+all-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1b.RES', shell=True)
-        if even_dir and odd_dir or tm_dir1 or tm_dir2:
-            print('data from ' + all_order_path + ' moved to DATA_RAW directory')
-        os.chdir(dir_path)
+    if even_J is not None and odd_J is not None:
+        j_values = sorted(set([float(even_J), float(odd_J)]))
+        if len(j_values) >= 2:
+            j0, j1 = j_values[0], j_values[1]
+            
+            collect_portal_files('ci+all-order', j0, j1, data_raw_path)
+            collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT')
+        else:
+            print('even and odd J are the same (' + str(j_values[0]) + '); cannot determine TM directory pairs')
     
-    second_order_path = 'ci+second-order'
-    if os.path.isdir(second_order_path):
-        if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + second_order_path)
-        if even_dir and odd_dir:
-            if os.path.isdir(second_order_path + '/' + even_dir):
-                run('cp ci+second-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
-            if os.path.isdir(second_order_path + '/' + odd_dir):   
-                run('cp ci+second-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
-        if tm_dir1 and os.path.isdir(second_order_path + '/' + tm_dir1):   
-            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPTa.RES', shell=True)
-            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
-        if tm_dir2 and os.path.isdir(second_order_path + '/' + tm_dir2):   
-            run('cp ci+second-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1MBPTb.RES', shell=True)
-        if even_dir and odd_dir or tm_dir1 or tm_dir2:
-            print('data from ' + second_order_path + ' moved to DATA_RAW directory')
-        os.chdir(dir_path)
-
-    # Combine E1a/E1b and E1MBPTa/E1MBPTb files if they exist in DATA_RAW/
-    if os.path.exists(data_raw_path + '/E1a.RES') and os.path.exists(data_raw_path + '/E1b.RES'):
-        combine_tm(data_raw_path, data_processed_path)
-    else:
-        print('E1a.RES and/or E1b.RES not found in DATA_RAW/, skipping combine_tm')
-        
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
     print(url_nist)
@@ -1010,8 +970,7 @@ if __name__ == "__main__":
     else:
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
         print('Please put raw files in ' + raw_path)
-        print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1a.RES, E1b.RES, E1MBPTa.RES, E1MBPTb.RES')
-        print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_processed_path)
+        print('The files should be named: pconf_even.csv, pconf_odd.csv, pconf_even_MBPT.csv, pconf_odd_MBPT.csv')
         sys.exit()
     confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level = write_new_conf_res(name, raw_path, data_nist)
 
