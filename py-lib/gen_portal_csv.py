@@ -372,8 +372,6 @@ def convert_res_to_csv(filename, full_res, gs_exists, name):
     f.close()
     print(csvfile + ' has been written')
 
-    return
-
 def find_parity(configuration):
     '''
     This function finds parity of specified configuration
@@ -439,8 +437,6 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
     portal_df.to_csv(filename, index=False)
 
     print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
-
-    return
 
 def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level):
     '''
@@ -786,7 +782,7 @@ def find_ci_dirs(ci_path):
     dtm_dirs = glob('tm*')
     
     if even_dirs and odd_dirs:
-        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(ci_path + ' directory was found - use data from this directory? ')))))
+        use_path = input(ci_path + ' directory was found - use data from this directory? ').strip().lower() in ('yes', 'y', 'true')
     else:
         use_path = None
         
@@ -838,8 +834,7 @@ def combine_tm(raw_path, filtered_path):
     with open(raw_path + '/E1a.RES', 'r') as f:
         lines = f.readlines()
     with open(filtered_path + '/E1.RES', 'w') as f:
-        for line in lines:
-            f.write(line)
+        f.writelines(lines)
 
     for line in lines[1:]:
         matrix_element = re.findall(r'\<.*?\>', line)[0]
@@ -851,7 +846,7 @@ def combine_tm(raw_path, filtered_path):
     with open(filtered_path + '/E1.RES', 'a') as f:
         for line in lines2[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
-            if (matrix_element) not in e1_res:
+            if matrix_element not in e1_res:
                 f.write(line)
 
     # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES (if they exist)
@@ -860,8 +855,7 @@ def combine_tm(raw_path, filtered_path):
         with open(raw_path + '/E1MBPTa.RES', 'r') as f:
             lines = f.readlines()
         with open(filtered_path + '/E1MBPT.RES', 'w') as f:
-            for line in lines:
-                f.write(line)
+            f.writelines(lines)
 
         for line in lines[1:]:
             matrix_element = re.findall(r'\<.*?\>', line)[0]
@@ -873,7 +867,7 @@ def combine_tm(raw_path, filtered_path):
         with open(filtered_path + '/E1MBPT.RES', 'a') as f:
             for line in lines2[1:]:
                 matrix_element = re.findall(r'\<.*?\>', line)[0]
-                if (matrix_element) not in e1_mbpt_res:
+                if matrix_element not in e1_mbpt_res:
                     f.write(line)
         print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
     else:
@@ -881,7 +875,7 @@ def combine_tm(raw_path, filtered_path):
         print('E1MBPTa.RES and/or E1MBPTb.RES not found, skipping E1MBPT.RES creation')
 
 if __name__ == "__main__":
-    use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
+    use_config_yml = input('Using a config.yml file? ').strip().lower() in ('yes', 'y', 'true')
     
     if use_config_yml:
         config_yml = input("Input yml-file: ")
@@ -1065,11 +1059,6 @@ if __name__ == "__main__":
         else:
             num_levels_output_even += 1
     num_levels_output_odd = num_levels_theory_odd
-    #num_levels_output_odd = 0
-    #for i in range(num_levels_theory_even, num_levels_theory_even + num_levels_theory_odd):
-    #    num_levels_output_odd = i + 1 - num_levels_theory_even
-    #    if uncertainties[i] == '-':
-    #        break
         
     print('Number of even parity levels: ', num_levels_output_even)
     print('Number of odd parity levels: ', num_levels_output_odd)
@@ -1246,7 +1235,6 @@ if __name__ == "__main__":
     write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
 
     # Create a list of all possible transitions between states
-    print('even parity configurations:')
     even_confs = []
     odd_confs = []
     for line in filtered_mapping:
