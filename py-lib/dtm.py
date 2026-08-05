@@ -60,21 +60,16 @@ TM_DIR_PATHS = {
 }
 
 TM_DIR_OPERATORS = {
-    'tm_even0_odd1':  'E1, M2, E3',
-    'tm_odd0_even1':  'E1, M2, E3',
-    'tm_even0_even1': 'M1, E2, M3',
-    'tm_odd0_odd1':   'M1, E2, M3',
+    'tm_even0_odd1':  ['E1', 'M2', 'E3'],
+    'tm_odd0_even1':  ['E1', 'M2', 'E3'],
+    'tm_even0_even1': ['M1', 'E2', 'M3'],
+    'tm_odd0_odd1':   ['M1', 'E2', 'M3'],
 }
 
 
 def read_yaml(filename):
-    """ 
-    This function reads a configuration file in YAML format and returns a dictionary of config parameters
-    """ 
-
-    with open(filename,'r') as f:
+    with open(filename, 'r') as f:
         config = yaml.safe_load(f)
-
     return config
 
 def write_mbpt_inp(basis, matrix_elements):
@@ -85,21 +80,11 @@ def write_mbpt_inp(basis, matrix_elements):
             Nso += 1
         else:
             Nso += 2
-    
+
     key_dict = {
-        'A_hf': '0',
-        'B_hf': '0',
-        'E1_L': '0',
-        'EDM': '0',
-        'PNC': '0',
-        'E1_V': '0',
-        'AM': '0',
-        'MQM': '0',
-        'M1': '0',
-        'E2': '0',
-        'E3': '0',
-        'M2': '0',
-        'M3': '0'
+        'A_hf': '0', 'B_hf': '0', 'E1_L': '0', 'EDM': '0', 'PNC': '0',
+        'E1_V': '0', 'AM':  '0', 'MQM':  '0', 'M1':  '0', 'E2':  '0',
+        'E3':   '0', 'M2':  '0', 'M3':   '0',
     }
     for matrix_element in matrix_elements:
         key_dict[matrix_element] = '1'
@@ -107,7 +92,7 @@ def write_mbpt_inp(basis, matrix_elements):
             key_dict['E1_L'] = '1'
             key_dict['E1_V'] = '1'
 
-    with open('MBPT.INP','w') as f:
+    with open('MBPT.INP', 'w') as f:
         f.write('MBPT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Used by ALL MBPT programs \n')
         f.write('Nso = ' + str(Nso) + ' - CI core \n')
         f.write('Nsh = ' + str(Nso) + ' - defines SCF field (For MS calculations Nsh=Nso) \n')
@@ -145,11 +130,9 @@ def write_mbpt_inp(basis, matrix_elements):
         f.write('Kex =  1 - key for exchange (0 - skip, 1 - include) \n')
         f.write('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n')
 
-    return
-
 def write_dtm_in(mode, levels, operators):
     """ Write dtm.in """
-    with open('dtm.in','w') as f:
+    with open('dtm.in', 'w') as f:
         f.write('Mode = ' + mode + '\n')
         if levels:
             f.write('Levels = ' + levels + '\n')
@@ -174,58 +157,60 @@ def read_nlv_from_conf(conf_path):
     conf_file = os.path.join(conf_path, 'CONF.INP')
     if not os.path.isfile(conf_file):
         return None
-    
     try:
         with open(conf_file, 'r') as f:
             for line in f:
                 if 'Nlv=' in line:
-                    # Extract number after 'Nlv='
                     nlv_str = line.split('Nlv=')[1].strip().split()[0]
                     return int(nlv_str)
     except (IOError, ValueError, IndexError):
         return None
-    
     return None
 
+def copy_ci_files(src, dtm_dir, conf_prefix='CONF'):
+    """Copy the standard set of CI files from src into dtm_dir."""
+    for fname in ['CONF.INP', 'CONF.DET', 'CONF.XIJ', 'CONFSTR.RES', 'CONF.DAT', 'CONF.INT']:
+        dest = fname.replace('CONF', conf_prefix, 1)
+        run_shell('cp ' + src + '/' + fname + ' ' + dtm_dir + '/' + dest)
+
 if __name__ == "__main__":
-    # Read yaml file for system configurations
     yml_file = input("Input yml-file: ")
     config = read_yaml(yml_file)
-    
+
     atom = get_dict_value(config, 'atom')
     code_method = get_dict_value(atom, 'code_method')
     if not isinstance(code_method, list): code_method = [code_method]
-    
+
     system = get_dict_value(config, 'system')
     pci_version = get_dict_value(system, 'pci_version')
     on_hpc = get_dict_value(system, 'on_hpc')
     bin_dir = get_dict_value(system, 'bin_directory')
     run_codes = get_dict_value(system, 'run_codes')
     for_portal = get_dict_value(system, 'for_portal')
-    
+
     # hpc parameters
     on_slurm = check_slurm_installed()
     if on_hpc and on_slurm:
         hpc = get_dict_value(config, 'hpc')
-        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
+            submit_job = get_dict_value(hpc, 'submit_job')
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
         else:
             print('hpc block was not found in', yml_file)
+            submit_job = False
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
         submit_job = False
-    
+
     basis = get_dict_value(config, 'basis')
     conf = get_dict_value(config, 'conf')
-    
+
     if for_portal:
         print('Portal mode enabled for DTM')
     else:
-        # Regular mode: use config J values
         odd_J = get_dict_value(conf['odd'], 'J')
         even_J = get_dict_value(conf['even'], 'J')
         conf_odd_path = 'odd' + str(odd_J)[0]
@@ -233,17 +218,16 @@ if __name__ == "__main__":
 
     dtm = get_dict_value(config, 'dtm')
     include_rpa = get_dict_value(dtm, 'include_rpa')
-    
-    # Create an array of directories for dtm
+
+    # Create list of dtm directories
     dtm_dirs = []
-    
+
     # DM parameters
     dm = get_dict_value(dtm, 'DM')
-    dm_parity = get_dict_value(dm, 'parity')
+    dm_parity = get_dict_value(dm, 'parity') or 'both'
     dm_matrix_elements = get_dict_value(dm, 'matrix_elements')
-    if not dm_parity: dm_parity = 'both'
     dm_range = get_dict_value(dm, 'level_range')
-    include_dm = True if dm_range else False
+    include_dm = bool(dm_range)
     if include_dm:
         dm_odd = get_dict_value(dm_range, 'odd')
         dm_even = get_dict_value(dm_range, 'even')
@@ -255,7 +239,7 @@ if __name__ == "__main__":
             from_level_even = dm_even.split(' ')[0]
             to_level_even = dm_even.split(' ')[1]
             dtm_dirs.append('dm_even')
-    
+
     # TM parameters
     tm = get_dict_value(dtm, 'TM')
     tm_matrix_elements = get_dict_value(tm, 'matrix_elements')
@@ -265,35 +249,29 @@ if __name__ == "__main__":
     tm_to = get_dict_value(tm, 'to')
     tm_to_parity = get_dict_value(tm_to, 'parity')
     tm_to_range = get_dict_value(tm_to, 'level_range')
-    
+
     if for_portal:
-        dtm_dirs.extend(list(TM_DIR_PATHS.keys()))
+        dtm_dirs.extend(list(TM_DIR_PATHS))
     else:
-        # Regular mode
-        include_tm = True if tm_from_range and tm_to_range else False
+        include_tm = bool(tm_from_range and tm_to_range)
         if include_tm:
             from_level_initial = tm_from_range.split(' ')[0]
             from_level_final = tm_from_range.split(' ')[1]
             to_level_initial = tm_to_range.split(' ')[0]
             to_level_final = tm_to_range.split(' ')[1]
             dtm_dirs.append('tm')
-    
-    # list of keys for dtm operators
+
     dm_key_list = gen_key_list(dm_matrix_elements)
     tm_key_list = gen_key_list(tm_matrix_elements)
 
-    # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
-    
+
     dir_path = os.getcwd()
     for method in code_method:
-        if len(code_method) > 1:
-            full_path = dir_path+'/'+method
-        else:
-            full_path = dir_path
+        full_path = dir_path + '/' + method if len(code_method) > 1 else dir_path
         os.chdir(full_path)
-        
+
         if for_portal:
             current_dir = os.getcwd()
             all_ci_dirs = set(p for pair in TM_DIR_PATHS.values() for p in pair)
@@ -304,23 +282,26 @@ if __name__ == "__main__":
             if not all_ci_dirs_exist:
                 missing = [d for d, ok in dir_exists.items() if not ok]
                 print('Portal mode in ' + current_dir + ': missing CI directories: ' + ', '.join(missing))
+                sys.exit()
         else:
-            # Regular mode
             even_exists, odd_exists = False, False
-            if tm_from_parity == 'even' or tm_to_parity == 'even' or dm_parity == 'even' or dm_parity == 'both':
+            if tm_from_parity == 'even' or tm_to_parity == 'even' or dm_parity in ('even', 'both'):
                 if os.path.isfile(conf_even_path + '/CONF.RES') or os.path.isfile(conf_even_path + '/CONFFINAL.RES'):
-                        even_exists = True
-            if tm_from_parity == 'odd' or tm_to_parity == 'odd' or dm_parity == 'odd' or dm_parity == 'both':
+                    even_exists = True
+            if tm_from_parity == 'odd' or tm_to_parity == 'odd' or dm_parity in ('odd', 'both'):
                 if os.path.isfile(conf_odd_path + '/CONF.RES') or os.path.isfile(conf_odd_path + '/CONFFINAL.RES'):
-                        odd_exists = True
-        
-        # Create dtm directories with dtm input and job script
+                    odd_exists = True
+            if not even_exists and not odd_exists:
+                print('ci directories could not be found')
+                sys.exit()
+
+        # Create dtm directories with input files and job scripts
         for dtm_dir in dtm_dirs:
-            Path(full_path+'/'+dtm_dir).mkdir(parents=True, exist_ok=True)
+            Path(full_path + '/' + dtm_dir).mkdir(parents=True, exist_ok=True)
             if include_rpa:
-                write_dtm_in('Init','','')
+                write_dtm_in('Init', '', '')
                 if 'tm' in dtm_dir:
-                    ops = gen_key_list(TM_DIR_OPERATORS[dtm_dir]) if dtm_dir in TM_DIR_OPERATORS else tm_key_list
+                    ops = TM_DIR_OPERATORS[dtm_dir] if dtm_dir in TM_DIR_OPERATORS else tm_key_list
                     write_mbpt_inp(basis, ops)
                 elif 'dm' in dtm_dir:
                     write_mbpt_inp(basis, dm_key_list)
@@ -330,9 +311,7 @@ if __name__ == "__main__":
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                 run_shell('cp rpa.in ' + dtm_dir + '/rpa.in')
-                
-                if on_hpc:
-                    script_name = write_job_script('.','dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                script_name = write_job_script('.', 'dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir) if on_hpc else None
                 if script_name:
                     run_shell('cp dtm_rpa.qs ' + dtm_dir + '/dtm_rpa.qs')
             else:
@@ -341,103 +320,68 @@ if __name__ == "__main__":
                     write_dtm_in('TM', levels, ', '.join(tm_key_list))
                 elif dtm_dir in TM_DIR_PATHS:
                     from_key, to_key = TM_DIR_PATHS[dtm_dir]
-                    current_dir = os.getcwd()
-                    from_nlv = read_nlv_from_conf(os.path.join(current_dir, from_key))
-                    to_nlv = read_nlv_from_conf(os.path.join(current_dir, to_key))
+                    from_nlv = read_nlv_from_conf(os.path.join(full_path, from_key))
+                    to_nlv = read_nlv_from_conf(os.path.join(full_path, to_key))
                     if from_nlv and to_nlv:
                         levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
-                        write_dtm_in('TM', levels, TM_DIR_OPERATORS[dtm_dir])
+                        write_dtm_in('TM', levels, ', '.join(TM_DIR_OPERATORS[dtm_dir]))
                         print(dtm_dir + ': using levels 1-' + str(from_nlv) + ' (' + from_key + ') -> 1-' + str(to_nlv) + ' (' + to_key + ')')
                 elif dtm_dir == 'dm_even':
                     write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
-                elif dtm_dir =='dm_odd':
-                    write_dtm_in('DM', from_level_odd + ' ' + from_level_odd, ', '.join(dm_key_list))
-                if on_hpc:
-                    script_name = write_job_script('.','dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                elif dtm_dir == 'dm_odd':
+                    write_dtm_in('DM', from_level_odd + ' ' + to_level_odd, ', '.join(dm_key_list))
+                run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
+                script_name = write_job_script('.', 'dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir) if on_hpc else None
                 if script_name:
                     run_shell('cp dtm.qs ' + dtm_dir + '/dtm.qs')
-            run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
 
-            if for_portal:
-                if not all_ci_dirs_exist:
-                    print('Portal mode: required CI directories could not be found')
-                    sys.exit()
-            else:
-                if not even_exists and not odd_exists:
-                    print('ci directories could not be found')
-                    sys.exit()
-            
-            # Copy CI files to dtm directories
+            # Copy CI files to dtm directory
             if dtm_dir == 'tm':
-                if tm_from_parity == 'even': 
-                    from_path = conf_even_path
-                elif tm_from_parity == 'odd':
-                    from_path = conf_odd_path
-                run_shell('cp ' + from_path  + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                run_shell('cp ' + from_path  + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                run_shell('cp ' + from_path  + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                run_shell('cp ' + from_path  + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                run_shell('cp ' + from_path  + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                run_shell('cp ' + from_path  + '/CONF.INT ' + dtm_dir + '/CONF.INT')
-
-                if tm_to_parity == 'even': 
-                    to_path = conf_even_path
-                elif tm_to_parity == 'odd':
-                    to_path = conf_odd_path
-                run_shell('cp ' + to_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
-                run_shell('cp ' + to_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
-                run_shell('cp ' + to_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                from_path = conf_even_path if tm_from_parity == 'even' else conf_odd_path
+                to_path   = conf_even_path if tm_to_parity   == 'even' else conf_odd_path
+                copy_ci_files(from_path, dtm_dir, 'CONF')
+                run_shell('cp ' + to_path + '/CONF.INP '    + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + to_path + '/CONF.DET '    + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + to_path + '/CONF.XIJ '    + dtm_dir + '/CONF1.XIJ')
                 run_shell('cp ' + to_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
             elif dtm_dir in TM_DIR_PATHS:
                 from_key, to_key = TM_DIR_PATHS[dtm_dir]
-                for fname in ['CONF.INP', 'CONF.DET', 'CONF.XIJ', 'CONFSTR.RES', 'CONF.DAT', 'CONF.INT']:
-                    run_shell('cp ' + from_key + '/' + fname + ' ' + dtm_dir + '/' + fname)
-                run_shell('cp ' + to_key + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
-                run_shell('cp ' + to_key + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
-                run_shell('cp ' + to_key + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                copy_ci_files(from_key, dtm_dir, 'CONF')
+                run_shell('cp ' + to_key + '/CONF.INP '    + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + to_key + '/CONF.DET '    + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + to_key + '/CONF.XIJ '    + dtm_dir + '/CONF1.XIJ')
                 run_shell('cp ' + to_key + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
             elif dtm_dir == 'dm_even':
-                run_shell('cp ' + conf_even_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                run_shell('cp ' + conf_even_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                run_shell('cp ' + conf_even_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                run_shell('cp ' + conf_even_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                run_shell('cp ' + conf_even_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                run_shell('cp ' + conf_even_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
+                copy_ci_files(conf_even_path, dtm_dir, 'CONF')
             elif dtm_dir == 'dm_odd':
-                run_shell('cp ' + conf_odd_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                run_shell('cp ' + conf_odd_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                run_shell('cp ' + conf_odd_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                run_shell('cp ' + conf_odd_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                run_shell('cp ' + conf_odd_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                run_shell('cp ' + conf_odd_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
-        
-        # cd into new dtm directories and submit job scripts if run_codes
+                copy_ci_files(conf_odd_path, dtm_dir, 'CONF')
+
+        # Submit job scripts
         if run_codes:
             for dtm_dir in dtm_dirs:
-                dtm_path = full_path+'/'+dtm_dir
+                dtm_path = full_path + '/' + dtm_dir
                 os.chdir(dtm_path)
                 if include_rpa:
-                    if on_hpc: 
+                    if on_hpc:
                         run_shell('mpirun -n 1 ' + bin_dir + 'pdtm > dtm0.out')
                         if dtm_dir == 'tm':
                             levels = from_level_initial + ' ' + from_level_final + ', ' + to_level_initial + ' ' + to_level_final
                             write_dtm_in('TM', levels, ', '.join(tm_key_list))
                         elif dtm_dir in TM_DIR_PATHS:
                             from_key, to_key = TM_DIR_PATHS[dtm_dir]
-                            current_dir_rpa = os.getcwd()
-                            from_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', from_key))
-                            to_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', to_key))
+                            from_nlv = read_nlv_from_conf(os.path.join(full_path, from_key))
+                            to_nlv = read_nlv_from_conf(os.path.join(full_path, to_key))
                             if from_nlv and to_nlv:
                                 levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
-                                write_dtm_in('TM', levels, TM_DIR_OPERATORS[dtm_dir])
+                                write_dtm_in('TM', levels, ', '.join(TM_DIR_OPERATORS[dtm_dir]))
                         elif dtm_dir == 'dm_even':
                             write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
-                        elif dtm_dir =='dm_odd':
-                            write_dtm_in('DM', from_level_odd + ' ' + from_level_odd, ', '.join(dm_key_list))
+                        elif dtm_dir == 'dm_odd':
+                            write_dtm_in('DM', from_level_odd + ' ' + to_level_odd, ', '.join(dm_key_list))
                         if submit_job:
                             run_shell('sbatch dtm_rpa.qs')
-                else:    
+                else:
                     if submit_job:
                         run_shell('sbatch dtm.qs')
-                os.chdir('..')
-            os.chdir('..')
+                os.chdir(full_path)
+            os.chdir(dir_path)
