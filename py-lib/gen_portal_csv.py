@@ -356,8 +356,11 @@ def convert_res_to_csv(filename, full_res, gs_exists, name):
 
     if 'odd' in filename:
         parity = 'Odd'
-    if 'even' in filename:
+    elif 'even' in filename:
         parity = 'Even'
+    else:
+        print('ERROR: cannot determine parity from filename: ' + filename)
+        sys.exit()
     csvfile = "DATA_Filtered/UD/"+name+'_UD_' + parity + '.csv'
 
     os.makedirs(os.path.dirname(csvfile), exist_ok=True)
