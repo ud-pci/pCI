@@ -67,7 +67,7 @@ def reorder_levels(confs1, terms1, confs2, terms2, energies_au2, energies_cm2):
 
     return confs1, terms1, energies_au2, energies_cm2
 
-def create_mapping(num_levels_even, num_levels_odd):
+def create_mapping(name, num_levels_even, num_levels_odd):
     '''
     This function reads Vipul's energy level table and creates the mapping between experimental and theory data
     Data to map: Config, Term, J, Energy(cm-1)
@@ -96,7 +96,7 @@ def create_mapping(num_levels_even, num_levels_odd):
         theory_term = line.split()[8]
         try:
             theory_J = str(Fraction(line.split()[9]))
-        except:
+        except ValueError:
             theory_J = line.split()[9]
         theory_energy_cm = line.split()[10]
         theory_uncertainty = line.split()[11]
@@ -105,8 +105,7 @@ def create_mapping(num_levels_even, num_levels_odd):
         try:
             # Extract energy difference percentage (last column, remove '%' sign)
             energy_diff_pct = float(line.split()[14].rstrip('%'))
-        except:
-            # If parsing fails, set to 0 (perfect match)
+        except (ValueError, IndexError):
             energy_diff_pct = 0.0
 
         # select relevant data for portal database
@@ -961,9 +960,6 @@ if __name__ == "__main__":
         energy_cutoff = None
     name = atom_name_to_filename(atom)
     
-    ri = False # 
-    fac = 2 # maximum energy difference (in percent) for comparison
-    
     # Find input files from directories if they exist and put into DATA_RAW directory
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
@@ -1124,7 +1120,7 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_odd_missing, path)
     
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
-    mapping = create_mapping(num_levels_output_even, num_levels_output_odd)
+    mapping = create_mapping(name, num_levels_output_even, num_levels_output_odd)
     
     # Filter mapping: keep all levels within energy cutoff
     # Apply separately to even and odd parity since they're ordered independently
@@ -1280,31 +1276,10 @@ if __name__ == "__main__":
         else:
             raise ValueError(f'Configuration {configuration} is not valid.')
 
-    possible_E1 = []
-    for conf_odd in odd_confs:
-        try:
-            float(conf_odd[2])
-            J_odd = int(conf_odd[2])
-        except ValueError:
-            J_odd = int(conf_odd[1])
-        for conf_even in even_confs:
-            try:
-                float(conf_even[2])
-                J_even = int(conf_even[2])
-            except ValueError:
-                J_even = int(conf_even[1])
-            if J_even == 0 and J_odd == 0: continue
-            if abs(J_even - J_odd) <= 1:
-                possible_E1.append([conf_odd, conf_even])
-    num_possible_E1 = len(possible_E1)
-    print('Number of possible E1: ', len(possible_E1))
-
     unmatched_matrix = []
     if matrix_file_exists:
         print('Writing matrix elements...')
         num_E1, unmatched_matrix = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
-        coverage = round(num_E1/num_possible_E1*100, 2)
-        print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
 
