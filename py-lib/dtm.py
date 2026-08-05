@@ -52,6 +52,14 @@ from utils import run_shell, get_dict_value, check_slurm_installed
 from gen_job_script import write_job_script
 
 
+TM_DIR_PATHS = {
+    'tm_even0_odd1':  ('even0', 'odd1'),
+    'tm_odd0_even1':  ('odd0', 'even1'),
+    'tm_even0_even1': ('even0', 'even1'),
+    'tm_odd0_odd1':   ('odd0', 'odd1'),
+}
+
+
 def read_yaml(filename):
     """ 
     This function reads a configuration file in YAML format and returns a dictionary of config parameters
@@ -208,13 +216,7 @@ if __name__ == "__main__":
     conf = get_dict_value(config, 'conf')
     
     if for_portal:
-        # Portal mode: use specific J values for transitions
-        # even0 -> odd1 and odd0 -> even1
-        conf_even0_path = 'even0'
-        conf_even1_path = 'even1'
-        conf_odd0_path = 'odd0'
-        conf_odd1_path = 'odd1'
-        print("Portal mode enabled for DTM - using even0->odd1 and odd0->even1 transitions")
+        print('Portal mode enabled for DTM')
     else:
         # Regular mode: use config J values
         odd_J = get_dict_value(conf['odd'], 'J')
@@ -258,10 +260,7 @@ if __name__ == "__main__":
     tm_to_range = get_dict_value(tm_to, 'level_range')
     
     if for_portal:
-        # Portal mode: create directories for both transitions
-        include_tm = True if tm_matrix_elements else False  # Only need matrix elements defined
-        if include_tm:
-            dtm_dirs.extend(['tm_even0_odd1', 'tm_odd0_even1'])  # Two transition directories
+        dtm_dirs.extend(list(TM_DIR_PATHS.keys()))
     else:
         # Regular mode
         include_tm = True if tm_from_range and tm_to_range else False
@@ -290,14 +289,14 @@ if __name__ == "__main__":
         
         if for_portal:
             current_dir = os.getcwd()
-            even0_exists = os.path.isfile(os.path.join(current_dir, conf_even0_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_even0_path, 'CONFFINAL.RES'))
-            even1_exists = os.path.isfile(os.path.join(current_dir, conf_even1_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_even1_path, 'CONFFINAL.RES'))
-            odd0_exists = os.path.isfile(os.path.join(current_dir, conf_odd0_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_odd0_path, 'CONFFINAL.RES'))
-            odd1_exists = os.path.isfile(os.path.join(current_dir, conf_odd1_path, 'CONF.RES')) or os.path.isfile(os.path.join(current_dir, conf_odd1_path, 'CONFFINAL.RES'))
-            
-            portal_exists = even0_exists and even1_exists and odd0_exists and odd1_exists
-            if not portal_exists:
-                print(f'Portal mode in {current_dir}: requires all CI directories: even0({even0_exists}), even1({even1_exists}), odd0({odd0_exists}), odd1({odd1_exists})')
+            all_ci_dirs = set(p for pair in TM_DIR_PATHS.values() for p in pair)
+            dir_exists = {d: os.path.isfile(os.path.join(current_dir, d, 'CONF.RES')) or
+                             os.path.isfile(os.path.join(current_dir, d, 'CONFFINAL.RES'))
+                          for d in all_ci_dirs}
+            all_ci_dirs_exist = all(dir_exists.values())
+            if not all_ci_dirs_exist:
+                missing = [d for d, ok in dir_exists.items() if not ok]
+                print('Portal mode in ' + current_dir + ': missing CI directories: ' + ', '.join(missing))
         else:
             # Regular mode
             even_exists, odd_exists = False, False
@@ -332,26 +331,15 @@ if __name__ == "__main__":
                 if dtm_dir == 'tm':
                     levels = from_level_initial + ' ' + from_level_final + ', ' + to_level_initial + ' ' + to_level_final
                     write_dtm_in('TM', levels, ', '.join(tm_key_list))
-                elif dtm_dir == 'tm_even0_odd1':
-                    # Portal mode: even0 -> odd1 transition
-                    # Read Nlv from even0 and odd1 CONF.INP files within current method directory
+                elif dtm_dir in TM_DIR_PATHS:
+                    from_key, to_key = TM_DIR_PATHS[dtm_dir]
                     current_dir = os.getcwd()
-                    even0_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_even0_path))
-                    odd1_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_odd1_path))
-                    if even0_nlv and odd1_nlv:
-                        levels = f'1 {even0_nlv}, 1 {odd1_nlv}'
+                    from_nlv = read_nlv_from_conf(os.path.join(current_dir, from_key))
+                    to_nlv = read_nlv_from_conf(os.path.join(current_dir, to_key))
+                    if from_nlv and to_nlv:
+                        levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
                         write_dtm_in('TM', levels, ', '.join(tm_key_list))
-                        print(f'tm_even0_odd1: using levels 1-{even0_nlv} (even0) -> 1-{odd1_nlv} (odd1)')
-                elif dtm_dir == 'tm_odd0_even1':
-                    # Portal mode: odd0 -> even1 transition
-                    # Read Nlv from odd0 and even1 CONF.INP files within current method directory
-                    current_dir = os.getcwd()
-                    odd0_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_odd0_path))
-                    even1_nlv = read_nlv_from_conf(os.path.join(current_dir, conf_even1_path))
-                    if odd0_nlv and even1_nlv:
-                        levels = f'1 {odd0_nlv}, 1 {even1_nlv}'
-                        write_dtm_in('TM', levels, ', '.join(tm_key_list))
-                        print(f'tm_odd0_even1: using levels 1-{odd0_nlv} (odd0) -> 1-{even1_nlv} (even1)')
+                        print(dtm_dir + ': using levels 1-' + str(from_nlv) + ' (' + from_key + ') -> 1-' + str(to_nlv) + ' (' + to_key + ')')
                 elif dtm_dir == 'dm_even':
                     write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
                 elif dtm_dir =='dm_odd':
@@ -363,7 +351,7 @@ if __name__ == "__main__":
             run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
 
             if for_portal:
-                if not portal_exists:
+                if not all_ci_dirs_exist:
                     print('Portal mode: required CI directories could not be found')
                     sys.exit()
             else:
@@ -392,32 +380,14 @@ if __name__ == "__main__":
                 run_shell('cp ' + to_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
                 run_shell('cp ' + to_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
                 run_shell('cp ' + to_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
-            elif dtm_dir == 'tm_even0_odd1':
-                # Portal mode: even0 -> odd1 transition - copy files from current method directory
-                run_shell('cp ' + conf_even0_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                run_shell('cp ' + conf_even0_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                run_shell('cp ' + conf_even0_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                run_shell('cp ' + conf_even0_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                run_shell('cp ' + conf_even0_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                run_shell('cp ' + conf_even0_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
-                # Copy odd1 files as CONF1.*
-                run_shell('cp ' + conf_odd1_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
-                run_shell('cp ' + conf_odd1_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
-                run_shell('cp ' + conf_odd1_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
-                run_shell('cp ' + conf_odd1_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
-            elif dtm_dir == 'tm_odd0_even1':
-                # Portal mode: odd0 -> even1 transition - copy files from current method directory
-                run_shell('cp ' + conf_odd0_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
-                run_shell('cp ' + conf_odd0_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
-                run_shell('cp ' + conf_odd0_path + '/CONF.XIJ ' + dtm_dir + '/CONF.XIJ')
-                run_shell('cp ' + conf_odd0_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR.RES')
-                run_shell('cp ' + conf_odd0_path + '/CONF.DAT ' + dtm_dir + '/CONF.DAT')
-                run_shell('cp ' + conf_odd0_path + '/CONF.INT ' + dtm_dir + '/CONF.INT')
-                # Copy even1 files as CONF1.*
-                run_shell('cp ' + conf_even1_path + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
-                run_shell('cp ' + conf_even1_path + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
-                run_shell('cp ' + conf_even1_path + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
-                run_shell('cp ' + conf_even1_path + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
+            elif dtm_dir in TM_DIR_PATHS:
+                from_key, to_key = TM_DIR_PATHS[dtm_dir]
+                for fname in ['CONF.INP', 'CONF.DET', 'CONF.XIJ', 'CONFSTR.RES', 'CONF.DAT', 'CONF.INT']:
+                    run_shell('cp ' + from_key + '/' + fname + ' ' + dtm_dir + '/' + fname)
+                run_shell('cp ' + to_key + '/CONF.INP ' + dtm_dir + '/CONF1.INP')
+                run_shell('cp ' + to_key + '/CONF.DET ' + dtm_dir + '/CONF1.DET')
+                run_shell('cp ' + to_key + '/CONF.XIJ ' + dtm_dir + '/CONF1.XIJ')
+                run_shell('cp ' + to_key + '/CONFSTR.RES ' + dtm_dir + '/CONFSTR1.RES')
             elif dtm_dir == 'dm_even':
                 run_shell('cp ' + conf_even_path + '/CONF.INP ' + dtm_dir + '/CONF.INP')
                 run_shell('cp ' + conf_even_path + '/CONF.DET ' + dtm_dir + '/CONF.DET')
@@ -444,21 +414,13 @@ if __name__ == "__main__":
                         if dtm_dir == 'tm':
                             levels = from_level_initial + ' ' + from_level_final + ', ' + to_level_initial + ' ' + to_level_final
                             write_dtm_in('TM', levels, ', '.join(tm_key_list))
-                        elif dtm_dir == 'tm_even0_odd1':
-                            # Portal mode: even0 -> odd1 transition - re-read Nlv values from current method directory
+                        elif dtm_dir in TM_DIR_PATHS:
+                            from_key, to_key = TM_DIR_PATHS[dtm_dir]
                             current_dir_rpa = os.getcwd()
-                            even0_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_even0_path))
-                            odd1_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_odd1_path))
-                            if even0_nlv and odd1_nlv:
-                                levels = f'1 {even0_nlv}, 1 {odd1_nlv}'
-                                write_dtm_in('TM', levels, ', '.join(tm_key_list))
-                        elif dtm_dir == 'tm_odd0_even1':
-                            # Portal mode: odd0 -> even1 transition - re-read Nlv values from current method directory
-                            current_dir_rpa = os.getcwd()
-                            odd0_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_odd0_path))
-                            even1_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', conf_even1_path))
-                            if odd0_nlv and even1_nlv:
-                                levels = f'1 {odd0_nlv}, 1 {even1_nlv}'
+                            from_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', from_key))
+                            to_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', to_key))
+                            if from_nlv and to_nlv:
+                                levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
                                 write_dtm_in('TM', levels, ', '.join(tm_key_list))
                         elif dtm_dir == 'dm_even':
                             write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
