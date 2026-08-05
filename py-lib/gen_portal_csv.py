@@ -72,15 +72,11 @@ def create_mapping(name, num_levels_even, num_levels_odd):
     This function reads Vipul's energy level table and creates the mapping between experimental and theory data
     Data to map: Config, Term, J, Energy(cm-1)
     '''
-    filepath = "DATA_Output/"+name+"_Even.txt"
-    f = open(filepath, 'r')
-    lines = f.readlines()[:num_levels_even + 1]
-    f.close()
+    with open("DATA_Output/"+name+"_Even.txt", 'r') as f:
+        lines = f.readlines()[:num_levels_even + 1]
 
-    filepath = "DATA_Output/"+name+"_Odd.txt"
-    f = open(filepath, 'r')
-    lines = lines + f.readlines()[:num_levels_odd + 1]
-    f.close()
+    with open("DATA_Output/"+name+"_Odd.txt", 'r') as f:
+        lines = lines + f.readlines()[:num_levels_odd + 1]
     
     mapping = []
     for line in lines[1:]:
@@ -363,13 +359,10 @@ def convert_res_to_csv(filename, full_res, gs_exists, name):
     csvfile = "DATA_Filtered/UD/"+name+'_UD_' + parity + '.csv'
 
     os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-    f = open(csvfile, 'w')
-    f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
-
-    for row in full_res:
-        f.write(','.join([str(item) for item in row[0:2]]) + ',' + row[2].replace(',','') + ',' + ','.join([str(item) for item in row[3:]]) + '\n')
-
-    f.close()
+    with open(csvfile, 'w') as f:
+        f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
+        for row in full_res:
+            f.write(','.join([str(item) for item in row[0:2]]) + ',' + row[2].replace(',','') + ',' + ','.join([str(item) for item in row[3:]]) + '\n')
     print(csvfile + ' has been written')
 
 def find_parity(configuration):
