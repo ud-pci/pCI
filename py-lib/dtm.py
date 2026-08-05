@@ -1,22 +1,48 @@
 """ dtm
 
-This script allows the user to automate the transition matrix element calculations from inputted parameters in a "config.yml" file. 
-The "config.yml" file should have the following blocks:
+Automates setup and optional execution of pdtm transition matrix element calculations from a config.yml file.
 
-    * system - system parameter (bin_directory, run_codes, on_hpc)
-    * atom.code_method - list of methods (CI, CI+all-order, CI+MBPT)
-    * basis.core_orbitals - list of core orbitals in basis set (used to form MBPT.INP)
-    * dtm - parameters used by dtm program (include_rpa, DM, TM)
+Required config.yml blocks:
 
-From these parameters, this script will create all input files required for execution of the add program.
-After the input files are created, the add program will be executed to create the list of configurations CONF.INP.
-The script will generate respective directories for DTM calculations (TM: /tm, DM: /dm_even, /dm_odd)
-If optional.run_codes is set to "True", the script will then submit the slurm job in the generated directories. 
+    system:
+        bin_directory   - path to directory containing pdtm binary
+        run_codes       - if True, run or submit pdtm after setup
+        on_hpc          - if True, use Slurm for job submission
+    atom:
+        code_method     - one or more methods (CI, CI+MBPT, CI+all-order)
+    basis:
+        orbitals.core   - space-separated list of core orbitals (used to set Nso in MBPT.INP)
+    dtm:
+        include_rpa     - if True, run pdtm in Init mode first to generate DTM.INT, then run rpa -> rpa_dtm -> pdtm
+        DM:
+            matrix_elements - operators for diagonal matrix elements
+            level_range:
+                even / odd  - "from_level to_level" range strings;
+                              a dm_even or dm_odd directory is created only if the corresponding range is present
+        TM:
+            matrix_elements - operators (e.g. E1, M1, E2, ...) for non-portal mode
+            from:
+                parity      - parity of the bra CI set
+                level_range - "from_level to_level" range string
+            to:
+                parity      - parity of the ket CI set
+                level_range - "from_level to_level" range string
 
-This python script has 2 main capabilities for polarizability calculations:
-1. Set up file directory for matrix elements calculations.
-2. Submit job script for matrix elements calculations.
+Portal mode (system.for_portal = True):
+    Ignores DM and TM level_range settings. Instead creates four TM directories
+    covering all parity combinations, each with all Nlv levels read from CONF.INP:
 
+        tm_even0_odd1  : E1, M2, E3
+        tm_odd0_even1  : E1, M2, E3
+        tm_even0_even1 : M1, E2, M3
+        tm_odd0_odd1   : M1, E2, M3
+
+    Requires even0, even1, odd0, odd1 CI directories with CONF.RES or
+    CONFFINAL.RES present.
+
+For each dtm directory, the script writes dtm.in (Mode = TM or DM, level ranges, operator list), 
+MBPT.INP (RPA flags), and copies CI files (CONF.INP, CONF.DET, CONF.XIJ, CONFSTR.RES, CONF.DAT, CONF.INT). 
+If on_hpc is True, a Slurm job script is also written and optionally submitted.
 """
 import yaml
 import os
