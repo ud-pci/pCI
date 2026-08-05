@@ -59,6 +59,13 @@ TM_DIR_PATHS = {
     'tm_odd0_odd1':   ('odd0', 'odd1'),
 }
 
+TM_DIR_OPERATORS = {
+    'tm_even0_odd1':  'E1, M2, E3',
+    'tm_odd0_even1':  'E1, M2, E3',
+    'tm_even0_even1': 'M1, E2, M3',
+    'tm_odd0_odd1':   'M1, E2, M3',
+}
+
 
 def read_yaml(filename):
     """ 
@@ -313,7 +320,8 @@ if __name__ == "__main__":
             if include_rpa:
                 write_dtm_in('Init','','')
                 if 'tm' in dtm_dir:
-                    write_mbpt_inp(basis, tm_key_list)
+                    ops = gen_key_list(TM_DIR_OPERATORS[dtm_dir]) if dtm_dir in TM_DIR_OPERATORS else tm_key_list
+                    write_mbpt_inp(basis, ops)
                 elif 'dm' in dtm_dir:
                     write_mbpt_inp(basis, dm_key_list)
                 run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
@@ -338,7 +346,7 @@ if __name__ == "__main__":
                     to_nlv = read_nlv_from_conf(os.path.join(current_dir, to_key))
                     if from_nlv and to_nlv:
                         levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
-                        write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                        write_dtm_in('TM', levels, TM_DIR_OPERATORS[dtm_dir])
                         print(dtm_dir + ': using levels 1-' + str(from_nlv) + ' (' + from_key + ') -> 1-' + str(to_nlv) + ' (' + to_key + ')')
                 elif dtm_dir == 'dm_even':
                     write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
@@ -421,7 +429,7 @@ if __name__ == "__main__":
                             to_nlv = read_nlv_from_conf(os.path.join(current_dir_rpa, '..', to_key))
                             if from_nlv and to_nlv:
                                 levels = '1 ' + str(from_nlv) + ', 1 ' + str(to_nlv)
-                                write_dtm_in('TM', levels, ', '.join(tm_key_list))
+                                write_dtm_in('TM', levels, TM_DIR_OPERATORS[dtm_dir])
                         elif dtm_dir == 'dm_even':
                             write_dtm_in('DM', from_level_even + ' ' + to_level_even, ', '.join(dm_key_list))
                         elif dtm_dir =='dm_odd':
