@@ -7,9 +7,7 @@ from fractions import Fraction
 from UDRead import *
 from parse_asd import *
 from get_atomic_term import *
-from subprocess import run
 from compare_res import *
-from glob import glob
 from utils import get_dict_value
 import shutil
 
@@ -173,6 +171,63 @@ def normalize_config(config):
     ))
     
     return ".".join(parts)
+
+
+def read_pconf_csv(path):
+    '''
+    Read a pconf.csv file and return a list of rows.
+    Each row is: [conf, term, energy_au, energy_cm, S, L, J_str, gf, conf%, converged, conf2, conf2%]
+    Convert spaces in conf and conf2 to dots for consistency with NIST.
+    '''
+    df = pd.read_csv(path)
+    rows = []
+    for _, r in df.iterrows():
+        J_str    = _j_suffix(float(r['J']))
+        term_raw = '' if pd.isna(r['term']) else str(r['term'])
+        S_val    = '' if pd.isna(r['S'])      else str(r['S'])
+        L_val    = '' if pd.isna(r['L'])      else str(r['L'])
+        gf_val   = '' if pd.isna(r['gf'])     else str(r['gf'])
+        conf2    = '' if pd.isna(r['conf2'])   else str(r['conf2'])
+        conf2pct = '' if pd.isna(r['conf2%'])  else str(r['conf2%'])
+        conf_str  = str(r['configuration']).replace(' ', '.')
+        conf2_str = conf2.replace(' ', '.')
+        rows.append([conf_str, term_raw,
+                     float(r['energy_au']), float(r['energy_cm']),
+                     S_val, L_val, J_str, gf_val,
+                     str(r['conf%']), str(r['converged']), conf2_str, conf2pct])
+    return rows
+
+
+def write_pconf_csv(name, parity, ao_rows, level_rows):
+    '''
+    Write a merged pconf.csv file with uncertainties for one parity.
+    ao_rows: output of read_pconf_csv
+    level_rows: output of _build_levels
+    '''
+    parity_cap = parity.capitalize()
+    csvfile = 'DATA_Filtered/UD/' + name + '_UD_' + parity_cap + '.csv'
+    os.makedirs(os.path.dirname(csvfile), exist_ok=True)
+    with open(csvfile, 'w') as f:
+        f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
+        for idx, (r, lv) in enumerate(zip(ao_rows, level_rows), 1):
+            conf, term = r[0], r[1]
+            energy_au = r[2]
+            S, L, J_str = r[4], r[5], r[6]
+            gf, conf_pct, converged = r[7], r[8], r[9]
+            conf2, conf2pct = r[10], r[11]
+            energy_cm = lv[3]
+            uncertainty = lv[4]
+            term_col = term
+            S_fmt = '{:.3f}'.format(float(S)) if S else ''
+            L_fmt = '{:.3f}'.format(float(L)) if L else ''
+            gf_fmt = '{:.5f}'.format(float(gf)) if gf else ''
+            cpct_fmt = '{:.2f}'.format(float(conf_pct)) if conf_pct else ''
+            c2pct_fmt = '{:.2f}'.format(float(conf2pct)) if conf2pct else ''
+            f.write(','.join([str(idx), conf, term_col, str(energy_au), str(energy_cm),
+                              S_fmt, L_fmt, J_str, gf_fmt, cpct_fmt, str(converged),
+                              conf2, c2pct_fmt, str(uncertainty)]) + '\n')
+    print(f'{csvfile} has been written')
+
 
 def write_new_conf_res(name, filepath, data_nist):
     '''
@@ -902,11 +957,6 @@ if __name__ == "__main__":
         even_J = get_dict_value(even, 'J')
         odd = get_dict_value(conf, 'odd')
         odd_J = get_dict_value(odd, 'J')
-        even_dir = 'even' + str(even_J)[0] if even_J else None
-        odd_dir = 'odd' + str(odd_J)[0] if odd_J else None
-        tm_dir = 'tm' if even_J and odd_J else None
-        tm_dir1 = None
-        tm_dir2 = None
         
         # portal parameters
         portal = get_dict_value(config, 'portal')
@@ -957,6 +1007,8 @@ if __name__ == "__main__":
             collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT')
         else:
             print('even and odd J are the same (' + str(j_values[0]) + '); cannot determine TM directory pairs')
+    else:
+        print('J values not available; skipping portal file collection')
     
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
@@ -981,6 +1033,7 @@ if __name__ == "__main__":
         NIST_shift = 0
         theory_shift = 0
 
+    # Store filtered data of even or odd parity in DATA_Filtered/NIST/
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'even')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name)
@@ -1011,7 +1064,7 @@ if __name__ == "__main__":
         else:
             num_levels_output_even += 1
     num_levels_output_odd = num_levels_theory_odd
-        
+
     print('Number of even parity levels: ', num_levels_output_even)
     print('Number of odd parity levels: ', num_levels_output_odd)
 
@@ -1185,34 +1238,3 @@ if __name__ == "__main__":
         fixes = (fixes1 + mapping_fixes, fixes2 + mapping_fixes)
 
     write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
-
-    # Create a list of all possible transitions between states
-    even_confs = []
-    odd_confs = []
-    for line in filtered_mapping:
-        # Use NIST config if available, otherwise use theory config
-        if line[0][0] != '-':
-            configuration = line[0][0]
-            term = line[0][1]
-            J = line[0][2]
-        else:
-            configuration = line[1][5]
-            term = line[1][1]
-            J = line[1][2]
-
-        if find_parity(configuration) == 'even':
-            even_confs.append([configuration, term, J])
-        elif find_parity(configuration) == 'odd':
-            odd_confs.append([configuration, term, J])
-        else:
-            raise ValueError(f'Configuration {configuration} is not valid.')
-
-    unmatched_matrix = []
-    if matrix_file_exists:
-        print('Writing matrix elements...')
-        num_E1, unmatched_matrix = write_matrix_csv(name, data_filtered_theory_path, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
-    else:
-        print('E1.RES files were not found, so matrix csv file was not generated')
-
-    # Write unmatched items to file
-    write_unmatched_file(unmatched_energies, unmatched_matrix)
