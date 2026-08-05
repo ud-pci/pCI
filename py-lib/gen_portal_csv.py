@@ -963,14 +963,11 @@ if __name__ == "__main__":
     # Find input files from directories if they exist and put into DATA_RAW directory
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
-    data_filtered_path = 'DATA_Filtered/UD/'
+    data_filtered_theory_path = 'DATA_Filtered/UD/'
+    data_filtered_nist_path = 'DATA_Filtered/NIST/'
     data_processed_path = 'DATA_Processed/'
-    if not os.path.isdir(data_raw_path):
-        Path(data_raw_path).mkdir(parents=True, exist_ok=True)
-    if not os.path.isdir(data_filtered_path):
-        Path(data_filtered_path).mkdir(parents=True, exist_ok=True)
-    if not os.path.isdir(data_processed_path):
-        Path(data_processed_path).mkdir(parents=True, exist_ok=True)
+    for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
+        os.makedirs(d, exist_ok=True)
     
     all_order_path = 'ci+all-order'
     if os.path.isdir(all_order_path):
@@ -1038,22 +1035,16 @@ if __name__ == "__main__":
         NIST_shift = 0
         theory_shift = 0
 
-    # Store filtered data of even or odd parity in DATA_Filtered/NIST/ 
-    path_filtered_nist = "DATA_Filtered/NIST/"
-    path_filtered_theory = "DATA_Filtered/UD/"
-    os.makedirs(os.path.dirname(path_filtered_nist), exist_ok=True)
-    os.makedirs(os.path.dirname(path_filtered_theory), exist_ok=True)
-
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'even')
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name)
     
     # Filter NIST and UD data
-    path_nist_even = "DATA_Filtered/NIST/"+name+"_NIST_Even.csv"
-    path_ud_even = "DATA_Filtered/UD/"+name+"_UD_Even.csv"
+    path_nist_even = data_filtered_nist_path+name+"_NIST_Even.csv"
+    path_ud_even = data_filtered_theory_path+name+"_UD_Even.csv"
 
-    path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
-    path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
+    path_nist_odd = data_filtered_nist_path+name+"_NIST_Odd.csv"
+    path_ud_odd = data_filtered_theory_path+name+"_UD_Odd.csv"
     
     # Set maximum number of levels to be read from NIST equal to number of levels in CONFFINAL.RES
     with open(raw_path + 'CONFFINALeven.RES','r') as f:
@@ -1279,7 +1270,7 @@ if __name__ == "__main__":
     unmatched_matrix = []
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1, unmatched_matrix = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
+        num_E1, unmatched_matrix = write_matrix_csv(name, data_filtered_theory_path, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
     else:
         print('E1.RES files were not found, so matrix csv file was not generated')
 
