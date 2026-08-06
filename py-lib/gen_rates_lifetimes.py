@@ -75,6 +75,13 @@ def _rate_formula(operator):
     return table[operator]
 
 
+def _fmt5(x):
+    """5 decimal places, switching to scientific notation outside [1e-4, 1e5]."""
+    if x != 0.0 and (abs(x) >= 1e5 or abs(x) < 1e-4):
+        return f'{x:.5e}'
+    return f'{x:.5f}'
+
+
 def _round_half_up(value, n_dec):
     """Round to n_dec decimal places using round-half-up."""
     d = decimal.Decimal(str(value))
@@ -591,7 +598,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
             # Write to transitions file
             f.write(config + ' ->\n')
             for rate in rates:
-                f.write('      ' + rate[0] + ' ' + str(rate[1]) + ' ' + str(rate[2]) + ' ' + str(rate[3]) + '\n')
+                f.write('      ' + rate[5] + ' ' + rate[0] + f' {_fmt5(rate[1])} {_fmt5(rate[2])} {_fmt5(rate[3])}' + '\n')
 
                 # Add to branching ratios dataframe
                 configuration2 = rate[0].split(' ')[0]
@@ -693,6 +700,7 @@ def add_display_formats(atom_name):
     lifetimes_exp  = f"{atom_name}_Lifetimes_Exp.csv"
     energies_file  = f"{atom_name}_Energies.csv"
     tr_check_out   = f"{atom_name}_Transition_Rates_Error_Check.csv"
+    tr_check_zero_out = f"{atom_name}_Transition_Rates_Error_Check_Zero_BR.csv"
     lifetimes_out  = f"{atom_name}_Lifetimes_Error_Check.csv"
 
     print(f"Reading {tr_file}...")
@@ -793,6 +801,7 @@ def add_display_formats(atom_name):
     props_df = pd.read_csv(props_file)
 
     wl_disp, me_disp, br_disp, rate_disp, rate_unc_list = [], [], [], [], []
+    br_values = []
 
     for _, row in props_df.iterrows():
         upper = (str(row['state_one_configuration']).strip(),
@@ -832,6 +841,7 @@ def add_display_formats(atom_name):
                 (B_i       / A_total) ** 2 * (sum_sq_all - dA_i ** 2)
             ) if A_total > 0 else 0.0
             br_disp.append(format_branching_ratio(B_i, dB_i))
+            br_values.append(B_i)
         else:
             print(f"  Warning: no {operator} transition data for {upper} -> {lower}, keeping old values")
             wl_disp.append(str(row['wavelength_display']))
@@ -839,6 +849,7 @@ def add_display_formats(atom_name):
             br_disp.append(str(row['branching_ratio_display']))
             rate_disp.append(str(row.get('transition_rate_display', '')))
             rate_unc_list.append('')
+            br_values.append(None)
 
     # Write Transition_Properties.csv with plain rate and uncertainty columns
     props_df['transition_rate_display']     = rate_disp
@@ -854,8 +865,19 @@ def add_display_formats(atom_name):
     tr_check_df['matrix_element_display']  = me_disp
     tr_check_df['branching_ratio_display'] = br_disp
     tr_check_df['transition_rate_display'] = rate_disp
-    tr_check_df.to_csv(tr_check_out, index=False)
-    print(f"{tr_check_out} written with {len(tr_check_df)} transitions")
+
+    # Split: rows with effectively zero branching ratio (B < 1e-6) go to a
+    # separate file so the main error-check CSV only contains significant transitions.
+    zero_mask = pd.Series([(b is not None and b < 1e-6) for b in br_values],
+                          index=tr_check_df.index)
+    tr_check_nonzero = tr_check_df[~zero_mask]
+    tr_check_zero    = tr_check_df[zero_mask]
+
+    tr_check_nonzero.to_csv(tr_check_out, index=False)
+    print(f"{tr_check_out} written with {len(tr_check_nonzero)} transitions")
+    if len(tr_check_zero) > 0:
+        tr_check_zero.to_csv(tr_check_zero_out, index=False)
+        print(f"{tr_check_zero_out} written with {len(tr_check_zero)} near-zero BR transitions")
 
     # ------------------------------------------------------------------ #
     # Write Lifetimes_Error_Check.csv                                    #
