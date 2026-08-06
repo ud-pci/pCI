@@ -959,17 +959,8 @@ if __name__ == "__main__":
     num_levels_theory_odd = len(pd.read_csv(raw_path + 'pconf_odd.csv'))
     nist_max_odd = num_levels_theory_odd
     
-    # Set maximum number of levels to be outputted in csv files
-    num_levels_output_even = 1 if uncertainties[0] == '-' else 0
-    for i in range(1, num_levels_theory_even):
-        if uncertainties[i] == '-':
-            break
-        else:
-            num_levels_output_even += 1
-    num_levels_output_odd = num_levels_theory_odd
-
-    print(f'Number of even parity levels: {num_levels_output_even}')
-    print(f'Number of odd parity levels: {num_levels_output_odd}')
+    print(f'Number of even parity levels: {num_levels_theory_even}')
+    print(f'Number of odd parity levels: {num_levels_theory_odd}')
 
     # Export filtered data to output directory
     path_output = "DATA_Output/"
@@ -1003,12 +994,11 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_odd_missing, path)
     
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
-    mapping = create_mapping(name, num_levels_output_even, num_levels_output_odd)
-    
-    # Filter mapping: keep all levels within energy cutoff
-    # Apply separately to even and odd parity since they're ordered independently
-    even_mapping = mapping[:num_levels_output_even]
-    odd_mapping = mapping[num_levels_output_even:]
+    mapping = create_mapping(name, num_levels_theory_even, num_levels_theory_odd)
+
+    # Split by parity then drop levels with no uncertainty
+    even_mapping = [lv for lv in mapping[:num_levels_theory_even] if lv[1][4] != '-']
+    odd_mapping  = [lv for lv in mapping[num_levels_theory_even:] if lv[1][4] != '-']
 
     # Determine global cutoff energy
     if energy_cutoff is not None:
