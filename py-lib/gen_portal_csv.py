@@ -1,3 +1,4 @@
+
 import yaml
 import re
 import sys
@@ -530,8 +531,6 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
 
         extra_unc = abs(matrix_element_value) * min_unc_per / 100
         uncertainty = np.sqrt(uncertainty**2 + extra_unc**2)
-        if uncertainty == 0:
-            uncertainty = 0.00001
 
         c1, c2 = False, False
         out_conf1, out_term1, out_J1 = '', '', ''
@@ -598,7 +597,7 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
             'state_one_configuration': out_conf1, 'state_one_term': out_term1, 'state_one_J': out_J1,
             'state_two_configuration': out_conf2, 'state_two_term': out_term2, 'state_two_J': out_J2,
             'operator': operator,
-            'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty,
+            'matrix_element': round(matrix_element_value, 5), 'matrix_element_uncertainty': round(uncertainty, 5) or 1e-05,
         }
 
     print(f'TOTAL MATRIX ELEMENTS: {len(df)}')
