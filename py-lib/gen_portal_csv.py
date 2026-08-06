@@ -314,7 +314,7 @@ def process_pconf_levels(name, filepath, data_nist):
         else:
             str_diff, num_diff = SubtractStr(nist_conf, confs[i])
             if num_diff > 0:
-                if nist_conf.replace(str_diff, '') == confs[i] and nist_term == term and nist_J == J:
+                if nist_conf.replace(str_diff, '') == confs[i] and nist_term == term[:-1] and _j_suffix(float(str(nist_J))) == J:
                     gs_exists = True
                     print(f'ground state found: {confs[i]}')
                     break
@@ -791,6 +791,7 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
             merged['matrix_element_uncertainty'] = (
                 merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
             ).abs()
+            merged['matrix_element_value'] = merged['matrix_element_value'].abs()
             mbpt_cols = [c for c in merged.columns if c.endswith('_mbpt')]
             merged = merged.drop(columns=mbpt_cols)
             me_idx = merged.columns.get_loc('matrix_element_value') + 1
