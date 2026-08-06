@@ -159,7 +159,7 @@ def generate_mapping_fixes(mapping):
 def normalize_config(config):
     '''
     Normalize an electronic configuration string by sorting the subshells.
-    Example: "5s.4d" -> "4d.5s
+    Example: "5s.4d" -> "4d.5s"
     '''
     if not isinstance(config, str):
         return config
@@ -483,218 +483,139 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
 
     print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level):
+def write_matrix_csv(element, mapping, gs_parity, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L'):
     '''
-    This function writes the matrix element csv file
-    Note: Transition rates are now calculated separately using generate_transition_rates.py
+    Read DATA_Processed/tm.csv and write {element}_Matrix_Elements_Theory.csv.
+    All operators (E1, E2, E3, M1, M2, M3) are included. 
+    For E1, gauge selects which form to keep: 'L' (length, default) or 'V' (velocity); 
+    the redundant E1 gauge column is dropped and the kept column is renamed to 'E1'. 
+    States are matched to the NIST/theory mapping by energy_au so that experimental configurations and energies are substituted where available.
+    tm.csv already has calculated uncertainty from combine_tm, and zero-energy transitions already filtered.
     '''
-    matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
+    tm_path = 'DATA_Processed/tm.csv'
+    if not os.path.isfile(tm_path):
+        print(f'{tm_path} not found; skipping matrix elements')
+        return
 
-    # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res, unmatched_matrix = cmp_matrix_res('DATA_Processed/E1.RES', 'DATA_Processed/E1MBPT.RES', swaps, fixes, energy_to_level, mbpt_energy_to_level)
+    df_tm = pd.read_csv(tm_path)
+    
+    # Drop the E1 gauge not selected; keep all other operators unchanged
+    drop_gauge = 'E1_V' if gauge == 'L' else 'E1_L'
+    df_tm = df_tm[df_tm['operator'] != drop_gauge].reset_index(drop=True)
+    df_tm['operator'] = df_tm['operator'].replace('E1_' + gauge, 'E1')
+    
+    matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
-                               'matrix_element', 'matrix_element_uncertainty'])
-    
-    # Track added transitions to avoid duplicates (E1.RES contains both A->B and B->A)
+                               'operator', 'matrix_element', 'matrix_element_uncertainty'])
+
     added_transitions = set()
 
     if ignore_g:
         print('IGNORING G STATES')
-        
-    # List of default minimum uncertainties for different systems
+
     default_min_uncertainties = {
         'Mg1': 0.3,
         'Ca1': 1.3,
         'Sr1': 1.5
     }
-    
-    # Use default uncertainty if defined
     if element in default_min_uncertainties:
         min_unc_per = default_min_uncertainties[element]
-        print('DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR', element + ':', str(min_unc_per) + '%')
+        print(f'DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR {element}: {min_unc_per}%')
 
-    print('MIN ENERGY DIFF PERCENT FOR NIST-THEORY:', str(min_energy_diff_percent) + '%')
+    print(f'MIN ENERGY DIFF PERCENT FOR NIST-THEORY: {min_energy_diff_percent}%')
 
-    for line in e1_res:
-        # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
-        conf1 = line[0]
-        conf2 = line[2]
-        term1 = line[1][0:2]
-        term2 = line[3][0:2]
-        J1_e1res = line[1][2]  # J from E1.RES (for matching)
-        J2_e1res = line[3][2]
-        J1 = J1_e1res  # Will be updated with matched state's J
-        J2 = J2_e1res
+    energy_tolerance = 1e-6
+
+    for _, row in df_tm.iterrows():
+        operator = str(row['operator'])
         try:
-            matrix_element_value = float(line[4])
-            uncertainty = float(line[5])
+            matrix_element_value = float(row['matrix_element_value'])
+            unc_raw = row['matrix_element_uncertainty']
+            uncertainty = 0.0 if pd.isna(unc_raw) else float(unc_raw)
         except (ValueError, TypeError):
             continue
-        energy1 = line[6]
-        energy2 = line[7]
-        wavelength = line[8]
-        
-        # Set minimum uncertainty
-        extra_uncertainty = matrix_element_value * min_unc_per / 100
-        uncertainty = np.sqrt(uncertainty**2 + extra_uncertainty**2)
+
+        energy1_au = abs(float(row['state_one_energy_au']))
+        energy2_au = abs(float(row['state_two_energy_au']))
+
+        extra_unc = abs(matrix_element_value) * min_unc_per / 100
+        uncertainty = np.sqrt(uncertainty**2 + extra_unc**2)
         if uncertainty == 0:
             uncertainty = 0.00001
-        
-        # Use mapping to correct confs and terms and use experimental energies
+
         c1, c2 = False, False
-        energy1cm, energy2cm = 0.0, 0.0
-        energy1_float = abs(float(energy1))  # Use absolute value (E1.RES uses negative binding energies)
-        energy2_float = abs(float(energy2))
-        energy_tolerance = 1e-6  # Tolerance for floating point comparison (in a.u.)
+        out_conf1, out_term1, out_J1 = '', '', ''
+        out_conf2, out_term2, out_J2 = '', '', ''
+        best1, best2 = float('inf'), float('inf')
 
-        # Track best matches (smallest energy difference)
-        best_match1_diff = float('inf')
-        best_match2_diff = float('inf')
+        for lt in mapping:
+            if lt[1][6] == '-':
+                continue
+            th_au = abs(float(lt[1][6]))
 
-        for line_theory in mapping:
-            # mapping structure:
-            # [expt=[conf, term, J, energy, unc], theory=[conf, term, J, energy, unc, final_conf, energy_au]]
-            if line_theory[1][6] == '-': continue
-
-            # Compare energies as floats with tolerance instead of exact string match
-            theory_energy_au = abs(float(line_theory[1][6]))  # Use absolute value for comparison
-            energy_diff1 = abs(theory_energy_au - energy1_float)
-
-            # Check if this is a better match than previous best
-            # Prefer exact energy matches, and use J as tiebreaker for equal energies
-            is_better_match1 = False
-            if energy_diff1 < energy_tolerance:
-                if energy_diff1 < best_match1_diff:
-                    is_better_match1 = True
-                elif abs(energy_diff1 - best_match1_diff) < 1e-12:
-                    # Same energy (within numerical precision) - prefer J match as tiebreaker
-                    if line_theory[1][2] == J1_e1res:
-                        is_better_match1 = True
-
-            if is_better_match1:
-                conf1 = line_theory[1][5]  # corrected_config for output
-                term1 = line_theory[1][1]
-                
-                if ignore_g:
-                    if 'g' in conf1 or 'G' in term1:
-                        continue
-                J1 = line_theory[1][2]
-                # Check if NIST energy exists - if it does, overwrite theory energy, configuration and term
-                if line_theory[0][3] != '-':
-                    # Check energy difference between NIST and theory
-                    nist_energy = float(line_theory[0][3])
-                    theory_energy = float(line_theory[1][3])
-
-                    # Calculate percentage difference
-                    if nist_energy != 0:
-                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
-                    else:
-                        energy_diff_percent = 0.0
-
-                    # Skip if energy difference exceeds minimum threshold
-                    if energy_diff_percent > min_energy_diff_percent:
-                        continue
-
-                    conf1 = line_theory[0][0]
-                    term1 = line_theory[0][1]
-                    J1 = line_theory[0][2]
-                    energy1cm = nist_energy
-                    if find_parity(conf1) != gs_parity:
-                        energy1cm = energy1cm + float(expt_shift)
-                else:
-                    energy1cm = float(line_theory[1][3])
-                    if find_parity(conf1) != gs_parity:
-                        energy1cm = energy1cm + float(theory_shift)
-                c1 = True
-                best_match1_diff = energy_diff1
-
-            energy_diff2 = abs(theory_energy_au - energy2_float)
-
-            # Check if this is a better match than previous best for state 2
-            is_better_match2 = False
-            if energy_diff2 < energy_tolerance:
-                if energy_diff2 < best_match2_diff:
-                    is_better_match2 = True
-                elif abs(energy_diff2 - best_match2_diff) < 1e-12:
-                    # Same energy (within numerical precision) - prefer J match as tiebreaker
-                    if line_theory[1][2] == J2_e1res:
-                        is_better_match2 = True
-
-            if is_better_match2:
-                conf2 = line_theory[1][5]  # corrected_config for output
-                term2 = line_theory[1][1]
-
-                if ignore_g:
-                    if 'g' in conf2 or 'G' in term2:
-                        continue
-                J2 = line_theory[1][2]
-                # Check if NIST energy exists - if it does, overwrite theory energy
-                if line_theory[0][3] != '-':
-                    # Check energy difference between NIST and theory
-                    nist_energy = float(line_theory[0][3])
-                    theory_energy = float(line_theory[1][3])
-
-                    # Calculate percentage difference
-                    if nist_energy != 0:
-                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
-                    else:
-                        energy_diff_percent = 0.0
-
-                    # Skip if energy difference exceeds minimum threshold
-                    if energy_diff_percent > min_energy_diff_percent:
-                        continue
-
-                    conf2 = line_theory[0][0]
-                    term2 = line_theory[0][1]
-                    J2 = line_theory[0][2]
-                    energy2cm = nist_energy
-                    if find_parity(conf2) != gs_parity:
-                        energy2cm = energy2cm + float(expt_shift)
-                else:
-                    energy2cm = float(line_theory[1][3])
-                    if find_parity(conf2) != gs_parity:
-                        energy2cm = energy2cm + float(theory_shift)
-                c2 = True
-                best_match2_diff = energy_diff2
-
-        if c1 and c2:
-            # Apply E1 selection rules
-            try:
-                J1_float = float(J1) if '/' not in str(J1) else float(eval(J1))
-                J2_float = float(J2) if '/' not in str(J2) else float(eval(J2))
-                delta_J = abs(J1_float - J2_float)
-
-                # Skip forbidden transitions
-                if (J1_float == 0 and J2_float == 0) or delta_J > 1:
+            diff1 = abs(th_au - energy1_au)
+            if diff1 < energy_tolerance and diff1 < best1:
+                cand_conf = lt[1][5]
+                cand_term = lt[1][1]
+                cand_J    = lt[1][2]
+                if ignore_g and ('g' in cand_conf or 'G' in cand_term):
                     continue
-            except:
-                continue
+                if lt[0][3] != '-':
+                    nist_e = float(lt[0][3])
+                    th_e = float(lt[1][3])
+                    pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
+                    if pct > min_energy_diff_percent:
+                        continue
+                    cand_conf = lt[0][0]
+                    cand_term = lt[0][1]
+                    cand_J = lt[0][2]
+                out_conf1, out_term1, out_J1 = cand_conf, cand_term, cand_J
+                c1 = True
+                best1 = diff1
 
-            # Create unique transition identifier to avoid duplicates (both A->B and B->A)
-            state1 = f"{conf1} {term1}{J1}"
-            state2 = f"{conf2} {term2}{J2}"
-            trans_id = tuple(sorted([state1, state2]))
+            diff2 = abs(th_au - energy2_au)
+            if diff2 < energy_tolerance and diff2 < best2:
+                cand_conf = lt[1][5]
+                cand_term = lt[1][1]
+                cand_J = lt[1][2]
+                if ignore_g and ('g' in cand_conf or 'G' in cand_term):
+                    continue
+                if lt[0][3] != '-':
+                    nist_e = float(lt[0][3])
+                    th_e = float(lt[1][3])
+                    pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
+                    if pct > min_energy_diff_percent:
+                        continue
+                    cand_conf = lt[0][0]
+                    cand_term = lt[0][1]
+                    cand_J    = lt[0][2]
+                out_conf2, out_term2, out_J2 = cand_conf, cand_term, cand_J
+                c2 = True
+                best2 = diff2
 
-            # Skip if we've already added this transition
-            if trans_id in added_transitions:
-                continue
+        if not (c1 and c2):
+            continue
 
-            added_transitions.add(trans_id)
+        # Include operator so different operators for the same state pair each get their own row
+        trans_id = (tuple(sorted([out_conf1 + ' ' + out_term1 + str(out_J1),
+                                  out_conf2 + ' ' + out_term2 + str(out_J2)])),
+                    operator)
+        if trans_id in added_transitions:
+            continue
+        added_transitions.add(trans_id)
 
-            row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
-                   'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
-                   'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
-            df.loc[len(df.index)] = row
-    
-    num_E1 = len(df)
-    print(f'TOTAL MATRIX ELEMENTS: {num_E1}')
+        df.loc[len(df.index)] = {
+            'state_one_configuration': out_conf1, 'state_one_term': out_term1, 'state_one_J': out_J1,
+            'state_two_configuration': out_conf2, 'state_two_term': out_term2, 'state_two_J': out_J2,
+            'operator': operator,
+            'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty,
+        }
 
+    print(f'TOTAL MATRIX ELEMENTS: {len(df)}')
     df.to_csv(matrix_element_filename, index=False)
-    print(matrix_element_filename + ' has been written')
-
-    return num_E1, unmatched_matrix
+    print(f'{matrix_element_filename} has been written')
 
 def nist_parity(term):
     ''' 
@@ -899,7 +820,7 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
         frames.append(merged)
         
     if not frames:
-        print('no tm.csv files found; skipping combine_portal_tm')
+        print('no tm.csv files found; skipping combine_tm')
         return
     
     combined = pd.concat(frames, ignore_index=True)
@@ -972,6 +893,10 @@ if __name__ == "__main__":
         # optional global energy cutoff in cm^-1 (if not specified, use min_energy_diff_percent logic)
         cutoff_value = get_dict_value(portal, 'energy_cutoff') if portal else None
         energy_cutoff = float(cutoff_value) if cutoff_value is not None else None
+        
+        # E1 gauge: 'L' (length, default) or 'V' (velocity)
+        gauge_value = get_dict_value(portal, 'gauge') if portal else None
+        gauge = gauge_value if gauge_value in ('L', 'V') else 'L'
     else:
         atom = input('Input name of atom: ')
         even_J = None
@@ -980,6 +905,7 @@ if __name__ == "__main__":
         min_uncertainty = float(input('Enter minimum uncertainty for matrix elements (as % of value): '))
         min_energy_diff_percent = 3.0
         energy_cutoff = None
+        gauge = 'L'
     name = atom_name_to_filename(atom)
     
     # Find input files from directories if they exist and put into DATA_RAW directory
@@ -1223,3 +1149,9 @@ if __name__ == "__main__":
         fixes = (fixes1 + mapping_fixes, fixes2 + mapping_fixes)
 
     write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
+    
+    if matrix_file_exists:
+        print('Writing matrix elements...')
+        write_matrix_csv(name, filtered_mapping, gs_parity, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge)
+    else:
+        print('tm.csv not found; matrix csv file was not generated')
