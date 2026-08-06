@@ -628,6 +628,9 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
         if not (c1 and c2):
             continue
 
+        if (out_conf1, out_term1, out_J1) == (out_conf2, out_term2, out_J2):
+            continue
+
         # Include operator so different operators for the same state pair each get their own row
         trans_id = (tuple(sorted([out_conf1 + ' ' + out_term1 + str(out_J1),
                                   out_conf2 + ' ' + out_term2 + str(out_J2)])),
