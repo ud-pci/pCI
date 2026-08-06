@@ -2,6 +2,7 @@ import yaml
 import re
 import sys
 import os
+import numpy as np
 import pandas as pd
 from fractions import Fraction
 from UDRead import *
@@ -83,10 +84,8 @@ def create_mapping(name, num_levels_even, num_levels_odd):
         NIST_J = line.split()[2]
         NIST_energy = line.split()[3]
         NIST_uncertainty = line.split()[4]
-        final_config = line.split()[5]
         theory_config = line.split()[6]
         corrected_config = line.split()[5]
-        theory_config2 = line.split()[7]
         theory_term = line.split()[8]
         try:
             theory_J = str(Fraction(line.split()[9]))
@@ -95,7 +94,6 @@ def create_mapping(name, num_levels_even, num_levels_odd):
         theory_energy_cm = line.split()[10]
         theory_uncertainty = line.split()[11]
         theory_energy_au = line.split()[12]
-        #theory_delta_cm = line.split()[13]
         try:
             # Extract energy difference percentage (last column, remove '%' sign)
             energy_diff_pct = float(line.split()[14].rstrip('%'))
@@ -112,15 +110,8 @@ def create_mapping(name, num_levels_even, num_levels_odd):
 
 def generate_mapping_fixes(mapping):
     """
-    Generate fixes for E1.RES based on differences between theory_config and corrected_config.
-
-    When NIST matching determines a different label (corrected_config) than the original theory label (theory_config), we need to fix E1.RES to use the corrected label.
-
-    Args:
-        mapping: list of [[NIST_data], [theory_data], energy_diff_pct] where theory_data = [theory_config, theory_term, theory_J, energy_cm, uncertainty, corrected_config, energy_au]
-
-    Returns:
-        list of fixes: [[old_conf, old_term, energy, new_conf, new_term], ...]
+    Find levels where NIST matching assigned a different label than the original theory label.
+    Returns list of [old_conf, old_term, energy_au, new_conf, new_term] entries.
     """
     fixes = []
     seen = set()
@@ -217,13 +208,12 @@ def write_pconf_csv(name, parity, ao_rows, level_rows):
             conf2, conf2pct = r[10], r[11]
             energy_cm = lv[3]
             uncertainty = lv[4]
-            term_col = term
             S_fmt = '{:.3f}'.format(float(S)) if S else ''
             L_fmt = '{:.3f}'.format(float(L)) if L else ''
             gf_fmt = '{:.5f}'.format(float(gf)) if gf else ''
             cpct_fmt = '{:.2f}'.format(float(conf_pct)) if conf_pct else ''
             c2pct_fmt = '{:.2f}'.format(float(conf2pct)) if conf2pct else ''
-            f.write(','.join([str(idx), conf, term_col, str(energy_au), str(energy_cm),
+            f.write(','.join([str(idx), conf, term, str(energy_au), str(energy_cm),
                               S_fmt, L_fmt, J_str, gf_fmt, cpct_fmt, str(converged),
                               conf2, c2pct_fmt, str(uncertainty)]) + '\n')
     print(f'{csvfile} has been written')
@@ -327,6 +317,7 @@ def process_pconf_levels(name, filepath, data_nist):
                 if nist_conf.replace(str_diff, '') == confs[i] and nist_term == term and nist_J == J:
                     gs_exists = True
                     print(f'ground state found: {confs[i]}')
+                    break
 
     if not gs_exists:
         print(f"{data_nist['Configuration'].iloc[0]} not in {confs}")
@@ -343,9 +334,7 @@ def process_pconf_levels(name, filepath, data_nist):
     write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
 
     return (confs, terms, energies_au, energies_cm, uncertainties, energy_shift,
-            theory_J, gs_parity, matrix_file_exists, gs_exists,
-            [], ([], []), {'odd': {}, 'even': {}},
-            {}, {})
+            theory_J, gs_parity, matrix_file_exists, gs_exists)
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -444,7 +433,7 @@ def find_parity(configuration):
         
     return parity
 
-def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent):
+def write_energy_csv(name, mapping, min_energy_diff_percent):
     '''
     This function writes the energy csv file
     Mapping should already be filtered to only include levels within min_energy_diff_percent
@@ -483,7 +472,7 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
 
     print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
 
-def write_matrix_csv(element, mapping, gs_parity, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L'):
+def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L'):
     '''
     Read DATA_Processed/tm.csv and write {element}_Matrix_Elements_Theory.csv.
     All operators (E1, E2, E3, M1, M2, M3) are included. 
@@ -752,10 +741,9 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
     
     s0 = _j_suffix(j0)
     s1 = _j_suffix(j1)
-    tm_suffix = ('_' + res_suffix) if res_suffix else ''
+    sfx = ('_' + res_suffix) if res_suffix else ''
     for parity in ('even', 'odd'):
         src = method_dir + '/' + parity + s0 + '/pconf.csv'
-        sfx = ('_' + res_suffix) if res_suffix else ''
         dst = data_raw_path + '/pconf_' + parity + sfx + '.csv'
         if os.path.isfile(src):
             shutil.copy(src, dst)
@@ -770,7 +758,7 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
     ]
     for tm_label in tm_dirs:
         src = method_dir + '/' + tm_label + '/tm.csv'
-        dst = data_raw_path + '/' + tm_label + tm_suffix + '.csv'
+        dst = data_raw_path + '/' + tm_label + sfx + '.csv'
         if os.path.isfile(src):
             shutil.copy(src, dst)
             print(f'copied {src} to {dst}')
@@ -943,8 +931,7 @@ if __name__ == "__main__":
         print(f'Please put raw files in {raw_path}')
         print('The files should be named: pconf_even.csv, pconf_odd.csv, pconf_even_MBPT.csv, pconf_odd_MBPT.csv')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, \
-        swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level = process_pconf_levels(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists = process_pconf_levels(name, raw_path, data_nist)
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
     if gs_exists:
@@ -1140,18 +1127,10 @@ if __name__ == "__main__":
         print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g orbital (ignore_g=True)')
         print(f'Final mapping has {len(filtered_mapping)} levels')
 
-    # Generate mapping-based fixes: when theory_config differs from corrected_config
-    # These fixes change E1.RES entries to match the NIST-determined labels
-    mapping_fixes = generate_mapping_fixes(filtered_mapping)
-    if mapping_fixes:
-        # Add mapping fixes to both fixes1 (for E1.RES) and fixes2 (for E1MBPT.RES)
-        fixes1, fixes2 = fixes
-        fixes = (fixes1 + mapping_fixes, fixes2 + mapping_fixes)
-
-    write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
+    write_energy_csv(name, filtered_mapping, min_energy_diff_percent)
     
     if matrix_file_exists:
         print('Writing matrix elements...')
-        write_matrix_csv(name, filtered_mapping, gs_parity, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge)
+        write_matrix_csv(name, filtered_mapping, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge)
     else:
         print('tm.csv not found; matrix csv file was not generated')
