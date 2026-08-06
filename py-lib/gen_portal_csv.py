@@ -1,4 +1,6 @@
-
+"""
+gen_portal_csv.py -- generate atomic data CSV files for the ATOM Portal from pCI calculation results and available NIST data.
+"""
 import yaml
 import re
 import sys
@@ -737,8 +739,8 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
         print(f'{method_dir} directory not found, skipping')
         return
     
-    s0 = _j_suffix(j0)
-    s1 = _j_suffix(j1)
+    s0 = str(int(float(j0)))
+    s1 = str(int(float(j1)))
     sfx = ('_' + res_suffix) if res_suffix else ''
     for parity in ('even', 'odd'):
         src = method_dir + '/' + parity + s0 + '/pconf.csv'
@@ -764,8 +766,8 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
             print(f'{src} not found, skipping')
 
 def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
-    s0 = _j_suffix(j0)
-    s1 = _j_suffix(j1)
+    s0 = str(int(float(j0)))
+    s1 = str(int(float(j1)))
     tm_labels = [
         'tm_even' + s0 + '_even' + s1,
         'tm_even' + s0 + '_odd'  + s1,
