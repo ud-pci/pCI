@@ -259,10 +259,6 @@ def process_pconf_levels(name, filepath, data_nist):
     mbpt_even = read_pconf_csv(path_even_mbpt) if second_order_exists else []
     mbpt_odd  = read_pconf_csv(path_odd_mbpt)  if second_order_exists else []
 
-    # MBPT lookup: (conf, term) -> same-parity-relative energy_cm
-    mbpt_cm_even = {(r[0], r[1]): r[3] for r in mbpt_even}
-    mbpt_cm_odd  = {(r[0], r[1]): r[3] for r in mbpt_odd}
-
     # Larger energy_au = more tightly bound (valence energy convention in pconf)
     if ao_even[0][2] > ao_odd[0][2]:
         gs_parity    = 'even'
@@ -273,7 +269,12 @@ def process_pconf_levels(name, filepath, data_nist):
 
     ht_to_cm = 219474.63
 
-    def _build_levels(ao_rows, mbpt_cm_map, parity):
+    # MBPT lookup: (conf, term) -> energy_au, used to compute uncertainty via absolute energies.
+    mbpt_au_even = {(r[0], r[1]): r[2] for r in mbpt_even}
+    mbpt_au_odd = {(r[0], r[1]): r[2] for r in mbpt_odd}
+    mbpt_gs_au = (mbpt_even[0][2] if gs_parity == 'even' else mbpt_odd[0][2]) if second_order_exists else None
+
+    def _build_levels(ao_rows, mbpt_au_map, parity):
         levels = []
         for r in ao_rows:
             conf, term, energy_au, energy_cm_own = r[0], r[1], r[2], r[3]
@@ -282,13 +283,18 @@ def process_pconf_levels(name, filepath, data_nist):
                 energy_cm_global = energy_cm_own
             else:
                 energy_cm_global = round((gs_energy_au - energy_au) * ht_to_cm, 2)
-            mbpt_cm = mbpt_cm_map.get((conf, term))
-            unc = '-' if mbpt_cm is None else round(abs(energy_cm_own - mbpt_cm))
+            mbpt_au = mbpt_au_map.get((conf, term))
+            if mbpt_au is None or mbpt_gs_au is None:
+                unc = '-'
+            else:
+                ao_abs = (gs_energy_au - energy_au) * ht_to_cm
+                mbpt_abs = (mbpt_gs_au - mbpt_au) * ht_to_cm
+                unc = round(abs(ao_abs - mbpt_abs))
             levels.append([conf, term, energy_au, energy_cm_global, unc, J_str])
         return levels
 
-    even_levels = _build_levels(ao_even, mbpt_cm_even, 'even')
-    odd_levels  = _build_levels(ao_odd,  mbpt_cm_odd,  'odd')
+    even_levels = _build_levels(ao_even, mbpt_au_even, 'even')
+    odd_levels  = _build_levels(ao_odd,  mbpt_au_odd,  'odd')
     all_levels  = even_levels + odd_levels
 
     confs         = [r[0] for r in all_levels]
@@ -873,8 +879,7 @@ if __name__ == "__main__":
         if min_unc_value is not None:
             min_uncertainty = float(min_unc_value)
         else:
-            min_uncertainty = float(input('portal.min_uncertainty not set in config.yml. \
-                Enter minimum matrix element uncertainty as a percentage of the value (e.g. 1.5 for 1.5%): '))
+            min_uncertainty = float(input('portal.min_uncertainty not set in config.yml. Enter minimum matrix element uncertainty as a percentage of the value (e.g. 1.5 for 1.5%): '))
 
         # set default minimum energy difference percentage between NIST and theory to 3.0
         min_diff_value = get_dict_value(portal, 'min_energy_diff_percent') if portal else None
