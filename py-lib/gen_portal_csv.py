@@ -856,64 +856,59 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
         else:
             print(f'{src} not found, skipping')
 
-def combine_tm(raw_path, filtered_path):
-    """
-    Combine E1a/E1b and E1MBPTa/E1MBPTb files into E1.RES and E1MBPT.RES
-
-    Args:
-        raw_path: Path to raw data (E1a.RES, E1b.RES, etc.)
-        filtered_path: Path to filtered data (output E1.RES, E1MBPT.RES)
-    """
-    # Track E1 matrix elements separately from E1MBPT
-    e1_res = []
-    e1_mbpt_res = []
-
-    # Ensure filtered path exists
+def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
+    s0 = _j_suffix(j0)
+    s1 = _j_suffix(j1)
+    tm_labels = [
+        'tm_even' + s0 + '_even' + s1,
+        'tm_even' + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_even' + s1,
+    ]
+    match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
     os.makedirs(filtered_path, exist_ok=True)
-
-    # Combine E1a.RES and E1b.RES into E1.RES
-    with open(raw_path + '/E1a.RES', 'r') as f:
-        lines = f.readlines()
-    with open(filtered_path + '/E1.RES', 'w') as f:
-        f.writelines(lines)
-
-    for line in lines[1:]:
-        matrix_element = re.findall(r'\<.*?\>', line)[0]
-        e1_res.append(matrix_element)
-
-    with open(raw_path + '/E1b.RES', 'r') as f:
-        lines2 = f.readlines()
-
-    with open(filtered_path + '/E1.RES', 'a') as f:
-        for line in lines2[1:]:
-            matrix_element = re.findall(r'\<.*?\>', line)[0]
-            if matrix_element not in e1_res:
-                f.write(line)
-
-    # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES (if they exist)
-    # Use separate list to avoid mixing with E1 data
-    if os.path.exists(raw_path + '/E1MBPTa.RES') and os.path.exists(raw_path + '/E1MBPTb.RES'):
-        with open(raw_path + '/E1MBPTa.RES', 'r') as f:
-            lines = f.readlines()
-        with open(filtered_path + '/E1MBPT.RES', 'w') as f:
-            f.writelines(lines)
-
-        for line in lines[1:]:
-            matrix_element = re.findall(r'\<.*?\>', line)[0]
-            e1_mbpt_res.append(matrix_element)
-
-        with open(raw_path + '/E1MBPTb.RES', 'r') as f:
-            lines2 = f.readlines()
-
-        with open(filtered_path + '/E1MBPT.RES', 'a') as f:
-            for line in lines2[1:]:
-                matrix_element = re.findall(r'\<.*?\>', line)[0]
-                if matrix_element not in e1_mbpt_res:
-                    f.write(line)
-        print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
-    else:
-        print(f'E1.RES written to {filtered_path}')
-        print('E1MBPTa.RES and/or E1MBPTb.RES not found, skipping E1MBPT.RES creation')
+    
+    frames = []
+    for label in tm_labels:
+        path_ao   = data_raw_path + '/' + label + '.csv'
+        path_mbpt = data_raw_path + '/' + label + '_MBPT.csv'
+        if not os.path.isfile(path_ao):
+            print(f'{path_ao} not found, skipping')
+            continue
+        df_ao = pd.read_csv(path_ao)
+        if os.path.isfile(path_mbpt):
+            df_mbpt = pd.read_csv(path_mbpt)
+            merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'))
+            merged['matrix_element_uncertainty'] = (
+                merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
+            ).abs()
+            mbpt_cols = [c for c in merged.columns if c.endswith('_mbpt')]
+            merged = merged.drop(columns=mbpt_cols)
+            me_idx = merged.columns.get_loc('matrix_element_value') + 1
+            cols = list(merged.columns)
+            cols.remove('matrix_element_uncertainty')
+            cols.insert(me_idx, 'matrix_element_uncertainty')
+            merged = merged[cols]
+        else:
+            print(f'{path_mbpt} not found; no uncertainty for {label}')
+            merged = df_ao.copy()
+            merged['matrix_element_uncertainty'] = None
+        filtered_out = filtered_path + '/' + label + '.csv'
+        merged.to_csv(filtered_out, index=False)
+        print(f'{label}: {len(merged)} matched transitions -> {filtered_out}')
+        frames.append(merged)
+        
+    if not frames:
+        print('no tm.csv files found; skipping combine_portal_tm')
+        return
+    
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined[combined['transition_energy_cm'] != 0]
+    os.makedirs(data_processed_path, exist_ok=True)
+    out_path = data_processed_path + '/tm.csv'
+    combined.to_csv(out_path, index=False)
+    
+    print(f'combined tm.csv written to {out_path} ({len(combined)} transitions)')
 
 if __name__ == "__main__":
     use_config_yml = input('Using a config.yml file? ').strip().lower() in ('yes', 'y', 'true')
@@ -1002,6 +997,7 @@ if __name__ == "__main__":
             j0, j1 = j_values[0], j_values[1]
             collect_portal_files('ci+all-order', j0, j1, data_raw_path)
             collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT')
+            combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
         else:
             print(f'even and odd J are the same ({j_values[0]}); cannot determine TM directory pairs')
     else:
