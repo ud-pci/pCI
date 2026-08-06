@@ -1,6 +1,37 @@
 """
 Script to generate transition rates and lifetimes from energy levels and matrix elements.
 
+Multipole transition probabilities A_wv(Tk) from upper state v to lower state w:
+
+                    2.02613e18
+    A_wv(E1) =  ------------------  x S(E1)
+                (2*J_v+1)*lambda^3
+
+                    1.11995e18
+    A_wv(E2) =  ------------------  x S(E2)
+                (2*J_v+1)*lambda^5
+
+                    3.14441e17
+    A_wv(E3) =  ------------------  x S(E3)
+                (2*J_v+1)*lambda^7
+
+                    2.69735e13
+    A_wv(M1) =  ------------------  x S(M1)
+                (2*J_v+1)*lambda^3
+
+                    1.49097e13
+    A_wv(M2) =  ------------------  x S(M2)
+                (2*J_v+1)*lambda^5
+
+                    4.18610e12
+    A_wv(M3) =  ------------------  x S(M3)
+                (2*J_v+1)*lambda^7
+
+where J_v is the total angular momentum of the upper state, lambda is the transition
+wavelength in Angstroms, and S(Tk) = |<j_w || T^k || j_v>|^2 is the line strength.
+
+Reference: https://www1.udel.edu/atom/about
+
 Input files:
 - {atom}_Energies.csv
 - {atom}_Matrix_Elements_Theory.csv
@@ -19,6 +50,29 @@ import decimal
 import pandas as pd
 import sys
 import os
+
+
+def _rate_formula(operator):
+    """
+    Return (constant, wavelength_power) for:
+    
+              C
+    A = --------------- x S,
+        (2J+1)*lambda^p
+
+    where C = constant, p = wavelength_power, and lambda must be in Angstroms.
+    """
+    table = {
+        'E1': (2.02613e18, 3),
+        'E2': (1.11995e18, 5),
+        'E3': (3.14441e17, 7),
+        'M1': (2.69735e13, 3),
+        'M2': (1.49097e13, 5),
+        'M3': (4.18610e12, 7),
+    }
+    if operator not in table:
+        raise ValueError('Unknown operator: ' + operator)
+    return table[operator]
 
 
 def _round_half_up(value, n_dec):
@@ -354,6 +408,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
         term2 = row['state_two_term']
         J2 = str(row['state_two_J'])
 
+        operator = str(row['operator'])
         matrix_element = row['matrix_element']
         matrix_element_unc = row['matrix_element_uncertainty']
 
@@ -374,19 +429,17 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
             print(f"Warning: Zero energy difference for transition {key1} -> {key2}, skipping...")
             continue
 
-        wavelength = 1e7 / energy_diff  # Convert cm^-1 to nm
+        wavelength = 1e7 / energy_diff  # nm
 
-        # Calculate transition rate using formula
-        # trate = (2.02613*10**18)/((2*J+1)*(abs(wavelength)*10)**3)*matrix_element**2
-        # The J value used depends on which state has higher energy
+        # J of the upper state (v) goes in the (2J_v+1) denominator
         if energy1 > energy2:
-            # Transition from state 1 to state 2
-            J_denominator = int(J1)
+            J_upper = float(J1)
         else:
-            # Transition from state 2 to state 1
-            J_denominator = int(J2)
+            J_upper = float(J2)
 
-        transition_rate = (2.02613e18) / ((2*J_denominator + 1) * (abs(wavelength)*10)**3) * matrix_element**2
+        C, p = _rate_formula(operator)
+        wl_angstrom = abs(wavelength) * 10
+        transition_rate = C / ((2 * J_upper + 1) * wl_angstrom ** p) * matrix_element ** 2
 
         # Add to list
         transition_rates.append({
@@ -396,6 +449,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
             'state_two_configuration': conf2,
             'state_two_term': term2,
             'state_two_J': J2,
+            'operator': operator,
             'matrix_element': matrix_element,
             'matrix_element_uncertainty': matrix_element_unc,
             'energy1(cm-1)': f"{energy1:.3f}",
@@ -436,7 +490,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     lifetimes_df = pd.DataFrame(columns=['state_configuration', 'state_term', 'state_J', 'lifetime', 'lifetime_uncertainty'])
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                          'state_two_configuration', 'state_two_term', 'state_two_J',
-                                         'wavelength_display', 'matrix_element_display',
+                                         'operator', 'wavelength_display', 'matrix_element_display',
                                          'branching_ratio_display', 'transition_rate_display', 'transition_rate', 'transition_rate_uncertainty'])
 
     # Load energies early for uncertainty lookup and energy-based sorting
@@ -471,6 +525,8 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
         J2 = str(row['state_two_J'])
         termJ2 = term2 + J2
 
+        operator = str(row['operator'])
+        _, wl_power = _rate_formula(operator)
         matrix_element = row['matrix_element']
         me_unc = float(row['matrix_element_uncertainty'])
         wavelength = float(row['wavelength(nm)'])
@@ -491,7 +547,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
         if upper_state not in tr_rates:
             tr_rates[upper_state] = []
 
-        tr_rates[upper_state].append([lower_state, tr_rate, matrix_element, wavelength, me_unc])
+        tr_rates[upper_state].append([lower_state, tr_rate, matrix_element, wavelength, me_unc, operator, wl_power])
 
     # Calculate lifetimes and branching ratios
     lifetimes = []
@@ -521,10 +577,10 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                 me_i       = rate_entry[2]
                 wl_i       = rate_entry[3]
                 me_unc_i   = rate_entry[4]
+                p_i        = rate_entry[6]
                 wl_unc_i   = (wl_i ** 2 / 1e7) * math.sqrt(e_unc_upper ** 2 + e_unc_lower ** 2)
                 if me_i != 0 and wl_i != 0:
-                    rate_unc_i = tr_rate_i * math.sqrt((2.0 * me_unc_i / abs(me_i)) ** 2
-                                                       + (3.0 * wl_unc_i / wl_i) ** 2)
+                    rate_unc_i = tr_rate_i * math.sqrt((2.0 * me_unc_i / abs(me_i)) ** 2 + (p_i * wl_unc_i / wl_i) ** 2)
                 else:
                     rate_unc_i = 0.0
                 sum_rate_unc_sq += rate_unc_i ** 2
@@ -541,9 +597,10 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                 configuration2 = rate[0].split(' ')[0]
                 termJ2 = rate[0].split(' ')[1]
                 term2, J2 = parse_termJ(termJ2)
+                tr_rate        = rate[1]
                 matrix_element = rate[2]
-                wavelength = rate[3]
-                tr_rate = rate[1]
+                wavelength     = rate[3]
+                op             = rate[5]
                 branching_ratio = tr_rate / total_rates
 
                 row_data = {
@@ -553,6 +610,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                     'state_two_configuration': configuration2,
                     'state_two_term': term2,
                     'state_two_J': J2,
+                    'operator': op,
                     'wavelength_display': f"{wavelength:.2f}",
                     'matrix_element_display': matrix_element,
                     'branching_ratio_display': format(_round_half_up(branching_ratio, (-math.floor(math.log10(branching_ratio)) + 2) if branching_ratio > 0 else 3), 'f'),
@@ -613,9 +671,20 @@ def add_display_formats(atom_name):
 
     Uncertainty formulas
     --------------------
-    Wavelength:   δλ = (λ² / 1e7) x sqrt(δE₁² + δE₂²)
-    Rate:         δA = 2 x A x (δd / |d|)
-    Lifetime:     δτ_ns = (τ_ns² / 1e9) x sqrt(Σ δAᵢ²)
+    Wavelength:
+                     lambda^2
+        d_lambda =  ----------  x sqrt(dE1^2 + dE2^2)
+                       1e7
+
+    Rate:
+                  d_me
+        dA = 2A x ----
+                  |me|
+
+    Lifetime:
+                     tau_ns^2
+        d_tau_ns =  ----------  x sqrt(sum dAi^2)
+                       1e9
     """
 
     tr_file        = f"{atom_name}_Transition_Rates.csv"
@@ -663,6 +732,8 @@ def add_display_formats(atom_name):
         term2 = str(row['state_two_term']).strip()
         J2    = str(row['state_two_J']).strip()
 
+        operator = str(row['operator']).strip()
+        C, p     = _rate_formula(operator)
         me      = float(row['matrix_element'])
         me_unc  = float(row['matrix_element_uncertainty'])
         rate    = float(row['transition_rate(s-1)'])
@@ -687,24 +758,27 @@ def add_display_formats(atom_name):
             lower = (conf1, term1, J1)
             J_upper_str = J2
 
-        # Rate uncertainty: δA/A = sqrt( (2δd/d)² + (3δλ/λ)² )
-        # When me == 0 but me_unc > 0, the linear formula gives δA = 0 (not useful).
-        # Instead, evaluate the rate formula at me = me_unc to get an upper bound:
-        #   A_max = (C / (2J+1)) x me_unc² / (λ_Å)³
-        # i.e. the largest rate consistent with |me| ≤ me_unc.
+        # Rate uncertainty:
+        #
+        #   dA        /  (2*d_me)^2   (p*d_lambda)^2  \
+        #   -- = sqrt(  ---------  + ----------------  )
+        #    A        \    me^2          lambda^2     /
+        # 
+        # where p is the wavelength power for the operator (3 for E1/M1, 5 for E2/M2, 7 for E3/M3).
+        # When me == 0 but me_unc > 0, evaluate the rate formula at me = me_unc for an upper bound.
         if me != 0 and wl != 0:
-            rate_unc = rate * math.sqrt((2.0 * me_unc / abs(me)) ** 2 + (3.0 * wl_unc / wl) ** 2)
+            rate_unc = rate * math.sqrt((2.0 * me_unc / abs(me)) ** 2 + (p * wl_unc / wl) ** 2)
         elif me_unc > 0 and wl != 0:
             j_parts     = J_upper_str.split('/')
             j_val       = float(j_parts[0]) / float(j_parts[1]) if len(j_parts) == 2 \
                           else float(J_upper_str)
             j_degen     = 2 * j_val + 1
             wl_angstrom = wl * 10.0
-            rate_unc    = (2.02613e18 / j_degen) * (me_unc ** 2) / (wl_angstrom ** 3)
+            rate_unc    = C / j_degen * (me_unc ** 2) / (wl_angstrom ** p)
         else:
             rate_unc = 0.0
 
-        trans_data[upper + lower] = {
+        trans_data[upper + lower + (operator,)] = {
             'me':      me,      'me_unc':   me_unc,
             'wl':      wl,      'wl_unc':   wl_unc,
             'rate':    rate,    'rate_unc': rate_unc,
@@ -727,7 +801,8 @@ def add_display_formats(atom_name):
         lower = (str(row['state_two_configuration']).strip(),
                  str(row['state_two_term']).strip(),
                  str(row['state_two_J']).strip())
-        key = upper + lower
+        operator = str(row['operator']).strip()
+        key = upper + lower + (operator,)
 
         if key in trans_data:
             t = trans_data[key]
@@ -737,8 +812,15 @@ def add_display_formats(atom_name):
             rate_unc_list.append(f"{t['rate_unc']:.3e}")
 
             # Branching ratio and its uncertainty via error propagation
-            # B_i = A_i / A_total
-            # δB_i = (1/A_total) x sqrt[ (1-B_i)² δA_i² + B_i² x Σ_{j≠i} δA_j² ]
+            #
+            #          A_i
+            # B_i = ---------
+            #        A_total
+            #
+            #          sqrt[ (1-B_i)^2 x dA_i^2 + B_i^2 x sum_{j!=i} dA_j^2 ]
+            # dB_i = -----------------------------------------------------------
+            #                               A_total
+            #
             A_i  = t['rate']
             dA_i = t['rate_unc']
             trans_list = upper_trans.get(upper, [(A_i, dA_i)])
@@ -751,7 +833,7 @@ def add_display_formats(atom_name):
             ) if A_total > 0 else 0.0
             br_disp.append(format_branching_ratio(B_i, dB_i))
         else:
-            print(f"  Warning: no transition data for {upper} -> {lower}, keeping old values")
+            print(f"  Warning: no {operator} transition data for {upper} -> {lower}, keeping old values")
             wl_disp.append(str(row['wavelength_display']))
             me_disp.append(str(row['matrix_element_display']))
             br_disp.append(str(row['branching_ratio_display']))
