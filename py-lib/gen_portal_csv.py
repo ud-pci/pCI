@@ -102,9 +102,10 @@ def create_mapping(name, num_levels_even, num_levels_odd):
 
         # select relevant data for portal database
         if NIST_config != 'Config':
+            has_nist = NIST_config != '-'
             mapping.append([[NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
                     [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
-                    energy_diff_pct])
+                    energy_diff_pct, has_nist])
     
     return mapping
 
@@ -445,16 +446,14 @@ def write_energy_csv(name, mapping, min_energy_diff_percent):
                                      'energy_uncertainty', 'is_from_theory'])
 
     for level in mapping:
-        # if experimental data does not exist, use theory values
-        if level[0][3] == '-':
-            is_from_theory = True
+        is_from_theory = not level[3]
+        if is_from_theory:
             state_config = level[1][5]
             state_term = level[1][1]
             state_J = level[1][2]
             state_energy = level[1][3]
             state_uncertainty = level[1][4]
         else:
-            is_from_theory = False
             state_config = level[0][0]
             state_term = level[0][1]
             state_J = level[0][2]
@@ -551,7 +550,7 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
                 cand_J    = lt[1][2]
                 if ignore_g and ('g' in cand_conf or 'G' in cand_term):
                     continue
-                if lt[0][3] != '-':
+                if lt[3]:
                     nist_e = float(lt[0][3])
                     th_e = float(lt[1][3])
                     pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
@@ -571,7 +570,7 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
                 cand_J = lt[1][2]
                 if ignore_g and ('g' in cand_conf or 'G' in cand_term):
                     continue
-                if lt[0][3] != '-':
+                if lt[3]:
                     nist_e = float(lt[0][3])
                     th_e = float(lt[1][3])
                     pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
@@ -1013,11 +1012,7 @@ if __name__ == "__main__":
         even_cutoff_energy = float('inf')
         for i, level in enumerate(even_mapping):
             if level[2] > min_energy_diff_percent:
-                # Set cutoff to 1 cm-1 below the first bad level's energy
-                if level[0][3] != '-':
-                    bad_level_energy = float(level[0][3])
-                else:
-                    bad_level_energy = float(level[1][3])
+                bad_level_energy = float(level[0][3]) if level[3] else float(level[1][3])
                 even_cutoff_energy = bad_level_energy - 1.0
                 print(f'Even parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {even_cutoff_energy:.2f} cm^-1)')
                 break
@@ -1025,11 +1020,7 @@ if __name__ == "__main__":
         odd_cutoff_energy = float('inf')
         for i, level in enumerate(odd_mapping):
             if level[2] > min_energy_diff_percent:
-                # Set cutoff to 1 cm-1 below the first bad level's energy
-                if level[0][3] != '-':
-                    bad_level_energy = float(level[0][3])
-                else:
-                    bad_level_energy = float(level[1][3])
+                bad_level_energy = float(level[0][3]) if level[3] else float(level[1][3])
                 odd_cutoff_energy = bad_level_energy - 1.0
                 print(f'Odd parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {odd_cutoff_energy:.2f} cm^-1)')
                 break
@@ -1051,14 +1042,9 @@ if __name__ == "__main__":
 
         # Filter even parity based on energy cutoff
         for level in even_mapping:
-            if level[0][3] != '-':
-                energy = float(level[0][3])
-            else:
-                energy = float(level[1][3])
-
+            energy = float(level[0][3]) if level[3] else float(level[1][3])
             if energy <= global_cutoff_energy:
-                # Also exclude NIST-matched levels with bad energy difference
-                if level[0][3] != '-' and level[2] > min_energy_diff_percent:
+                if level[3] and level[2] > min_energy_diff_percent:
                     excluded_even += 1
                     continue
                 filtered_even.append(level)
@@ -1067,14 +1053,9 @@ if __name__ == "__main__":
 
         # Filter odd parity based on energy cutoff
         for level in odd_mapping:
-            if level[0][3] != '-':
-                energy = float(level[0][3])
-            else:
-                energy = float(level[1][3])
-
+            energy = float(level[0][3]) if level[3] else float(level[1][3])
             if energy <= global_cutoff_energy:
-                # Also exclude NIST-matched levels with bad energy difference
-                if level[0][3] != '-' and level[2] > min_energy_diff_percent:
+                if level[3] and level[2] > min_energy_diff_percent:
                     excluded_odd += 1
                     continue
                 filtered_odd.append(level)
@@ -1082,12 +1063,12 @@ if __name__ == "__main__":
                 excluded_odd += 1
     else:
         for level in even_mapping:
-            if level[0][3] != '-' and level[2] > min_energy_diff_percent:
+            if level[3] and level[2] > min_energy_diff_percent:
                 excluded_even += 1
                 continue
             filtered_even.append(level)
         for level in odd_mapping:
-            if level[0][3] != '-' and level[2] > min_energy_diff_percent:
+            if level[3] and level[2] > min_energy_diff_percent:
                 excluded_odd += 1
                 continue
             filtered_odd.append(level)
