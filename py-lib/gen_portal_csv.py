@@ -873,7 +873,8 @@ if __name__ == "__main__":
         if min_unc_value is not None:
             min_uncertainty = float(min_unc_value)
         else:
-            min_uncertainty = float(input('min_uncertainty not found in config.yml. Enter minimum uncertainty (as % of value): '))
+            min_uncertainty = float(input('portal.min_uncertainty not set in config.yml. \
+                Enter minimum matrix element uncertainty as a percentage of the value (e.g. 1.5 for 1.5%): '))
 
         # set default minimum energy difference percentage between NIST and theory to 3.0
         min_diff_value = get_dict_value(portal, 'min_energy_diff_percent') if portal else None
@@ -1001,79 +1002,43 @@ if __name__ == "__main__":
     even_mapping = [lv for lv in mapping[:num_levels_theory_even] if lv[1][4] != '-']
     odd_mapping  = [lv for lv in mapping[num_levels_theory_even:] if lv[1][4] != '-']
 
-    # Determine global cutoff energy
+    # Determine global energy cutoff in cm^-1.
+    # Exclude levels whose energy exceeds the cutoff from the outputs.
+    # If energy_cutoff is not set, find the first level in each parity whose NIST-theory percentage difference exceeds min_energy_diff_percent, 
+    # then place the ceiling 1 cm^-1 below that level's energy.
+    # The lower of the two parities is used so even and odd coverage stay consistent.
+    # global_cutoff_energy = float('inf') when no ceiling applies.
     if energy_cutoff is not None:
-        # User specified an explicit energy cutoff in cm^-1
         global_cutoff_energy = energy_cutoff
         print(f'Using user-specified global energy cutoff: {global_cutoff_energy:.2f} cm^-1')
     else:
-        # Calculate cutoff from min_energy_diff_percent
-        # Find the first bad level (exceeds energy diff threshold) for each parity
-        # and set cutoff to 1 cm-1 below that level's energy
-        even_cutoff_energy = float('inf')
-        for i, level in enumerate(even_mapping):
-            if level[2] > min_energy_diff_percent:
-                bad_level_energy = float(level[0][3]) if level[3] else float(level[1][3])
-                even_cutoff_energy = bad_level_energy - 1.0
-                print(f'Even parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {even_cutoff_energy:.2f} cm^-1)')
-                break
-
-        odd_cutoff_energy = float('inf')
-        for i, level in enumerate(odd_mapping):
-            if level[2] > min_energy_diff_percent:
-                bad_level_energy = float(level[0][3]) if level[3] else float(level[1][3])
-                odd_cutoff_energy = bad_level_energy - 1.0
-                print(f'Odd parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {odd_cutoff_energy:.2f} cm^-1)')
-                break
-
-        # Apply global cutoff: use the lower of the two cutoff energies to prevent gaps
-        global_cutoff_energy = min(even_cutoff_energy, odd_cutoff_energy)
-
-    # Filter levels based on energy cutoff
-    filtered_even = []
-    filtered_odd = []
-    excluded_even = 0
-    excluded_odd = 0
-
-    if global_cutoff_energy < float('inf'):
-        if energy_cutoff is None:
+        global_cutoff_energy = float('inf')
+        for parity_name, pmap in (('Even', even_mapping), ('Odd', odd_mapping)):
+            for i, level in enumerate(pmap):
+                if level[2] > min_energy_diff_percent:
+                    bad_e = float(level[0][3]) if level[3] else float(level[1][3])
+                    cutoff = bad_e - 1.0
+                    print(f'{parity_name} parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {cutoff:.2f} cm^-1)')
+                    global_cutoff_energy = min(global_cutoff_energy, cutoff)
+                    break
+        if global_cutoff_energy < float('inf'):
             print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1 (lower of even/odd cutoffs)')
-        else:
-            print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1')
 
-        # Filter even parity based on energy cutoff
-        for level in even_mapping:
-            energy = float(level[0][3]) if level[3] else float(level[1][3])
-            if energy <= global_cutoff_energy:
-                if level[3] and level[2] > min_energy_diff_percent:
-                    excluded_even += 1
-                    continue
-                filtered_even.append(level)
-            else:
-                excluded_even += 1
-
-        # Filter odd parity based on energy cutoff
-        for level in odd_mapping:
-            energy = float(level[0][3]) if level[3] else float(level[1][3])
-            if energy <= global_cutoff_energy:
-                if level[3] and level[2] > min_energy_diff_percent:
-                    excluded_odd += 1
-                    continue
-                filtered_odd.append(level)
-            else:
-                excluded_odd += 1
-    else:
-        for level in even_mapping:
-            if level[3] and level[2] > min_energy_diff_percent:
-                excluded_even += 1
-                continue
+    # Keep a level if: 
+    # (1) its energy is at or below the cutoff, and
+    # (2) it either has no NIST match or its NIST-theory agreement is good enough.
+    filtered_even, filtered_odd = [], []
+    for level in even_mapping:
+        energy = float(level[0][3]) if level[3] else float(level[1][3])
+        if energy <= global_cutoff_energy and not (level[3] and level[2] > min_energy_diff_percent):
             filtered_even.append(level)
-        for level in odd_mapping:
-            if level[3] and level[2] > min_energy_diff_percent:
-                excluded_odd += 1
-                continue
+    for level in odd_mapping:
+        energy = float(level[0][3]) if level[3] else float(level[1][3])
+        if energy <= global_cutoff_energy and not (level[3] and level[2] > min_energy_diff_percent):
             filtered_odd.append(level)
-
+    excluded_even = len(even_mapping) - len(filtered_even)
+    excluded_odd = len(odd_mapping) - len(filtered_odd)
+    
     # Create filtered mapping
     filtered_mapping = filtered_even + filtered_odd
     print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels')
