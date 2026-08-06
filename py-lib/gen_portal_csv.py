@@ -976,8 +976,8 @@ if __name__ == "__main__":
     print(f'NIST energy offset for even parity: {nist_even_offset} cm-1')
     print(f'NIST energy offset for odd parity: {nist_odd_offset} cm-1')
 
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists, nist_offset=nist_even_offset, theory_offset=0.0)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists, nist_offset=nist_odd_offset, theory_offset=0.0)
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists, nist_offset=nist_even_offset)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists, nist_offset=nist_odd_offset)
     
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
@@ -996,7 +996,7 @@ if __name__ == "__main__":
     # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping(name, num_levels_theory_even, num_levels_theory_odd)
 
-    # Split by parity then drop levels with no uncertainty
+    # Split by parity then drop levels with no MBPT uncertainty
     even_mapping = [lv for lv in mapping[:num_levels_theory_even] if lv[1][4] != '-']
     odd_mapping  = [lv for lv in mapping[num_levels_theory_even:] if lv[1][4] != '-']
 

@@ -522,7 +522,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             # over-correct (e.g., 4s.6p corrects to 4s.5p when 4s.5p already
             # exists as a jf==1 match).
             new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
-            # Restore original config — Correct_Config may have shifted n,
+            # Restore original config - Correct_Config may have shifted n,
             # but new_config must keep the original for FindJthAll matching.
             new_config[j] = config
         elif jf==0 or jf==2:
@@ -632,7 +632,7 @@ def ESort(i,data_final):
 
 
 # j,df_nist,df_ud,corr_config=[],OutAll=False
-def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,theory_offset=0.0):
+def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0):
 
     df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,gs_exists,nist_max)
     ManualCorrection=True if ("Sr_I" in path_nist.split("/")[-1])==True else False
@@ -664,8 +664,8 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
     # each (NIST, theory) pair in order, skipping already-used levels.
     #
     # Config2 matches get an additive penalty (2%) so that Config1 is preferred
-    # for typical well-matched levels (ΔE < 2%). Config2 can still win for
-    # strongly-mixed states where Config1 has very poor energy agreement (ΔE >> 2%),
+    # for typical well-matched levels (dE < 2%). Config2 can still win for
+    # strongly-mixed states where Config1 has very poor energy agreement (dE >> 2%),
     # e.g., Ga2 4p2/4s.4d 1D2 where Config1 gives ~15% error but Config2 gives ~0.2%.
     config2_penalty = 2.0
     all_matches.sort(key=lambda x: (x[3] + config2_penalty * (x[2] - 1), x[2]))
@@ -693,14 +693,13 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
             final_config = config2_ao if jf==2 else config1_ao # final config
             # Calculate energy difference after applying offsets (relative to ground state)
             nist_energy_offset = level_nist + nist_offset
-            theory_energy_offset = level_ao + theory_offset
-            Ediff = round(abs(nist_energy_offset - theory_energy_offset),1)
+            Ediff = round(abs(nist_energy_offset - level_ao),1)
             Eperc = round(100*Ediff/nist_energy_offset,2) if nist_energy_offset!=0 else 0
             EpercStr = str(Eperc)+"%"
             if config2_ao=='': config2_ao='-'
             term_ao=Unmark_Term(term_ao)
             # Use NIST config as final config (experimental designation), not theory's corrected config
-            data_csv.append(data_nist+[config_nist,config1_ao,config2_ao, term_ao, j_ao, round(theory_energy_offset,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
+            data_csv.append(data_nist+[config_nist,config1_ao,config2_ao, term_ao, j_ao, round(level_ao,roundd),uncer_ud,level_au,Ediff,EpercStr, per1,per2])
 
     ## remaining ao states
     for j in range(len(df_ud)):
@@ -716,10 +715,10 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0,t
                 corrected_state = (new_config[j], Unmark_Term(term_ao), j_ao)
                 if corrected_state not in matched_nist_states:
                     final_cfg = new_config[j]
-            data_csv.append(["-","-","-",round(level_ao+theory_offset,roundd),"-",final_cfg,config1_ao, config2_ao, term_ao, j_ao, round(level_ao+theory_offset,roundd),uncer_ud,level_au,"-","-", per1,per2])
+            data_csv.append(["-","-","-",round(level_ao,roundd),"-",final_cfg,config1_ao, config2_ao, term_ao, j_ao, round(level_ao,roundd),uncer_ud,level_au,"-","-", per1,per2])
 
 
-    header = [" Config","  Term","  J","  Level (cm⁻¹)","Uncertainty (cm-1)","Final Config","  Config1","  Config2","  Term","  J","  Level (cm⁻¹)","  Uncertainty (cm⁻¹)","  Level (au)","    \u0394E","    \u0394E%","  I","  II"]
+    header = [" Config","  Term","  J","  Level (cm^-1)","Uncertainty (cm^-1)","Final Config","  Config1","  Config2","  Term","  J","  Level (cm^-1)","  Uncertainty (cm^-1)","  Level (au)","    dE","    dE%","  I","  II"]
     data = np.array(data_csv)
 
     # sort data
