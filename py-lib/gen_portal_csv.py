@@ -1,5 +1,45 @@
 """
 gen_portal_csv.py -- generate atomic data CSV files for the ATOM Portal from pCI calculation results and available NIST data.
+
+Pipeline overview
+-----------------
+1. Read config YAML: atom name, conf J values for even/odd parity, and portal options (min_uncertainty, min_energy_diff_percent, energy_cutoff, gauge).
+
+2. Collect all input files:
+    a. Copy pconf.csv and tm.csv from ci+all-order/ and ci+second-order/ to DATA_RAW/ ("_MBPT" is appended to CI+MBPT results).
+    b. Fetch NIST ASD data live from the NIST website using the atom name.
+
+3. Process all input data:
+    a. process_pconf_levels: read pconf.csv for both CI+all-order and CI+MBPT.
+       Match levels by (conf, term) and compute level energy uncertainty as |CI+all-order - CI+MBPT| in cm^-1,
+       both referenced to the absolute ground state. Write merged CSV files to DATA_Filtered/UD/.
+    b. combine_tm: merge the CI+all-order and CI+MBPT tm.csv files and write DATA_Processed/tm.csv with matrix element uncertainty.
+    c. Reformat NIST data and write parity-filtered CSV files to DATA_Filtered/NIST/.
+
+4. Run MainCode (compare_res.py) for each parity to match theory levels to NIST ASD levels.
+    Results are written to DATA_Output/{atom}_Even.txt and DATA_Output/{atom}_Odd.txt.
+
+5. create_mapping: read the txt files and build a list of mapping tuples:
+        [ [NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
+            [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
+            energy_diff_pct,   # |NIST - theory| / NIST * 100 (%)
+            has_nist ]         # True if a NIST match was found
+
+6. Filter mapping: 
+    - Drop levels with no MBPT match.
+    - Apply energy ceiling.
+    - Drop levels where has_nist=True but NIST-theory energy agreement exceeds the threshold.
+    - Optionally drop g-orbital levels.
+
+7. write_energy_csv: write {atom}_Energies.csv.
+    - If has_nist=True: use NIST config/term/J and NIST energy.
+    - If has_nist=False (is_from_theory=True): use corrected theory labels and theory energy.
+
+8. write_matrix_csv: write {atom}_Matrix_Elements_Theory.csv.
+    - Match each tm.csv row to the filtered mapping via theory_energy_au (tolerance 1e-6 au).
+    - Substitute NIST labels for matched levels (has_nist=True).
+    - Apply minimum percentage uncertainty floor in quadrature.
+    - Round matrix element and uncertainty to 5 decimal places; floor uncertainty at 1e-05 if rounding produces zero.
 """
 import yaml
 import re
@@ -232,7 +272,6 @@ def process_pconf_levels(name, filepath, data_nist):
     '''
     
     second_order_exists = True
-    matrix_file_exists = True
 
     path_even = filepath + 'pconf_even.csv'
     path_odd = filepath + 'pconf_odd.csv'
@@ -250,9 +289,6 @@ def process_pconf_levels(name, filepath, data_nist):
     if not os.path.exists(path_odd_mbpt):
         print(f'{path_odd_mbpt} not found')
         second_order_exists = False
-    if not os.path.exists('DATA_Processed/tm.csv'):
-        print('tm.csv not found in DATA_Processed/')
-        matrix_file_exists = False
 
     ao_even   = read_pconf_csv(path_even)
     ao_odd    = read_pconf_csv(path_odd)
@@ -343,8 +379,7 @@ def process_pconf_levels(name, filepath, data_nist):
     write_pconf_csv(name, 'even', ao_even, even_levels)
     write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
 
-    return (confs, terms, energies_au, energies_cm, uncertainties, energy_shift,
-            theory_J, gs_parity, matrix_file_exists, gs_exists)
+    return (confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, gs_exists)
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -866,7 +901,7 @@ if __name__ == "__main__":
         even_J = get_dict_value(even, 'J')
         odd = get_dict_value(conf, 'odd')
         odd_J = get_dict_value(odd, 'J')
-        
+
         # portal parameters
         portal = get_dict_value(config, 'portal')
         
@@ -912,13 +947,13 @@ if __name__ == "__main__":
     for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
         os.makedirs(d, exist_ok=True)
     
+    j0, j1 = None, None
     if even_J is not None and odd_J is not None:
         j_values = sorted(set([float(even_J), float(odd_J)]))
         if len(j_values) >= 2:
             j0, j1 = j_values[0], j_values[1]
             collect_portal_files('ci+all-order', j0, j1, data_raw_path)
             collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT')
-            combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
         else:
             print(f'even and odd J are the same ({j_values[0]}); cannot determine TM directory pairs')
     else:
@@ -938,7 +973,13 @@ if __name__ == "__main__":
         print(f'Please put raw files in {raw_path}')
         print('The files should be named: pconf_even.csv, pconf_odd.csv, pconf_even_MBPT.csv, pconf_odd_MBPT.csv')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists = process_pconf_levels(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, gs_exists = process_pconf_levels(name, raw_path, data_nist)
+
+    if j0 is not None:
+        combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
+    matrix_file_exists = os.path.exists('DATA_Processed/tm.csv')
+    if not matrix_file_exists:
+        print('tm.csv not found in DATA_Processed/')
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
     if gs_exists:
@@ -1000,7 +1041,6 @@ if __name__ == "__main__":
     path = "DATA_Output/"+name+"_Odd+missing.txt" 
     ConvertToTXT(data_final_odd_missing, path)
     
-    # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
     mapping = create_mapping(name, num_levels_theory_even, num_levels_theory_odd)
 
     # Split by parity then drop levels with no MBPT uncertainty
@@ -1043,7 +1083,7 @@ if __name__ == "__main__":
             filtered_odd.append(level)
     excluded_even = len(even_mapping) - len(filtered_even)
     excluded_odd = len(odd_mapping) - len(filtered_odd)
-    
+
     # Create filtered mapping
     filtered_mapping = filtered_even + filtered_odd
     print(f'Filtered {len(mapping)} levels to {len(filtered_mapping)} levels')
