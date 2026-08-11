@@ -535,6 +535,9 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
     drop_gauge = 'E1_V' if gauge == 'L' else 'E1_L'
     df_tm = df_tm[df_tm['operator'] != drop_gauge].reset_index(drop=True)
     df_tm['operator'] = df_tm['operator'].replace('E1_' + gauge, 'E1')
+
+    # Drop zero matrix elements
+    df_tm = df_tm[df_tm['matrix_element_value'] != 0].reset_index(drop=True)
     
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
