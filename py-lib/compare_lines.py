@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import re
+from parse_asd import generate_lines_url, generate_lines_df_from_asd, lines_df_to_csv
 
 
 _LEADING_ORB = re.compile(r"^(\d+[spdfg](?:2|6|10|14))\.")
@@ -51,9 +52,16 @@ def load_theory_lines(filepath):
     return df
 
 
-def compare_lines(nist_path, theory_path, atom):
+def compare_lines(nist_path, theory_path, atom, min_accur=''):
     nist   = load_nist_lines(nist_path)
     theory = load_theory_lines(theory_path)
+
+    if min_accur and min_accur in _ACC_ORDER:
+        keep = set(_ACC_ORDER[:_ACC_ORDER.index(min_accur) + 1])
+        nist = nist[nist['Acc'].isin(keep)].reset_index(drop=True)
+
+    if 'operator' in theory.columns:
+        theory = theory[theory['operator'] == 'E1'].reset_index(drop=True)
 
     # Strip core from NIST configs using theory configs as the target set
     theory_confs = set(theory['conf_lower']) | set(theory['conf_upper'])
@@ -108,6 +116,8 @@ def compare_lines(nist_path, theory_path, atom):
     wl_col  = 'ritz_wl_vac(nm)' if 'ritz_wl_vac(nm)' in merged.columns else 'obs_wl_vac(nm)'
     unc_col = 'unc_ritz_wl'     if 'unc_ritz_wl'     in merged.columns else 'unc_obs_wl'
 
+    has_operator = 'operator' in merged.columns
+
     base_cols = [
         'conf_lower', 'term_lower_x', 'J_lower',
         'E_lower', 'E_lower(cm-1)',
@@ -116,6 +126,8 @@ def compare_lines(nist_path, theory_path, atom):
         'wavelength(nm)', wl_col, 'matrix_element', 'matrix_element_uncertainty',
         'transition_rate(s-1)', 'Aki(s^-1)', 'Acc',
     ]
+    if has_operator:
+        base_cols.append('operator')
     if 'transition_rate_uncertainty' in merged.columns:
         base_cols.append('transition_rate_uncertainty')
     rename_map = {
@@ -146,10 +158,7 @@ def compare_lines(nist_path, theory_path, atom):
     ).round(2)
     result['matrix_element_uncertainty(%)'] = (result['matrix_element_uncertainty'] / result['matrix_element'] * 100).abs().round(2)
 
-    _ACC_UNC = {'AA': 0.01, 'A+': 0.02, 'A': 0.03,
-                'B+': 0.07, 'B': 0.10,
-                'C+': 0.18, 'C': 0.25,
-                'D+': 0.40, 'D': 0.50}
+    _ACC_UNC = dict(zip(_ACC_ORDER, [0.01, 0.02, 0.03, 0.07, 0.10, 0.18, 0.25, 0.40, 0.50, None]))
     result['Aki_unc_NIST(s^-1)'] = (result['Acc_NIST'].map(_ACC_UNC) * result['Aki_NIST(s^-1)']).round(2)
 
     has_theory_unc = 'Aki_unc_theory(s^-1)' in result.columns
@@ -172,6 +181,7 @@ def compare_lines(nist_path, theory_path, atom):
         'conf_upper', 'term_upper', 'J_upper',
         'E_upper_theory(cm-1)', 'E_upper_NIST(cm-1)', 'dE_upper(cm-1)',
         *wl_cols,
+        *(['operator'] if has_operator else []),
         'matrix_element', 'matrix_element_uncertainty(%)',
         *(['Aki_theory(s^-1)', 'Aki_unc_theory(s^-1)'] if has_theory_unc else ['Aki_theory(s^-1)']),
         'Aki_NIST(s^-1)', 'Aki_unc_NIST(s^-1)',
@@ -208,6 +218,8 @@ def print_statistics(result):
     print(f"{'All':<6} {len(r):>4} {r.mean():>12.4f} {r.abs().min():>13.4f} {r.abs().max():>13.4f}")
 
 
+_ACC_ORDER = ['AA', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E']
+
 _ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 
 
@@ -233,14 +245,24 @@ def parse_atom(name):
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) == 3:
-        nist_path, theory_path = sys.argv[1], sys.argv[2]
-        atom = Path(theory_path).stem.replace('_Transition_Rates', '')
-    else:
-        name = sys.argv[1] if len(sys.argv) == 2 else input("Atom (e.g. Y2 or Y_II)? ")
-        atom_dir, nist_stem = parse_atom(name)
-        nist_path   = f"{nist_stem}_NIST_Lines.csv"
-        theory_path = f"{atom_dir}_Transition_Rates.csv"
-        atom = atom_dir
-    result = compare_lines(nist_path, theory_path, atom)
+    name      = sys.argv[1] if len(sys.argv) >= 2 else input("Atom (e.g. Y2 or Y_II)? ")
+    min_accur = sys.argv[2] if len(sys.argv) >= 3 else ''
+    atom_dir, nist_stem = parse_atom(name)
+    nist_path   = f"{atom_dir}_NIST_Lines.csv"
+    theory_path = f"{atom_dir}_Transition_Rates.csv"
+    atom = atom_dir
+
+    if not Path(nist_path).exists():
+        spectrum = nist_stem.replace('_', ' ')
+        print(f"Fetching NIST Lines data for {spectrum}...")
+        lines_url = generate_lines_url(spectrum)
+        lines_df = generate_lines_df_from_asd(lines_url)
+        if lines_df.empty:
+            print(f"No lines data available for {spectrum}")
+            sys.exit(1)
+        saved = lines_df_to_csv(lines_df, spectrum)
+        Path(saved).rename(nist_path)
+        print(f"Saved to {nist_path}")
+
+    result = compare_lines(nist_path, theory_path, atom, min_accur)
     print_statistics(result)
