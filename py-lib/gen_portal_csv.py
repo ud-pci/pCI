@@ -671,7 +671,7 @@ def find_energy_shift(df):
     ground_parity = nist_parity(df['state_term'].values[:1][0])
 
     energy_shift = 0.0
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         parity = nist_parity(row['state_term'])
         if parity != ground_parity:
             # Skip if energy is missing (marked as '-')
@@ -832,9 +832,16 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
             print(f'{path_ao} not found, skipping')
             continue
         df_ao = pd.read_csv(path_ao)
+        n_unmatched = 0
         if os.path.isfile(path_mbpt):
             df_mbpt = pd.read_csv(path_mbpt)
-            merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'))
+            merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
+            no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
+            n_unmatched = len(no_mbpt)
+            for _, r in no_mbpt.iterrows():
+                print(f'    {r["state_one_configuration"]} {r["state_one_term"]} -> '
+                      f'{r["state_two_configuration"]} {r["state_two_term"]} {r["operator"]}')
+            merged = merged[merged['matrix_element_value_mbpt'].notna()].reset_index(drop=True)
             merged['matrix_element_uncertainty'] = (
                 merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
             ).abs()
@@ -852,7 +859,8 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
             merged['matrix_element_uncertainty'] = None
         filtered_out = filtered_path + '/' + label + '.csv'
         merged.to_csv(filtered_out, index=False)
-        print(f'{label}: {len(merged)} matched transitions -> {filtered_out}')
+        unmatched_str = f' ({n_unmatched} transitions unmatched)' if n_unmatched > 0 else ''
+        print(f'{label}: {len(merged)} matched transitions{unmatched_str} -> {filtered_out}')
         frames.append(merged)
         
     if not frames:
