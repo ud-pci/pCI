@@ -90,12 +90,6 @@ def _round_half_up(value, n_dec):
     return d.quantize(q, rounding=decimal.ROUND_HALF_UP)
 
 
-def _fmt5(x):
-    """5 decimal places, switching to scientific notation outside [1e-4, 1e5]."""
-    if x != 0.0 and (abs(x) >= 1e5 or abs(x) < 1e-4):
-        return f'{x:.5e}'
-    return f'{x:.5f}'
-
 
 def parse_termJ(termJ):
     """
@@ -477,7 +471,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
     return output_file
 
 
-def calculate_lifetimes_and_branching_ratios(tr_file):
+def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     """
     Calculate lifetimes and branching ratios from transition rates.
 
@@ -485,17 +479,17 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     -----------
     tr_file : str
         Path to the transition rates CSV file
+    atom_name : str
+        Atom name used to construct output filenames (e.g. Sr1, Ba1)
     """
 
     # Read transition rates from file
     print(f"Reading {tr_file}...")
     df = pd.read_csv(tr_file)
 
-    atom = tr_file.split('_')[0]
-
     # Open files to write lifetimes and branching ratios
-    filename_lifetimes = atom + '_Lifetimes.csv'
-    filename_br_ratios = atom + '_Transition_Properties.csv'
+    filename_lifetimes = atom_name + '_Lifetimes.csv'
+    filename_br_ratios = atom_name + '_Transition_Properties.csv'
 
     lifetimes_df = pd.DataFrame(columns=['state_configuration', 'state_term', 'state_J', 'lifetime', 'lifetime_uncertainty'])
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
@@ -504,7 +498,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
                                          'branching_ratio_display', 'transition_rate_display', 'transition_rate', 'transition_rate_uncertainty'])
 
     # Load energies early for uncertainty lookup and energy-based sorting
-    energies_file = atom + '_Energies.csv'
+    energies_file = atom_name + '_Energies.csv'
     energy_unc_lookup = {}
     energies_df_for_sort = None
     try:
@@ -946,7 +940,6 @@ def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes
                 upper = (configuration, term, J)
                 energy_cm = upper_energies.get(config, 0.0)
                 lt_ns, lt_unc = lt_lookup.get(upper, (0.0, 0.0))
-                total_rates = sum(rate[1] for rate in rates)
                 lt_str = format_lifetime(lt_ns, lt_unc, show_upper_bound=False)
                 if lt_unc > lt_ns:
                     lt_str += '*'
@@ -987,10 +980,8 @@ def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes
                             br_str += '*'
                         f.write(f'      {rate[0]:<{W_ST}} {operator:<{W_OP}} {wl_str:<{W_WL}} {me_str:<{W_ME}} {rate_str:<{W_RT}} {br_str}\n')
                     else:
-                        br = rate[1] / total_rates if total_rates > 0 else 0.0
-                        wl_s  = _fmt5(rate[3]); me_s = _fmt5(rate[2])
-                        rt_s  = _fmt5(rate[1]); br_s = _fmt5(br)
-                        f.write(f'      {rate[0]:<{W_ST}} {operator:<{W_OP}} {wl_s:<{W_WL}} {me_s:<{W_ME}} {rt_s:<{W_RT}} {br_s}\n')
+                        print(f'WARNING: no display format found for transition {rate[0]} {operator}; skipping')
+                        continue
         print(f'{transitions_file} has been written')
 
 
@@ -1029,7 +1020,7 @@ def main():
 
     # Step 2: Calculate lifetimes and branching ratios
     print("\nStep 2: Calculating lifetimes and branching ratios...")
-    tr_rates, upper_energies, lifetimes_raw = calculate_lifetimes_and_branching_ratios(tr_file)
+    tr_rates, upper_energies, lifetimes_raw = calculate_lifetimes_and_branching_ratios(tr_file, atom_name)
 
     # Step 3: Add parenthetical uncertainty display formats and write {atom}_transitions.txt
     print("\nStep 3: Adding parenthetical uncertainty display formats...")
