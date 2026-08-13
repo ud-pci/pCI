@@ -655,7 +655,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     return tr_rates, upper_energies, lifetimes
 
 
-def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes_raw=None, br_cutoff=1e-6):
+def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes_raw=None, br_cutoff=1e-10):
     """
     Step 3: Overwrite the display columns in the Error_Check CSVs with
     parenthetical uncertainty notation.
@@ -992,9 +992,9 @@ def main():
         description='Generate transition rates and lifetimes from energy levels and matrix elements.'
     )
     parser.add_argument('atom_name', help='Atom name (e.g. Ba1, In2)')
-    parser.add_argument('--br-cutoff', type=float, default=1e-6,
+    parser.add_argument('--br-cutoff', type=float, default=1e-10,
                         help='Branching ratio cutoff; transitions below this are excluded from '
-                             '{atom}_transitions.txt and moved to the Zero_BR CSV (default: 1e-6)')
+                             '{atom}_transitions.txt and moved to the Zero_BR CSV (default: 1e-10)')
     args = parser.parse_args()
     atom_name = args.atom_name
     br_cutoff = args.br_cutoff
