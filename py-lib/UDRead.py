@@ -5,6 +5,7 @@ import atomic_term_symbol
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 
+
 def Convert_Type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     # s = s.replace(" ", "")
     try:
@@ -740,28 +741,33 @@ def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
     return [header,data_final]
 
 
-def Missing_Levels(data):
+def Missing_Levels(data, term_cache=None):
+    if term_cache is None:
+        term_cache = {}
     print("Finding missing levels")
     header,data_copy=data
     data_final = np.copy(data_copy)
 
-    config_nist,term_nist,J_nist,config_ud,term_ud,J_ud = data_final[:,0],data_final[:,1],data_final[:,2],data_final[:,5],data_final[:,8],data_final[:,9]
+    config_nist, config_ud, term_ud, J_ud = data_final[:,0], data_final[:,5], data_final[:,8], data_final[:,9]
 
     idx = np.where(config_nist=="-")[0]
-    config_nist[idx],term_nist[idx],J_nist[idx]=config_ud[idx],term_ud[idx],J_ud[idx]
-    terms_all = np.array([term_nist[i]+J_nist[i] for i in range(len(term_nist))])
+    config_nist[idx] = config_ud[idx]
+    terms_all = np.array([term_ud[i]+J_ud[i] for i in range(len(term_ud))])
 
     lst = np.array([])
     config_exp,term_exp,J_exp=[],[],[]
     terms_calculated=set()
     for i in range(len(config_nist)):
         config = config_nist[i]
-        if config in terms_calculated: 
+        config_key = ' '.join(sorted(config.replace('.', ' ').split()))
+        if config_key in terms_calculated:
             continue
         else:
-            terms_calculated.add(config)
+            terms_calculated.add(config_key)
         if (i in lst)==True or ("0" in config)==True: continue
-        terms_expected = atomic_term_symbol.calc_term_symbols(config)
+        if config_key not in term_cache:
+            term_cache[config_key] = atomic_term_symbol.calc_term_symbols(config_key)
+        terms_expected = term_cache[config_key]
         for j in range(len(terms_expected)):
             term_str = terms_expected[j][:2]+str(Convert_Type(terms_expected[j][2:]))
             idx = np.where((config_nist==config) & (terms_all==term_str))[0]

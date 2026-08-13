@@ -251,16 +251,20 @@ _L_map = {'S': 0, 'P': 1, 'D': 2, 'F': 3, 'G': 4, 'H': 5, 'I': 6, 'K': 7}
 _term_re = re.compile(r'^(\d+)([A-Z])(\d+)$')
 _term_cache = {}
 
+def _conf_key(conf):
+    parts = conf.replace('.', ' ').split()
+    return ' '.join(sorted(parts))
+
 def fix_term(conf, term, S_val, L_val):
     """
     If term is not a valid LS term for conf, replace it with the valid term 
     whose S and L are closest to the CI expectation values S_val/L_val.
     Returns the original term unchanged if no better match is found.
     """
-    conf_space = conf.replace('.', ' ')
-    if conf_space not in _term_cache:
-        _term_cache[conf_space] = scrape_term(conf_space)
-    valid = _term_cache[conf_space]
+    key = _conf_key(conf)
+    if key not in _term_cache:
+        _term_cache[key] = scrape_term(key)
+    valid = _term_cache[key]
     if not valid or term in valid:
         return term
     m = _term_re.match(term)
@@ -1030,8 +1034,8 @@ if __name__ == "__main__":
     ConvertToTXT(data_final_odd,  f'{path_output}/{name}_Odd.txt')
 
     ## Finding Missing Levels
-    data_final_even_missing = Missing_Levels(data_final_even)
-    data_final_odd_missing = Missing_Levels(data_final_odd)
+    data_final_even_missing = Missing_Levels(data_final_even, _term_cache)
+    data_final_odd_missing = Missing_Levels(data_final_odd, _term_cache)
 
     ConvertToTXT(data_final_even_missing, f'{path_output}/{name}_Even+missing.txt')
     ConvertToTXT(data_final_odd_missing,  f'{path_output}/{name}_Odd+missing.txt')
