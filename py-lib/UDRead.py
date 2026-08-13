@@ -275,27 +275,30 @@ def FindJthAll(i,df_nist,df_ud,corr_config=[]): # find ao config corresponding t
         if j_nist==j_ao:
             inv_config = Inverse_Config(config_nist)
             
+            term_nist_u = Unmark_Term(term_nist)
+            term_ao_u = Unmark_Term(term_ao)
+            
             # Second Pass : if Term_NIST = Term_AO
-            if term_nist==term_ao:
+            if term_nist_u==term_ao_u:
                 # Third Pass :
                 if config_nist==config1_ao or inv_config==config1_ao:j1.append(j),Eperc1.append(Eperc)
                 if config_nist==config2_ao or inv_config==config2_ao:j2.append(j),Eperc2.append(Eperc)
             
             # Fourth Pass : If Term_NIST != Term_AO --> Check using term correction by +-1
-            if term_nist!=term_ao: # correction to terms in ao results
+            if term_nist_u!=term_ao_u: # correction to terms in ao results
                 if config_nist==config1_ao or inv_config==config1_ao:
-                    if term_nist==Term_Correct(term_ao,1):j1.append(j),Eperc1.append(Eperc)
-                    if term_nist==Term_Correct(term_ao,-1):j1.append(j),Eperc1.append(Eperc)
+                    if term_nist_u==Term_Correct(term_ao_u,1):j1.append(j),Eperc1.append(Eperc)
+                    if term_nist_u==Term_Correct(term_ao_u,-1):j1.append(j),Eperc1.append(Eperc)
 
                 if config_nist==config2_ao or inv_config==config2_ao:
-                    if term_nist==Term_Correct(term_ao,1):j2.append(j),Eperc2.append(Eperc)
-                    if term_nist==Term_Correct(term_ao,-1):j2.append(j),Eperc2.append(Eperc)
+                    if term_nist_u==Term_Correct(term_ao_u,1):j2.append(j),Eperc2.append(Eperc)
+                    if term_nist_u==Term_Correct(term_ao_u,-1):j2.append(j),Eperc2.append(Eperc)
 
             # Fifth Pass : Check with principal quantum number -1 for theory
             # Theory sometimes overestimates n by 1 (e.g., 2s.7p when it should be 2s.6p)
             # So we need to adjust n of last orbital of theory config down by 1 and check if it matches NIST config
             # Note: NIST configs may have core prefix (e.g., "1s2.2s.6p"), so we need to check both
-            if term_nist==term_ao:
+            if term_nist_u==term_ao_u:
                 try:
                     # Try adjusting theory config1's principal quantum number down by 1
                     # For configs like "2s.7p", we need to adjust the LAST orbital (7p)
@@ -343,7 +346,7 @@ def ChooseJth(ith,J1,J2,Eperc1,Eperc2,df_nist,df_ud,corr_config=[]):
             for i in range(len(J1)):
                 config1,config2,Term,J,Level,Levelau,Per1,Per2,uncer_ud=Data_UD(J1[i],df_ud)
                 config_nist,term_nist,j_nist,level_nist,uncer_nist,term_org=Data_Nist(ith,df_nist)
-                if Term!=term_nist:
+                if Unmark_Term(Term)!=Unmark_Term(term_nist):
                     J1.remove(J1[i])
                     Eperc1.remove(Eperc1[i])
                     break
@@ -524,7 +527,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
 
             if de1!=0 and de2==0: config=config1_ao
             elif de1==0 and de2!=0: config=config2_ao
-            elif de1!=0 and de2!=0: config=config1_ao if de1<=de2 else config2_ao
+            elif de1!=0 and de2!=0: config=config1_ao if de1<de2 else config2_ao
             else: config=config1_ao
 
             new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
