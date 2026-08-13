@@ -3,7 +3,7 @@ gen_portal_csv.py -- generate atomic data CSV files for the ATOM Portal from pCI
 
 Pipeline overview
 -----------------
-1. Read config YAML: atom name, conf J values for even/odd parity, and portal options (min_uncertainty, min_energy_diff_percent, energy_cutoff, gauge).
+1. Read config YAML: atom name, J values for even/odd parity, and portal options (min_uncertainty, min_energy_diff_percent, energy_cutoff, gauge).
 
 2. Collect all input files:
     a. Copy pconf.csv and tm.csv from ci+all-order/ and ci+second-order/ to DATA_RAW/ ("_MBPT" is appended to CI+MBPT results).
@@ -12,7 +12,7 @@ Pipeline overview
 3. Process all input data:
     a. process_pconf_levels: read pconf.csv for both CI+all-order and CI+MBPT.
        Match levels by (conf, term) and compute level energy uncertainty as |CI+all-order - CI+MBPT| in cm^-1,
-       both referenced to the absolute ground state. Write merged CSV files to DATA_Filtered/UD/.
+       both as absolute excitation from the ground state. Write merged CSV files to DATA_Filtered/UD/.
     b. combine_tm: merge the CI+all-order and CI+MBPT tm.csv files and write DATA_Processed/tm.csv with matrix element uncertainty.
     c. Reformat NIST data and write parity-filtered CSV files to DATA_Filtered/NIST/.
 
@@ -20,12 +20,12 @@ Pipeline overview
     Results are written to DATA_Output/{atom}_Even.txt and DATA_Output/{atom}_Odd.txt.
 
 5. create_mapping: read the txt files and build a list of mapping tuples:
-        [ [NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
-            [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
-            energy_diff_pct,   # |NIST - theory| / NIST * 100 (%)
-            has_nist ]         # True if a NIST match was found
+    [ [NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
+      [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
+      energy_diff_pct,   # |NIST - theory| / NIST * 100 (%)
+      has_nist ]         # True if a NIST match was found
 
-6. Filter mapping: 
+6. Filter mapping:
     - Drop levels with no MBPT match.
     - Apply energy ceiling.
     - Drop levels where has_nist=True but NIST-theory energy agreement exceeds the threshold.
@@ -336,32 +336,47 @@ def process_pconf_levels(name, filepath):
 
     ht_to_cm = 219474.63
 
-    # MBPT lookup: (conf, term) -> energy_au, used to compute uncertainty via absolute energies.
-    mbpt_au_even = {(r[0], r[1]): r[2] for r in mbpt_even}
-    mbpt_au_odd = {(r[0], r[1]): r[2] for r in mbpt_odd}
+    # MBPT lookup: (conf, term) -> [(n_mbpt, row), ...] by row index order.
+    # Using a list per key rather than a flat dict lets duplicates get mapped to each other.
+    def _build_mbpt_groups(mbpt_rows):
+        groups = {}
+        for n, mr in enumerate(mbpt_rows, 1):
+            key = (mr[0], mr[1])
+            if key not in groups:
+                groups[key] = []
+            groups[key].append((n, mr))
+        return groups
+
+    mbpt_groups_even = _build_mbpt_groups(mbpt_even)
+    mbpt_groups_odd = _build_mbpt_groups(mbpt_odd)
     mbpt_gs_au = (mbpt_even[0][2] if gs_parity == 'even' else mbpt_odd[0][2]) if second_order_exists else None
 
-    def _build_levels(ao_rows, mbpt_au_map, parity):
+    def _build_levels(ao_rows, mbpt_groups, parity):
         levels = []
+        occurrence = {}
         for r in ao_rows:
-            conf, term, energy_au, energy_cm_own = r[0], r[1], r[2], r[3]
+            conf, term, energy_au, energy_cm = r[0], r[1], r[2], r[3]
             J_str = r[6]
             if parity == gs_parity:
-                energy_cm_global = energy_cm_own
+                energy_cm_global = energy_cm
             else:
                 energy_cm_global = round((gs_energy_au - energy_au) * ht_to_cm, 2)
-            mbpt_au = mbpt_au_map.get((conf, term))
-            if mbpt_au is None or mbpt_gs_au is None:
-                unc = '-'
-            else:
+            key = (conf, term)
+            occ = occurrence.get(key, 0)
+            occurrence[key] = occ + 1
+            group = mbpt_groups.get(key, [])
+            if occ < len(group) and mbpt_gs_au is not None:
+                _, mr = group[occ]
                 ao_abs = (gs_energy_au - energy_au) * ht_to_cm
-                mbpt_abs = (mbpt_gs_au - mbpt_au) * ht_to_cm
+                mbpt_abs = (mbpt_gs_au - mr[2]) * ht_to_cm
                 unc = round(abs(ao_abs - mbpt_abs))
+            else:
+                unc = '-'
             levels.append([conf, term, energy_au, energy_cm_global, unc, J_str])
         return levels
 
-    even_levels = _build_levels(ao_even, mbpt_au_even, 'even')
-    odd_levels  = _build_levels(ao_odd,  mbpt_au_odd,  'odd')
+    even_levels = _build_levels(ao_even, mbpt_groups_even, 'even')
+    odd_levels  = _build_levels(ao_odd,  mbpt_groups_odd,  'odd')
     all_levels  = even_levels + odd_levels
 
     confs         = [r[0] for r in all_levels]
@@ -381,8 +396,45 @@ def process_pconf_levels(name, filepath):
         'odd':  [r[6] for r in ao_odd],
     }
 
+    def _write_pconf_comp(ao_rows, mbpt_groups, level_rows, parity):
+        csvfile = f'DATA_Filtered/UD/pconf_comp_{parity}.csv'
+        os.makedirs(os.path.dirname(csvfile), exist_ok=True)
+        occurrence = {}
+        with open(csvfile, 'w') as f:
+            f.write('n_ao,n_mbpt,conf_ao,term_ao,conf_mbpt,term_mbpt,'
+                    'energy_cm_ao,energy_cm_mbpt,uncertainty,conf2_ao,conf2_mbpt\n')
+            for n_ao, (r, lv) in enumerate(zip(ao_rows, level_rows), 1):
+                conf_ao = r[0]
+                term_ao = r[1]
+                conf2_ao = r[10]
+                energy_cm_ao = lv[3]
+                unc = lv[4]
+                key = (conf_ao, term_ao)
+                occ = occurrence.get(key, 0)
+                occurrence[key] = occ + 1
+                group = mbpt_groups.get(key, [])
+                if occ < len(group):
+                    n_mbpt, mr    = group[occ]
+                    conf_mbpt     = mr[0]
+                    term_mbpt     = mr[1]
+                    conf2_mbpt    = mr[10]
+                    mbpt_energy_cm = round((mbpt_gs_au - mr[2]) * ht_to_cm, 2)
+                else:
+                    n_mbpt = conf_mbpt = term_mbpt = conf2_mbpt = '-'
+                    mbpt_energy_cm = '-'
+                f.write(','.join([str(n_ao), str(n_mbpt),
+                                  conf_ao, term_ao,
+                                  str(conf_mbpt), str(term_mbpt),
+                                  str(energy_cm_ao), str(mbpt_energy_cm),
+                                  str(unc), conf2_ao, str(conf2_mbpt)]) + '\n')
+        print(f'{csvfile} has been written')
+    
+    print(f'Ground state parity: {gs_parity}')
+    
     write_pconf_csv(name, 'even', ao_even, even_levels)
     write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
+    _write_pconf_comp(ao_even, mbpt_groups_even, even_levels, 'even')
+    _write_pconf_comp(ao_odd,  mbpt_groups_odd,  odd_levels,  'odd')
 
     return (confs, terms, energies_au, energies_cm, uncertainties, theory_J)
 
