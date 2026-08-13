@@ -178,7 +178,7 @@ def SubtractStr(a,b,w=True): # give subtraction between string a and b : "3p6.4s
     if w==True: return ri,i
     if w==False: return ri
 
-def Dataframe(path_nist,path_ud,gs_exists,nist_max=0):
+def Dataframe(path_nist,path_ud,nist_max=0):
     # read csv
     df_nist = pd.read_csv(path_nist,keep_default_na=False)
     df_ud = pd.read_csv(path_ud).fillna('') # fill blank for nan
@@ -201,26 +201,15 @@ def Dataframe(path_nist,path_ud,gs_exists,nist_max=0):
         maxx = df_ud[:,1][-1]
         nist_max =  max(np.where(df_nist[:,0]==maxx)[0])-8
     
-    #print("nist_max : ",nist_max)
-
     df_nist = df_nist[:nist_max]
-
-    if gs_exists:
-        ref_E = df_nist[:,3][0]
-    else: 
-        ref_E = 0
-    df_nist[:,3] = df_nist[:,3]- ref_E
-
     df_nist = BlankTerms(df_nist,df_ud)
-    #print(df_nist[0])
-    #print(df_nist[1])
 
     df_nist=Mark_NIST(df_nist)
     df_ud=Mark_UD(df_ud)
 
 
     print("Generating Dataframes...!")
-    return df_nist,df_ud,ref_E
+    return df_nist, df_ud
 
 
 def BlankTerms(df_nist,df_ud): # Filling in blank terms (terms for states with terms (1/2,3/2) in Fe16+) in nist data
@@ -632,9 +621,9 @@ def ESort(i,data_final):
 
 
 # j,df_nist,df_ud,corr_config=[],OutAll=False
-def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0):
+def MainCode(path_nist,path_ud,nist_max,Ordering="E"):
 
-    df_nist,df_ud,ref_E = Dataframe(path_nist,path_ud,gs_exists,nist_max)
+    df_nist, df_ud = Dataframe(path_nist,path_ud,nist_max)
     ManualCorrection=True if ("Sr_I" in path_nist.split("/")[-1])==True else False
     new_config = Corrected_Config(df_ud,df_nist,ManCorr=ManualCorrection)
 
@@ -684,17 +673,15 @@ def MainCode(path_nist,path_ud,nist_max,gs_exists,Ordering="E",nist_offset=0.0):
         config_nist, term_nist, j_nist, level_nist, uncer_nist,term_org = Data_Nist(i,df_nist)
         term_nist=Unmark_Term(term_nist)
         term_org=term_org.replace(' ','.')
-        data_nist = [config_nist, term_org, j_nist, round(level_nist+nist_offset,roundd),uncer_nist]
+        data_nist = [config_nist, term_org, j_nist, round(level_nist,roundd),uncer_nist]
 
         if i in nist_used_dict:
             matched_nist_states.add((config_nist, term_org, j_nist))
             jth, jf, de = nist_used_dict[i]
             config1_ao, config2_ao, term_ao, j_ao, level_ao,level_au, per1,per2,uncer_ud = Data_UD(jth,df_ud)
             final_config = config2_ao if jf==2 else config1_ao # final config
-            # Calculate energy difference after applying offsets (relative to ground state)
-            nist_energy_offset = level_nist + nist_offset
-            Ediff = round(abs(nist_energy_offset - level_ao),1)
-            Eperc = round(100*Ediff/nist_energy_offset,2) if nist_energy_offset!=0 else 0
+            Ediff = round(abs(level_nist - level_ao),1)
+            Eperc = round(100*Ediff/level_nist,2) if level_nist!=0 else 0
             EpercStr = str(Eperc)+"%"
             if config2_ao=='': config2_ao='-'
             term_ao=Unmark_Term(term_ao)

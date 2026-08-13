@@ -191,22 +191,6 @@ def generate_mapping_fixes(mapping):
 
     return fixes
 
-def normalize_config(config):
-    '''
-    Normalize an electronic configuration string by sorting the subshells.
-    Example: "5s.4d" -> "4d.5s"
-    '''
-    if not isinstance(config, str):
-        return config
-    
-    parts = [part.strip() for part in config.split('.') if part.strip()]
-    parts.sort(key=lambda x: (
-        int(re.match(r'(\d+)', x).group(1)) if re.match(r'(\d+)', x) else 0,
-        x
-    ))
-    
-    return ".".join(parts)
-
 
 def read_pconf_csv(path):
     '''
@@ -305,7 +289,7 @@ def fix_term(conf, term, S_val, L_val):
         print(f'  fix_term: {conf} {term} -> {best} (S={S_val}, L={L_val})')
     return best
 
-def process_pconf_levels(name, filepath, data_nist):
+def process_pconf_levels(name, filepath):
     '''
     Read pconf_even.csv / pconf_odd.csv (and optional MBPT variants) from filepath,
     compute level energies globally referenced to the ground state, 
@@ -385,38 +369,12 @@ def process_pconf_levels(name, filepath, data_nist):
     energies_au   = [r[2] for r in all_levels]
     energies_cm   = [r[3] for r in all_levels]
     uncertainties = [r[4] for r in all_levels]
-    J_list        = [r[5] for r in all_levels]
 
     with open('final_res.csv', 'w') as f:
         f.write('conf,term,J,energy(a.u.),energy(cm-1),uncertainty\n')
         for r in all_levels:
             f.write(','.join([r[0], r[1], r[5],
                               str(r[2]), str(r[3]), str(r[4])]) + '\n')
-
-    gs_exists = False
-    nist_conf = data_nist['Configuration'].iloc[0]
-    nist_term = data_nist['Term'].iloc[0]
-    nist_J    = data_nist['J'].iloc[0]
-    for i in range(len(confs)):
-        term = terms[i]
-        J    = J_list[i]
-        if normalize_config(confs[i]) == normalize_config(nist_conf):
-            gs_exists = True
-            print(f'ground state found: {confs[i]}')
-            break
-        else:
-            str_diff, num_diff = SubtractStr(nist_conf, confs[i])
-            if num_diff > 0:
-                if nist_conf.replace(str_diff, '') == confs[i] and nist_term == term[:-1] and _j_suffix(float(str(nist_J))) == J:
-                    gs_exists = True
-                    print(f'ground state found: {confs[i]}')
-                    break
-
-    if not gs_exists:
-        print(f"{data_nist['Configuration'].iloc[0]} not in {confs}")
-        gs_parity = find_parity(data_nist['Configuration'].iloc[0])
-
-    energy_shift = abs(ht_to_cm * (ao_even[0][2] - ao_odd[0][2]))
 
     theory_J = {
         'even': [r[6] for r in ao_even],
@@ -426,7 +384,7 @@ def process_pconf_levels(name, filepath, data_nist):
     write_pconf_csv(name, 'even', ao_even, even_levels)
     write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
 
-    return (confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, gs_exists)
+    return (confs, terms, energies_au, energies_cm, uncertainties, theory_J)
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -476,54 +434,6 @@ def write_final_res(full_res, outfile):
 
     print(f'{outfile} has been written')
 
-def convert_res_to_csv(filename, full_res, gs_exists, name):
-
-    f = open(filename, 'r')
-    lines = f.readlines()
-    f.close()
-
-    if 'odd' in filename:
-        parity = 'Odd'
-    elif 'even' in filename:
-        parity = 'Even'
-    else:
-        print('ERROR: cannot determine parity from filename: ' + filename)
-        sys.exit()
-    csvfile = "DATA_Filtered/UD/"+name+'_UD_' + parity + '.csv'
-
-    os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-    with open(csvfile, 'w') as f:
-        f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
-        for row in full_res:
-            f.write(','.join([str(item) for item in row[0:2]]) + ',' + row[2].replace(',','') + ',' + ','.join([str(item) for item in row[3:]]) + '\n')
-    print(csvfile + ' has been written')
-
-def find_parity(configuration):
-    '''
-    This function finds parity of specified configuration
-    '''
-    p = 0
-    parity = ''
-    ldict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
-    
-    orbitals = configuration.split('.')
-    for orbital in orbitals:
-        nq = re.findall('[0-9]+', orbital)
-        if len(nq) <= 1: 
-            q = 1
-        else:
-            q = int(nq[1])
-        
-        l_str = re.findall('[spdfghi]+', orbital)[0]
-        l = ldict[l_str]
-        p += l*q
-    
-    if p%2 == 0:
-        parity = 'even'
-    else:
-        parity= 'odd'
-        
-    return parity
 
 def write_energy_csv(name, mapping, min_energy_diff_percent):
     '''
@@ -711,22 +621,6 @@ def nist_parity(term):
     
     return parity
 
-def find_energy_shift(df):
-    '''
-    this function finds the energy shift between lowest odd and even parity energy levels
-    '''
-    ground_parity = nist_parity(df['state_term'].values[:1][0])
-
-    energy_shift = 0.0
-    for _, row in df.iterrows():
-        parity = nist_parity(row['state_term'])
-        if parity != ground_parity:
-            # Skip if energy is missing (marked as '-')
-            if row['energy'] != '-':
-                energy_shift = float(row['energy'])
-                break
-
-    return energy_shift
 
 def convert_num_to_roman(num):
     """
@@ -1034,7 +928,7 @@ if __name__ == "__main__":
         print(f'Please put raw files in {raw_path}')
         print('The files should be named: pconf_even.csv, pconf_odd.csv, pconf_even_MBPT.csv, pconf_odd_MBPT.csv')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, gs_exists = process_pconf_levels(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_J = process_pconf_levels(name, raw_path)
 
     if j0 is not None:
         combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
@@ -1043,11 +937,6 @@ if __name__ == "__main__":
         print('tm.csv not found in DATA_Processed/')
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
-    if gs_exists:
-        NIST_shift = find_energy_shift(data_nist)
-    else:
-        NIST_shift = 0
-        theory_shift = 0
 
     # Store filtered data of even or odd parity in DATA_Filtered/NIST/
     df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
@@ -1075,18 +964,8 @@ if __name__ == "__main__":
     path_output = "DATA_Output/"
     os.makedirs(os.path.dirname(path_output), exist_ok=True)
 
-    # NIST energies still need the cross-parity shift; theory energies in the
-    # UD CSV are already referenced to the ground state by _build_levels, so
-    # theory_offset is always 0.
-    nist_even_offset = 0.0 if gs_parity == 'even' else NIST_shift
-    nist_odd_offset = 0.0 if gs_parity == 'odd' else NIST_shift
-
-    print(f'Ground state parity: {gs_parity}')
-    print(f'NIST energy offset for even parity: {nist_even_offset} cm-1')
-    print(f'NIST energy offset for odd parity: {nist_odd_offset} cm-1')
-
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists, nist_offset=nist_even_offset)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists, nist_offset=nist_odd_offset)
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
     
     path = "DATA_Output/"+name+"_Even.txt" 
     ConvertToTXT(data_final_even, path)
