@@ -263,6 +263,48 @@ def write_pconf_csv(name, parity, ao_rows, level_rows):
     print(f'{csvfile} has been written')
 
 
+_L_map = {'S': 0, 'P': 1, 'D': 2, 'F': 3, 'G': 4, 'H': 5, 'I': 6, 'K': 7}
+_term_re = re.compile(r'^(\d+)([A-Z])(\d+)$')
+_term_cache = {}
+
+def fix_term(conf, term, S_val, L_val):
+    """
+    If term is not a valid LS term for conf, replace it with the valid term 
+    whose S and L are closest to the CI expectation values S_val/L_val.
+    Returns the original term unchanged if no better match is found.
+    """
+    conf_space = conf.replace('.', ' ')
+    if conf_space not in _term_cache:
+        _term_cache[conf_space] = scrape_term(conf_space)
+    valid = _term_cache[conf_space]
+    if not valid or term in valid:
+        return term
+    m = _term_re.match(term)
+    if not m:
+        return term
+    J_target = int(m.group(3))
+    valid_same_J = [(t, mt) for t in valid for mt in [_term_re.match(t)] if mt and int(mt.group(3)) == J_target]
+    if not valid_same_J:
+        return term
+    try:
+        S_ci = float(S_val)
+        L_ci = float(L_val)
+    except (ValueError, TypeError):
+        return term
+    best, best_dist = term, float('inf')
+    for t, mt in valid_same_J:
+        S_t = (int(mt.group(1)) - 1) / 2.0
+        L_t = _L_map.get(mt.group(2), -1)
+        if L_t < 0:
+            continue
+        dist = abs(S_ci - S_t) + abs(L_ci - L_t)
+        if dist < best_dist:
+            best_dist = dist
+            best = t
+    if best != term:
+        print(f'  fix_term: {conf} {term} -> {best} (S={S_val}, L={L_val})')
+    return best
+
 def process_pconf_levels(name, filepath, data_nist):
     '''
     Read pconf_even.csv / pconf_odd.csv (and optional MBPT variants) from filepath,
@@ -294,6 +336,11 @@ def process_pconf_levels(name, filepath, data_nist):
     ao_odd    = read_pconf_csv(path_odd)
     mbpt_even = read_pconf_csv(path_even_mbpt) if second_order_exists else []
     mbpt_odd  = read_pconf_csv(path_odd_mbpt)  if second_order_exists else []
+
+    # Fix terms in all files before matching
+    for rows in (ao_even, ao_odd, mbpt_even, mbpt_odd):
+        for r in rows:
+            r[1] = fix_term(r[0], r[1], r[4], r[5])
 
     # Larger energy_au = more tightly bound (valence energy convention in pconf)
     if ao_even[0][2] > ao_odd[0][2]:
