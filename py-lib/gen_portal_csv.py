@@ -114,10 +114,10 @@ def create_mapping(name, num_levels_even, num_levels_odd):
     This function reads Vipul's energy level table and creates the mapping between experimental and theory data
     Data to map: Config, Term, J, Energy(cm-1)
     '''
-    with open("DATA_Output/"+name+"_Even.txt", 'r') as f:
+    with open(f'DATA_Output/{name}_Even.txt', 'r') as f:
         lines = f.readlines()[:num_levels_even + 1]
 
-    with open("DATA_Output/"+name+"_Odd.txt", 'r') as f:
+    with open(f'DATA_Output/{name}_Odd.txt', 'r') as f:
         lines = lines + f.readlines()[:num_levels_odd + 1]
     
     mapping = []
@@ -224,7 +224,7 @@ def write_pconf_csv(name, parity, ao_rows, level_rows):
     level_rows: output of _build_levels
     '''
     parity_cap = parity.capitalize()
-    csvfile = 'DATA_Filtered/UD/' + name + '_UD_' + parity_cap + '.csv'
+    csvfile = f'DATA_Filtered/UD/{name}_UD_{parity_cap}.csv'
     os.makedirs(os.path.dirname(csvfile), exist_ok=True)
     with open(csvfile, 'w') as f:
         f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
@@ -286,7 +286,7 @@ def fix_term(conf, term, S_val, L_val):
             best_dist = dist
             best = t
     if best != term:
-        print(f'  fix_term: {conf} {term} -> {best} (S={S_val}, L={L_val})')
+        print(f'  fix_term: {conf} {term} -> {best} (S={float(S_val):.3f}, L={float(L_val):.3f})')
     return best
 
 def process_pconf_levels(name, filepath):
@@ -818,6 +818,7 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
     os.makedirs(filtered_path, exist_ok=True)
     
     frames = []
+    unmatched_frames = []
     for label in tm_labels:
         path_ao   = data_raw_path + '/' + label + '.csv'
         path_mbpt = data_raw_path + '/' + label + '_MBPT.csv'
@@ -831,9 +832,10 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
             merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
             no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
             n_unmatched = len(no_mbpt)
-            for _, r in no_mbpt.iterrows():
-                print(f'    {r["state_one_configuration"]} {r["state_one_term"]} -> '
-                      f'{r["state_two_configuration"]} {r["state_two_term"]} {r["operator"]}')
+            if n_unmatched > 0:
+                tag = no_mbpt[match_keys].copy()
+                tag.insert(0, 'tm_file', label)
+                unmatched_frames.append(tag)
             merged = merged[merged['matrix_element_value_mbpt'].notna()].reset_index(drop=True)
             merged['matrix_element_uncertainty'] = (
                 merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
@@ -856,6 +858,11 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
         print(f'{label}: {len(merged)} matched transitions{unmatched_str} -> {filtered_out}')
         frames.append(merged)
         
+    if unmatched_frames:
+        unmatched_path = filtered_path + '/tm_unmatched.csv'
+        pd.concat(unmatched_frames, ignore_index=True).to_csv(unmatched_path, index=False)
+        print(f'unmatched transitions written to {unmatched_path}')
+
     if not frames:
         print('no tm.csv files found; skipping combine_tm')
         return
@@ -948,9 +955,9 @@ if __name__ == "__main__":
     # Find input files from directories if they exist and put into DATA_RAW directory
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
-    data_filtered_theory_path = 'DATA_Filtered/UD/'
-    data_filtered_nist_path = 'DATA_Filtered/NIST/'
-    data_processed_path = 'DATA_Processed/'
+    data_filtered_theory_path = 'DATA_Filtered/UD'
+    data_filtered_nist_path = 'DATA_Filtered/NIST'
+    data_processed_path = 'DATA_Processed'
     for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
         os.makedirs(d, exist_ok=True)
     
@@ -984,23 +991,23 @@ if __name__ == "__main__":
 
     if j0 is not None:
         combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
-    matrix_file_exists = os.path.exists('DATA_Processed/tm.csv')
+    matrix_file_exists = os.path.exists(f'{data_processed_path}/tm.csv')
     if not matrix_file_exists:
-        print('tm.csv not found in DATA_Processed/')
+        print(f'tm.csv not found in {data_processed_path}/')
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
 
     # Store filtered data of even or odd parity in DATA_Filtered/NIST/
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'even')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name)
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}', 'odd')
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}', 'even')
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}')
     
     # Filter NIST and UD data
-    path_nist_even = data_filtered_nist_path+name+"_NIST_Even.csv"
-    path_ud_even = data_filtered_theory_path+name+"_UD_Even.csv"
+    path_nist_even = f'{data_filtered_nist_path}/{name}_NIST_Even.csv'
+    path_ud_even   = f'{data_filtered_theory_path}/{name}_UD_Even.csv'
 
-    path_nist_odd = data_filtered_nist_path+name+"_NIST_Odd.csv"
-    path_ud_odd = data_filtered_theory_path+name+"_UD_Odd.csv"
+    path_nist_odd = f'{data_filtered_nist_path}/{name}_NIST_Odd.csv'
+    path_ud_odd   = f'{data_filtered_theory_path}/{name}_UD_Odd.csv'
     
     # Set maximum number of levels to be read from NIST equal to number of levels in pconf.csv
     num_levels_theory_even = len(pd.read_csv(raw_path + 'pconf_even.csv'))
@@ -1013,25 +1020,21 @@ if __name__ == "__main__":
     print(f'Number of odd parity levels: {num_levels_theory_odd}')
 
     # Export filtered data to output directory
-    path_output = "DATA_Output/"
-    os.makedirs(os.path.dirname(path_output), exist_ok=True)
+    path_output = "DATA_Output"
+    os.makedirs(path_output, exist_ok=True)
 
     data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
     data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
-    
-    path = "DATA_Output/"+name+"_Even.txt" 
-    ConvertToTXT(data_final_even, path)
-    path = "DATA_Output/"+name+"_Odd.txt" 
-    ConvertToTXT(data_final_odd, path)
-    
+
+    ConvertToTXT(data_final_even, f'{path_output}/{name}_Even.txt')
+    ConvertToTXT(data_final_odd,  f'{path_output}/{name}_Odd.txt')
+
     ## Finding Missing Levels
     data_final_even_missing = Missing_Levels(data_final_even)
-    data_final_odd_missing = Missing_Levels(data_final_odd)    
+    data_final_odd_missing = Missing_Levels(data_final_odd)
 
-    path = "DATA_Output/"+name+"_Even+missing.txt" 
-    ConvertToTXT(data_final_even_missing, path)
-    path = "DATA_Output/"+name+"_Odd+missing.txt" 
-    ConvertToTXT(data_final_odd_missing, path)
+    ConvertToTXT(data_final_even_missing, f'{path_output}/{name}_Even+missing.txt')
+    ConvertToTXT(data_final_odd_missing,  f'{path_output}/{name}_Odd+missing.txt')
     
     mapping = create_mapping(name, num_levels_theory_even, num_levels_theory_odd)
 
