@@ -53,7 +53,7 @@ from UDRead import *
 from parse_asd import *
 from get_atomic_term import *
 from compare_res import *
-from utils import get_dict_value
+from utils import get_dict_value, get_basis_dir_name
 import shutil
 
 def read_yaml(filename):
@@ -867,16 +867,17 @@ def _j_suffix(j):
     i = int(f)
     return str(i) if f == i else str(f)
 
-def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
+def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix='', subdir=None):
     if not os.path.isdir(method_dir):
         print(f'{method_dir} directory not found, skipping')
         return
-    
+
+    prefix = method_dir + '/' + subdir if subdir else method_dir
     s0 = str(int(float(j0)))
     s1 = str(int(float(j1)))
     sfx = ('_' + res_suffix) if res_suffix else ''
     for parity in ('even', 'odd'):
-        src = method_dir + '/' + parity + s0 + '/pconf.csv'
+        src = prefix + '/' + parity + s0 + '/pconf.csv'
         dst = data_raw_path + '/pconf_' + parity + sfx + '.csv'
         if os.path.isfile(src):
             shutil.copy(src, dst)
@@ -890,7 +891,7 @@ def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix=''):
         'tm_odd'  + s0 + '_even' + s1,
     ]
     for tm_label in tm_dirs:
-        src = method_dir + '/' + tm_label + '/tm.csv'
+        src = prefix + '/' + tm_label + '/tm.csv'
         dst = data_raw_path + '/' + tm_label + sfx + '.csv'
         if os.path.isfile(src):
             shutil.copy(src, dst)
@@ -1054,13 +1055,18 @@ if __name__ == "__main__":
     for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
         os.makedirs(d, exist_ok=True)
     
+    system = get_dict_value(config, 'system') if use_config_yml else None
+    basis_subdir = get_dict_value(system, 'basis_subdir') if system else None
+    add_config = get_dict_value(config, 'add') if use_config_yml else None
+    basis_dir_name = get_basis_dir_name(add_config['basis_set']) if basis_subdir and add_config else None
+
     j0, j1 = None, None
     if even_J is not None and odd_J is not None:
         j_values = sorted(set([float(even_J), float(odd_J)]))
         if len(j_values) >= 2:
             j0, j1 = j_values[0], j_values[1]
-            collect_portal_files('ci+all-order', j0, j1, data_raw_path)
-            collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT')
+            collect_portal_files('ci+all-order', j0, j1, data_raw_path, subdir=basis_dir_name)
+            collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT', subdir=basis_dir_name)
         else:
             print(f'even and odd J are the same ({j_values[0]}); cannot determine TM directory pairs')
     else:

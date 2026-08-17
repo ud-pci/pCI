@@ -48,7 +48,7 @@ import yaml
 import os
 import sys
 from pathlib import Path
-from utils import run_shell, get_dict_value, check_slurm_installed
+from utils import run_shell, get_dict_value, check_slurm_installed, get_basis_dir_name
 from gen_job_script import write_job_script
 
 
@@ -187,6 +187,9 @@ if __name__ == "__main__":
     bin_dir = get_dict_value(system, 'bin_directory')
     run_codes = get_dict_value(system, 'run_codes')
     for_portal = get_dict_value(system, 'for_portal')
+    basis_subdir = get_dict_value(system, 'basis_subdir')
+    add_config = get_dict_value(config, 'add')
+    basis_dir_name = get_basis_dir_name(add_config['basis_set']) if basis_subdir and add_config else None
 
     # hpc parameters
     on_slurm = check_slurm_installed()
@@ -269,7 +272,9 @@ if __name__ == "__main__":
 
     dir_path = os.getcwd()
     for method in code_method:
-        full_path = dir_path + '/' + method if len(code_method) > 1 else dir_path
+        method_path = dir_path + '/' + method if len(code_method) > 1 else dir_path
+        full_path = method_path + '/' + basis_dir_name if basis_dir_name else method_path
+        basis_path = method_path + '/basis'
         os.chdir(full_path)
 
         if for_portal:
@@ -307,7 +312,7 @@ if __name__ == "__main__":
                     write_mbpt_inp(basis, dm_key_list)
                 run_shell('cp dtm.in ' + dtm_dir + '/dtm.in')
                 run_shell('cp MBPT.INP ' + dtm_dir + '/MBPT.INP')
-                run_shell('cp basis/HFD.DAT ' + dtm_dir + '/HFD.DAT')
+                run_shell('cp ' + basis_path + '/HFD.DAT ' + dtm_dir + '/HFD.DAT')
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                 run_shell('cp rpa.in ' + dtm_dir + '/rpa.in')

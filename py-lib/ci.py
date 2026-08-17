@@ -26,7 +26,7 @@ import re
 import math
 import orbitals as orb_lib
 import get_atomic_data as libatomic
-from utils import run_shell, get_dict_value, check_slurm_installed
+from utils import run_shell, get_dict_value, check_slurm_installed, get_basis_dir_name
 from pathlib import Path
 from gen_job_script import write_job_script
 
@@ -143,6 +143,7 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
 
     print(f'{filename} has been written')
 
+
 def check_orbital_exists(orb):
     """Exit with an error if orbital n < l+1 (e.g. 3f, 4g do not exist)."""
     m = re.match(r'(\d+)([a-z])', orb)
@@ -227,13 +228,13 @@ def form_conf_inp(parity, bin_dir, j_suffix=None):
     if j_suffix is not None:
         run_shell('rm ADD.INP')
 
-def write_ci_in(conf_dir, write_hij, include_lsj):
+def write_ci_in(conf_dir, write_hij, include_lsj, basis_path='basis'):
     Kw = '1' if write_hij else '0'
     KLSJ = '1' if include_lsj else '0'
     with open(f'{conf_dir}/ci.in', 'w') as f:
-        if os.path.isfile('basis/SGC.CON'):
+        if os.path.isfile(f'{basis_path}/SGC.CON'):
             f.write('Kl = 2 \n')
-            f.write('Ksig = 2 \n' if os.path.isfile('basis/SCRC.CON') else 'Ksig = 1 \n')
+            f.write('Ksig = 2 \n' if os.path.isfile(f'{basis_path}/SCRC.CON') else 'Ksig = 1 \n')
         else:
             f.write('Kl = 0 \n')
             f.write('Ksig = 0 \n')
@@ -241,11 +242,13 @@ def write_ci_in(conf_dir, write_hij, include_lsj):
         f.write(f'Kw = {Kw}\n')
         f.write(f'KLSJ = {KLSJ}')
 
-def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij, K_is, C_is, j_suffix=None):
+def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij, K_is, C_is, j_suffix=None, basis_path=None):
+    if basis_path is None:
+        basis_path = f'{root_dir}/basis'
     if not os.path.isdir(conf_dir):
         run_shell(f'mkdir {conf_dir}')
-    if os.path.isfile('basis/HFD.DAT'):
-        run_shell(f'cp basis/HFD.DAT {conf_dir}')
+    if os.path.isfile(f'{basis_path}/HFD.DAT'):
+        run_shell(f'cp {basis_path}/HFD.DAT {conf_dir}')
     else:
         print('basis/HFD.DAT was not found.. try running basis.py first')
         sys.exit()
@@ -264,14 +267,14 @@ def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij,
         run_shell(f'cp {conf_src} {conf_dir}/CONF.INP')
     if os.path.isfile(add_src):
         run_shell(f'cp {add_src} {conf_dir}/ADD.INP')
-    if os.path.isfile('basis/SGC.CON'):
-        run_shell(f'cp basis/SGC.CON {conf_dir}')
-    if os.path.isfile('basis/SCRC.CON'):
-        run_shell(f'cp basis/SCRC.CON {conf_dir}')
+    if os.path.isfile(f'{basis_path}/SGC.CON'):
+        run_shell(f'cp {basis_path}/SGC.CON {conf_dir}')
+    if os.path.isfile(f'{basis_path}/SCRC.CON'):
+        run_shell(f'cp {basis_path}/SCRC.CON {conf_dir}')
     if run_codes and os.path.isfile(f'{root_dir}/ci.qs'):
         run_shell(f'cp {root_dir}/ci.qs {conf_dir}')
 
-    write_ci_in(conf_dir, write_hij, include_lsj)
+    write_ci_in(conf_dir, write_hij, include_lsj, basis_path)
 
 def submit_ci_job(conf_path, script_name, submit_job):
     os.chdir(conf_path)
@@ -292,6 +295,7 @@ if __name__ == '__main__':
     pci_version = get_dict_value(system, 'pci_version')
     bin_dir = get_dict_value(system, 'bin_directory')
     on_hpc = get_dict_value(system, 'on_hpc')
+    basis_subdir = get_dict_value(system, 'basis_subdir')
 
     # hpc parameters
     on_slurm = check_slurm_installed()
@@ -476,21 +480,30 @@ if __name__ == '__main__':
                 if method is not None:
                     Path(f'{dir_path}/{method}/basis').mkdir(parents=True, exist_ok=True)
                     os.chdir(method)
+                    method_basis = f'{dir_path}/{method}/basis'
+                else:
+                    method_basis = f'{root_dir}/basis'
                 if for_portal:
+                    if basis_subdir:
+                        basis_dir = get_basis_dir_name(config['add']['basis_set'])
+                        Path(basis_dir).mkdir(exist_ok=True)
+                        os.chdir(basis_dir)
                     for parity in parities:
                         for J in j_values:
                             conf_path = f'{parity}{J}'
                             if os.path.isfile(f'{root_dir}/CONF{parity}{J}.INP'):
-                                move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0, j_suffix=J)
+                                move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0, j_suffix=J, basis_path=method_basis)
                                 if on_hpc and run_codes:
                                     submit_ci_job(conf_path, script_name, submit_job)
                                 else:
                                     print('run_codes option is only available with HPC access - please run ci codes manually')
+                    if basis_subdir:
+                        os.chdir('../')
                 else:
                     for parity in parities:
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = f'{parity}{str(J)[0]}'
-                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0)
+                        move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0, basis_path=method_basis)
                         if on_hpc and run_codes:
                             submit_ci_job(conf_path, script_name, submit_job)
                         else:
