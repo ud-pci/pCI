@@ -389,7 +389,7 @@ if __name__ == '__main__':
                 parities.append('odd')
     else:
         if for_portal:
-            j_values = sorted(set([J_even, J_odd]))
+            j_values = sorted({int(J) for J in [J_even, J_odd]})
             print(f'Portal mode enabled - generating configurations for J={j_values} for both parities')
             parities = []
 
