@@ -143,6 +143,19 @@ def write_add_inp(filename, Z, AM, config, multiplicity, num_val, orb_occ, parit
 
     print(f'{filename} has been written')
 
+def check_orbital_exists(orb):
+    """Exit with an error if orbital n < l+1 (e.g. 3f, 4g do not exist)."""
+    m = re.match(r'(\d+)([a-z])', orb)
+    if not m:
+        return
+    n, l_char = int(m.group(1)), m.group(2)
+    if l_char not in orb_lib.l_dict:
+        return
+    l = orb_lib.l_dict[l_char]
+    if n < l + 1:
+        print(f'ERROR: orbital {orb} does not exist (min n for {l_char} is {l + 1})')
+        sys.exit()
+
 def format_configurations(configurations):
     """ Format configurations as 'nnlqq',
         where nn represents principal quantum number
@@ -152,6 +165,7 @@ def format_configurations(configurations):
     for configuration in configurations:
         orbitals_formatted = []
         for orbital in configuration.split():
+            check_orbital_exists(orbital)
             num_digits = len(re.findall('[0-9]+', orbital)[0])
             if num_digits == 1:
                 orbital_formatted = orbital.center(5, ' ')
