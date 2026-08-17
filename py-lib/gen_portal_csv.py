@@ -45,6 +45,7 @@ import yaml
 import re
 import sys
 import os
+from collections import defaultdict, Counter
 import numpy as np
 import pandas as pd
 from fractions import Fraction
@@ -275,23 +276,110 @@ def fix_term(conf, term, S_val, L_val):
     if not valid_same_J:
         return term
     try:
-        S_ci = float(S_val)
-        L_ci = float(L_val)
+        S = float(S_val)
+        L = float(L_val)
     except (ValueError, TypeError):
         return term
     best, best_dist = term, float('inf')
     for t, mt in valid_same_J:
-        S_t = (int(mt.group(1)) - 1) / 2.0
-        L_t = _L_map.get(mt.group(2), -1)
-        if L_t < 0:
+        S_term = (int(mt.group(1)) - 1) / 2.0
+        L_term = _L_map.get(mt.group(2), -1)
+        if L_term < 0:
             continue
-        dist = abs(S_ci - S_t) + abs(L_ci - L_t)
+        dist = abs(S - S_term) + abs(L - L_term)
         if dist < best_dist:
             best_dist = dist
             best = t
     if best != term:
         print(f'  fix_term: {conf} {term} -> {best} (S={float(S_val):.3f}, L={float(L_val):.3f})')
     return best
+
+def _sl_dist(S, L, term):
+    """
+    Return the distance between CI expectation values (S, L) and the S, L implied by a term label.
+    Distance is |S - S_term| + |L - L_term|. Returns inf if the term cannot be parsed.
+    """
+    mt = _term_re.match(term)
+    if not mt:
+        return float('inf')
+    S_term = (int(mt.group(1)) - 1) / 2.0
+    L_term = _L_map.get(mt.group(2), -1)
+    if L_term < 0:
+        return float('inf')
+    return abs(S - S_term) + abs(L - L_term)
+
+def _resolve_term_duplicates(rows):
+    """
+    For each (conf, J) group in rows, if a term appears more than once,
+    keep the occurrence closest to that term by S/L distance and try to
+    reassign the extras to unused valid terms of the same J.
+    """
+    # Group all levels by (configuration, J) so we can check for duplicate
+    # term labels within the same J block of a given configuration.
+    groups = defaultdict(list)
+    for i, r in enumerate(rows):
+        m = _term_re.match(r[1])
+        if m:
+            groups[(r[0], m.group(3))].append(i)
+
+    for (conf, J_char), indices in groups.items():
+        terms = [rows[i][1] for i in indices]
+        term_counts = Counter(terms)
+
+        # For each term that appears more than once, keep the level whose
+        # S and J expectation values are closest to that term.
+        # The remaining duplicate(s) are candidates for relabeling.
+        dup_indices = []
+        for term, count in term_counts.items():
+            if count <= 1:
+                continue
+            cands = [i for i in indices if rows[i][1] == term]
+            try:
+                cands.sort(key=lambda i: _sl_dist(float(rows[i][4]), float(rows[i][5]), term))
+            except (ValueError, TypeError):
+                pass
+            dup_indices.extend(cands[1:])
+
+        if not dup_indices:
+            continue
+
+        # Find all LS terms allowed for this configuration at this J,
+        # then identify which ones are not yet assigned to any level.
+        key = _conf_key(conf)
+        if key not in _term_cache:
+            _term_cache[key] = scrape_term(key)
+        valid = _term_cache[key]
+        valid_same_J = [t for t in valid if _term_re.match(t) and _term_re.match(t).group(3) == J_char]
+        unused = [t for t in valid_same_J if t not in set(terms)]
+
+        if not unused:
+            continue
+
+        # For each candidate duplicate level, compute its S/L distance to each unused term.
+        # Assign greedily by closest match.
+        pairs = []
+        for i in dup_indices:
+            try:
+                S, L = float(rows[i][4]), float(rows[i][5])
+            except (ValueError, TypeError):
+                continue
+            for t in unused:
+                pairs.append((_sl_dist(S, L, t), i, t))
+        pairs.sort()
+
+        assigned_rows, assigned_terms = set(), set()
+        for _, i, t in pairs:
+            if i in assigned_rows or t in assigned_terms:
+                continue
+            assigned_rows.add(i)
+            assigned_terms.add(t)
+            old = rows[i][1]
+            try:
+                S = float(rows[i][4])
+            except (ValueError, TypeError):
+                S = 0.0
+            print(f'  resolve_dup: {conf} {old} -> {t} (S={S:.3f})')
+            rows[i][1] = t
 
 def process_pconf_levels(name, filepath):
     '''
@@ -329,6 +417,7 @@ def process_pconf_levels(name, filepath):
     for rows in (ao_even, ao_odd, mbpt_even, mbpt_odd):
         for r in rows:
             r[1] = fix_term(r[0], r[1], r[4], r[5])
+        _resolve_term_duplicates(rows)
 
     # Larger energy_au = more tightly bound (valence energy convention in pconf)
     if ao_even[0][2] > ao_odd[0][2]:
