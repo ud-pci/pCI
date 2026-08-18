@@ -11,11 +11,11 @@ From these parameters, this script will create all input files required for the 
 After the input files are created, the sequence of basis set codes will be executed if the parameter run_codes is set to "True".
 
 This python script has 2 main capabilities for basis set construction:
-1. Construction of basis for isotope shift calculations 
+1. Construction of basis for isotope shift calculations
 2. Construction of basis for multiple code methods
 
 """
-import yaml 
+import yaml
 import re
 import sys
 import get_atomic_data as libatomic
@@ -26,8 +26,8 @@ from utils import run_shell, get_dict_value, check_slurm_installed
 from gen_job_script import write_job_script
 
 def read_yaml(filename):
-    """ Reads a configuration file in YAML format and returns a dictionary of config parameters """ 
-    with open(filename,'r') as f:
+    """ Reads a configuration file in YAML format and returns a dictionary of config parameters """
+    with open(filename, 'r') as f:
         config = yaml.safe_load(f)
 
     return config
@@ -43,7 +43,7 @@ def count_total_orbitals(core_orbitals, valence_orbitals):
     """ Counts the total number of orbitals given lists of core and valence shells """
     num_core_orbitals = count_orbitals(core_orbitals)
     num_val_orbitals = count_orbitals(valence_orbitals)
-    
+
     return num_core_orbitals + num_val_orbitals, num_core_orbitals, num_val_orbitals
 
 def count_orbitals(orbitals):
@@ -54,7 +54,8 @@ def count_orbitals(orbitals):
         try:
             l = re.findall('[spdfghikl]+', orbital)[0]
         except IndexError:
-            print(orbital + ' is not a valid orbital')
+            print(f'{orbital} is not a valid orbital')
+            continue
         if l == 's':
             num_orbitals += 1
         else:
@@ -64,8 +65,7 @@ def count_orbitals(orbitals):
 
 def get_key_breit(breit_bool):
     """ Returns key for breit from input whether to use breit or not """
-    key_breit = int(re.sub('(no|No|n|N|false|False)', '0', re.sub('(yes|Yes|y|Y|true|True)', '2', str(breit_bool))))
-    return key_breit
+    return 2 if breit_bool else 0
 
 def get_key_vw(kvw_str):
     """ Returns key kvw used in inf.vw """
@@ -150,7 +150,7 @@ def gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals):
     """ Generates a list of relativistic quantum numbers kappa and energy guesses for bas_wj.in """
     N, kappa, iters, energies = [], [], [], []
     lowest_n = {}
-    
+
     for orbital in core_orbitals.split():
         N.append(orbital[0])
         iters.append('0')
@@ -173,7 +173,7 @@ def gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals):
             if orbital[1] == 'g':
                 kappa.append(' 4')
                 kappa.append('-5')
-    
+
     # Retrieve lowest n for each l for valence orbitals
     for orbital in valence_orbitals.split():
         if orbital[1] not in lowest_n:
@@ -200,13 +200,13 @@ def gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals):
                 kappa.append('-4')
             if orbital[1] == 'g':
                 kappa.append(' 4')
-                kappa.append('-5')    
+                kappa.append('-5')
 
     return N, kappa, iters, energies
 
 def get_energy_guess(deg_ion, n, n0, l):
-    """ 
-    Returns the prediction for DHF energy 
+    """
+    Returns the prediction for DHF energy
 
     Inputs:
     deg_ion = degree of ionization (1 for Cs I, 2 for Ba II and so on)
@@ -259,8 +259,6 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
             nmin[3] = n + 1
         elif orbital[-1] == 'g':
             nmin[4] = n + 1
-        else:
-            pass
 
     # Set maximum n for each l (4 lowest s, p, d; 3 lowest f) by default
     if val_aov == {}:
@@ -306,22 +304,7 @@ def get_ao_valence(core_orbitals, valence_orbitals, val_aov):
                 kappa.append(' 4')
             for i in range(nmin[n],nmax[n]):
                 N.append(i)
-                kappa.append('-5')        
-
-    """
-    # Find orbital # for 23f7/2 
-    nmax = [23, 23, 23, 23]
-    Nmax = nmax[0] - nmin[0]            # number of s orbitals
-    print(Nmax)
-    Nmax += (nmax[1] - nmin[1]) * 2     # number of p orbitals 
-    print(Nmax)
-    Nmax += (nmax[2] - nmin[2]) * 2     # number of d orbitals
-    print(Nmax)
-    Nmax += (nmax[3] - nmin[3]) * 2     # number of f orbitals
-    print(Nmax)
-    Nmax -= NSO                         # remove core orbitals
-    print(Nmax)
-    """
+                kappa.append('-5')
 
     return N, kappa
 
@@ -332,99 +315,93 @@ def write_hfd_inp(filename, system, NS, NSO, Z, AM, kbr, NL, J, QQ, KP, NC, rnuc
     JM = -2.0
 
     with open(filename, 'w') as f:
-        f.write(' ' + system['atom']['name'] + '\n')
-        f.write(' KL =  ' + str(KL) + '\n')
-        f.write(' NS =  ' + str(NS) + '\n')
-        f.write(' NSO=  ' + str(NSO) + '\n')
-        f.write(' Z  =  ' + str(Z) + '\n')
+        f.write(f' {system["atom"]["name"]}\n')
+        f.write(f' KL =  {KL}\n')
+        f.write(f' NS =  {NS}\n')
+        f.write(f' NSO=  {NSO}\n')
+        f.write(f' Z  =  {Z}\n')
         try:
-            f.write(' AM =  ' + '{:.2f}'.format(round(AM)) + '\n')
+            f.write(f' AM =  {round(AM):.2f}\n')
         except:
             print('AM could not be found')
             sys.exit()
-        f.write(' JM =  ' + str(JM) + '\n')
-        f.write(' R2 =  ' + str(float(system['basis']['cavity_radius'])) + '\n')
-        f.write(' kbr= ' + str(kbr) + '\n')
+        f.write(f' JM =  {JM}\n')
+        f.write(f' R2 =  {float(system["basis"]["cavity_radius"])}\n')
+        f.write(f' kbr= {kbr}\n')
         if C_is != 0:
-            f.write('K_is= ' + str(K_is) + '\n')
-            f.write('C_is= ' + str(C_is) + '\n')
+            f.write(f'K_is= {K_is}\n')
+            f.write(f'C_is= {C_is}\n')
         if rnuc:
-            f.write('rnuc= ' + '{:.4f}'.format(rnuc) + '\n\n')
+            f.write(f'rnuc= {rnuc:.4f}\n\n')
         else:
             f.write('\n')
         f.write('        NL   J       QQ     KP   NC\n\n')
         for i in range(len(NL)):
-            f.write(str(i+1).rjust(3," ") + '     ' + NL[i] + ' (' + J[i] + ')' + '   ' 
-                        + QQ[i] + '    ' + str(KP[i]) + '   ' + str(NC[i]).rjust(2,' ') + '\n')
-    f.close()
-    print(filename + ' has been written')
+            f.write(f'{i+1:>3}     {NL[i]} ({J[i]})   {QQ[i]}    {KP[i]}   {NC[i]:>2}\n')
+    print(f'{filename} has been written')
 
 def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_base, QQ_base, KP_base, NC_base, rnuc, K_is, C_is):
     """ Write multiple HFD.INP files for case of pure CI"""
 
     basis = system['basis']
-    cavity_radius = basis['cavity_radius']
     core_orbitals = basis['orbitals']['core']
     valence_orbitals = basis['orbitals']['valence']
     order = [shell.strip() for shell in basis['orbitals']['order'].split('/')]
-    
-    num_hfd_inps = len(order)
-    
+
     # Obtain base list of shells
     NL_base, J_base, QQ_base, KP_base, NC_base, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
-    
+
     index = 1
-    base_hfd_index = 1
     shells_found = {}
     frozen_found = { }
     frozen_shells = []
-    
-    core_shells = []        
-    for orbital in core_orbitals.split(" "):
+
+    core_shells = []
+    for orbital in core_orbitals.split(' '):
         core_shells.append(orbital[0] + orbital[1].capitalize())
-        
+
     if num_core_electrons == num_electrons:
         core_shells.pop()
-    
+
     # Loop through list of shells to form orbitals from
     for shell_list in order:
         NL, J, QQ, KP, NC = [], [], [], [], []
 
-        shells = shell_list.split(" ")
-        
+        shells = shell_list.split(' ')
+
         # Count the number of electrons when forming orbitals
         electron_cnt = 0
         electron_removed = False
-        
+
         # Reset shells found
         shells_found = shells_found.fromkeys(shells_found, False)
         frozen_found = frozen_found.fromkeys(frozen_found, False)
-        
+
         # Add new shells to shells_found
         for shell in shells:
             # Get the shell in the same format as NL
-            shell_fmt = shell[0] + shell[1].capitalize()        
+            shell_fmt = shell[0] + shell[1].capitalize()
             shells_found[shell_fmt] = False
-        
+
         nc_it = 0
-        
+
         # Loop through base list of shells formed from all core and valence orbitals
         for i in range(len(NL_base)):
             NL.append(NL_base[i])
             J.append(J_base[i])
-            
+
             QQ_num = int(J_base[i].split('/')[0]) + 1
-            
+
             electron_cnt += QQ_num
-            
+
             # If NL is in the list of found shells, set shells_found to 'True'
-            if NL[i] in list(shells_found.keys()): 
+            if NL[i] in list(shells_found.keys()):
                 shells_found[NL[i]] = True
-                
+
             # If NL is in the list of frozen shells, set frozen_found to 'True
             if NL[i] in list(frozen_found.keys()):
                 frozen_found[NL[i]] = True
-            
+
             # Exit the loop if the following conditions are met:
             # 1. all shells in the "order" list have been found
             # 2. NL is not in the list of "order" shells
@@ -433,24 +410,24 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
                 NL.pop()
                 J.pop()
                 break
-            
+
             # For HFD files after the first, non-core orbitals should have QQ=1 (first j) or QQ=0 (second j)
             # Core orbitals retain their full occupation
             if index > 1 and NL[i] not in core_shells:
                 # Non-core orbitals: QQ=1 for first j-value, QQ=0 for second j-value
                 if i == 0 or NL[i] != NL[i-1]:
-                    QQ.append(f"{1:.4f}")
+                    QQ.append(f'{1:.4f}')
                 else:
-                    QQ.append(f"{0:.4f}")
+                    QQ.append(f'{0:.4f}')
             # Finding when to remove an electron distinguishes core and valence shells
             # If an electron hasn't been removed yet, check if the electron count has surpassed the N-1 threshold
             elif not electron_removed:
                 # If it has, remove an electron from QQ
                 if electron_cnt > num_electrons - 1:
-                    QQ.append(f"{QQ_num - 1:.4f}")
+                    QQ.append(f'{QQ_num - 1:.4f}')
                     electron_removed = True
                 else:
-                    QQ.append(f"{QQ_num:.4f}")
+                    QQ.append(f'{QQ_num:.4f}')
 
             # If an electron has already been removed, set QQ to 0.0000 if any of the following conditions match:
             # 1. if the current shell is frozen
@@ -458,21 +435,21 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
             # 3. current shell is not in the shells_found list
             else:
                 if NL[i] in frozen_shells or NL[i] == NL[i-1] or NL[i] not in shells_found.keys():
-                    QQ.append(f"{0:.4f}")
+                    QQ.append(f'{0:.4f}')
                 else:
-                    QQ.append(f"{1:.4f}")
-            
+                    QQ.append(f'{1:.4f}')
+
             # By default, first list has KP = 0 and NC = 0 for all shells
             if index == 1:
                 KP.append(0)
                 NC.append(0)
-            else:                
+            else:
                 # Set KP = 1 if the current shell is in core or is frozen, else 0
                 if NL[i] in core_shells or NL[i] in frozen_found.keys():
                     KP.append(1)
                 else:
                     KP.append(0)
-                
+
                 # Set NC = 0 if the current shell is in core or is frozen, else iterate per shell
                 if NL[i] in core_shells or NL[i] in frozen_found.keys() and NC[i-1] == 0:
                     NC.append(0)
@@ -480,10 +457,10 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
                     if NL[i] != NL[i-1]:
                         nc_it += 1
                     NC.append(nc_it)
-        
+
         # Freeze the shells for next iteration
         for shell in shells:
-            shell_fmt = shell[0] + shell[1].capitalize() 
+            shell_fmt = shell[0] + shell[1].capitalize()
             if shell_fmt not in frozen_shells:
                 frozen_shells.append(shell_fmt)
                 frozen_found[shell_fmt] = False
@@ -491,8 +468,8 @@ def write_hfd_inp_ci(filename, system, num_electrons, Z, AM, kbrt, NL_base, J_ba
         # Write the HFD.INP to construct orbitals for this shell
         NS = len(NL)
         NSO = count_orbitals_in_list(core_shells)
-        write_hfd_inp('HFD'+str(index)+'.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
-        
+        write_hfd_inp(f'HFD{index}.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
+
         index += 1
 
 def count_orbitals_in_list(shell_list):
@@ -503,7 +480,7 @@ def count_orbitals_in_list(shell_list):
             num_orbitals += 1
         else:
             num_orbitals += 2
-    
+
     return num_orbitals
 
 def construct_vvorbs(core, valence, codename, nmax, lmax):
@@ -513,7 +490,7 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
 
     ## First we need to construct list of orbitals from nmax + lmax
     nmin = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    core_val = core + ' ' + valence
+    core_val = f'{core} {valence}'
     l = ['s','p','d','f','g','h','i','k','l']
     for orbital in core_val.split():
         n = int(re.findall('[0-9]+', orbital)[0])
@@ -535,8 +512,6 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
             nmin[7] = n
         elif orbital[-1] == 'l' and n > nmin[8]:
             nmin[8] = n
-        else:
-            pass
 
     ### Set minimum n for each l, effectively removing core orbitals
     for n in range(len(nmin)):
@@ -545,30 +520,20 @@ def construct_vvorbs(core, valence, codename, nmax, lmax):
         nmin[n] += 1
 
     # Write valence orbitals
-    if codename == 'ci':
-        if len(valence.split()) != 0:
-            count = 0
-            for i in range(0, len(valence.split())):
-                orbs = liborb.convert_char_to_digital(valence.split()[i])
-                for orb in orbs:
-                    count += 1
-                    vorbs += [orb]
-                    norbs += [orb[-6]+orb[-4]]
-    else:
-        if len(valence.split()) != 0:
-            count = 0
-            for i in range(0, len(valence.split())):
-                orbs = liborb.convert_char_to_digital(valence.split()[i])
-                for orb in orbs:
-                    count += 1
-                    vorbs += [orb]
-                    norbs += [orb[-6]+orb[-4]]
+    if len(valence.split()) != 0:
+        count = 0
+        for i in range(len(valence.split())):
+            orbs = liborb.convert_char_to_digital(valence.split()[i])
+            for orb in orbs:
+                count += 1
+                vorbs += [orb]
+                norbs += [orb[-6]+orb[-4]]
     nval = count
 
     ### Loop over n to nmax, l to lmax
     for n in range(nmax+1):
         for i in range(lmax+1):
-            if (nmin[i] <= nmin[lmax] and n == nmin[i]): 
+            if (nmin[i] <= nmin[lmax] and n == nmin[i]):
                 strorb = str(nmin[i]) + str(l[i])
                 orbs = liborb.convert_char_to_digital(strorb)
                 for orb in orbs:
@@ -587,39 +552,34 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
     basis = system['basis']
     nmax = basis['orbitals']['nmax']
     lmax = basis['orbitals']['lmax']
-    codename = atom['code_method']
+    codename = system['atom']['code_method']
     try:
         method = basis['method']
     except KeyError:
         raise KeyError("'method' not found in basis config. Options: 'b-splines', 'dirac-fock'")
     core = basis['orbitals']['core']
     valence = basis['orbitals']['valence']
-    
-    Nv = len(valence.split())
+
     Ksg = 1
-    
-    if system['basis']['diagonalized']:
-        Kdg = 1
-    else:
-        Kdg = 0
+
+    Kdg = 1 if system['basis']['diagonalized'] else 0
     Kkin = 1
-    kout = 0
 
     vorbs, norbs, nval, nvvorbs = construct_vvorbs(core, valence, codename, nmax, lmax)
 
     # Set first orbital for diagonalization to be first valence orbital
     fvalorb = vorbs[0]
     fvalorb_str = liborb.convert_digital_to_char(fvalorb)
-    fvalorb = fvalorb_str[0] + " " + fvalorb_str[1][0]
+    fvalorb = f'{fvalorb_str[0]} {fvalorb_str[1][0]}'
 
     # Set first orbital to apply kinetic balance to be first virtual orbital
     fvirorb = vorbs[nval]
     fvirorb_str = liborb.convert_digital_to_char(fvirorb)
-    fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
+    fvirorb = f'{fvirorb_str[0]} {fvirorb_str[1][0]}'
 
     # Set last frozen orbital to be last orbital in core
     frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core.split()[-1])[-1])
-    frorb = frorb_str[0] + " " + frorb_str[1][0]    
+    frorb = f'{frorb_str[0]} {frorb_str[1][0]}'
 
     # Handle custom orbitals
     custom_orbs = {}
@@ -627,8 +587,8 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
     try:
         custom = system['basis']['orbitals']['custom']
     except KeyError:
-        custom = ""
-    
+        custom = ''
+
     if custom:
         for orbital in custom:
             orb = orbital.split(' ')[0]
@@ -636,7 +596,6 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
             custom_orbs[orb] = from_orb
             for vorb in liborb.convert_char_to_digital(orb):
                 vorb_fmt = vorb[:-2] + '01'
-                orb_fmt = orb[:-2] + '01'
                 from_orb_fmt = from_orb[:-2] + '01'
                 # If virtual orbital constructed from hfd, set value same as key
                 if from_orb == 'hfd':
@@ -645,36 +604,36 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
                     for from_orb_fmt in liborb.convert_char_to_digital(from_orb):
                         if vorb_fmt[0] == from_orb_fmt[0]:
                             from_orb_fmt = from_orb_fmt[:-2] + '01'
-                            custom_vorbs[vorb_fmt] = from_orb_fmt    
-    
+                            custom_vorbs[vorb_fmt] = from_orb_fmt
+
     with open(filename, 'w') as f:
-        f.write(' ' + system['atom']['name'] + '\n')
-        f.write(' Z  = ' + str(Z) + '\n')
-        f.write(' Am = ' + '{:.1f}'.format(round(AM)) + '\n')
-        f.write(' Nso=' + str(NSO).rjust(5," ") + ' # number of core orbitals (defines DF operator)\n')
-        f.write(' Nv =' + str(nvvorbs).rjust(5," ") + ' # number of valence & virtual orbitals\n')
-        f.write(' Ksg=' + str(Ksg).rjust(5," ") + ' # defines Hamiltonian: 1-DF, 3-DF+Breit\n')
-        f.write(' Kdg=' + str(Kdg).rjust(5," ") + ' # diagonalization of Hamiltonian (0=no,1,2=yes)\n')
-        f.write(' orb=' + fvalorb.rjust(5," ") + ' # first orbital for diagonalization\n')
-        f.write(' Kkin' + str(Kkin).rjust(5," ") + ' # kinetic balance (0,1,or 2)\n')
-        f.write(' orb=' + fvirorb.rjust(5," ") + ' # first orbital to apply kin.bal.\n')
-        f.write(' orb=' + frorb.rjust(5," ") + ' # last frozen orbital\n')
-        f.write('kout=' + str(0).rjust(5," ") + ' # detail rate in the output\n')
-        f.write('kbrt=' + str(kbr).rjust(5," ") + ' # 0,1,2 - Coulomb, Gaunt, Breit\n')
+        f.write(f' {system["atom"]["name"]}\n')
+        f.write(f' Z  = {Z}\n')
+        f.write(f' Am = {round(AM):.1f}\n')
+        f.write(f' Nso={NSO:>5} # number of core orbitals (defines DF operator)\n')
+        f.write(f' Nv ={nvvorbs:>5} # number of valence & virtual orbitals\n')
+        f.write(f' Ksg={Ksg:>5} # defines Hamiltonian: 1-DF, 3-DF+Breit\n')
+        f.write(f' Kdg={Kdg:>5} # diagonalization of Hamiltonian (0=no,1,2=yes)\n')
+        f.write(f' orb={fvalorb:>5} # first orbital for diagonalization\n')
+        f.write(f' Kkin{Kkin:>5} # kinetic balance (0,1,or 2)\n')
+        f.write(f' orb={fvirorb:>5} # first orbital to apply kin.bal.\n')
+        f.write(f' orb={frorb:>5} # last frozen orbital\n')
+        f.write(f'kout={0:>5} # detail rate in the output\n')
+        f.write(f'kbrt={kbr:>5} # 0,1,2 - Coulomb, Gaunt, Breit\n')
         if C_is != 0:
-            f.write('K_is= ' + str(K_is) + '\n')
-            f.write('C_is= ' + str(C_is) + '\n')
+            f.write(f'K_is= {K_is}\n')
+            f.write(f'C_is= {C_is}\n')
         f.write('----------------------------------------------------------\n')
         # Write core orbitals
         if len(core.split()) != 0:
             count = 0
-            for i in range(0, len(core.split())):
+            for i in range(len(core.split())):
                 orbs = liborb.convert_char_to_digital(core.split()[i])
                 for orb in orbs:
                     if orb[0] == '-':
-                        f.write('    ' + orb)
+                        f.write(f'    {orb}')
                     else:
-                        f.write('     ' + orb)
+                        f.write(f'     {orb}')
                     count += 1
                     if count == 6:
                         f.write('\n')
@@ -685,30 +644,29 @@ def write_bass_inp(filename, system, NSO, Z, AM, kbr, vorbs, norbs, K_is, C_is):
         for i, orb in enumerate(vorbs):
             orb = orb[:-2] + '01'
             if (i < nval) or method == 'dirac-fock':
-                f.write(str(i+1).rjust(3," ") + orb.rjust(8," "))
+                f.write(f'{i+1:>3}{orb:>8}')
                 # Check if orbital is in the list of custom virtual orbitals
                 if orb in list(custom_vorbs.keys()):
-                    # Check if key and value for the custom orbital is the same 
+                    # Check if key and value for the custom orbital is the same
                     if orb == custom_vorbs[orb]:
-                        f.write("  3 ")
+                        f.write('  3 ')
                     else:
-                        f.write("    ")
-                    f.write(custom_vorbs[orb].rjust(7," ") + "\n")
+                        f.write('    ')
+                    f.write(f'{custom_vorbs[orb]:>7}\n')
                 else:
-                    f.write("\n")
+                    f.write('\n')
             else:
-                f.write(str(i+1).rjust(3," ") + orb.rjust(8," ") + "  3 " + orb.rjust(7," ") + "\n")
-            
+                f.write(f'{i+1:>3}{orb:>8}  3 {orb:>7}\n')
+
             # Write a new line in between different n
             if (i == nval-1):
-                f.write(" \n")
+                f.write(' \n')
             try:
                 if (i >= nval and norbs[i+1] != norbs[i]):
-                    f.write(" \n")
+                    f.write(' \n')
             except IndexError:
                 f.write('>>>>>>>>>> END <<<<<<<<<<')
-    f.close()
-    print(filename + ' has been written')
+    print(f'{filename} has been written')
 
 def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi, bspline_params=None):
     """ Writes bas_wj.in """
@@ -728,102 +686,94 @@ def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies,
     r0 = float(get_dict_value(dhf_params, 'r0') or 5e-4)
     h  = float(get_dict_value(dhf_params, 'h')  or 0.03125)
     # format as fixed-point decimal (avoids scientific notation for small values)
-    r0_str = '{:.7f}'.format(r0).rstrip('0').rstrip('.')
-    with open(filename,'w') as f:
-        f.write(' ' + symbol + ' ' + str(NS).rjust(4, ' ') + str(int(Z)).rjust(4, ' ')
-                    + str(int(AM)).rjust(4,' ') + '   0   0   9' + str(NSO+1).rjust(4, ' ')
-                    + '   1\n')
+    r0_str = f'{r0:.7f}'.rstrip('0').rstrip('.')
+    with open(filename, 'w') as f:
+        f.write(f' {symbol}{NS:>4}{int(Z):>4}{int(AM):>4}   0   0   9{NSO+1:>4}   1\n')
         for i in range(len(N)):
-            f.write(N[i].rjust(4, ' ') + kappa[i].rjust(4, ' ') + iters[i].rjust(4, ' ') +
-                         "{:.2f}".format(energies[i]).rjust(7, ' ') + '\n')
-        f.write('   ' + str(xalpha) + '\n')
-        f.write(r0_str.rjust(9, ' ') + '  ' + '{:.5f}'.format(h) + '  500\n')
+            f.write(f'{N[i]:>4}{kappa[i]:>4}{iters[i]:>4}{energies[i]:>7.2f}\n')
+        f.write(f'   {xalpha}\n')
+        f.write(f'{r0_str:>9}  {h:.5f}  500\n')
         f.write('   1\n')
-        f.write('   0.0000' + str(round(cfermi, 4)).rjust(10, ' ') + '    2.3\n')
+        f.write(f'   0.0000{round(cfermi, 4):>10}    2.3\n')
         f.write('   0.0')
-    f.close()
     print('bas_wj.in has been written')
 
 def write_inf_aov(filename, val_N, val_kappa, NSO, nmax, lmax, kval, energies):
     """ Writes inf.aov """
-    with open(filename,'w') as f: 
-        f.write(str(NSO) + '\n')
+    with open(filename, 'w') as f:
+        f.write(f'{NSO}\n')
         for i in range(NSO):
-            f.write(N[i] + ' ' + kappa[i] + '\n')
-        f.write(str(nmax) + '  ' + str(lmax) + '\n')
+            f.write(f'{val_N[i]} {val_kappa[i]}\n')
+        f.write(f'{nmax}  {lmax}\n')
         f.write('0   0\n') # internal parameters
         f.write('30\n') # max iterations
         f.write('2 7 1\n') # stabilizer code parameters
         f.write('0.d0\n') # damping factor
-        f.write(str(kval) + '\n') # kval
-        # If kval = 2, write energies 
+        f.write(f'{kval}\n') # kval
+        # If kval = 2, write energies
         if kval == 2:
-            f.write(str(len(energies)-1) + '\n')
+            f.write(f'{len(energies)-1}\n')
             n = 0
             for l in energies:
                 energy = energies[l]
                 if isinstance(energy, list):
-                    f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy[0]) + '  ' + "{:.5f}".format(energy[1]) + '\n')
+                    f.write(f'{n:>2}  {energy[0]:.5f}  {energy[1]:.5f}\n')
                 elif isinstance(energy, float):
-                    f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy) + '\n')
-            n += 1
-        f.write(str(len(val_kappa)) + '\n')
+                    f.write(f'{n:>2}  {energy:.5f}\n')
+                n += 1
+        f.write(f'{len(val_kappa)}\n')
         for i in range(len(val_kappa)):
-            f.write(str(val_N[i]).rjust(2, ' ') + '  ' + val_kappa[i] + ' 30\n' )
-    f.close()
+            f.write(f'{val_N[i]:>2}  {val_kappa[i]} 30\n')
     print('inf.aov has been written')
-        
+
 
 def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energies):
     """ Writes inf.vw """
     l_array = ['s', 'p', 'd', 'f']
-    with open(filename,'w') as f: 
-        f.write(str(NSO) + '\n')
+    with open(filename, 'w') as f:
+        f.write(f'{NSO}\n')
         for i in range(NSO):
-            f.write(N[i] + ' ' + kappa[i] + '\n')
-        f.write(str(nmax) + ' ' + str(lmax) + '\n')
+            f.write(f'{val_N[i]} {val_kappa[i]}\n')
+        f.write(f'{nmax} {lmax}\n')
         f.write('250\n')
         f.write('4\n')
         f.write('9\n')
         f.write('250 100\n')
-        f.write(str(kvw) + '\n')
-        f.write(str(kval) + '\n')
-        # If kval = 2, write energies 
+        f.write(f'{kvw}\n')
+        f.write(f'{kval}\n')
+        # If kval = 2, write energies
         if kval == 2:
-            f.write(str(len(energies)-1) + '\n')
+            f.write(f'{len(energies)-1}\n')
             n = 0
             for l in l_array:
                 energy = energies[l]
                 if isinstance(energy, list):
-                    f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy[0]) + '  ' + "{:.5f}".format(energy[1]) + '\n')
+                    f.write(f'{n:>2}  {energy[0]:.5f}  {energy[1]:.5f}\n')
                 elif isinstance(energy, float):
-                    f.write(str(n).rjust(2,' ') + '  ' + "{:.5f}".format(energy) + '\n')
-            n += 1
-    f.close()
+                    f.write(f'{n:>2}  {energy:.5f}\n')
+                n += 1
     print('inf.vw has been written')
 
 def write_spl_in(filename, radius, spl_params):
     """ Writes spl.in """
-    
-    with open(filename,'w') as f: 
-        f.write(str(spl_params['lmax']) + '\n') 
-        f.write(str(radius) + '\n')  # Cavity radius
-        f.write(str(spl_params['nmax']) + ' ' + str(spl_params['k']) + '\n')  # Number of splines and order of splines
-        f.write('0.0 0.00 500')
 
-    f.close()
+    with open(filename, 'w') as f:
+        f.write(f'{spl_params["lmax"]}\n')
+        f.write(f'{radius}\n')  # Cavity radius
+        f.write(f'{spl_params["nmax"]} {spl_params["k"]}\n')  # Number of splines and order of splines
+        f.write('0.0 0.00 500')
     print('spl.in has been written')
 
 def write_ao_inputs(system, K_is, C_is, kvw, basis_method):
     if basis_method == 'b-splines':
         write_hfd_inp('HFD.INP', system, NS, NSO, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
-        vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+        vorbs, norbs, *_ = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
         write_bass_inp('BASS.INP', system, NSO, Z, AM, kbrt, vorbs, norbs, K_is, C_is)
         write_bas_wj_in('bas_wj.in', symbol, Z, AM, NS, NSO, N, kappa, iters, energies, cfermi, system['basis']['b_splines'])
         write_spl_in('spl.in', system['basis']['cavity_radius'], system['basis']['b_splines'])
     elif basis_method == 'dirac-fock':
         write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, C_is)
-        vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
+        vorbs, norbs, *_ = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
         write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, K_is, C_is)
     else:
         raise ValueError('basis_method not valid. Expecting "b-splines" or "dirac-fock".')
@@ -832,69 +782,61 @@ def write_ao_inputs(system, K_is, C_is, kvw, basis_method):
 
 def generate_batch_qed(bin_dir, kqed, kbrt):
     """ Writes batch.qed """
-    
+
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
-    
-    with open('q.in','w') as f:
-        f.write("1 \n")
-        if kqed == True:
-            f.write('2 \n')
-        else:
-            f.write('1 \n')
-        f.write(str(kbrt) + '\n')
-    f.close()
 
-    with open('batch.qed','w') as f: 
-        f.write("#! /bin/bash -fe \n")
-        f.write("kvar=1  # variant of QED potential \n")
-        f.write("iter=25 # max number of iterations \n")
-        f.write("##################################### \n")
-        f.write("cat >qedpot.inp <<EndofFile\n")
-        f.write(" $kvar \n")
-        f.write(" HFD.DAT \n")
-        f.write("EndofFile \n")
-        f.write("##################################### \n")
-        f.write("cat >q.in <<EndofFile\n")
-        f.write("1 \n")
-        if kqed == True:
+    with open('batch.qed', 'w') as f:
+        f.write('#! /bin/bash -fe \n')
+        f.write('kvar=1  # variant of QED potential \n')
+        f.write('iter=25 # max number of iterations \n')
+        f.write('##################################### \n')
+        f.write('cat >qedpot.inp <<EndofFile\n')
+        f.write(' $kvar \n')
+        f.write(' HFD.DAT \n')
+        f.write('EndofFile \n')
+        f.write('##################################### \n')
+        f.write('cat >q.in <<EndofFile\n')
+        f.write('1 \n')
+        if kqed:
             f.write('2 \n')
         else:
             f.write('1 \n')
-        f.write(str(kbrt) + '\n')
-        f.write(". \n")
-        f.write(". \n")
-        f.write("  \n")
-        f.write("EndofFile\n")
-        f.write("##################################### \n")
-        f.write("n=1 \n")
-        f.write("while [ $n -lt $iter ]; do \n")
+        f.write(f'{kbrt}\n')
+        f.write('. \n')
+        f.write('. \n')
+        f.write('  \n')
+        f.write('EndofFile\n')
+        f.write('##################################### \n')
+        f.write('n=1 \n')
+        f.write('while [ $n -lt $iter ]; do \n')
         f.write("echo 'Iteration '$n \n")
-        f.write(bin_dir + "qedpot_conf <q.in >qp.res \n")
-        f.write(bin_dir + "qed_rot <q.in >qr.res \n")
-        f.write("grep 'changed' \"QED_ROT.RES\" \n")
-        f.write("  if grep -q reached \"QED_ROT.RES\"; then \n")
+        f.write(f'{bin_dir}qedpot_conf <q.in >qp.res \n')
+        f.write(f'{bin_dir}qed_rot <q.in >qr.res \n')
+        f.write('grep \'changed\' "QED_ROT.RES" \n')
+        f.write('  if grep -q reached "QED_ROT.RES"; then \n')
         f.write("  echo 'Converged in '$n' iterations' \n")
-        f.write("  break \n")
-        f.write("  fi \n")
-        f.write("  let n=n+1 \n")
-        f.write("done \n")
-        f.write("##################################### \n")
+        f.write('  break \n')
+        f.write('  fi \n')
+        f.write('  let n=n+1 \n')
+        f.write('done \n')
+        f.write('##################################### \n')
     print('batch.qed has been written')
     run_shell('chmod +x batch.qed')
-    
+
+
 def check_errors(filename):
     # This function checks output files for errors and returns the number of errors
     # Currently only supports output of program bass
     num_errors = 0
-    
+
     if filename == 'bass.out':
         warning_msgs = ['failed', 'error', 'warning']
     elif filename == 'HFD.RES':
         warning_msgs = ['NaN']
     else:
-        print(filename + "not currently supported")
+        print(f'{filename} not currently supported')
 
     try:
         f = open(filename, 'r')
@@ -904,7 +846,7 @@ def check_errors(filename):
             if any(msg in line for msg in warning_msgs):
                 num_errors += 1
     except FileNotFoundError:
-        num_errors = 1   
+        num_errors = 1
 
     return num_errors
 
@@ -912,26 +854,26 @@ def run_ci_executables(bin_dir, order, custom):
     # Remove old HFD.INP
     if os.path.isfile('HFD.INP'):
         run_shell('rm HFD.INP')
-    file_list = os.listdir(".")
+    file_list = os.listdir('.')
     hfd_list = []
     for file in file_list:
         if file[:3] == 'HFD' and file[-3:] == 'INP':
             hfd_list.append(file)
-    
+
     hfd_list.sort()
-            
+
     # Run hfd for HFD.INP files
     print('Found the following HFD.INP files:', ', '.join(hfd_list))
     for file in hfd_list:
-        run_shell('cp ' + file + ' HFD.INP')
-        run_shell(bin_dir + 'hfd > hfd' + file[-5] + '.out')
-        run_shell('cp HFD.DAT ' + file[:-3] + 'DAT')
-        run_shell('cp HFD.RES ' + file[:-3] + 'RES')
-        print('hfd completed with ' + file)
-        
+        run_shell(f'cp {file} HFD.INP')
+        run_shell(f'{bin_dir}hfd > hfd{file[-5]}.out')
+        run_shell(f'cp HFD.DAT {file[:-3]}DAT')
+        run_shell(f'cp HFD.RES {file[:-3]}RES')
+        print(f'hfd completed with {file}')
+
     # Clean up
     run_shell('rm HFD.INP HFD.RES')
-    
+
     # Find base HFD.DAT to construct basis set
     # Check if key and value is the same in custom_vorbs (from hfd)
     # We assume corresponding HFD.DAT was constructed to make orbitals, and use previous as the base
@@ -949,117 +891,116 @@ def run_ci_executables(bin_dir, order, custom):
         shells = order_list_fmt.split(' ')
         if not any(shell in from_hfd for shell in shells):
             base_hfd_index += 1
-    
+
     # Prepare inputs for bass
-    run_shell('cp HFD' + str(base_hfd_index) + '.DAT HFD.DAT')
+    run_shell(f'cp HFD{base_hfd_index}.DAT HFD.DAT')
     with open('bass.in', 'w') as f:
-        f.write('HFD' + str(base_hfd_index + 1) + '.DAT')
-    
+        f.write(f'HFD{base_hfd_index + 1}.DAT')
+
     # Run bass
     # check if bass.out exists and remove if it does
     if os.path.isfile('bass.out'):
         run_shell('rm bass.out')
-        
+
     maxNumTries = 5
     nTry = 1
 
     while check_errors('bass.out') > 0:
         print('bass attempt', nTry)
-        run_shell(bin_dir + 'bass < bass.in > bass.out')
-        
-        run_shell('cp bass.out ' + 'bass' + str(nTry) + '.out')
-            
+        run_shell(f'{bin_dir}bass < bass.in > bass.out')
+        run_shell(f'cp bass.out bass{nTry}.out')
+
         if (nTry >= maxNumTries):
-            print("bass did not converge after", nTry, "attempts")
+            print('bass did not converge after', nTry, 'attempts')
             break
         nTry += 1
-        
+
     else:
-        print("bass completed with no errors after", nTry - 1, "attempts")
-    
+        print('bass completed with no errors after', nTry - 1, 'attempts')
+
 def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_method):
     # Specify directory of executables
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
-    
+
     # Produce B-splines
     if basis_method == 'b-splines':
         # Run hfd
-        run_shell(bin_dir + 'hfd > hfd.out')
-        print("hfd complete")
+        run_shell(f'{bin_dir}hfd > hfd.out')
+        print('hfd complete')
 
         if check_errors('HFD.RES'):
-            print("Error found in HFD.RES. Please check.")
+            print('Error found in HFD.RES. Please check.')
             sys.exit()
 
         if kbrt == 0:
-            run_shell(bin_dir + 'tdhf < bas_wj.in > tdhf.out')
-            print("tdhf complete")
-            run_shell(bin_dir + 'nspl < spl.in > nspl.out')
-            print("nspl complete")
+            run_shell(f'{bin_dir}tdhf < bas_wj.in > tdhf.out')
+            print('tdhf complete')
+            run_shell(f'{bin_dir}nspl < spl.in > nspl.out')
+            print('nspl complete')
         else:
-            run_shell(bin_dir + 'bdhf < bas_wj.in > bdhf.out')
-            print("bdhf complete")
-            run_shell(bin_dir + 'bspl < spl.in > bspl.out')
-            print("bspl complete")
-    
-        with open('bwj.in','w') as f: 
-            f.write(str(basis_lmax) + '\n')
-            for i in range(basis_lmax+1):
-                f.write(str(basis_nmax) + '\n')
+            run_shell(f'{bin_dir}bdhf < bas_wj.in > bdhf.out')
+            print('bdhf complete')
+            run_shell(f'{bin_dir}bspl < spl.in > bspl.out')
+            print('bspl complete')
+
+        with open('bwj.in', 'w') as f:
+            f.write(f'{basis_lmax}\n')
+            for _ in range(basis_lmax+1):
+                f.write(f'{basis_nmax}\n')
             f.write('\n')
             f.write('\n')
             f.write('1')
-    
-        run_shell(bin_dir + 'bas_wj < bwj.in > bas_wj.out')
+
+        run_shell(f'{bin_dir}bas_wj < bwj.in > bas_wj.out')
         run_shell('rm bwj.in')
-        print("bas_wj complete")
-    
+        print('bas_wj complete')
+
         # Edit BASS.INP
         with open('BASS.INP', 'r') as f:
             lines = f.readlines()
-    
+
         # Set diagonalization
         Kdg = '0' if not diag_basis else '1'
-    
+
         # Set first orbital for diagonalization to be first valence orbital
         fvalorb = vorbs[0]
         fvalorb_str = liborb.convert_digital_to_char(fvalorb)
-        fvalorb = fvalorb_str[0] + " " + fvalorb_str[1][0]
-    
+        fvalorb = f'{fvalorb_str[0]} {fvalorb_str[1][0]}'
+
         # Set first orbital to apply kinetic balance to be first virtual orbital
         fvirorb = vorbs[nvalb]
         fvirorb_str = liborb.convert_digital_to_char(fvirorb)
-        fvirorb = fvirorb_str[0] + " " + fvirorb_str[1][0]
-    
+        fvirorb = f'{fvirorb_str[0]} {fvirorb_str[1][0]}'
+
         # Set last frozen orbital to be last orbital in core
         frorb_str = liborb.convert_digital_to_char(liborb.convert_char_to_digital(core_orbitals.split()[-1])[-1])
-        frorb = frorb_str[0] + " " + frorb_str[1][0]   
-        
-        with open('BASS.INP','w') as f:
+        frorb = f'{frorb_str[0]} {frorb_str[1][0]}'
+
+        with open('BASS.INP', 'w') as f:
             for line in lines:
                 if line[:4] == ' lst':
                     continue
                 elif 'diagonalization' in line.split() and 'Hamiltonian' in line.split():
-                    f.write(' Kdg=' + Kdg.rjust(5," ") + '# diagonalization of Hamiltonian (0=no,1,2=yes)\n')
+                    f.write(f' Kdg={Kdg:>5}# diagonalization of Hamiltonian (0=no,1,2=yes)\n')
                 elif 'first' in line.split() and 'diagonalization' in line.split():
-                    f.write(' orb=' + fvalorb.rjust(5," ") + '# first orbital for diagonalization\n')
+                    f.write(f' orb={fvalorb:>5}# first orbital for diagonalization\n')
                 elif 'kin.bal.' in line.split():
-                    f.write(' orb=' + fvirorb.rjust(5," ") + '# first orbital to apply kin.bal.\n')
+                    f.write(f' orb={fvirorb:>5}# first orbital to apply kin.bal.\n')
                 elif 'frozen' in line.split():
-                    f.write(' orb=' + frorb.rjust(5," ") + '# last frozen orbital\n')
+                    f.write(f' orb={frorb:>5}# last frozen orbital\n')
                 elif line[:4] == 'kbrt':
-                    f.write('kbrt=' + str(kbrt).rjust(2," ") + '   # 0,1,2 - Coulomb, Gaunt, Breit\n')
+                    f.write(f'kbrt={kbrt:>2}   # 0,1,2 - Coulomb, Gaunt, Breit\n')
                     if K_is != 0:
-                        f.write('K_is=' + str(K_is).rjust(2," ") + '\n')
-                        f.write('C_is=' + str(C_is) + '\n')
+                        f.write(f'K_is={K_is:>2}\n')
+                        f.write(f'C_is= {C_is}\n')
                 elif line[:3].strip().isdigit() and int(line[:3].strip()) <= nval:
-                    f.write(line[:12] + "\n")
+                    f.write(f'{line[:12]}\n')
                 else:
                     f.write(line)
-    
+
         # run bass until there are no errors in output
-        with open('bass.in','w') as f:
+        with open('bass.in', 'w') as f:
             f.write('WJ.DAT\n')
 
         # check if bass.out exists and remove if it does
@@ -1071,13 +1012,13 @@ def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_met
 
         while check_errors('bass.out') > 0:
             print('bass attempt', nTry)
-            run_shell(bin_dir + 'bass < bass.in > bass.out')
+            run_shell(f'{bin_dir}bass < bass.in > bass.out')
             if (nTry >= maxNumTries):
-                print("bass did not converge after", nTry, "attempts")
+                print('bass did not converge after', nTry, 'attempts')
                 break
             nTry += 1
         else:
-            print("bass completed with no errors after", nTry, "attempts")
+            print('bass completed with no errors after', nTry, 'attempts')
     elif basis_method == 'dirac-fock':
         run_ci_executables(bin_dir, order, custom)
 
@@ -1087,54 +1028,59 @@ def run_ao_executables(diag_basis, K_is, C_is, bin_dir, order, custom, basis_met
         run_shell('rm hfspl.1 hfspl.2')
 
     # Run bas_x
-    run_shell(bin_dir + 'bas_x > bas_x.out')
-    print("bas_x complete")
+    run_shell(f'{bin_dir}bas_x > bas_x.out')
+    print('bas_x complete')
 
-if __name__ == "__main__":
+def c_dir_name(c):
+    prefix = 'minus' if c < 0 else ('plus' if c > 0 else '')
+    return f'{prefix}{abs(c)}'
+
+if __name__ == '__main__':
     # Read yaml file for system configurations
-    yml_file = input("Input yml-file: ")
+    yml_file = input('Input yml-file: ')
     config = read_yaml(yml_file)
     validate_config(config)
-    
+
     system = get_dict_value(config, 'system')
     atom = get_dict_value(config, 'atom')
     basis = get_dict_value(config, 'basis')
     optional = get_dict_value(config, 'optional')
-    
+
     # system parameters
     bin_dir = get_dict_value(system, 'bin_directory')
     if bin_dir and bin_dir[-1] != '/':
         bin_dir += '/'
-        
+
     on_hpc = get_dict_value(system, 'on_hpc')
     run_codes = get_dict_value(system, 'run_codes')
     pci_version = get_dict_value(system, 'pci_version')
-    
+
     # hpc parameters
     on_slurm = check_slurm_installed()
     if on_hpc and on_slurm:
         hpc = get_dict_value(config, 'hpc')
-        submit_job = get_dict_value(hpc, 'submit_job')
         if hpc:
+            submit_job = get_dict_value(hpc, 'submit_job')
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
         else:
             print('hpc block was not found in', yml_file)
+            submit_job = False
             partition, nodes, tasks_per_node = None, 1, 1
     else:
         on_hpc = False
         submit_job = False
-        
+
     # atom parameters
     name = atom['name']
     try:
         isotope = atom['isotope']
     except KeyError:
-        isotope = ""
+        isotope = ''
     include_breit = atom['include_breit']
     code_method = atom['code_method']
-    
+
     # basis parameters
     orbitals = get_dict_value(basis, 'orbitals')
     core_orbitals = get_dict_value(orbitals, 'core')
@@ -1155,9 +1101,9 @@ if __name__ == "__main__":
     if include_isotope_shifts:
         K_is = get_dict_value(isotope_shifts, 'K_is')
         C_is = get_dict_value(isotope_shifts, 'C_is')
-        c_list = [-C_is,-C_is/2,0,C_is/2,C_is]
+        c_list = [-C_is, -C_is/2, 0, C_is/2, C_is]
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
-    
+
     # qed parameters
     qed = get_dict_value(optional, 'qed')
     include_qed = get_dict_value(qed, 'include')
@@ -1166,14 +1112,14 @@ if __name__ == "__main__":
     Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
 
     # Get orbital information
-    NS, NSO, num_val_orbitals = count_total_orbitals(core_orbitals, valence_orbitals)
+    NS, NSO, _ = count_total_orbitals(core_orbitals, valence_orbitals)
 
     # Get breit key
     kbrt = get_key_breit(include_breit)
 
     # Generate body of HFD.INP including orbitals, values of J, and occupation numbers
     NL, J, QQ, KP, NC, num_core_electrons, nval = gen_lists_orbitals(core_orbitals, valence_orbitals)
-    
+
     ao_methods = ['all-order','second-order','ci+all-order','ci+second-order']
     ao_method_in_code_methods = any(x in code_method for x in ao_methods)
 
@@ -1192,22 +1138,13 @@ if __name__ == "__main__":
         # Write input files to basis directory
         if include_isotope_shifts and K_is > 0:
             for method in code_method:
-                dir_path = os.getcwd()
-                is_dir = method + '/' + K_is_dict[K_is]
-                Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
-                os.chdir(dir_path+'/'+is_dir)
+                is_dir = f'{method}/{K_is_dict[K_is]}'
+                Path(is_dir).mkdir(parents=True, exist_ok=True)
+                os.chdir(is_dir)
                 for c in c_list:
-                    dir_path = os.getcwd()
-                    if c < 0:
-                        dir_prefix = 'minus' 
-                    elif c > 0:
-                        dir_prefix = 'plus'
-                    else:
-                        dir_prefix = ''
-                    dir_name = dir_prefix+str(abs(c))+'/basis'
-                    Path(dir_path+'/'+dir_name).mkdir(parents=True, exist_ok=True)
+                    dir_name = f'{c_dir_name(c)}/basis'
+                    Path(dir_name).mkdir(parents=True, exist_ok=True)
                     os.chdir(dir_name)
-                    run_shell('pwd')
                     write_ao_inputs(config, K_is, c, get_key_vw(method), basis_method)
                     os.chdir('../../')
                 if K_is_dict[K_is]:
@@ -1216,18 +1153,14 @@ if __name__ == "__main__":
                     os.chdir('../')
         else:
             if isinstance(code_method, list):
-                dir_path = os.getcwd()
                 for method in code_method:
-                    Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
-                    os.chdir(method+'/basis')
-                    run_shell('pwd')
+                    Path(f'{method}/basis').mkdir(parents=True, exist_ok=True)
+                    os.chdir(f'{method}/basis')
                     write_ao_inputs(config, 0, 0, get_key_vw(method), basis_method)
                     os.chdir('../../')
             else:
-                dir_path = os.getcwd()
-                Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+                Path('basis').mkdir(parents=True, exist_ok=True)
                 os.chdir('basis')
-                run_shell('pwd')
                 write_ao_inputs(config, 0, 0, kvw, basis_method)
                 os.chdir('../')
 
@@ -1236,28 +1169,19 @@ if __name__ == "__main__":
             if not on_hpc:
                 print('run_codes option is only available with HPC access')
             else:
-                print("Running codes...")
+                print('Running codes...')
                 if include_isotope_shifts and K_is > 0:
                     for method in code_method:
-                        dir_path = os.getcwd()
-                        is_dir = method + '/' + K_is_dict[K_is]
-                        Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
-                        os.chdir(dir_path+'/'+is_dir)
+                        is_dir = f'{method}/{K_is_dict[K_is]}'
+                        Path(is_dir).mkdir(parents=True, exist_ok=True)
+                        os.chdir(is_dir)
                         for c in c_list:
-                            dir_path = os.getcwd()
-                            if c < 0:
-                                dir_prefix = 'minus' 
-                            elif c > 0:
-                                dir_prefix = 'plus'
-                            else:
-                                dir_prefix = ''
-                            dir_name = dir_prefix+str(abs(c))+'/basis'
+                            dir_name = f'{c_dir_name(c)}/basis'
                             os.chdir(dir_name)
-                            run_shell('pwd')
                             run_ao_executables(diagonalize_basis, K_is, c, bin_dir, order, custom, basis_method)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                             if script_name and submit_job:
-                                run_shell('sbatch ' + script_name)
+                                run_shell(f'sbatch {script_name}')
                             else:
                                 print('job script was not submitted. check job script and submit manually.')
                             os.chdir('../../')
@@ -1268,78 +1192,63 @@ if __name__ == "__main__":
                 else:
                     if isinstance(code_method, list):
                         for method in code_method:
-                            dir_path = os.getcwd()
-                            Path(dir_path+'/'+method+'/basis').mkdir(parents=True, exist_ok=True)
-                            os.chdir(method+'/basis')
-                            run_shell('pwd')
+                            Path(f'{method}/basis').mkdir(parents=True, exist_ok=True)
+                            os.chdir(f'{method}/basis')
                             run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
                             script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                             if script_name and submit_job:
-                                run_shell('sbatch ' + script_name)
+                                run_shell(f'sbatch {script_name}')
                             else:
                                 print('job script was not submitted - check job script and submit manually.')
                             os.chdir('../../')
                     else:
-                        dir_path = os.getcwd()
-                        Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+                        Path('basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
-                        run_shell('pwd')
                         run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
                         script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
                         if script_name and submit_job:
-                            run_shell('sbatch ' + script_name)
+                            run_shell(f'sbatch {script_name}')
                         else:
                             print('job script was not submitted - check job script and submit manually.')
                         os.chdir('../')
-            
+
     elif code_method == 'ci':
         if include_isotope_shifts and K_is > 0:
-            dir_path = os.getcwd()
             is_dir = K_is_dict[K_is]
-            Path(dir_path+'/'+is_dir).mkdir(parents=True, exist_ok=True)
-            os.chdir(dir_path+'/'+is_dir)
+            Path(is_dir).mkdir(parents=True, exist_ok=True)
+            os.chdir(is_dir)
             for c in c_list:
-                dir_path = os.getcwd()
-                if c < 0:
-                    dir_prefix = 'minus' 
-                elif c > 0:
-                    dir_prefix = 'plus'
-                else:
-                    dir_prefix = ''
-                dir_name = dir_prefix+str(abs(c))+'/basis'
+                dir_name = f'{c_dir_name(c)}/basis'
                 Path(dir_name).mkdir(parents=True, exist_ok=True)
                 os.chdir(dir_name)
-                print(dir_name)
                 write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, K_is, c)
-                vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method,   basis_nmax, basis_lmax)
+                vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
                 write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, K_is, c)
-                
+
                 if run_codes:
                     run_ci_executables(bin_dir, order, custom)
-                    
+
                 if K_is_dict[K_is]:
                     os.chdir('../../')
                 else:
                     os.chdir('../')
-                
+
         else:
-            dir_path = os.getcwd()
-            Path(dir_path+'/basis').mkdir(parents=True, exist_ok=True)
+            Path('basis').mkdir(parents=True, exist_ok=True)
             os.chdir('basis')
-            run_shell('pwd')
             write_hfd_inp_ci('HFD.INP', config, num_electrons, Z, AM, kbrt, NL, J, QQ, KP, NC, rnuc, 0, 0)
             vorbs, norbs, nvalb, nvvorbs = construct_vvorbs(core_orbitals, valence_orbitals, code_method, basis_nmax, basis_lmax)
             write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, 0, 0)
-            
+
             if run_codes:
                 run_ci_executables(bin_dir, order, custom)
-                        
+
         if include_qed:
             generate_batch_qed(bin_dir, include_qed, kbrt)
-            if run_codes: 
-                run_shell(bin_dir+'sgc0')
+            if run_codes:
+                run_shell(f'{bin_dir}sgc0')
                 run_shell('./batch.qed > qed.out')
-        
+
         os.chdir('../')
 
     else:

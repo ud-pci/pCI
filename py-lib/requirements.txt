@@ -1,3 +1,4 @@
 pandas
 requests
 pyyaml
+term-symbols==0.1.5

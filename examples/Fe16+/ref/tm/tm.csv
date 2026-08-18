@@ -1,0 +1,5 @@
+n1,n2,state_one_configuration,state_one_term,state_two_configuration,state_two_term,operator,matrix_element_value,state_one_energy_au,state_two_energy_au,transition_energy_cm,wavelength_nm,transition_rate
+4,1,2s2 2p5 3d,3D1,2s2 2p6,1S0,E1_L,-0.17879,-452.86311109,-482.71085202,-6550821.90,1.53,6.0693E+12
+4,1,2s2 2p5 3d,3D1,2s2 2p6,1S0,E1_V,-0.17890,-452.86311109,-482.71085202,-6550821.90,1.53,6.0767E+12
+5,1,2s2 2p5 3d,2P1,2s2 2p6,1S0,E1_L,-0.33537,-452.36939630,-482.71085202,-6659179.77,1.50,2.2431E+13
+5,1,2s2 2p5 3d,2P1,2s2 2p6,1S0,E1_V,-0.33563,-452.36939630,-482.71085202,-6659179.77,1.50,2.2466E+13

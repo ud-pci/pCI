@@ -1,17 +1,59 @@
+"""
+gen_portal_csv.py -- generate atomic data CSV files for the ATOM Portal from pCI calculation results and available NIST data.
+
+Pipeline overview
+-----------------
+1. Read config YAML: atom name, J values for even/odd parity, and portal options (min_uncertainty, min_energy_diff_percent, energy_cutoff, gauge).
+
+2. Collect all input files:
+    a. Copy pconf.csv and tm.csv from ci+all-order/ and ci+second-order/ to DATA_RAW/ ("_MBPT" is appended to CI+MBPT results).
+    b. Fetch NIST ASD data live from the NIST website using the atom name.
+
+3. Process all input data:
+    a. process_pconf_levels: read pconf.csv for both CI+all-order and CI+MBPT.
+       Match levels by (conf, term) and compute level energy uncertainty as |CI+all-order - CI+MBPT| in cm^-1,
+       both as absolute excitation from the ground state. Write merged CSV files to DATA_Filtered/UD/.
+    b. combine_tm: merge the CI+all-order and CI+MBPT tm.csv files and write DATA_Processed/tm.csv with matrix element uncertainty.
+    c. Reformat NIST data and write parity-filtered CSV files to DATA_Filtered/NIST/.
+
+4. Run UDRead for each parity to match theory levels to NIST ASD levels.
+    Results are written to DATA_Output/{atom}_Even.txt and DATA_Output/{atom}_Odd.txt.
+
+5. create_mapping: read the txt files and build a list of mapping tuples:
+    [ [NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
+      [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
+      energy_diff_pct,   # |NIST - theory| / NIST * 100 (%)
+      has_nist ]         # True if a NIST match was found
+
+6. Filter mapping:
+    - Drop levels with no MBPT match.
+    - Apply energy ceiling.
+    - Drop levels where has_nist=True but NIST-theory energy agreement exceeds the threshold.
+    - Optionally drop g-orbital levels.
+
+7. write_energy_csv: write {atom}_Energies.csv.
+    - If has_nist=True: use NIST config/term/J and NIST energy.
+    - If has_nist=False (is_from_theory=True): use corrected theory labels and theory energy.
+
+8. write_matrix_csv: write {atom}_Matrix_Elements_Theory.csv.
+    - Match each tm.csv row to the filtered mapping via theory_energy_au (tolerance 1e-6 au).
+    - Substitute NIST labels for matched levels (has_nist=True).
+    - Apply minimum percentage uncertainty floor in quadrature.
+    - Round matrix element and uncertainty to 5 decimal places; floor uncertainty at 1e-05 if rounding produces zero.
+"""
 import yaml
 import re
 import sys
 import os
+from collections import defaultdict, Counter
+import numpy as np
 import pandas as pd
 from fractions import Fraction
 from UDRead import *
 from parse_asd import *
-from get_atomic_term import *
-from pathlib import Path
-from subprocess import run
-from compare_res import *
-from glob import glob
-from utils import get_dict_value
+from term_symbols.terms import calc_term_symbols
+from utils import get_dict_value, get_basis_dir_name
+import shutil
 
 def read_yaml(filename):
     """ 
@@ -67,20 +109,16 @@ def reorder_levels(confs1, terms1, confs2, terms2, energies_au2, energies_cm2):
 
     return confs1, terms1, energies_au2, energies_cm2
 
-def create_mapping(num_levels_even, num_levels_odd):
+def create_mapping(name, num_levels_even, num_levels_odd):
     '''
     This function reads Vipul's energy level table and creates the mapping between experimental and theory data
     Data to map: Config, Term, J, Energy(cm-1)
     '''
-    filepath = "DATA_Output/"+name+"_Even.txt"
-    f = open(filepath, 'r')
-    lines = f.readlines()[:num_levels_even + 1]
-    f.close()
+    with open(f'DATA_Output/{name}_Even.txt', 'r') as f:
+        lines = f.readlines()[:num_levels_even + 1]
 
-    filepath = "DATA_Output/"+name+"_Odd.txt"
-    f = open(filepath, 'r')
-    lines = lines + f.readlines()[:num_levels_odd + 1]
-    f.close()
+    with open(f'DATA_Output/{name}_Odd.txt', 'r') as f:
+        lines = lines + f.readlines()[:num_levels_odd + 1]
     
     mapping = []
     for line in lines[1:]:
@@ -89,45 +127,35 @@ def create_mapping(num_levels_even, num_levels_odd):
         NIST_J = line.split()[2]
         NIST_energy = line.split()[3]
         NIST_uncertainty = line.split()[4]
-        final_config = line.split()[5]
         theory_config = line.split()[6]
         corrected_config = line.split()[5]
-        theory_config2 = line.split()[7]
         theory_term = line.split()[8]
         try:
             theory_J = str(Fraction(line.split()[9]))
-        except:
+        except ValueError:
             theory_J = line.split()[9]
         theory_energy_cm = line.split()[10]
         theory_uncertainty = line.split()[11]
         theory_energy_au = line.split()[12]
-        #theory_delta_cm = line.split()[13]
         try:
             # Extract energy difference percentage (last column, remove '%' sign)
             energy_diff_pct = float(line.split()[14].rstrip('%'))
-        except:
-            # If parsing fails, set to 0 (perfect match)
+        except (ValueError, IndexError):
             energy_diff_pct = 0.0
 
         # select relevant data for portal database
         if NIST_config != 'Config':
+            has_nist = NIST_config != '-'
             mapping.append([[NIST_config, NIST_term, NIST_J, NIST_energy, NIST_uncertainty],
                     [theory_config, theory_term, theory_J, theory_energy_cm, theory_uncertainty, corrected_config, theory_energy_au],
-                    energy_diff_pct])
+                    energy_diff_pct, has_nist])
     
     return mapping
 
 def generate_mapping_fixes(mapping):
     """
-    Generate fixes for E1.RES based on differences between theory_config and corrected_config.
-
-    When NIST matching determines a different label (corrected_config) than the original theory label (theory_config), we need to fix E1.RES to use the corrected label.
-
-    Args:
-        mapping: list of [[NIST_data], [theory_data], energy_diff_pct] where theory_data = [theory_config, theory_term, theory_J, energy_cm, uncertainty, corrected_config, energy_au]
-
-    Returns:
-        list of fixes: [[old_conf, old_term, energy, new_conf, new_term], ...]
+    Find levels where NIST matching assigned a different label than the original theory label.
+    Returns list of [old_conf, old_term, energy_au, new_conf, new_term] entries.
     """
     fixes = []
     seen = set()
@@ -163,142 +191,344 @@ def generate_mapping_fixes(mapping):
 
     return fixes
 
-def normalize_config(config):
-    '''
-    Normalize an electronic configuration string by sorting the subshells.
-    Example: "5s.4d" -> "4d.5s
-    '''
-    if not isinstance(config, str):
-        return config
-    
-    parts = [part.strip() for part in config.split('.') if part.strip()]
-    parts.sort(key=lambda x: (
-        int(re.match(r'(\d+)', x).group(1)) if re.match(r'(\d+)', x) else 0,
-        x
-    ))
-    
-    return ".".join(parts)
 
-def write_new_conf_res(name, filepath, data_nist):
+def read_pconf_csv(path):
     '''
-    This function creates a new CONF.RES file with theory uncertainties
+    Read a pconf.csv file and return a list of rows.
+    Each row is: [conf, term, energy_au, energy_cm, S, L, J_str, gf, conf%, converged, conf2, conf2%]
+    Convert spaces in conf and conf2 to dots for consistency with NIST.
+    '''
+    df = pd.read_csv(path)
+    rows = []
+    for _, r in df.iterrows():
+        J_str    = _j_suffix(float(r['J']))
+        term_raw = '' if pd.isna(r['term']) else str(r['term'])
+        S_val    = '' if pd.isna(r['S'])      else str(r['S'])
+        L_val    = '' if pd.isna(r['L'])      else str(r['L'])
+        gf_val   = '' if pd.isna(r['gf'])     else str(r['gf'])
+        conf2    = '' if pd.isna(r['conf2'])   else str(r['conf2'])
+        conf2pct = '' if pd.isna(r['conf2%'])  else str(r['conf2%'])
+        conf_str  = str(r['configuration']).replace(' ', '.')
+        conf2_str = conf2.replace(' ', '.')
+        rows.append([conf_str, term_raw,
+                     float(r['energy_au']), float(r['energy_cm']),
+                     S_val, L_val, J_str, gf_val,
+                     str(r['conf%']), str(r['converged']), conf2_str, conf2pct])
+    return rows
+
+
+def write_pconf_csv(name, parity, ao_rows, level_rows):
+    '''
+    Write a merged pconf.csv file with uncertainties for one parity.
+    ao_rows: output of read_pconf_csv
+    level_rows: output of _build_levels
+    '''
+    parity_cap = parity.capitalize()
+    csvfile = f'DATA_Filtered/UD/{name}_UD_{parity_cap}.csv'
+    os.makedirs(os.path.dirname(csvfile), exist_ok=True)
+    with open(csvfile, 'w') as f:
+        f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
+        for idx, (r, lv) in enumerate(zip(ao_rows, level_rows), 1):
+            conf, term = r[0], r[1]
+            energy_au = r[2]
+            S, L, J_str = r[4], r[5], r[6]
+            gf, conf_pct, converged = r[7], r[8], r[9]
+            conf2, conf2pct = r[10], r[11]
+            energy_cm = lv[3]
+            uncertainty = lv[4]
+            S_fmt = '{:.3f}'.format(float(S)) if S else ''
+            L_fmt = '{:.3f}'.format(float(L)) if L else ''
+            gf_fmt = '{:.5f}'.format(float(gf)) if gf else ''
+            cpct_fmt = '{:.2f}'.format(float(conf_pct)) if conf_pct else ''
+            c2pct_fmt = '{:.2f}'.format(float(conf2pct)) if conf2pct else ''
+            f.write(','.join([str(idx), conf, term, str(energy_au), str(energy_cm),
+                              S_fmt, L_fmt, J_str, gf_fmt, cpct_fmt, str(converged),
+                              conf2, c2pct_fmt, str(uncertainty)]) + '\n')
+    print(f'{csvfile} has been written')
+
+
+_L_map = {'S': 0, 'P': 1, 'D': 2, 'F': 3, 'G': 4, 'H': 5, 'I': 6, 'K': 7}
+_term_re = re.compile(r'^(\d+)([A-Z])(\d+)$')
+_term_cache = {}
+
+def _conf_key(conf):
+    parts = conf.replace('.', ' ').split()
+    return ' '.join(sorted(parts))
+
+def fix_term(conf, term, S_val, L_val):
+    """
+    If term is not a valid LS term for conf, replace it with the valid term 
+    whose S and L are closest to the CI expectation values S_val/L_val.
+    Returns the original term unchanged if no better match is found.
+    """
+    key = _conf_key(conf)
+    if key not in _term_cache:
+        _term_cache[key] = calc_term_symbols(key)
+    valid = _term_cache[key]
+    if not valid or term in valid:
+        return term
+    m = _term_re.match(term)
+    if not m:
+        return term
+    J_target = int(m.group(3))
+    valid_same_J = [(t, mt) for t in valid for mt in [_term_re.match(t)] if mt and int(mt.group(3)) == J_target]
+    if not valid_same_J:
+        return term
+    try:
+        S = float(S_val)
+        L = float(L_val)
+    except (ValueError, TypeError):
+        return term
+    best, best_dist = term, float('inf')
+    for t, mt in valid_same_J:
+        S_term = (int(mt.group(1)) - 1) / 2.0
+        L_term = _L_map.get(mt.group(2), -1)
+        if L_term < 0:
+            continue
+        dist = abs(S - S_term) + abs(L - L_term)
+        if dist < best_dist:
+            best_dist = dist
+            best = t
+    if best != term:
+        print(f'  fix_term: {conf} {term} -> {best} (S={float(S_val):.3f}, L={float(L_val):.3f})')
+    return best
+
+def _sl_dist(S, L, term):
+    """
+    Return the distance between CI expectation values (S, L) and the S, L implied by a term label.
+    Distance is |S - S_term| + |L - L_term|. Returns inf if the term cannot be parsed.
+    """
+    mt = _term_re.match(term)
+    if not mt:
+        return float('inf')
+    S_term = (int(mt.group(1)) - 1) / 2.0
+    L_term = _L_map.get(mt.group(2), -1)
+    if L_term < 0:
+        return float('inf')
+    return abs(S - S_term) + abs(L - L_term)
+
+def _resolve_term_duplicates(rows):
+    """
+    For each (conf, J) group in rows, if a term appears more than once,
+    keep the occurrence closest to that term by S/L distance and try to
+    reassign the extras to unused valid terms of the same J.
+    """
+    # Group all levels by (configuration, J) so we can check for duplicate
+    # term labels within the same J block of a given configuration.
+    groups = defaultdict(list)
+    for i, r in enumerate(rows):
+        m = _term_re.match(r[1])
+        if m:
+            groups[(r[0], m.group(3))].append(i)
+
+    for (conf, J_char), indices in groups.items():
+        terms = [rows[i][1] for i in indices]
+        term_counts = Counter(terms)
+
+        # For each term that appears more than once, keep the level whose
+        # S and J expectation values are closest to that term.
+        # The remaining duplicate(s) are candidates for relabeling.
+        dup_indices = []
+        for term, count in term_counts.items():
+            if count <= 1:
+                continue
+            cands = [i for i in indices if rows[i][1] == term]
+            try:
+                cands.sort(key=lambda i: _sl_dist(float(rows[i][4]), float(rows[i][5]), term))
+            except (ValueError, TypeError):
+                pass
+            dup_indices.extend(cands[1:])
+
+        if not dup_indices:
+            continue
+
+        # Find all LS terms allowed for this configuration at this J,
+        # then identify which ones are not yet assigned to any level.
+        key = _conf_key(conf)
+        if key not in _term_cache:
+            _term_cache[key] = calc_term_symbols(key)
+        valid = _term_cache[key]
+        valid_same_J = [t for t in valid if _term_re.match(t) and _term_re.match(t).group(3) == J_char]
+        unused = [t for t in valid_same_J if t not in set(terms)]
+
+        if not unused:
+            continue
+
+        # For each candidate duplicate level, compute its S/L distance to each unused term.
+        # Assign greedily by closest match.
+        pairs = []
+        for i in dup_indices:
+            try:
+                S, L = float(rows[i][4]), float(rows[i][5])
+            except (ValueError, TypeError):
+                continue
+            for t in unused:
+                pairs.append((_sl_dist(S, L, t), i, t))
+        pairs.sort()
+
+        assigned_rows, assigned_terms = set(), set()
+        for _, i, t in pairs:
+            if i in assigned_rows or t in assigned_terms:
+                continue
+            assigned_rows.add(i)
+            assigned_terms.add(t)
+            old = rows[i][1]
+            try:
+                S = float(rows[i][4])
+            except (ValueError, TypeError):
+                S = 0.0
+            print(f'  resolve_dup: {conf} {old} -> {t} (S={S:.3f})')
+            rows[i][1] = t
+
+def process_pconf_levels(name, filepath):
+    '''
+    Read pconf_even.csv / pconf_odd.csv (and optional MBPT variants) from filepath,
+    compute level energies globally referenced to the ground state, 
+    estimate theory uncertainties as |CI+all-order - CI+MBPT| in cm^-1, 
+    and write the final CSV files for both parities.
     '''
     
     second_order_exists = True
-    matrix_file_exists = True
-    # Check if raw files exist
-    if not os.path.exists(filepath + 'CONFFINALeven.RES'):
-        print('CONFFINALeven.RES not found in', filepath)
+
+    path_even = filepath + 'pconf_even.csv'
+    path_odd = filepath + 'pconf_odd.csv'
+    path_even_mbpt = filepath + 'pconf_even_MBPT.csv'
+    path_odd_mbpt = filepath + 'pconf_odd_MBPT.csv'
+    if not os.path.exists(path_even):
+        print(f'{path_even} not found')
         sys.exit()
-    if not os.path.exists(filepath + 'CONFFINALodd.RES'):
-        print('CONFFINALodd.RES not found in', filepath)
+    if not os.path.exists(path_odd):
+        print(f'{path_odd} not found')
         sys.exit()
-    if not os.path.exists(filepath + 'CONFFINALevenMBPT.RES'):
-        print('CONFFINALevenMBPT.RES not found in', filepath)
+    if not os.path.exists(path_even_mbpt):
+        print(f'{path_even_mbpt} not found')
         second_order_exists = False
-    if not os.path.exists(filepath + 'CONFFINALoddMBPT.RES'):
-        print('CONFFINALoddMBPT.RES not found in', filepath)
-        second_order_exists = False
-    # E1.RES and E1MBPT.RES are in DATA_Processed/, check there
-    if not os.path.exists('DATA_Processed/E1.RES'):
-        print('E1.RES not found in DATA_Processed/')
-        matrix_file_exists = False
-    if not os.path.exists('DATA_Processed/E1MBPT.RES'):
-        print('E1MBPT.RES not found in DATA_Processed/')
+    if not os.path.exists(path_odd_mbpt):
+        print(f'{path_odd_mbpt} not found')
         second_order_exists = False
 
-    # Read CONF.RES files
-    conf_res_odd, full_res_odd, swaps_odd, fixes_odd, unmatched_odd, allorder_e2l_odd, mbpt_e2l_odd = cmp_res(filepath + 'CONFFINALodd.RES', filepath + 'CONFFINALoddMBPT.RES')
-    conf_res_even, full_res_even, swaps_even, fixes_even, unmatched_even, allorder_e2l_even, mbpt_e2l_even = cmp_res(filepath + 'CONFFINALeven.RES', filepath + 'CONFFINALevenMBPT.RES')
-    swaps = swaps_odd + swaps_even
-    # Combine energy to level mappings from both parities (all-order mapping for fixes, MBPT mapping for swaps)
-    energy_to_level = {**allorder_e2l_odd, **allorder_e2l_even}
-    mbpt_energy_to_level = {**mbpt_e2l_odd, **mbpt_e2l_even}
-    # fixes_odd and fixes_even are tuples (fixes1, fixes2)
-    # Combine all-order fixes together and MBPT fixes together
-    fixes1_odd, fixes2_odd = fixes_odd
-    fixes1_even, fixes2_even = fixes_even
-    fixes = (fixes1_odd + fixes1_even, fixes2_odd + fixes2_even)
-    unmatched_energies = {'odd': unmatched_odd, 'even': unmatched_even}
-    
-    # Merge even and odd parity CONF.RES files and obtain uncertainties
-    gs_parity, merged_res = merge_res(conf_res_even, conf_res_odd, second_order_exists)
+    ao_even   = read_pconf_csv(path_even)
+    ao_odd    = read_pconf_csv(path_odd)
+    mbpt_even = read_pconf_csv(path_even_mbpt) if second_order_exists else []
+    mbpt_odd  = read_pconf_csv(path_odd_mbpt)  if second_order_exists else []
 
-    confs, terms, energies_au, energies_cm, energies_au_MBPT, energies_cm_MBPT, uncertainties = [], [], [], [], [], [], []
-    with open('final_res.csv','w') as f:
-        f.write('conf,term,J,energy(a.u.),energy(cm-1),energy_MBPT(a.u.),energy_MBPT(cm-1),uncertainty\n')
-        for conf in merged_res:
-            confs.append(conf[0])
-            terms.append(conf[1])
-            energies_au.append(conf[2])
-            energies_cm.append(conf[3])
-            energies_au_MBPT.append(conf[4])
-            energies_cm_MBPT.append(conf[5])
-            uncertainties.append(conf[6])
-            f.write(','.join(str(i) for i in conf) + '\n')
-    
-    even_res = [conf for conf in merged_res if find_parity(conf[0]) == 'even']
-    odd_res = [conf for conf in merged_res if find_parity(conf[0]) == 'odd']
-    
-    # Update uncertainties after merging even and odd parity CONF.RES files
-    if second_order_exists:
-        for ilvl in range(len(even_res)):
-            full_res_even[ilvl][13] = even_res[ilvl][6]
-        for ilvl in range(len(odd_res)):
-            full_res_odd[ilvl][13] = odd_res[ilvl][6]
+    # Fix terms in all files before matching
+    for rows in (ao_even, ao_odd, mbpt_even, mbpt_odd):
+        for r in rows:
+            r[1] = fix_term(r[0], r[1], r[4], r[5])
+        _resolve_term_duplicates(rows)
 
-    # Determine if ground state level exists in theory results
-    gs_exists = False
-    nist_conf = data_nist['Configuration'].iloc[0]
-    nist_term = data_nist['Term'].iloc[0]
-    nist_J = data_nist['J'].iloc[0]
+    # Larger energy_au = more tightly bound (valence energy convention in pconf)
+    if ao_even[0][2] > ao_odd[0][2]:
+        gs_parity    = 'even'
+        gs_energy_au = ao_even[0][2]
+    else:
+        gs_parity    = 'odd'
+        gs_energy_au = ao_odd[0][2]
 
-    for i in range(len(confs)): 
-        conf = confs[i]
-        term = terms[i].split(',')[0]
-        J = terms[i].split(',')[1]
-        
-        if normalize_config(conf) == normalize_config(nist_conf):
-                gs_exists = True
-                print('ground state found:', conf)
-                break
-        else:
-            str_diff, num_diff = SubtractStr(nist_conf, conf)
-            if num_diff > 0:
-                if nist_conf.replace(str_diff, '') == conf and nist_term == term and nist_J == J:
-                    gs_exists = True
-                    print('ground state found:', confs[i])
-    
-    # If ground state level not found in theory results, ask user for energy (a.u.) of ground state level
-    if not gs_exists:
-        print(data_nist['Configuration'].iloc[0], ' not in', confs)
-        th_gs_au = float(input('Ground state level was not found in theory results. Enter energy (a.u.) of ground state level: '))
-        gs_parity = find_parity(data_nist['Configuration'].iloc[0])
+    ht_to_cm = 219474.63
 
-    # TODO - reimplement shift by user-inputted ground state
-    
-    
-    # Determine energy shift between odd and even parity lowest energy levels
-    ht_to_cm = 219474.63 # hartree to cm-1
-    min_energy_even = even_res[0][2]
-    min_energy_odd = odd_res[0][2]
-    energy_shift = abs(ht_to_cm * (min_energy_even - min_energy_odd))
-        
-    # List of J values in theory results
-    theory_J = {}
-    theory_J['even'] = [conf[1].split(',')[1] for conf in even_res]
-    theory_J['odd'] = [conf[1].split(',')[1] for conf in odd_res]
-    
-    # Write csv-formatted CONF.RES files with uncertainties
-    convert_res_to_csv(filepath + 'CONFFINALeven.RES', full_res_even, gs_exists, name)
-    convert_res_to_csv(filepath + 'CONFFINALodd.RES', full_res_odd, gs_exists, name)
+    # MBPT lookup: (conf, term) -> [(n_mbpt, row), ...] by row index order.
+    # Using a list per key rather than a flat dict lets duplicates get mapped to each other.
+    def _build_mbpt_groups(mbpt_rows):
+        groups = {}
+        for n, mr in enumerate(mbpt_rows, 1):
+            key = (mr[0], mr[1])
+            if key not in groups:
+                groups[key] = []
+            groups[key].append((n, mr))
+        return groups
 
-    # Write FINAL.RES files with uncertainties in CONFFINAL.RES format
-    os.makedirs('DATA_Processed', exist_ok=True)
-    write_final_res(full_res_even, 'DATA_Processed/FINALeven.RES')
-    write_final_res(full_res_odd, 'DATA_Processed/FINALodd.RES')
+    mbpt_groups_even = _build_mbpt_groups(mbpt_even)
+    mbpt_groups_odd = _build_mbpt_groups(mbpt_odd)
+    mbpt_gs_au = (mbpt_even[0][2] if gs_parity == 'even' else mbpt_odd[0][2]) if second_order_exists else None
 
-    return confs, terms, energies_au, energies_cm, uncertainties, energy_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level
+    def _build_levels(ao_rows, mbpt_groups, parity):
+        levels = []
+        occurrence = {}
+        for r in ao_rows:
+            conf, term, energy_au, energy_cm = r[0], r[1], r[2], r[3]
+            J_str = r[6]
+            if parity == gs_parity:
+                energy_cm_global = energy_cm
+            else:
+                energy_cm_global = round((gs_energy_au - energy_au) * ht_to_cm, 2)
+            key = (conf, term)
+            occ = occurrence.get(key, 0)
+            occurrence[key] = occ + 1
+            group = mbpt_groups.get(key, [])
+            if occ < len(group) and mbpt_gs_au is not None:
+                _, mr = group[occ]
+                ao_abs = (gs_energy_au - energy_au) * ht_to_cm
+                mbpt_abs = (mbpt_gs_au - mr[2]) * ht_to_cm
+                unc = round(abs(ao_abs - mbpt_abs))
+            else:
+                unc = '-'
+            levels.append([conf, term, energy_au, energy_cm_global, unc, J_str])
+        return levels
+
+    even_levels = _build_levels(ao_even, mbpt_groups_even, 'even')
+    odd_levels  = _build_levels(ao_odd,  mbpt_groups_odd,  'odd')
+    all_levels  = even_levels + odd_levels
+
+    confs         = [r[0] for r in all_levels]
+    terms         = [r[1] for r in all_levels]
+    energies_au   = [r[2] for r in all_levels]
+    energies_cm   = [r[3] for r in all_levels]
+    uncertainties = [r[4] for r in all_levels]
+
+    with open('final_res.csv', 'w') as f:
+        f.write('conf,term,J,energy(a.u.),energy(cm-1),uncertainty\n')
+        for r in all_levels:
+            f.write(','.join([r[0], r[1], r[5],
+                              str(r[2]), str(r[3]), str(r[4])]) + '\n')
+
+    theory_J = {
+        'even': [r[6] for r in ao_even],
+        'odd':  [r[6] for r in ao_odd],
+    }
+
+    def _write_pconf_comp(ao_rows, mbpt_groups, level_rows, parity):
+        csvfile = f'DATA_Filtered/UD/pconf_comp_{parity}.csv'
+        os.makedirs(os.path.dirname(csvfile), exist_ok=True)
+        occurrence = {}
+        with open(csvfile, 'w') as f:
+            f.write('n_ao,n_mbpt,conf_ao,term_ao,conf_mbpt,term_mbpt,'
+                    'energy_cm_ao,energy_cm_mbpt,uncertainty,conf2_ao,conf2_mbpt\n')
+            for n_ao, (r, lv) in enumerate(zip(ao_rows, level_rows), 1):
+                conf_ao = r[0]
+                term_ao = r[1]
+                conf2_ao = r[10]
+                energy_cm_ao = lv[3]
+                unc = lv[4]
+                key = (conf_ao, term_ao)
+                occ = occurrence.get(key, 0)
+                occurrence[key] = occ + 1
+                group = mbpt_groups.get(key, [])
+                if occ < len(group):
+                    n_mbpt, mr    = group[occ]
+                    conf_mbpt     = mr[0]
+                    term_mbpt     = mr[1]
+                    conf2_mbpt    = mr[10]
+                    mbpt_energy_cm = round((mbpt_gs_au - mr[2]) * ht_to_cm, 2)
+                else:
+                    n_mbpt = conf_mbpt = term_mbpt = conf2_mbpt = '-'
+                    mbpt_energy_cm = '-'
+                f.write(','.join([str(n_ao), str(n_mbpt),
+                                  conf_ao, term_ao,
+                                  str(conf_mbpt), str(term_mbpt),
+                                  str(energy_cm_ao), str(mbpt_energy_cm),
+                                  str(unc), conf2_ao, str(conf2_mbpt)]) + '\n')
+        print(f'{csvfile} has been written')
+    
+    print(f'Ground state parity: {gs_parity}')
+    
+    write_pconf_csv(name, 'even', ao_even, even_levels)
+    write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
+    _write_pconf_comp(ao_even, mbpt_groups_even, even_levels, 'even')
+    _write_pconf_comp(ao_odd,  mbpt_groups_odd,  odd_levels,  'odd')
+
+    return (confs, terms, energies_au, energies_cm, uncertainties, theory_J)
 
 def convert_type(s): # detect and correct the 'type' of object to 'float', 'integer', 'string' while reading data
     s = s.replace(" ", "")
@@ -348,58 +578,8 @@ def write_final_res(full_res, outfile):
 
     print(f'{outfile} has been written')
 
-def convert_res_to_csv(filename, full_res, gs_exists, name):
 
-    f = open(filename, 'r')
-    lines = f.readlines()
-    f.close()
-
-    if 'odd' in filename:
-        parity = 'Odd'
-    if 'even' in filename:
-        parity = 'Even'
-    csvfile = "DATA_Filtered/UD/"+name+'_UD_' + parity + '.csv'
-
-    os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-    f = open(csvfile, 'w')
-    f.write('n, conf, term, E_n (a.u.), DEL (cm^-1), S, L, J, gf, conf%, converged, conf2, conf2%, uncertainty \n')
-
-    for row in full_res:
-        f.write(','.join([str(item) for item in row[0:2]]) + ',' + row[2].replace(',','') + ',' + ','.join([str(item) for item in row[3:]]) + '\n')
-
-    f.close()
-    print(csvfile + ' has been written')
-
-    return
-
-def find_parity(configuration):
-    '''
-    This function finds parity of specified configuration
-    '''
-    p = 0
-    parity = ''
-    ldict = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
-    
-    orbitals = configuration.split('.')
-    for orbital in orbitals:
-        nq = re.findall('[0-9]+', orbital)
-        if len(nq) <= 1: 
-            q = 1
-        else:
-            q = int(nq[1])
-        
-        l_str = re.findall('[spdfghi]+', orbital)[0]
-        l = ldict[l_str]
-        p += l*q
-    
-    if p%2 == 0:
-        parity = 'even'
-    else:
-        parity= 'odd'
-        
-    return parity
-
-def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent):
+def write_energy_csv(name, mapping, min_energy_diff_percent):
     '''
     This function writes the energy csv file
     Mapping should already be filtered to only include levels within min_energy_diff_percent
@@ -411,16 +591,14 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
                                      'energy_uncertainty', 'is_from_theory'])
 
     for level in mapping:
-        # if experimental data does not exist, use theory values
-        if level[0][3] == '-':
-            is_from_theory = True
+        is_from_theory = not level[3]
+        if is_from_theory:
             state_config = level[1][5]
             state_term = level[1][1]
             state_J = level[1][2]
             state_energy = level[1][3]
             state_uncertainty = level[1][4]
         else:
-            is_from_theory = False
             state_config = level[0][0]
             state_term = level[0][1]
             state_J = level[0][2]
@@ -438,220 +616,143 @@ def write_energy_csv(name, mapping, NIST_shift, theory_shift, gs_parity, min_ene
 
     print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
 
-    return
+def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L'):
+    '''
+    Read DATA_Processed/tm.csv and write {element}_Matrix_Elements_Theory.csv.
+    All operators (E1, E2, E3, M1, M2, M3) are included. 
+    For E1, gauge selects which form to keep: 'L' (length, default) or 'V' (velocity); 
+    the redundant E1 gauge column is dropped and the kept column is renamed to 'E1'. 
+    States are matched to the NIST/theory mapping by energy_au so that experimental configurations and energies are substituted where available.
+    tm.csv already has calculated uncertainty from combine_tm, and zero-energy transitions already filtered.
+    '''
+    tm_path = 'DATA_Processed/tm.csv'
+    if not os.path.isfile(tm_path):
+        print(f'{tm_path} not found; skipping matrix elements')
+        return
 
-def write_matrix_csv(element, filepath, mapping, gs_parity, theory_shift, expt_shift, swaps, fixes, ignore_g, min_unc_per, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level):
-    '''
-    This function writes the matrix element csv file
-    Note: Transition rates are now calculated separately using generate_transition_rates.py
-    '''
+    df_tm = pd.read_csv(tm_path)
+    
+    # Drop the E1 gauge not selected; keep all other operators unchanged
+    drop_gauge = 'E1_V' if gauge == 'L' else 'E1_L'
+    df_tm = df_tm[df_tm['operator'] != drop_gauge].reset_index(drop=True)
+    df_tm['operator'] = df_tm['operator'].replace('E1_' + gauge, 'E1')
+
+    # Drop zero matrix elements
+    df_tm = df_tm[df_tm['matrix_element_value'] != 0].reset_index(drop=True)
+    
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
-
-    # Read E1.RES and E1MBPT.RES and return E1.RES table with uncertainties
-    e1_res, unmatched_matrix = cmp_matrix_res('DATA_Processed/E1.RES', 'DATA_Processed/E1MBPT.RES', swaps, fixes, energy_to_level, mbpt_energy_to_level)
 
     df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                'state_two_configuration', 'state_two_term', 'state_two_J',
-                               'matrix_element', 'matrix_element_uncertainty'])
-    
-    # Track added transitions to avoid duplicates (E1.RES contains both A->B and B->A)
+                               'operator', 'matrix_element', 'matrix_element_uncertainty'])
+
     added_transitions = set()
 
     if ignore_g:
         print('IGNORING G STATES')
-        
-    # List of default minimum uncertainties for different systems
+
     default_min_uncertainties = {
         'Mg1': 0.3,
         'Ca1': 1.3,
         'Sr1': 1.5
     }
-    
-    # Use default uncertainty if defined
     if element in default_min_uncertainties:
         min_unc_per = default_min_uncertainties[element]
-        print('DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR', element + ':', str(min_unc_per) + '%')
+        print(f'DEFAULT MINIMUM MATRIX ELEMENT UNCERTAINTY USED FOR {element}: {min_unc_per}%')
 
-    print('MIN ENERGY DIFF PERCENT FOR NIST-THEORY:', str(min_energy_diff_percent) + '%')
+    print(f'MIN ENERGY DIFF PERCENT FOR NIST-THEORY: {min_energy_diff_percent}%')
 
-    for line in e1_res:
-        # E1.RES format: [conf11, term11, conf12, term12, me1, uncertainty, energy1, energy2, wavelength]
-        conf1 = line[0]
-        conf2 = line[2]
-        term1 = line[1][0:2]
-        term2 = line[3][0:2]
-        J1_e1res = line[1][2]  # J from E1.RES (for matching)
-        J2_e1res = line[3][2]
-        J1 = J1_e1res  # Will be updated with matched state's J
-        J2 = J2_e1res
+    energy_tolerance = 1e-6
+
+    for _, row in df_tm.iterrows():
+        operator = str(row['operator'])
         try:
-            matrix_element_value = float(line[4])
-            uncertainty = float(line[5])
+            matrix_element_value = float(row['matrix_element_value'])
+            unc_raw = row['matrix_element_uncertainty']
+            uncertainty = 0.0 if pd.isna(unc_raw) else float(unc_raw)
         except (ValueError, TypeError):
             continue
-        energy1 = line[6]
-        energy2 = line[7]
-        wavelength = line[8]
-        
-        # Set minimum uncertainty
-        extra_uncertainty = matrix_element_value * min_unc_per / 100
-        uncertainty = np.sqrt(uncertainty**2 + extra_uncertainty**2)
-        if uncertainty == 0:
-            uncertainty = 0.00001
-        
-        # Use mapping to correct confs and terms and use experimental energies
+
+        energy1_au = abs(float(row['state_one_energy_au']))
+        energy2_au = abs(float(row['state_two_energy_au']))
+
+        extra_unc = abs(matrix_element_value) * min_unc_per / 100
+        uncertainty = np.sqrt(uncertainty**2 + extra_unc**2)
+
         c1, c2 = False, False
-        energy1cm, energy2cm = 0.0, 0.0
-        energy1_float = abs(float(energy1))  # Use absolute value (E1.RES uses negative binding energies)
-        energy2_float = abs(float(energy2))
-        energy_tolerance = 1e-6  # Tolerance for floating point comparison (in a.u.)
+        out_conf1, out_term1, out_J1 = '', '', ''
+        out_conf2, out_term2, out_J2 = '', '', ''
+        best1, best2 = float('inf'), float('inf')
 
-        # Track best matches (smallest energy difference)
-        best_match1_diff = float('inf')
-        best_match2_diff = float('inf')
+        for lt in mapping:
+            if lt[1][6] == '-':
+                continue
+            th_au = abs(float(lt[1][6]))
 
-        for line_theory in mapping:
-            # mapping structure:
-            # [expt=[conf, term, J, energy, unc], theory=[conf, term, J, energy, unc, final_conf, energy_au]]
-            if line_theory[1][6] == '-': continue
-
-            # Compare energies as floats with tolerance instead of exact string match
-            theory_energy_au = abs(float(line_theory[1][6]))  # Use absolute value for comparison
-            energy_diff1 = abs(theory_energy_au - energy1_float)
-
-            # Check if this is a better match than previous best
-            # Prefer exact energy matches, and use J as tiebreaker for equal energies
-            is_better_match1 = False
-            if energy_diff1 < energy_tolerance:
-                if energy_diff1 < best_match1_diff:
-                    is_better_match1 = True
-                elif abs(energy_diff1 - best_match1_diff) < 1e-12:
-                    # Same energy (within numerical precision) - prefer J match as tiebreaker
-                    if line_theory[1][2] == J1_e1res:
-                        is_better_match1 = True
-
-            if is_better_match1:
-                conf1 = line_theory[1][5]  # corrected_config for output
-                term1 = line_theory[1][1]
-                
-                if ignore_g:
-                    if 'g' in conf1 or 'G' in term1:
-                        continue
-                J1 = line_theory[1][2]
-                # Check if NIST energy exists - if it does, overwrite theory energy, configuration and term
-                if line_theory[0][3] != '-':
-                    # Check energy difference between NIST and theory
-                    nist_energy = float(line_theory[0][3])
-                    theory_energy = float(line_theory[1][3])
-
-                    # Calculate percentage difference
-                    if nist_energy != 0:
-                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
-                    else:
-                        energy_diff_percent = 0.0
-
-                    # Skip if energy difference exceeds minimum threshold
-                    if energy_diff_percent > min_energy_diff_percent:
-                        continue
-
-                    conf1 = line_theory[0][0]
-                    term1 = line_theory[0][1]
-                    J1 = line_theory[0][2]
-                    energy1cm = nist_energy
-                    if find_parity(conf1) != gs_parity:
-                        energy1cm = energy1cm + float(expt_shift)
-                else:
-                    energy1cm = float(line_theory[1][3])
-                    if find_parity(conf1) != gs_parity:
-                        energy1cm = energy1cm + float(theory_shift)
-                c1 = True
-                best_match1_diff = energy_diff1
-
-            energy_diff2 = abs(theory_energy_au - energy2_float)
-
-            # Check if this is a better match than previous best for state 2
-            is_better_match2 = False
-            if energy_diff2 < energy_tolerance:
-                if energy_diff2 < best_match2_diff:
-                    is_better_match2 = True
-                elif abs(energy_diff2 - best_match2_diff) < 1e-12:
-                    # Same energy (within numerical precision) - prefer J match as tiebreaker
-                    if line_theory[1][2] == J2_e1res:
-                        is_better_match2 = True
-
-            if is_better_match2:
-                conf2 = line_theory[1][5]  # corrected_config for output
-                term2 = line_theory[1][1]
-
-                if ignore_g:
-                    if 'g' in conf2 or 'G' in term2:
-                        continue
-                J2 = line_theory[1][2]
-                # Check if NIST energy exists - if it does, overwrite theory energy
-                if line_theory[0][3] != '-':
-                    # Check energy difference between NIST and theory
-                    nist_energy = float(line_theory[0][3])
-                    theory_energy = float(line_theory[1][3])
-
-                    # Calculate percentage difference
-                    if nist_energy != 0:
-                        energy_diff_percent = abs((nist_energy - theory_energy) / nist_energy * 100)
-                    else:
-                        energy_diff_percent = 0.0
-
-                    # Skip if energy difference exceeds minimum threshold
-                    if energy_diff_percent > min_energy_diff_percent:
-                        continue
-
-                    conf2 = line_theory[0][0]
-                    term2 = line_theory[0][1]
-                    J2 = line_theory[0][2]
-                    energy2cm = nist_energy
-                    if find_parity(conf2) != gs_parity:
-                        energy2cm = energy2cm + float(expt_shift)
-                else:
-                    energy2cm = float(line_theory[1][3])
-                    if find_parity(conf2) != gs_parity:
-                        energy2cm = energy2cm + float(theory_shift)
-                c2 = True
-                best_match2_diff = energy_diff2
-
-        if c1 and c2:
-            # Apply E1 selection rules
-            try:
-                J1_float = float(J1) if '/' not in str(J1) else float(eval(J1))
-                J2_float = float(J2) if '/' not in str(J2) else float(eval(J2))
-                delta_J = abs(J1_float - J2_float)
-
-                # Skip forbidden transitions
-                if (J1_float == 0 and J2_float == 0) or delta_J > 1:
+            diff1 = abs(th_au - energy1_au)
+            if diff1 < energy_tolerance and diff1 < best1:
+                cand_conf = lt[1][5]
+                cand_term = lt[1][1]
+                cand_J    = lt[1][2]
+                if ignore_g and ('g' in cand_conf or 'G' in cand_term):
                     continue
-            except:
-                continue
+                if lt[3]:
+                    nist_e = float(lt[0][3])
+                    th_e = float(lt[1][3])
+                    pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
+                    if pct > min_energy_diff_percent:
+                        continue
+                    cand_conf = lt[0][0]
+                    cand_term = lt[0][1]
+                    cand_J = lt[0][2]
+                out_conf1, out_term1, out_J1 = cand_conf, cand_term, cand_J
+                c1 = True
+                best1 = diff1
 
-            # Create unique transition identifier to avoid duplicates (both A->B and B->A)
-            state1 = f"{conf1} {term1}{J1}"
-            state2 = f"{conf2} {term2}{J2}"
-            trans_id = tuple(sorted([state1, state2]))
+            diff2 = abs(th_au - energy2_au)
+            if diff2 < energy_tolerance and diff2 < best2:
+                cand_conf = lt[1][5]
+                cand_term = lt[1][1]
+                cand_J = lt[1][2]
+                if ignore_g and ('g' in cand_conf or 'G' in cand_term):
+                    continue
+                if lt[3]:
+                    nist_e = float(lt[0][3])
+                    th_e = float(lt[1][3])
+                    pct = abs((nist_e - th_e) / nist_e * 100) if nist_e != 0 else 0.0
+                    if pct > min_energy_diff_percent:
+                        continue
+                    cand_conf = lt[0][0]
+                    cand_term = lt[0][1]
+                    cand_J    = lt[0][2]
+                out_conf2, out_term2, out_J2 = cand_conf, cand_term, cand_J
+                c2 = True
+                best2 = diff2
 
-            # Skip if we've already added this transition
-            if trans_id in added_transitions:
-                continue
+        if not (c1 and c2):
+            continue
 
-            added_transitions.add(trans_id)
+        if (out_conf1, out_term1, out_J1) == (out_conf2, out_term2, out_J2):
+            continue
 
-            row = {'state_one_configuration': conf1, 'state_one_term': term1, 'state_one_J': J1,
-                   'state_two_configuration': conf2, 'state_two_term': term2, 'state_two_J': J2,
-                   'matrix_element': matrix_element_value, 'matrix_element_uncertainty': uncertainty}
-            df.loc[len(df.index)] = row
-    
-    num_E1 = len(df)
-    print(f'TOTAL MATRIX ELEMENTS: {num_E1}')
+        # Include operator so different operators for the same state pair each get their own row
+        trans_id = (tuple(sorted([out_conf1 + ' ' + out_term1 + str(out_J1),
+                                  out_conf2 + ' ' + out_term2 + str(out_J2)])),
+                    operator)
+        if trans_id in added_transitions:
+            continue
+        added_transitions.add(trans_id)
 
+        df.loc[len(df.index)] = {
+            'state_one_configuration': out_conf1, 'state_one_term': out_term1, 'state_one_J': out_J1,
+            'state_two_configuration': out_conf2, 'state_two_term': out_term2, 'state_two_J': out_J2,
+            'operator': operator,
+            'matrix_element': round(matrix_element_value, 5), 'matrix_element_uncertainty': round(uncertainty, 5) or 1e-05,
+        }
+
+    print(f'TOTAL MATRIX ELEMENTS: {len(df)}')
     df.to_csv(matrix_element_filename, index=False)
-    print(matrix_element_filename + ' has been written')
-
-    return num_E1, unmatched_matrix
+    print(f'{matrix_element_filename} has been written')
 
 def nist_parity(term):
     ''' 
@@ -664,22 +765,6 @@ def nist_parity(term):
     
     return parity
 
-def find_energy_shift(df):
-    '''
-    this function finds the energy shift between lowest odd and even parity energy levels
-    '''
-    ground_parity = nist_parity(df['state_term'].values[:1][0])
-
-    energy_shift = 0.0
-    for index, row in df.iterrows():
-        parity = nist_parity(row['state_term'])
-        if parity != ground_parity:
-            # Skip if energy is missing (marked as '-')
-            if row['energy'] != '-':
-                energy_shift = float(row['energy'])
-                break
-
-    return energy_shift
 
 def convert_num_to_roman(num):
     """
@@ -776,110 +861,115 @@ def atom_name_to_filename(atom):
         ionization = convert_roman_to_num(suffix)
         return element + str(ionization)
 
-def find_ci_dirs(ci_path):
-    os.chdir(ci_path)
-    
-    even_dirs = glob('even*')
-    odd_dirs = glob('odd*')
-    dtm_dirs = glob('tm*')
-    
-    if even_dirs and odd_dirs:
-        use_path = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input(ci_path + ' directory was found - use data from this directory? ')))))
-    else:
-        use_path = None
-        
-    if not use_path:
-        return None, None, None, None
-    
-    if len(even_dirs) > 1:
-        even_dir = input(str(len(even_dirs)) + ' even directories were found: (' + ', '.join(even_dirs) + ') - which one would you like to use data from? ')
-    else:
-        even_dir = even_dirs[0]
-    if len(odd_dirs) > 1:
-        odd_dir = input(str(len(odd_dirs)) + ' odd directories were found: (' + ', '.join(odd_dirs) + ') - which one would you like to use data from? ')
-    else:
-        odd_dir = odd_dirs[0]
-    if len(dtm_dirs) > 1:
-        dtm_dir1 = input(str(len(dtm_dirs)) + ' dtm directories were found: (' + ', '.join(dtm_dirs) + ') - which one would you like to use data from? ')
-        dtm_dir2 = input('Select another dtm directory if desired: ')
-        if dtm_dir2 not in dtm_dirs:
-            if dtm_dir2 != '':
-                print(dtm_dir2 + ' was not found.')
-            dtm_dir2 = None
-    elif len(dtm_dirs) == 1:
-        dtm_dir1 = dtm_dirs[0]
-        dtm_dir2 = None
-    else:
-        dtm_dir1 = None
-        dtm_dir2 = None
-        
-    os.chdir('..')
-        
-    return even_dir, odd_dir, dtm_dir1, dtm_dir2
+def _j_suffix(j):
+    f = float(j)
+    i = int(f)
+    return str(i) if f == i else str(f)
 
-def combine_tm(raw_path, filtered_path):
-    """
-    Combine E1a/E1b and E1MBPTa/E1MBPTb files into E1.RES and E1MBPT.RES
+def collect_portal_files(method_dir, j0, j1, data_raw_path, res_suffix='', subdir=None):
+    if not os.path.isdir(method_dir):
+        print(f'{method_dir} directory not found, skipping')
+        return
 
-    Args:
-        raw_path: Path to raw data (E1a.RES, E1b.RES, etc.)
-        filtered_path: Path to filtered data (output E1.RES, E1MBPT.RES)
-    """
-    # Track E1 matrix elements separately from E1MBPT
-    e1_res = []
-    e1_mbpt_res = []
+    prefix = method_dir + '/' + subdir if subdir else method_dir
+    s0 = str(int(float(j0)))
+    s1 = str(int(float(j1)))
+    sfx = ('_' + res_suffix) if res_suffix else ''
+    for parity in ('even', 'odd'):
+        src = prefix + '/' + parity + s0 + '/pconf.csv'
+        dst = data_raw_path + '/pconf_' + parity + sfx + '.csv'
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
+            print(f'copied {src} to {dst}')
+        else:
+            print(f'{src} not found, skipping')
+    tm_dirs = [
+        'tm_even' + s0 + '_even' + s1,
+        'tm_even' + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_even' + s1,
+    ]
+    for tm_label in tm_dirs:
+        src = prefix + '/' + tm_label + '/tm.csv'
+        dst = data_raw_path + '/' + tm_label + sfx + '.csv'
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
+            print(f'copied {src} to {dst}')
+        else:
+            print(f'{src} not found, skipping')
 
-    # Ensure filtered path exists
+def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
+    s0 = str(int(float(j0)))
+    s1 = str(int(float(j1)))
+    tm_labels = [
+        'tm_even' + s0 + '_even' + s1,
+        'tm_even' + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_odd'  + s1,
+        'tm_odd'  + s0 + '_even' + s1,
+    ]
+    match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
     os.makedirs(filtered_path, exist_ok=True)
+    
+    frames = []
+    unmatched_frames = []
+    for label in tm_labels:
+        path_ao   = data_raw_path + '/' + label + '.csv'
+        path_mbpt = data_raw_path + '/' + label + '_MBPT.csv'
+        if not os.path.isfile(path_ao):
+            print(f'{path_ao} not found, skipping')
+            continue
+        df_ao = pd.read_csv(path_ao)
+        n_unmatched = 0
+        if os.path.isfile(path_mbpt):
+            df_mbpt = pd.read_csv(path_mbpt)
+            merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
+            no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
+            n_unmatched = len(no_mbpt)
+            if n_unmatched > 0:
+                tag = no_mbpt[match_keys].copy()
+                tag.insert(0, 'tm_file', label)
+                unmatched_frames.append(tag)
+            merged = merged[merged['matrix_element_value_mbpt'].notna()].reset_index(drop=True)
+            merged['matrix_element_uncertainty'] = (
+                merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
+            ).abs()
+            merged['matrix_element_value'] = merged['matrix_element_value'].abs()
+            mbpt_cols = [c for c in merged.columns if c.endswith('_mbpt')]
+            merged = merged.drop(columns=mbpt_cols)
+            me_idx = merged.columns.get_loc('matrix_element_value') + 1
+            cols = list(merged.columns)
+            cols.remove('matrix_element_uncertainty')
+            cols.insert(me_idx, 'matrix_element_uncertainty')
+            merged = merged[cols]
+        else:
+            print(f'{path_mbpt} not found; no uncertainty for {label}')
+            merged = df_ao.copy()
+            merged['matrix_element_uncertainty'] = None
+        filtered_out = filtered_path + '/' + label + '.csv'
+        merged.to_csv(filtered_out, index=False)
+        unmatched_str = f' ({n_unmatched} transitions unmatched)' if n_unmatched > 0 else ''
+        print(f'{label}: {len(merged)} matched transitions{unmatched_str} -> {filtered_out}')
+        frames.append(merged)
+        
+    if unmatched_frames:
+        unmatched_path = filtered_path + '/tm_unmatched.csv'
+        pd.concat(unmatched_frames, ignore_index=True).to_csv(unmatched_path, index=False)
+        print(f'unmatched transitions written to {unmatched_path}')
 
-    # Combine E1a.RES and E1b.RES into E1.RES
-    with open(raw_path + '/E1a.RES', 'r') as f:
-        lines = f.readlines()
-    with open(filtered_path + '/E1.RES', 'w') as f:
-        for line in lines:
-            f.write(line)
-
-    for line in lines[1:]:
-        matrix_element = re.findall(r'\<.*?\>', line)[0]
-        e1_res.append(matrix_element)
-
-    with open(raw_path + '/E1b.RES', 'r') as f:
-        lines2 = f.readlines()
-
-    with open(filtered_path + '/E1.RES', 'a') as f:
-        for line in lines2[1:]:
-            matrix_element = re.findall(r'\<.*?\>', line)[0]
-            if (matrix_element) not in e1_res:
-                f.write(line)
-
-    # Combine E1MBPTa.RES and E1MBPTb.RES into E1MBPT.RES (if they exist)
-    # Use separate list to avoid mixing with E1 data
-    if os.path.exists(raw_path + '/E1MBPTa.RES') and os.path.exists(raw_path + '/E1MBPTb.RES'):
-        with open(raw_path + '/E1MBPTa.RES', 'r') as f:
-            lines = f.readlines()
-        with open(filtered_path + '/E1MBPT.RES', 'w') as f:
-            for line in lines:
-                f.write(line)
-
-        for line in lines[1:]:
-            matrix_element = re.findall(r'\<.*?\>', line)[0]
-            e1_mbpt_res.append(matrix_element)
-
-        with open(raw_path + '/E1MBPTb.RES', 'r') as f:
-            lines2 = f.readlines()
-
-        with open(filtered_path + '/E1MBPT.RES', 'a') as f:
-            for line in lines2[1:]:
-                matrix_element = re.findall(r'\<.*?\>', line)[0]
-                if (matrix_element) not in e1_mbpt_res:
-                    f.write(line)
-        print(f'E1.RES and E1MBPT.RES written to {filtered_path}')
-    else:
-        print(f'E1.RES written to {filtered_path}')
-        print('E1MBPTa.RES and/or E1MBPTb.RES not found, skipping E1MBPT.RES creation')
+    if not frames:
+        print('no tm.csv files found; skipping combine_tm')
+        return
+    
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined[combined['transition_energy_cm'] != 0]
+    os.makedirs(data_processed_path, exist_ok=True)
+    out_path = data_processed_path + '/tm.csv'
+    combined.to_csv(out_path, index=False)
+    
+    print(f'combined tm.csv written to {out_path} ({len(combined)} transitions)')
 
 if __name__ == "__main__":
-    use_config_yml = eval(re.sub('(no|No|n|N|false)', 'False', re.sub('(yes|Yes|y|Y|true)', 'True', str(input('Using a config.yml file? ')))))
+    use_config_yml = input('Using a config.yml file? ').strip().lower() in ('yes', 'y', 'true')
     
     if use_config_yml:
         config_yml = input("Input yml-file: ")
@@ -918,12 +1008,7 @@ if __name__ == "__main__":
         even_J = get_dict_value(even, 'J')
         odd = get_dict_value(conf, 'odd')
         odd_J = get_dict_value(odd, 'J')
-        even_dir = 'even' + str(even_J)[0] if even_J else None
-        odd_dir = 'odd' + str(odd_J)[0] if odd_J else None
-        tm_dir = 'tm' if even_J and odd_J else None
-        tm_dir1 = None
-        tm_dir2 = None
-        
+
         # portal parameters
         portal = get_dict_value(config, 'portal')
         
@@ -936,7 +1021,7 @@ if __name__ == "__main__":
         if min_unc_value is not None:
             min_uncertainty = float(min_unc_value)
         else:
-            min_uncertainty = float(input('min_uncertainty not found in config.yml. Enter minimum uncertainty (as % of value): '))
+            min_uncertainty = float(input('portal.min_uncertainty not set in config.yml. Enter minimum matrix element uncertainty as a percentage of the value (e.g. 1.5 for 1.5%): '))
 
         # set default minimum energy difference percentage between NIST and theory to 3.0
         min_diff_value = get_dict_value(portal, 'min_energy_diff_percent') if portal else None
@@ -945,279 +1030,152 @@ if __name__ == "__main__":
         # optional global energy cutoff in cm^-1 (if not specified, use min_energy_diff_percent logic)
         cutoff_value = get_dict_value(portal, 'energy_cutoff') if portal else None
         energy_cutoff = float(cutoff_value) if cutoff_value is not None else None
+        
+        # E1 gauge: 'L' (length, default) or 'V' (velocity)
+        gauge_value = get_dict_value(portal, 'gauge') if portal else None
+        gauge = gauge_value if gauge_value in ('L', 'V') else 'L'
     else:
         atom = input('Input name of atom: ')
-        even_dir = None
-        odd_dir = None
-        tm_dir = None
-        tm_dir1 = None
-        tm_dir2 = None
+        even_J = None
+        odd_J = None
         ignore_g = True
         min_uncertainty = float(input('Enter minimum uncertainty for matrix elements (as % of value): '))
         min_energy_diff_percent = 3.0
         energy_cutoff = None
+        gauge = 'L'
     name = atom_name_to_filename(atom)
-    
-    ri = False # 
-    fac = 2 # maximum energy difference (in percent) for comparison
     
     # Find input files from directories if they exist and put into DATA_RAW directory
     dir_path = os.getcwd()
     data_raw_path = 'DATA_RAW'
-    data_filtered_path = 'DATA_Filtered/UD/'
-    data_processed_path = 'DATA_Processed/'
-    if not os.path.isdir(data_raw_path):
-        Path(data_raw_path).mkdir(parents=True, exist_ok=True)
-    if not os.path.isdir(data_filtered_path):
-        Path(data_filtered_path).mkdir(parents=True, exist_ok=True)
-    if not os.path.isdir(data_processed_path):
-        Path(data_processed_path).mkdir(parents=True, exist_ok=True)
+    data_filtered_theory_path = 'DATA_Filtered/UD'
+    data_filtered_nist_path = 'DATA_Filtered/NIST'
+    data_processed_path = 'DATA_Processed'
+    for d in [data_raw_path, data_filtered_theory_path, data_filtered_nist_path, data_processed_path]:
+        os.makedirs(d, exist_ok=True)
     
-    all_order_path = 'ci+all-order'
-    if os.path.isdir(all_order_path):
-        if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + all_order_path)
-        if even_dir and odd_dir:
-            if os.path.isdir(all_order_path + '/' + even_dir):
-                run('cp ci+all-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALeven.RES', shell=True)
-            if os.path.isdir(all_order_path + '/' + odd_dir):   
-                run('cp ci+all-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALodd.RES', shell=True)
-        if tm_dir1 and os.path.isdir(all_order_path + '/' + tm_dir1):   
-            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1a.RES', shell=True)
-            run('cp ci+all-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1.RES', shell=True)
-        if tm_dir2 and os.path.isdir(all_order_path + '/' + tm_dir2):   
-            run('cp ci+all-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1b.RES', shell=True)
-        if even_dir and odd_dir or tm_dir1 or tm_dir2:
-            print('data from ' + all_order_path + ' moved to DATA_RAW directory')
-        os.chdir(dir_path)
-    
-    second_order_path = 'ci+second-order'
-    if os.path.isdir(second_order_path):
-        if not even_dir or not odd_dir or not tm_dir:
-            even_dir, odd_dir, tm_dir1, tm_dir2 = find_ci_dirs(dir_path + '/' + second_order_path)
-        if even_dir and odd_dir:
-            if os.path.isdir(second_order_path + '/' + even_dir):
-                run('cp ci+second-order/' + even_dir + '/FINAL.RES DATA_RAW/CONFFINALevenMBPT.RES', shell=True)
-            if os.path.isdir(second_order_path + '/' + odd_dir):   
-                run('cp ci+second-order/' + odd_dir + '/FINAL.RES DATA_RAW/CONFFINALoddMBPT.RES', shell=True)
-        if tm_dir1 and os.path.isdir(second_order_path + '/' + tm_dir1):   
-            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPTa.RES', shell=True)
-            run('cp ci+second-order/' + tm_dir1 + '/E1.RES DATA_RAW/E1MBPT.RES', shell=True)
-        if tm_dir2 and os.path.isdir(second_order_path + '/' + tm_dir2):   
-            run('cp ci+second-order/' + tm_dir2 + '/E1.RES DATA_RAW/E1MBPTb.RES', shell=True)
-        if even_dir and odd_dir or tm_dir1 or tm_dir2:
-            print('data from ' + second_order_path + ' moved to DATA_RAW directory')
-        os.chdir(dir_path)
+    system = get_dict_value(config, 'system') if use_config_yml else None
+    basis_subdir = get_dict_value(system, 'basis_subdir') if system else None
+    add_config = get_dict_value(config, 'add') if use_config_yml else None
+    basis_dir_name = get_basis_dir_name(add_config['basis_set']) if basis_subdir and add_config else None
 
-    # Combine E1a/E1b and E1MBPTa/E1MBPTb files if they exist in DATA_RAW/
-    if os.path.exists(data_raw_path + '/E1a.RES') and os.path.exists(data_raw_path + '/E1b.RES'):
-        combine_tm(data_raw_path, data_processed_path)
+    j0, j1 = None, None
+    if even_J is not None and odd_J is not None:
+        j_values = sorted(set([float(even_J), float(odd_J)]))
+        if len(j_values) >= 2:
+            j0, j1 = j_values[0], j_values[1]
+            collect_portal_files('ci+all-order', j0, j1, data_raw_path, subdir=basis_dir_name)
+            collect_portal_files('ci+second-order', j0, j1, data_raw_path, 'MBPT', subdir=basis_dir_name)
+        else:
+            print(f'even and odd J are the same ({j_values[0]}); cannot determine TM directory pairs')
     else:
-        print('E1a.RES and/or E1b.RES not found in DATA_RAW/, skipping combine_tm')
-        
+        print('J values not available; skipping portal file collection')
+
     # Parse NIST Atomic Spectral Database for full list of energy levels
     url_nist = generate_asd_url(atom)
     print(url_nist)
     data_nist = generate_df_from_asd(url_nist)
     
-    # Write new CONF.RES (CONFFINAL.csv) with uncertainties
+    # Write new pconf.csv with uncertainties
     raw_path = dir_path + "/DATA_RAW/"
     if os.path.isdir(raw_path):
-        print('Reading raw files from ' + raw_path)
+        print(f'Reading raw files from {raw_path}')
     else:
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
-        print('Please put raw files in ' + raw_path)
-        print('The files should be named: CONFFINALeven.RES, CONFFINALodd.RES, CONFFINALevenMBPT.RES, CONFFINALoddMBPT.RES, E1a.RES, E1b.RES, E1MBPTa.RES, E1MBPTb.RES')
-        print('Note: E1.RES and E1MBPT.RES will be generated and placed in ' + data_processed_path)
+        print(f'Please put raw files in {raw_path}')
+        print('The files should be named: pconf_even.csv, pconf_odd.csv, pconf_even_MBPT.csv, pconf_odd_MBPT.csv')
         sys.exit()
-    confs, terms, energies_au, energies_cm, uncertainties, theory_shift, theory_J, gs_parity, matrix_file_exists, gs_exists, swaps, fixes, unmatched_energies, energy_to_level, mbpt_energy_to_level = write_new_conf_res(name, raw_path, data_nist)
+    confs, terms, energies_au, energies_cm, uncertainties, theory_J = process_pconf_levels(name, raw_path)
+
+    if j0 is not None:
+        combine_tm(j0, j1, data_raw_path, data_processed_path, data_filtered_theory_path)
+    matrix_file_exists = os.path.exists(f'{data_processed_path}/tm.csv')
+    if not matrix_file_exists:
+        print(f'tm.csv not found in {data_processed_path}/')
 
     data_nist = reformat_df_to_atomdb(data_nist, theory_J)
-    if gs_exists:
-        NIST_shift = find_energy_shift(data_nist)
-    else:
-        NIST_shift = 0
-        theory_shift = 0
 
-    # Store filtered data of even or odd parity in DATA_Filtered/NIST/ 
-    path_filtered_nist = "DATA_Filtered/NIST/"
-    path_filtered_theory = "DATA_Filtered/UD/"
-    os.makedirs(os.path.dirname(path_filtered_nist), exist_ok=True)
-    os.makedirs(os.path.dirname(path_filtered_theory), exist_ok=True)
-
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'odd')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name,'even')
-    df_to_csv(data_nist,"DATA_Filtered/NIST/"+name)
+    # Store filtered data of even or odd parity in DATA_Filtered/NIST/
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}', 'odd')
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}', 'even')
+    df_to_csv(data_nist, f'{data_filtered_nist_path}/{name}')
     
     # Filter NIST and UD data
-    path_nist_even = "DATA_Filtered/NIST/"+name+"_NIST_Even.csv"
-    path_ud_even = "DATA_Filtered/UD/"+name+"_UD_Even.csv"
+    path_nist_even = f'{data_filtered_nist_path}/{name}_NIST_Even.csv'
+    path_ud_even   = f'{data_filtered_theory_path}/{name}_UD_Even.csv'
 
-    path_nist_odd = "DATA_Filtered/NIST/"+name+"_NIST_Odd.csv"
-    path_ud_odd = "DATA_Filtered/UD/"+name+"_UD_Odd.csv"
+    path_nist_odd = f'{data_filtered_nist_path}/{name}_NIST_Odd.csv'
+    path_ud_odd   = f'{data_filtered_theory_path}/{name}_UD_Odd.csv'
     
-    # Set maximum number of levels to be read from NIST equal to number of levels in CONFFINAL.RES
-    with open(raw_path + 'CONFFINALeven.RES','r') as f:
-        lines = f.readlines()
-        num_levels_theory_even = len(lines) - 1
+    # Set maximum number of levels to be read from NIST equal to number of levels in pconf.csv
+    num_levels_theory_even = len(pd.read_csv(raw_path + 'pconf_even.csv'))
     nist_max_even = num_levels_theory_even
-    
-    with open(raw_path + 'CONFFINALodd.RES','r') as f:
-        lines = f.readlines()
-        num_levels_theory_odd = len(lines) - 1
+
+    num_levels_theory_odd = len(pd.read_csv(raw_path + 'pconf_odd.csv'))
     nist_max_odd = num_levels_theory_odd
     
-    # Set maximum number of levels to be outputted in csv files
-    num_levels_output_even = 1 if uncertainties[0] == '-' else 0
-    for i in range(1, num_levels_theory_even):
-        if uncertainties[i] == '-':
-            break
-        else:
-            num_levels_output_even += 1
-    num_levels_output_odd = num_levels_theory_odd
-    #num_levels_output_odd = 0
-    #for i in range(num_levels_theory_even, num_levels_theory_even + num_levels_theory_odd):
-    #    num_levels_output_odd = i + 1 - num_levels_theory_even
-    #    if uncertainties[i] == '-':
-    #        break
-        
-    print('Number of even parity levels: ', num_levels_output_even)
-    print('Number of odd parity levels: ', num_levels_output_odd)
+    print(f'Number of even parity levels: {num_levels_theory_even}')
+    print(f'Number of odd parity levels: {num_levels_theory_odd}')
 
     # Export filtered data to output directory
-    path_output = "DATA_Output/"
-    os.makedirs(os.path.dirname(path_output), exist_ok=True)
+    path_output = "DATA_Output"
+    os.makedirs(path_output, exist_ok=True)
 
-    # Calculate energy offsets to reference all energies from ground state
-    # NIST energies use NIST_shift, theory energies use theory_shift
-    # The parity opposite to ground state needs to be shifted
-    nist_even_offset = 0.0 if gs_parity == 'even' else NIST_shift
-    nist_odd_offset = 0.0 if gs_parity == 'odd' else NIST_shift
-    theory_even_offset = 0.0 if gs_parity == 'even' else theory_shift
-    theory_odd_offset = 0.0 if gs_parity == 'odd' else theory_shift
+    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even)
+    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd)
 
-    print(f'Ground state parity: {gs_parity}')
-    print(f'NIST energy offset for even parity: {nist_even_offset} cm^-1')
-    print(f'NIST energy offset for odd parity: {nist_odd_offset} cm^-1')
-    print(f'Theory energy offset for even parity: {theory_even_offset} cm^-1')
-    print(f'Theory energy offset for odd parity: {theory_odd_offset} cm^-1')
+    ConvertToTXT(data_final_even, f'{path_output}/{name}_Even.txt')
+    ConvertToTXT(data_final_odd,  f'{path_output}/{name}_Odd.txt')
 
-    # Use Vipul's code to correct misidentified configurations
-    data_final_even = MainCode(path_nist_even, path_ud_even, nist_max_even, gs_exists, nist_offset=nist_even_offset, theory_offset=theory_even_offset)
-    data_final_odd = MainCode(path_nist_odd, path_ud_odd, nist_max_odd, gs_exists, nist_offset=nist_odd_offset, theory_offset=theory_odd_offset)
-    
-    path = "DATA_Output/"+name+"_Even.txt" 
-    ConvertToTXT(data_final_even, path)
-    path = "DATA_Output/"+name+"_Odd.txt" 
-    ConvertToTXT(data_final_odd, path)
-    
     ## Finding Missing Levels
-    data_final_even_missing = Missing_Levels(data_final_even)
-    data_final_odd_missing = Missing_Levels(data_final_odd)    
+    data_final_even_missing = Missing_Levels(data_final_even, _term_cache)
+    data_final_odd_missing = Missing_Levels(data_final_odd, _term_cache)
 
-    path = "DATA_Output/"+name+"_Even+missing.txt" 
-    ConvertToTXT(data_final_even_missing, path)
-    path = "DATA_Output/"+name+"_Odd+missing.txt" 
-    ConvertToTXT(data_final_odd_missing, path)
+    ConvertToTXT(data_final_even_missing, f'{path_output}/{name}_Even+missing.txt')
+    ConvertToTXT(data_final_odd_missing,  f'{path_output}/{name}_Odd+missing.txt')
     
-    # 3. Create mapping of NIST data to theory data and reformat data for use on Atom portal
-    mapping = create_mapping(num_levels_output_even, num_levels_output_odd)
-    
-    # Filter mapping: keep all levels within energy cutoff
-    # Apply separately to even and odd parity since they're ordered independently
-    even_mapping = mapping[:num_levels_output_even]
-    odd_mapping = mapping[num_levels_output_even:]
+    mapping = create_mapping(name, num_levels_theory_even, num_levels_theory_odd)
 
-    # Determine global cutoff energy
+    # Split by parity then drop levels with no MBPT uncertainty
+    even_mapping = [lv for lv in mapping[:num_levels_theory_even] if lv[1][4] != '-']
+    odd_mapping  = [lv for lv in mapping[num_levels_theory_even:] if lv[1][4] != '-']
+
+    # Determine global energy cutoff in cm^-1.
+    # Exclude levels whose energy exceeds the cutoff from the outputs.
+    # If energy_cutoff is not set, find the first level in each parity whose NIST-theory percentage difference exceeds min_energy_diff_percent, 
+    # then place the ceiling 1 cm^-1 below that level's energy.
+    # The lower of the two parities is used so even and odd coverage stay consistent.
+    # global_cutoff_energy = float('inf') when no ceiling applies.
     if energy_cutoff is not None:
-        # User specified an explicit energy cutoff in cm^-1
         global_cutoff_energy = energy_cutoff
         print(f'Using user-specified global energy cutoff: {global_cutoff_energy:.2f} cm^-1')
     else:
-        # Calculate cutoff from min_energy_diff_percent
-        # Find the first bad level (exceeds energy diff threshold) for each parity
-        # and set cutoff to 1 cm-1 below that level's energy
-        even_cutoff_energy = float('inf')
-        for i, level in enumerate(even_mapping):
-            if level[2] > min_energy_diff_percent:
-                # Set cutoff to 1 cm-1 below the first bad level's energy
-                if level[0][3] != '-':
-                    bad_level_energy = float(level[0][3])
-                else:
-                    bad_level_energy = float(level[1][3])
-                even_cutoff_energy = bad_level_energy - 1.0
-                print(f'Even parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {even_cutoff_energy:.2f} cm^-1)')
-                break
-
-        odd_cutoff_energy = float('inf')
-        for i, level in enumerate(odd_mapping):
-            if level[2] > min_energy_diff_percent:
-                # Set cutoff to 1 cm-1 below the first bad level's energy
-                if level[0][3] != '-':
-                    bad_level_energy = float(level[0][3])
-                else:
-                    bad_level_energy = float(level[1][3])
-                odd_cutoff_energy = bad_level_energy - 1.0
-                print(f'Odd parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {odd_cutoff_energy:.2f} cm^-1)')
-                break
-
-        # Apply global cutoff: use the lower of the two cutoff energies to prevent gaps
-        global_cutoff_energy = min(even_cutoff_energy, odd_cutoff_energy)
-
-    # Filter levels based on energy cutoff
-    filtered_even = []
-    filtered_odd = []
-    excluded_even = 0
-    excluded_odd = 0
-
-    if global_cutoff_energy < float('inf'):
-        if energy_cutoff is None:
+        global_cutoff_energy = float('inf')
+        for parity_name, pmap in (('Even', even_mapping), ('Odd', odd_mapping)):
+            for i, level in enumerate(pmap):
+                if level[2] > min_energy_diff_percent:
+                    bad_e = float(level[0][3]) if level[3] else float(level[1][3])
+                    cutoff = bad_e - 1.0
+                    print(f'{parity_name} parity: first bad match at level {i} (energy diff: {level[2]:.2f}% > {min_energy_diff_percent}%, cutoff: {cutoff:.2f} cm^-1)')
+                    global_cutoff_energy = min(global_cutoff_energy, cutoff)
+                    break
+        if global_cutoff_energy < float('inf'):
             print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1 (lower of even/odd cutoffs)')
-        else:
-            print(f'\nApplying global cutoff at {global_cutoff_energy:.2f} cm^-1')
 
-        # Filter even parity based on energy cutoff
-        for level in even_mapping:
-            if level[0][3] != '-':
-                energy = float(level[0][3])
-            else:
-                energy = float(level[1][3])
-
-            if energy <= global_cutoff_energy:
-                # Also exclude NIST-matched levels with bad energy difference
-                if level[0][3] != '-' and level[2] > min_energy_diff_percent:
-                    excluded_even += 1
-                    continue
-                filtered_even.append(level)
-            else:
-                excluded_even += 1
-
-        # Filter odd parity based on energy cutoff
-        for level in odd_mapping:
-            if level[0][3] != '-':
-                energy = float(level[0][3])
-            else:
-                energy = float(level[1][3])
-
-            if energy <= global_cutoff_energy:
-                # Also exclude NIST-matched levels with bad energy difference
-                if level[0][3] != '-' and level[2] > min_energy_diff_percent:
-                    excluded_odd += 1
-                    continue
-                filtered_odd.append(level)
-            else:
-                excluded_odd += 1
-    else:
-        for level in even_mapping:
-            if level[0][3] != '-' and level[2] > min_energy_diff_percent:
-                excluded_even += 1
-                continue
+    # Keep a level if: 
+    # (1) its energy is at or below the cutoff, and
+    # (2) it either has no NIST match or its NIST-theory agreement is good enough.
+    filtered_even, filtered_odd = [], []
+    for level in even_mapping:
+        energy = float(level[0][3]) if level[3] else float(level[1][3])
+        if energy <= global_cutoff_energy and not (level[3] and level[2] > min_energy_diff_percent):
             filtered_even.append(level)
-        for level in odd_mapping:
-            if level[0][3] != '-' and level[2] > min_energy_diff_percent:
-                excluded_odd += 1
-                continue
+    for level in odd_mapping:
+        energy = float(level[0][3]) if level[3] else float(level[1][3])
+        if energy <= global_cutoff_energy and not (level[3] and level[2] > min_energy_diff_percent):
             filtered_odd.append(level)
+    excluded_even = len(even_mapping) - len(filtered_even)
+    excluded_odd = len(odd_mapping) - len(filtered_odd)
 
     # Create filtered mapping
     filtered_mapping = filtered_even + filtered_odd
@@ -1245,65 +1203,10 @@ if __name__ == "__main__":
         print(f'Filtered out {before_g_filter - len(filtered_mapping)} states with g orbital (ignore_g=True)')
         print(f'Final mapping has {len(filtered_mapping)} levels')
 
-    # Generate mapping-based fixes: when theory_config differs from corrected_config
-    # These fixes change E1.RES entries to match the NIST-determined labels
-    mapping_fixes = generate_mapping_fixes(filtered_mapping)
-    if mapping_fixes:
-        # Add mapping fixes to both fixes1 (for E1.RES) and fixes2 (for E1MBPT.RES)
-        fixes1, fixes2 = fixes
-        fixes = (fixes1 + mapping_fixes, fixes2 + mapping_fixes)
-
-    write_energy_csv(name, filtered_mapping, NIST_shift, theory_shift, gs_parity, min_energy_diff_percent)
-
-    # Create a list of all possible transitions between states
-    print('even parity configurations:')
-    even_confs = []
-    odd_confs = []
-    for line in filtered_mapping:
-        # Use NIST config if available, otherwise use theory config
-        if line[0][0] != '-':
-            configuration = line[0][0]
-            term = line[0][1]
-            J = line[0][2]
-        else:
-            configuration = line[1][5]
-            term = line[1][1]
-            J = line[1][2]
-
-        if find_parity(configuration) == 'even':
-            even_confs.append([configuration, term, J])
-        elif find_parity(configuration) == 'odd':
-            odd_confs.append([configuration, term, J])
-        else:
-            raise ValueError(f'Configuration {configuration} is not valid.')
-
-    possible_E1 = []
-    for conf_odd in odd_confs:
-        try:
-            float(conf_odd[2])
-            J_odd = int(conf_odd[2])
-        except ValueError:
-            J_odd = int(conf_odd[1])
-        for conf_even in even_confs:
-            try:
-                float(conf_even[2])
-                J_even = int(conf_even[2])
-            except ValueError:
-                J_even = int(conf_even[1])
-            if J_even == 0 and J_odd == 0: continue
-            if abs(J_even - J_odd) <= 1:
-                possible_E1.append([conf_odd, conf_even])
-    num_possible_E1 = len(possible_E1)
-    print('Number of possible E1: ', len(possible_E1))
-
-    unmatched_matrix = []
+    write_energy_csv(name, filtered_mapping, min_energy_diff_percent)
+    
     if matrix_file_exists:
         print('Writing matrix elements...')
-        num_E1, unmatched_matrix = write_matrix_csv(name, path_filtered_theory, filtered_mapping, gs_parity, theory_shift, NIST_shift, swaps, fixes, ignore_g, min_uncertainty, min_energy_diff_percent, energy_to_level, mbpt_energy_to_level)
-        coverage = round(num_E1/num_possible_E1*100, 2)
-        print(f'{coverage}% of possible E1 transitions accounted for ({num_E1}/{num_possible_E1})')
+        write_matrix_csv(name, filtered_mapping, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge)
     else:
-        print('E1.RES files were not found, so matrix csv file was not generated')
-
-    # Write unmatched items to file
-    write_unmatched_file(unmatched_energies, unmatched_matrix)
+        print('tm.csv not found; matrix csv file was not generated')

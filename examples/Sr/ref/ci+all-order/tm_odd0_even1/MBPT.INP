@@ -1,0 +1,36 @@
+MBPT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Used by ALL MBPT programs 
+Nso = 12 - CI core 
+Nsh = 12 - defines SCF field (For MS calculations Nsh=Nso) 
+Nss =999 
+Nsv = 13 - =Nso+1 
+Nmax=210 
+Lmax=  4 - max (l_i,l_k) for valence radial integrals 
+Kmax=  9 - max multipolarity of two-electron valence integrals 
+Kt  =  1 - Keep this fixed 
+Kbrt=  2 - Breit interaction 
+Kout=  0 - Details in output file 
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+SMS:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> (p_i dot p_k) interaction 
+C_sms= 0.00000   - scaling of SMS interaction 
+Klow=  1         - lower component included/ignored 
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+RPA >>>>>>>>>>>>>>>>>>Used by programs which deal with RPA MEs 
+A_hf   0 | 
+B_hf   0 | 
+E1_L   1 | 
+EDM    0 | - Right hand side operators 
+PNC    0 | 
+E1_V   1 | 
+AM     0 | 
+MQM    0 | 
+M1     0 | 
+E2     0 | 
+E3     1 | 
+M2     1 | 
+M3     0 | 
+========================= 
+Nhf = 12 - SCF procedure includes Nhf upper shells (Nsh,Nsh-1,...) 
+Kmg =  0 - if not zero, Omega gives frequency of external field 
+Omega= 0.057580(a.u.) 
+Kex =  1 - key for exchange (0 - skip, 1 - include) 
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 

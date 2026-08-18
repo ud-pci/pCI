@@ -1,6 +1,37 @@
 """
 Script to generate transition rates and lifetimes from energy levels and matrix elements.
 
+Multipole transition probabilities A_wv(Tk) from upper state v to lower state w:
+
+                    2.02613e18
+    A_wv(E1) =  ------------------  x S(E1)
+                (2*J_v+1)*lambda^3
+
+                    1.11995e18
+    A_wv(E2) =  ------------------  x S(E2)
+                (2*J_v+1)*lambda^5
+
+                    3.14441e17
+    A_wv(E3) =  ------------------  x S(E3)
+                (2*J_v+1)*lambda^7
+
+                    2.69735e13
+    A_wv(M1) =  ------------------  x S(M1)
+                (2*J_v+1)*lambda^3
+
+                    1.49097e13
+    A_wv(M2) =  ------------------  x S(M2)
+                (2*J_v+1)*lambda^5
+
+                    4.18610e12
+    A_wv(M3) =  ------------------  x S(M3)
+                (2*J_v+1)*lambda^7
+
+where J_v is the total angular momentum of the upper state, lambda is the transition
+wavelength in Angstroms, and S(Tk) = |<j_w || T^k || j_v>|^2 is the line strength.
+
+Reference: https://www1.udel.edu/atom/about
+
 Input files:
 - {atom}_Energies.csv
 - {atom}_Matrix_Elements_Theory.csv
@@ -11,6 +42,9 @@ Output files:
 - {atom}_Lifetimes.csv                     (Step 2 - per-state lifetimes)
 - {atom}_Transition_Rates_Error_Check.csv  (Step 3 - parenthetical uncertainty display)
 - {atom}_Lifetimes_Error_Check.csv         (Step 3 - parenthetical uncertainty display)
+- {atom}_transitions.txt                   (Step 3 - per-state decay table:
+                                            header: conf termJ - energy cm^-1 - lifetime(unc) ns ->
+                                            col header + rows: Lower State, Op, Wavelength(nm), ME, Rate(s^-1), BR)
 """
 
 import math
@@ -19,6 +53,29 @@ import decimal
 import pandas as pd
 import sys
 import os
+
+
+def _rate_formula(operator):
+    """
+    Return (constant, wavelength_power) for:
+    
+              C
+    A = --------------- x S,
+        (2J+1)*lambda^p
+
+    where C = constant, p = wavelength_power, and lambda must be in Angstroms.
+    """
+    table = {
+        'E1': (2.02613e18, 3),
+        'E2': (1.11995e18, 5),
+        'E3': (3.14441e17, 7),
+        'M1': (2.69735e13, 3),
+        'M2': (1.49097e13, 5),
+        'M3': (4.18610e12, 7),
+    }
+    if operator not in table:
+        raise ValueError('Unknown operator: ' + operator)
+    return table[operator]
 
 
 def _round_half_up(value, n_dec):
@@ -31,6 +88,7 @@ def _round_half_up(value, n_dec):
     else:
         q = decimal.Decimal('1E' + str(-n_dec))
     return d.quantize(q, rounding=decimal.ROUND_HALF_UP)
+
 
 
 def parse_termJ(termJ):
@@ -122,13 +180,14 @@ def _fmt_plain(value, n_dec):
 # Type-specific formatters (following ATOM portal v3 formatting conventions)
 # ---------------------------------------------------------------------------
 
-def format_wavelength(wl, unc):
+def format_wavelength(wl, unc, show_upper_bound=True):
     """
     Wavelength display (nm).
       - 1 sig fig in uncertainty
       - Primary: decimal (e.g. 454.9813(2))
       - Exception: scientific when unc > 950 nm (e.g. 2.37(1)E+05)
-      - Version 3: unc > wl  ->  <(wl + unc)
+      - When unc > wl and show_upper_bound=True: <(wl + unc)
+      - When unc > wl and show_upper_bound=False: value(unc) as usual
     """
     if unc <= 0:
         return str(_round_half_up(wl, 4))
@@ -136,8 +195,7 @@ def format_wavelength(wl, unc):
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp)        # 1 sig fig: last digit at unc_exp
 
-    # Version 3: uncertainty exceeds value
-    if unc > wl:
+    if unc > wl and show_upper_bound:
         upper = wl + unc
         if unc > 950:
             exp  = math.floor(math.log10(abs(upper)))
@@ -155,12 +213,13 @@ def format_wavelength(wl, unc):
     return format_with_uncertainty(wl, unc, n_sig_figs=1)
 
 
-def format_matrix_element(me, unc):
+def format_matrix_element(me, unc, show_upper_bound=True):
     """
     Matrix element display (a.u.).
       - 2 sig figs in uncertainty
       - Primary: decimal, no exceptions
-      - Version 3: unc > me  ->  <(me + unc)
+      - When unc > me and show_upper_bound=True: <(me + unc)
+      - When unc > me and show_upper_bound=False: value(unc) as usual
     """
     if unc <= 0:
         return str(_round_half_up(me, 4))
@@ -168,31 +227,30 @@ def format_matrix_element(me, unc):
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - 1)    # 2 sig figs
 
-    # Version 3
-    if unc > me:
+    if unc > me and show_upper_bound:
         upper = me + unc
         return f"<{_fmt_plain(upper, n_dec)}"
 
     return format_with_uncertainty(me, unc, n_sig_figs=2)
 
 
-def format_rate_scientific(value, unc):
+def format_rate_scientific(value, unc, show_upper_bound=True):
     """
     Transition rate display (s^-1).
       - 2 sig figs in uncertainty
       - Primary: scientific with parenthetical coefficient (e.g. 1.661(12)E+06)
       - Exception: E+00 is omitted for normal display (e.g. 1.5(10))
-      - Version 3: unc > value  ->  <(value + unc) in scientific; E+00 kept
+      - When unc > value and show_upper_bound=True: <(value + unc) in scientific
+      - When unc > value and show_upper_bound=False: value(unc) as usual
     """
     if value == 0:
-        if unc > 0:
+        if unc > 0 and show_upper_bound:
             upper_exp = math.floor(math.log10(abs(unc)))
             sign = "+" if upper_exp >= 0 else "-"
             return f"<{_round_half_up(unc / 10**upper_exp, 1)}E{sign}{abs(upper_exp):02d}"
         return "0"
 
-    # Version 3: uncertainty exceeds value — always full scientific, E+00 kept
-    if unc > value:
+    if unc > value and show_upper_bound:
         upper     = value + unc
         upper_exp = math.floor(math.log10(abs(upper)))
         sign      = "+" if upper_exp >= 0 else "-"
@@ -218,16 +276,17 @@ def format_rate_scientific(value, unc):
     return f"{coefficient_str}E{sign}{abs(exp):02d}"
 
 
-def format_branching_ratio(B, unc):
+def format_branching_ratio(B, unc, show_upper_bound=True):
     """
     Branching ratio display (dimensionless, in [0, 1]).
       - 2 sig figs in uncertainty (1 sig fig when unc < 1e-10)
       - Primary: decimal, no exceptions
       - When unc > 0 but rounds to zero: shows (0) explicitly
-      - Version 3: unc > B  ->  <(B + unc), capped at <1
+      - When unc > B and show_upper_bound=True: <(B + unc), capped at <1
+      - When unc > B and show_upper_bound=False: value(unc) as usual
     """
     if B == 0:
-        if unc > 0:
+        if unc > 0 and show_upper_bound:
             upper = unc
             if upper >= 1.0:
                 return "<1"
@@ -247,8 +306,7 @@ def format_branching_ratio(B, unc):
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - (n_sig - 1))
 
-    # Version 3
-    if unc > B:
+    if unc > B and show_upper_bound:
         upper = B + unc
         if upper >= 1.0:
             return "<1"
@@ -273,13 +331,14 @@ def format_branching_ratio(B, unc):
     return f"{val_str}({u_int})"
 
 
-def format_lifetime(lt_ns, unc):
+def format_lifetime(lt_ns, unc, show_upper_bound=True):
     """
     Lifetime display (ns, or scientific for metastable states).
       - 2 sig figs in uncertainty
       - Primary: decimal (e.g. 1.8059(18))
       - Exception: scientific when lt_ns > 1e5 (e.g. 3.863(77)E+09)
-      - Version 3: unc > lt_ns  ->  <(lt_ns + unc)
+      - When unc > lt_ns and show_upper_bound=True: <(lt_ns + unc)
+      - When unc > lt_ns and show_upper_bound=False: value(unc) as usual
     """
     if unc <= 0:
         if lt_ns > 1e5:
@@ -291,8 +350,7 @@ def format_lifetime(lt_ns, unc):
     unc_exp = math.floor(math.log10(abs(unc)))
     n_dec   = -(unc_exp - 1)    # 2 sig figs
 
-    # Version 3
-    if unc > lt_ns:
+    if unc > lt_ns and show_upper_bound:
         upper = lt_ns + unc
         if upper > 1e5:
             exp  = math.floor(math.log10(abs(upper)))
@@ -354,6 +412,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
         term2 = row['state_two_term']
         J2 = str(row['state_two_J'])
 
+        operator = str(row['operator'])
         matrix_element = row['matrix_element']
         matrix_element_unc = row['matrix_element_uncertainty']
 
@@ -374,19 +433,17 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
             print(f"Warning: Zero energy difference for transition {key1} -> {key2}, skipping...")
             continue
 
-        wavelength = 1e7 / energy_diff  # Convert cm^-1 to nm
+        wavelength = 1e7 / energy_diff  # nm
 
-        # Calculate transition rate using formula
-        # trate = (2.02613*10**18)/((2*J+1)*(abs(wavelength)*10)**3)*matrix_element**2
-        # The J value used depends on which state has higher energy
+        # J of the upper state (v) goes in the (2J_v+1) denominator
         if energy1 > energy2:
-            # Transition from state 1 to state 2
-            J_denominator = int(J1)
+            J_upper = float(J1)
         else:
-            # Transition from state 2 to state 1
-            J_denominator = int(J2)
+            J_upper = float(J2)
 
-        transition_rate = (2.02613e18) / ((2*J_denominator + 1) * (abs(wavelength)*10)**3) * matrix_element**2
+        C, p = _rate_formula(operator)
+        wl_angstrom = abs(wavelength) * 10
+        transition_rate = C / ((2 * J_upper + 1) * wl_angstrom ** p) * matrix_element ** 2
 
         # Add to list
         transition_rates.append({
@@ -396,6 +453,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
             'state_two_configuration': conf2,
             'state_two_term': term2,
             'state_two_J': J2,
+            'operator': operator,
             'matrix_element': matrix_element,
             'matrix_element_uncertainty': matrix_element_unc,
             'energy1(cm-1)': f"{energy1:.3f}",
@@ -413,7 +471,7 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
     return output_file
 
 
-def calculate_lifetimes_and_branching_ratios(tr_file):
+def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     """
     Calculate lifetimes and branching ratios from transition rates.
 
@@ -421,26 +479,26 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     -----------
     tr_file : str
         Path to the transition rates CSV file
+    atom_name : str
+        Atom name used to construct output filenames (e.g. Sr1, Ba1)
     """
 
     # Read transition rates from file
     print(f"Reading {tr_file}...")
     df = pd.read_csv(tr_file)
 
-    atom = tr_file.split('_')[0]
-
     # Open files to write lifetimes and branching ratios
-    filename_lifetimes = atom + '_Lifetimes.csv'
-    filename_br_ratios = atom + '_Transition_Properties.csv'
+    filename_lifetimes = atom_name + '_Lifetimes.csv'
+    filename_br_ratios = atom_name + '_Transition_Properties.csv'
 
     lifetimes_df = pd.DataFrame(columns=['state_configuration', 'state_term', 'state_J', 'lifetime', 'lifetime_uncertainty'])
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
                                          'state_two_configuration', 'state_two_term', 'state_two_J',
-                                         'wavelength_display', 'matrix_element_display',
+                                         'operator', 'wavelength_display', 'matrix_element_display',
                                          'branching_ratio_display', 'transition_rate_display', 'transition_rate', 'transition_rate_uncertainty'])
 
     # Load energies early for uncertainty lookup and energy-based sorting
-    energies_file = atom + '_Energies.csv'
+    energies_file = atom_name + '_Energies.csv'
     energy_unc_lookup = {}
     energies_df_for_sort = None
     try:
@@ -456,6 +514,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     # Parse transition rates and sum up rates for each upper state
     # Note: Matrix_Elements_Theory.csv is already deduplicated by gen_portal_csv.py
     tr_rates = {}
+    upper_energies = {}
 
     for _, row in df.iterrows():
         energy1 = float(row['energy1(cm-1)'])
@@ -471,6 +530,8 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
         J2 = str(row['state_two_J'])
         termJ2 = term2 + J2
 
+        operator = str(row['operator'])
+        _, wl_power = _rate_formula(operator)
         matrix_element = row['matrix_element']
         me_unc = float(row['matrix_element_uncertainty'])
         wavelength = float(row['wavelength(nm)'])
@@ -482,87 +543,84 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
         # Determine which state is upper (higher energy)
         if energy2 < energy1:
             upper_state = config1
+            upper_energies[config1] = energy1
             lower_state = config2
         else:
             upper_state = config2
+            upper_energies[config2] = energy2
             lower_state = config1
 
         # Add transition to upper state's decay list
         if upper_state not in tr_rates:
             tr_rates[upper_state] = []
 
-        tr_rates[upper_state].append([lower_state, tr_rate, matrix_element, wavelength, me_unc])
+        tr_rates[upper_state].append([lower_state, tr_rate, matrix_element, wavelength, me_unc, operator, wl_power])
 
     # Calculate lifetimes and branching ratios
     lifetimes = []
 
-    # Write transitions to text file for inspection
-    with open('transitions.txt', 'w') as f:
-        for config, rates in tr_rates.items():
-            configuration = config.split(' ')[0]
-            termJ = config.split(' ')[1]
-            term, J = parse_termJ(termJ)
+    # Calculate lifetimes and branching ratios
+    for config, rates in tr_rates.items():
+        configuration = config.split(' ')[0]
+        termJ = config.split(' ')[1]
+        term, J = parse_termJ(termJ)
 
-            # Calculate total decay rate
-            total_rates = sum(rate[1] for rate in rates)
+        # Calculate total decay rate
+        total_rates = sum(rate[1] for rate in rates)
 
-            # Calculate lifetime in nanoseconds
-            lifetime = 1/total_rates * 1e9
+        # Calculate lifetime in nanoseconds
+        lifetime = 1/total_rates * 1e9
 
-            # Calculate lifetime uncertainty via error propagation
-            upper_key = (configuration, term, J)
-            e_unc_upper = energy_unc_lookup.get(upper_key, 0.0)
-            sum_rate_unc_sq = 0.0
-            for rate_entry in rates:
-                lower_conf  = rate_entry[0].split(' ')[0]
-                lower_term_p, lower_J_p = parse_termJ(rate_entry[0].split(' ')[1])
-                e_unc_lower = energy_unc_lookup.get((lower_conf, lower_term_p, lower_J_p), 0.0)
-                tr_rate_i  = rate_entry[1]
-                me_i       = rate_entry[2]
-                wl_i       = rate_entry[3]
-                me_unc_i   = rate_entry[4]
-                wl_unc_i   = (wl_i ** 2 / 1e7) * math.sqrt(e_unc_upper ** 2 + e_unc_lower ** 2)
-                if me_i != 0 and wl_i != 0:
-                    rate_unc_i = tr_rate_i * math.sqrt((2.0 * me_unc_i / abs(me_i)) ** 2
-                                                       + (3.0 * wl_unc_i / wl_i) ** 2)
-                else:
-                    rate_unc_i = 0.0
-                sum_rate_unc_sq += rate_unc_i ** 2
-            lt_unc = (lifetime ** 2 / 1e9) * math.sqrt(sum_rate_unc_sq)
+        # Sum squared rate uncertainties over all decay channels for lifetime uncertainty
+        upper_key = (configuration, term, J)
+        e_unc_upper = energy_unc_lookup.get(upper_key, 0.0)
+        sum_rate_unc_sq = 0.0
+        for rate_entry in rates:
+            lower_conf  = rate_entry[0].split(' ')[0]
+            lower_term_p, lower_J_p = parse_termJ(rate_entry[0].split(' ')[1])
+            e_unc_lower = energy_unc_lookup.get((lower_conf, lower_term_p, lower_J_p), 0.0)
+            tr_rate_i  = rate_entry[1]
+            me_i       = rate_entry[2]
+            wl_i       = rate_entry[3]
+            me_unc_i   = rate_entry[4]
+            p_i        = rate_entry[6]
+            wl_unc_i   = (wl_i ** 2 / 1e7) * math.sqrt(e_unc_upper ** 2 + e_unc_lower ** 2)
+            if me_i != 0 and wl_i != 0:
+                rate_unc_i = tr_rate_i * math.sqrt((2.0 * me_unc_i / abs(me_i)) ** 2 + (p_i * wl_unc_i / wl_i) ** 2)
+            else:
+                rate_unc_i = 0.0
+            sum_rate_unc_sq += rate_unc_i ** 2
+        lt_unc = (lifetime ** 2 / 1e9) * math.sqrt(sum_rate_unc_sq)
 
-            lifetimes.append([configuration, term, J, lifetime, lt_unc])
+        lifetimes.append([configuration, term, J, lifetime, lt_unc])
 
-            # Write to transitions file
-            f.write(config + ' ->\n')
-            for rate in rates:
-                f.write('      ' + rate[0] + ' ' + str(rate[1]) + ' ' + str(rate[2]) + ' ' + str(rate[3]) + '\n')
+        # Build one branching ratio row per decay channel
+        for rate in rates:
+            configuration2 = rate[0].split(' ')[0]
+            termJ2 = rate[0].split(' ')[1]
+            term2, J2 = parse_termJ(termJ2)
+            tr_rate        = rate[1]
+            matrix_element = rate[2]
+            wavelength     = rate[3]
+            op             = rate[5]
+            branching_ratio = tr_rate / total_rates
 
-                # Add to branching ratios dataframe
-                configuration2 = rate[0].split(' ')[0]
-                termJ2 = rate[0].split(' ')[1]
-                term2, J2 = parse_termJ(termJ2)
-                matrix_element = rate[2]
-                wavelength = rate[3]
-                tr_rate = rate[1]
-                branching_ratio = tr_rate / total_rates
-
-                row_data = {
-                    'state_one_configuration': configuration,
-                    'state_one_term': term,
-                    'state_one_J': J,
-                    'state_two_configuration': configuration2,
-                    'state_two_term': term2,
-                    'state_two_J': J2,
-                    'wavelength_display': f"{wavelength:.2f}",
-                    'matrix_element_display': matrix_element,
-                    'branching_ratio_display': format(_round_half_up(branching_ratio, (-math.floor(math.log10(branching_ratio)) + 2) if branching_ratio > 0 else 3), 'f'),
-                    'transition_rate_display': '',
-                    'transition_rate': f"{tr_rate:.3e}",
-                    'transition_rate_uncertainty': ''
-                }
-                br_ratios_df.loc[len(br_ratios_df.index)] = row_data
-
-    print(f"transitions.txt has been written")
+            row_data = {
+                'state_one_configuration': configuration,
+                'state_one_term': term,
+                'state_one_J': J,
+                'state_two_configuration': configuration2,
+                'state_two_term': term2,
+                'state_two_J': J2,
+                'operator': op,
+                'wavelength_display': f"{wavelength:.2f}",
+                'matrix_element_display': matrix_element,
+                'branching_ratio_display': format(_round_half_up(branching_ratio, (-math.floor(math.log10(branching_ratio)) + 2) if branching_ratio > 0 else 3), 'f'),
+                'transition_rate_display': '',
+                'transition_rate': f"{tr_rate:.3e}",
+                'transition_rate_uncertainty': ''
+            }
+            br_ratios_df.loc[len(br_ratios_df.index)] = row_data
 
     # Write lifetimes to dataframe
     for lifetime in lifetimes:
@@ -594,8 +652,10 @@ def calculate_lifetimes_and_branching_ratios(tr_file):
     lifetimes_df.to_csv(filename_lifetimes, index=False)
     print(f"{filename_lifetimes} has been written with {len(lifetimes_df)} states")
 
+    return tr_rates, upper_energies, lifetimes
 
-def add_display_formats(atom_name):
+
+def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes_raw=None, br_cutoff=1e-10):
     """
     Step 3: Overwrite the display columns in the Error_Check CSVs with
     parenthetical uncertainty notation.
@@ -613,9 +673,20 @@ def add_display_formats(atom_name):
 
     Uncertainty formulas
     --------------------
-    Wavelength:   δλ = (λ² / 1e7) x sqrt(δE₁² + δE₂²)
-    Rate:         δA = 2 x A x (δd / |d|)
-    Lifetime:     δτ_ns = (τ_ns² / 1e9) x sqrt(Σ δAᵢ²)
+    Wavelength:
+                     lambda^2
+        d_lambda =  ----------  x sqrt(dE1^2 + dE2^2)
+                       1e7
+
+    Rate:
+                  d_me
+        dA = 2A x ----
+                  |me|
+
+    Lifetime:
+                     tau_ns^2
+        d_tau_ns =  ----------  x sqrt(sum dAi^2)
+                       1e9
     """
 
     tr_file        = f"{atom_name}_Transition_Rates.csv"
@@ -624,6 +695,7 @@ def add_display_formats(atom_name):
     lifetimes_exp  = f"{atom_name}_Lifetimes_Exp.csv"
     energies_file  = f"{atom_name}_Energies.csv"
     tr_check_out   = f"{atom_name}_Transition_Rates_Error_Check.csv"
+    tr_check_zero_out = f"{atom_name}_Transition_Rates_Error_Check_Zero_BR.csv"
     lifetimes_out  = f"{atom_name}_Lifetimes_Error_Check.csv"
 
     print(f"Reading {tr_file}...")
@@ -663,6 +735,8 @@ def add_display_formats(atom_name):
         term2 = str(row['state_two_term']).strip()
         J2    = str(row['state_two_J']).strip()
 
+        operator = str(row['operator']).strip()
+        C, p     = _rate_formula(operator)
         me      = float(row['matrix_element'])
         me_unc  = float(row['matrix_element_uncertainty'])
         rate    = float(row['transition_rate(s-1)'])
@@ -687,24 +761,27 @@ def add_display_formats(atom_name):
             lower = (conf1, term1, J1)
             J_upper_str = J2
 
-        # Rate uncertainty: δA/A = sqrt( (2δd/d)² + (3δλ/λ)² )
-        # When me == 0 but me_unc > 0, the linear formula gives δA = 0 (not useful).
-        # Instead, evaluate the rate formula at me = me_unc to get an upper bound:
-        #   A_max = (C / (2J+1)) x me_unc² / (λ_Å)³
-        # i.e. the largest rate consistent with |me| ≤ me_unc.
+        # Rate uncertainty:
+        #
+        #   dA        /  (2*d_me)^2   (p*d_lambda)^2  \
+        #   -- = sqrt(  ---------  + ----------------  )
+        #    A        \    me^2          lambda^2     /
+        # 
+        # where p is the wavelength power for the operator (3 for E1/M1, 5 for E2/M2, 7 for E3/M3).
+        # When me == 0 but me_unc > 0, evaluate the rate formula at me = me_unc for an upper bound.
         if me != 0 and wl != 0:
-            rate_unc = rate * math.sqrt((2.0 * me_unc / abs(me)) ** 2 + (3.0 * wl_unc / wl) ** 2)
+            rate_unc = rate * math.sqrt((2.0 * me_unc / abs(me)) ** 2 + (p * wl_unc / wl) ** 2)
         elif me_unc > 0 and wl != 0:
             j_parts     = J_upper_str.split('/')
             j_val       = float(j_parts[0]) / float(j_parts[1]) if len(j_parts) == 2 \
                           else float(J_upper_str)
             j_degen     = 2 * j_val + 1
             wl_angstrom = wl * 10.0
-            rate_unc    = (2.02613e18 / j_degen) * (me_unc ** 2) / (wl_angstrom ** 3)
+            rate_unc    = C / j_degen * (me_unc ** 2) / (wl_angstrom ** p)
         else:
             rate_unc = 0.0
 
-        trans_data[upper + lower] = {
+        trans_data[upper + lower + (operator,)] = {
             'me':      me,      'me_unc':   me_unc,
             'wl':      wl,      'wl_unc':   wl_unc,
             'rate':    rate,    'rate_unc': rate_unc,
@@ -719,6 +796,7 @@ def add_display_formats(atom_name):
     props_df = pd.read_csv(props_file)
 
     wl_disp, me_disp, br_disp, rate_disp, rate_unc_list = [], [], [], [], []
+    br_values = []
 
     for _, row in props_df.iterrows():
         upper = (str(row['state_one_configuration']).strip(),
@@ -727,7 +805,8 @@ def add_display_formats(atom_name):
         lower = (str(row['state_two_configuration']).strip(),
                  str(row['state_two_term']).strip(),
                  str(row['state_two_J']).strip())
-        key = upper + lower
+        operator = str(row['operator']).strip()
+        key = upper + lower + (operator,)
 
         if key in trans_data:
             t = trans_data[key]
@@ -737,8 +816,15 @@ def add_display_formats(atom_name):
             rate_unc_list.append(f"{t['rate_unc']:.3e}")
 
             # Branching ratio and its uncertainty via error propagation
-            # B_i = A_i / A_total
-            # δB_i = (1/A_total) x sqrt[ (1-B_i)² δA_i² + B_i² x Σ_{j≠i} δA_j² ]
+            #
+            #          A_i
+            # B_i = ---------
+            #        A_total
+            #
+            #          sqrt[ (1-B_i)^2 x dA_i^2 + B_i^2 x sum_{j!=i} dA_j^2 ]
+            # dB_i = -----------------------------------------------------------
+            #                               A_total
+            #
             A_i  = t['rate']
             dA_i = t['rate_unc']
             trans_list = upper_trans.get(upper, [(A_i, dA_i)])
@@ -750,13 +836,15 @@ def add_display_formats(atom_name):
                 (B_i       / A_total) ** 2 * (sum_sq_all - dA_i ** 2)
             ) if A_total > 0 else 0.0
             br_disp.append(format_branching_ratio(B_i, dB_i))
+            br_values.append(B_i)
         else:
-            print(f"  Warning: no transition data for {upper} -> {lower}, keeping old values")
+            print(f"  Warning: no {operator} transition data for {upper} -> {lower}, keeping old values")
             wl_disp.append(str(row['wavelength_display']))
             me_disp.append(str(row['matrix_element_display']))
             br_disp.append(str(row['branching_ratio_display']))
             rate_disp.append(str(row.get('transition_rate_display', '')))
             rate_unc_list.append('')
+            br_values.append(None)
 
     # Write Transition_Properties.csv with plain rate and uncertainty columns
     props_df['transition_rate_display']     = rate_disp
@@ -772,8 +860,19 @@ def add_display_formats(atom_name):
     tr_check_df['matrix_element_display']  = me_disp
     tr_check_df['branching_ratio_display'] = br_disp
     tr_check_df['transition_rate_display'] = rate_disp
-    tr_check_df.to_csv(tr_check_out, index=False)
-    print(f"{tr_check_out} written with {len(tr_check_df)} transitions")
+
+    # Split: rows with branching ratio below cutoff go to a separate file
+    # so the main error-check CSV only contains significant transitions.
+    zero_mask = pd.Series([(b is not None and b < br_cutoff) for b in br_values],
+                          index=tr_check_df.index)
+    tr_check_nonzero = tr_check_df[~zero_mask]
+    tr_check_zero    = tr_check_df[zero_mask]
+
+    tr_check_nonzero.to_csv(tr_check_out, index=False)
+    print(f"{tr_check_out} written with {len(tr_check_nonzero)} transitions")
+    if len(tr_check_zero) > 0:
+        tr_check_zero.to_csv(tr_check_zero_out, index=False)
+        print(f"{tr_check_zero_out} written with {len(tr_check_zero)} near-zero BR transitions")
 
     # ------------------------------------------------------------------ #
     # Write Lifetimes_Error_Check.csv                                    #
@@ -830,28 +929,75 @@ def add_display_formats(atom_name):
     lt_check_df.to_csv(lifetimes_out, index=False)
     print(f"{lifetimes_out} written with {len(lt_check_df)} states")
 
+    if tr_rates is not None and upper_energies is not None and lifetimes_raw is not None:
+        lt_lookup = {(lt[0], lt[1], lt[2]): (lt[3], lt[4]) for lt in lifetimes_raw}
+        transitions_file = f"{atom_name}_transitions.txt"
+        with open(transitions_file, 'w') as f:
+            for config, rates in sorted(tr_rates.items(), key=lambda kv: upper_energies.get(kv[0], 0.0)):
+                configuration = config.split(' ')[0]
+                termJ = config.split(' ')[1]
+                term, J = parse_termJ(termJ)
+                upper = (configuration, term, J)
+                energy_cm = upper_energies.get(config, 0.0)
+                lt_ns, lt_unc = lt_lookup.get(upper, (0.0, 0.0))
+                lt_str = format_lifetime(lt_ns, lt_unc, show_upper_bound=False)
+                if lt_unc > lt_ns:
+                    lt_str += '*'
+                f.write(f'{config} - {energy_cm:.2f} cm^-1 - {lt_str} ns ->\n')
+                W_ST = 20; W_OP = 4; W_WL = 16; W_ME = 16; W_RT = 18
+                f.write(f'      {"Lower State":<{W_ST}} {"Op":<{W_OP}} {"Wavelength(nm)":<{W_WL}} {"ME":<{W_ME}} {"Rate(s^-1)":<{W_RT}} BR\n')
+                for rate in rates:
+                    lower_conf = rate[0].split(' ')[0]
+                    lower_term, lower_J = parse_termJ(rate[0].split(' ')[1])
+                    lower = (lower_conf, lower_term, lower_J)
+                    operator = rate[5]
+                    key = upper + lower + (operator,)
+                    if key in trans_data:
+                        t = trans_data[key]
+                        A_i  = t['rate']
+                        dA_i = t['rate_unc']
+                        trans_list = upper_trans.get(upper, [(A_i, dA_i)])
+                        A_total    = sum(r for r, _ in trans_list)
+                        B_i        = A_i / A_total if A_total > 0 else 0.0
+                        if B_i < br_cutoff:
+                            continue
+                        sum_sq_all = sum(u ** 2 for _, u in trans_list)
+                        dB_i = math.sqrt(
+                            ((1 - B_i) / A_total) ** 2 * dA_i ** 2 +
+                            (B_i       / A_total) ** 2 * (sum_sq_all - dA_i ** 2)
+                        ) if A_total > 0 else 0.0
+                        wl_str   = format_wavelength(t['wl'], t['wl_unc'], show_upper_bound=False)
+                        me_str   = format_matrix_element(t['me'], t['me_unc'], show_upper_bound=False)
+                        rate_str = format_rate_scientific(A_i, dA_i, show_upper_bound=False)
+                        br_str   = format_branching_ratio(B_i, dB_i, show_upper_bound=False)
+                        if t['wl_unc'] > t['wl']:
+                            wl_str += '*'
+                        if t['me_unc'] > abs(t['me']):
+                            me_str += '*'
+                        if dA_i > A_i:
+                            rate_str += '*'
+                        if dB_i > B_i:
+                            br_str += '*'
+                        f.write(f'      {rate[0]:<{W_ST}} {operator:<{W_OP}} {wl_str:<{W_WL}} {me_str:<{W_ME}} {rate_str:<{W_RT}} {br_str}\n')
+                    else:
+                        print(f'WARNING: no display format found for transition {rate[0]} {operator}; skipping')
+                        continue
+        print(f'{transitions_file} has been written')
+
 
 def main():
     """Main function to process command line arguments and run the script."""
-
-    if len(sys.argv) < 2:
-        print("Usage: python gen_rates_lifetimes.py <atom_name>")
-        print("Example: python gen_rates_lifetimes.py Ba1")
-        print("\nThis script expects the following files to exist:")
-        print("  - {atom_name}_Energies.csv")
-        print("  - {atom_name}_Matrix_Elements_Theory.csv")
-        print("\nOptionally, to replace theory lifetimes with experimental values:")
-        print("  - {atom_name}_Lifetimes_Exp.csv")
-        print("\nIt will generate:")
-        print("  - {atom_name}_Transition_Rates.csv          (Step 1)")
-        print("  - {atom_name}_Transition_Properties.csv     (Step 2)")
-        print("  - {atom_name}_Lifetimes.csv                 (Step 2)")
-        print("  - {atom_name}_Transition_Rates_Error_Check.csv  (Step 3)")
-        print("  - {atom_name}_Lifetimes_Error_Check.csv         (Step 3)")
-        print("  - transitions.txt")
-        sys.exit(1)
-
-    atom_name = sys.argv[1]
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Generate transition rates and lifetimes from energy levels and matrix elements.'
+    )
+    parser.add_argument('atom_name', help='Atom name (e.g. Ba1, In2)')
+    parser.add_argument('--br-cutoff', type=float, default=1e-10,
+                        help='Branching ratio cutoff; transitions below this are excluded from '
+                             '{atom}_transitions.txt and moved to the Zero_BR CSV (default: 1e-10)')
+    args = parser.parse_args()
+    atom_name = args.atom_name
+    br_cutoff = args.br_cutoff
 
     # Check if input files exist
     energies_file = f"{atom_name}_Energies.csv"
@@ -874,11 +1020,11 @@ def main():
 
     # Step 2: Calculate lifetimes and branching ratios
     print("\nStep 2: Calculating lifetimes and branching ratios...")
-    calculate_lifetimes_and_branching_ratios(tr_file)
+    tr_rates, upper_energies, lifetimes_raw = calculate_lifetimes_and_branching_ratios(tr_file, atom_name)
 
-    # Step 3: Add parenthetical uncertainty display formats
+    # Step 3: Add parenthetical uncertainty display formats and write {atom}_transitions.txt
     print("\nStep 3: Adding parenthetical uncertainty display formats...")
-    add_display_formats(atom_name)
+    add_display_formats(atom_name, tr_rates, upper_energies, lifetimes_raw, br_cutoff)
 
     print("\n" + "=" * 60)
     print("Processing complete!")
