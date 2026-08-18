@@ -314,7 +314,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '9.1'
+        version = '9.0'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -2494,7 +2494,7 @@ Contains
             i=0
             Do While (wsum < 0.995 .and. i < nconfs)
                 i=i+1
-                Write(98, strfmt) Wsave(i,j), strcsave(i,j)
+                Write(98, strfmt) Wsave(i,j), Trim(strcsave(i,j))
                 If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
                     Continue
                 Else
@@ -3559,7 +3559,7 @@ Contains
             i=0
             Do While (wsum < 0.9999 .and. i < nconfs)
                 i=i+1
-                Write(98, strfmt) Wsave(i,j), strcsave(i,j)
+                Write(98, strfmt) Wsave(i,j), Trim(strcsave(i,j))
                 If (Any(wgtconfs%strconfs == strcsave(i,j))) Then
                     Continue
                 Else
