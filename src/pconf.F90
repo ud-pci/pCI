@@ -2006,7 +2006,7 @@ Contains
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
         Real(type_real), Allocatable :: col(:), col_pwdvdsn(:,:)
         Integer(Kind=int64) :: start_time, s1
-        Real(type_real)  :: crit, ax, x, xx, vmax
+        Real(type_real)  :: crit, ax, x, xx, vmax, pmax
         Real(dp) :: cnx
         Character(Len=16) :: timeStr
 
@@ -2016,6 +2016,7 @@ Contains
         ax=1.d0
         cnx=1.d0
         ifail=0
+        vmax=0.d0
         If (.not. Allocated(ax_array)) Allocate(ax_array(Nlv))
 
         ! Start timer for Davidson procedure
@@ -2134,6 +2135,11 @@ Contains
                     ! Mxmpy2 + FormP2
                     Call startTimer(s1)
                     Call Mxmpy(2, mpi_type_real, mype)
+                    pmax = P(1,1)
+                    Do i=2,Nlv
+                        If (P(i,i) > pmax) pmax = P(i,i)
+                    End Do
+                    If (pmax > vmax) vmax = pmax
                     Call FormP(2, vmax, mpi_type_real)
                     If (mype==0) Then
                         Call stopTimer(s1, timeStr)
