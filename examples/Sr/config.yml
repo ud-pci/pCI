@@ -5,11 +5,12 @@ system:
     run_codes: True
     on_hpc: True
     pci_version: default
-    for_portal: False
+    for_portal: True
+    basis_subdir: False
 
 # HPC parameters
 hpc:
-    partition: large-mem
+    partition: xlarge-mem
     nodes: 1
     tasks_per_node: 64
     submit_job: False
