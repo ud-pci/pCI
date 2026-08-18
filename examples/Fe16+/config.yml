@@ -1,5 +1,5 @@
 system:
-    bin_directory: ""
+    bin_directory: "/lustre/safrono/users/1813/pCI-dev/bin"
     generate_directories: False
     run_codes: True
     on_hpc: True
@@ -9,7 +9,7 @@ hpc:
     partition: large-mem
     nodes: 1
     tasks_per_node: 64
-    submit_job: False
+    submit_job: True
 
 atom:
     name: Fe16+
@@ -41,8 +41,7 @@ add:
     # Lists of even and odd parity reference configurations
     ref_configs:
         odd: [2s2 2p5 3s1, 2s2 2p5 3d1, 2s1 2p6 3p1]
-        even: [2s2 2p6,
-               2s2 2p5 3p1]
+        even: [2s2 2p6, 2s2 2p5 3p1]
     basis_set: 12spdfg
     orbitals:
         core: 1s
