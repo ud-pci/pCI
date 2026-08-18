@@ -2,7 +2,6 @@ import re
 from contextlib import suppress
 from copy import deepcopy
 from itertools import combinations
-import read_bass
 import orbitals
 import copy
 
@@ -94,7 +93,7 @@ class Basis:
 
     def read_orbitals_from_bass(self, filename):
         """ reads orbitals from BASS.INP to create a dictionary of {key:value} = {subshells: electron occupancies} """
-        bass_orbitals = read_bass.read_bass(filename)
+        bass_orbitals = orbitals.read_bass(filename)
         orb_occ = {}
         min_occ = 0
         max_occ = 2
