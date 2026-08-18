@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
-import atomic_term_symbol
+from term_symbols.terms import calc_term_symbols
 
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 
@@ -766,7 +766,7 @@ def Missing_Levels(data, term_cache=None):
             terms_calculated.add(config_key)
         if (i in lst)==True or ("0" in config)==True: continue
         if config_key not in term_cache:
-            term_cache[config_key] = atomic_term_symbol.calc_term_symbols(config_key)
+            term_cache[config_key] = calc_term_symbols(config_key)
         terms_expected = term_cache[config_key]
         for j in range(len(terms_expected)):
             term_str = terms_expected[j][:2]+str(Convert_Type(terms_expected[j][2:]))

@@ -51,7 +51,7 @@ import pandas as pd
 from fractions import Fraction
 from UDRead import *
 from parse_asd import *
-from get_atomic_term import *
+from term_symbols.terms import calc_term_symbols
 from utils import get_dict_value, get_basis_dir_name
 import shutil
 
@@ -263,7 +263,7 @@ def fix_term(conf, term, S_val, L_val):
     """
     key = _conf_key(conf)
     if key not in _term_cache:
-        _term_cache[key] = scrape_term(key)
+        _term_cache[key] = calc_term_symbols(key)
     valid = _term_cache[key]
     if not valid or term in valid:
         return term
@@ -346,7 +346,7 @@ def _resolve_term_duplicates(rows):
         # then identify which ones are not yet assigned to any level.
         key = _conf_key(conf)
         if key not in _term_cache:
-            _term_cache[key] = scrape_term(key)
+            _term_cache[key] = calc_term_symbols(key)
         valid = _term_cache[key]
         valid_same_J = [t for t in valid if _term_re.match(t) and _term_re.match(t).group(3) == J_char]
         unused = [t for t in valid_same_J if t not in set(terms)]
