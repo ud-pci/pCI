@@ -16,7 +16,7 @@ Pipeline overview
     b. combine_tm: merge the CI+all-order and CI+MBPT tm.csv files and write DATA_Processed/tm.csv with matrix element uncertainty.
     c. Reformat NIST data and write parity-filtered CSV files to DATA_Filtered/NIST/.
 
-4. Run MainCode (compare_res.py) for each parity to match theory levels to NIST ASD levels.
+4. Run UDRead for each parity to match theory levels to NIST ASD levels.
     Results are written to DATA_Output/{atom}_Even.txt and DATA_Output/{atom}_Odd.txt.
 
 5. create_mapping: read the txt files and build a list of mapping tuples:
@@ -52,7 +52,6 @@ from fractions import Fraction
 from UDRead import *
 from parse_asd import *
 from get_atomic_term import *
-from compare_res import *
 from utils import get_dict_value, get_basis_dir_name
 import shutil
 
