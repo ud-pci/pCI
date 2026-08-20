@@ -122,6 +122,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         elif code == 'dtm_rpa':
             f.write(f'{bin_dir}rpa < rpa.in\n')
             f.write(f'{bin_dir}rpa_dtm\n')
+            f.write('cp DTM.INT DTM_RPA.INT\n')
             f.write(f'${{UD_MPIRUN}} {bin_dir}pdtm\n')
         elif code == 'ine':
             f.write(f'${{UD_MPIRUN}} {bin_dir}pine\n')
