@@ -1026,6 +1026,8 @@ Contains
             Read(13) (ki(i), i=1,13)
             Read(13) (RintVal(i), RintKey(i), i=1,Nint)
             Close(13)
+            Write(*,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
+                   /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
             Deallocate(l1)
             ! Insertion sort: sort RintKey ascending, permute RintVal correspondingly.
             Do i = 2, Nint
