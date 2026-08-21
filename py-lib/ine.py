@@ -18,6 +18,7 @@ This script has 2 main capabilities:
 import yaml
 import os
 import sys
+import pandas as pd
 from pathlib import Path
 from utils import run_shell, get_dict_value, convert_params_to_list, check_slurm_installed
 from gen_job_script import write_job_script
@@ -27,6 +28,20 @@ def read_yaml(filename):
     with open(filename, 'r') as f:
         config = yaml.safe_load(f)
     return config
+
+
+def get_config_term(ci_dir, level):
+    csv_path = os.path.join(ci_dir, 'pconf.csv')
+    try:
+        df = pd.read_csv(csv_path)
+        row = df[df['n'] == level]
+        if not row.empty:
+            config = row.iloc[0]['configuration'].replace(' ', '')
+            term = row.iloc[0]['term'].replace(' ', '')
+            return config, term
+    except Exception:
+        pass
+    return None, None
 
 
 def write_ine_in(rhs, lhs, n0, n2, include_static, include_dynamic, wavelength_range, step_size):
@@ -126,8 +141,11 @@ if __name__ == "__main__":
         Path(full_path).mkdir(parents=True, exist_ok=True)
         os.chdir(full_path)
 
-        ine_path = f'{full_path}/pol_{parity}{n0}'
-        Path(f'pol_{parity}{n0}').mkdir(parents=True, exist_ok=True)
+        ci_dir = conf_even_path if parity == 'even' else conf_odd_path
+        config, term = get_config_term(ci_dir, n0)
+        dir_name = f'ine_{config}_{term}' if config and term else f'ine_{parity}{n0}'
+        ine_path = f'{full_path}/{dir_name}'
+        Path(dir_name).mkdir(parents=True, exist_ok=True)
         write_ine_in(rhs, lhs, n0, n2, include_static, include_dynamic, wavelength_range, step_size)
         run_shell(f'mv ine.in {ine_path}/ine.in')
 
