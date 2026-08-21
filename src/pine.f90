@@ -86,7 +86,7 @@ Program pine
         version = '1.0'
         Write( 6,'(4X,"Program pine v",A)') Trim(AdjustL(version))
         Write(11,'(4X,"Program pine v",A)') Trim(AdjustL(version))
-        
+
         Call SetParams           ! Set job and array parameters
         Call Input               ! Read list of configurations from CONF.INP
         Call Init                ! Read basis set from CONF.DAT; reads CONF.DET and CONF0.DET
@@ -119,6 +119,23 @@ Program pine
         Write(*,'(2X,A)') 'TIMING >>> Vector took ' // Trim(timeStr) // ' to complete'
     End If
     ynorm_y1 = dsqrt(sum(Y1**2))
+
+    If (mype == 0) Then
+        Open(unit=97, status='UNKNOWN', file='pine.csv')
+        If (Kli==2.AND.Klf==2) Then
+            Write(97,'(A)', advance='no') 'wavelength,alpha_0,alpha_1,alpha_2,alpha_tot'
+            Do i = 0, Int(Tj0+0.1d0)
+                If (Abs(Tj0 - Int(Tj0+0.1d0)) > 0.4d0) Then
+                    Write(97,'(",alpha(m=",F3.1,")")', advance='no') Real(i,dp)+0.5d0
+                Else
+                    Write(97,'(",alpha(m=",I0,")")', advance='no') i
+                End If
+            End Do
+            Write(97,'()')
+        Else If (Kli==5) Then
+            Write(97,'(A)') 'wavelength,alpha_E2'
+        End If
+    End If
 
     ! Main loop over wavelengths
     Do k = 1, nrange
@@ -226,7 +243,10 @@ Program pine
 
     Call MPI_Barrier(MPI_COMM_WORLD, mpierr)
     Call stopTimer(start_time, timeStr)
-    If (mype == 0) Write(*,'(2X,A)') 'TIMING >>> pine total: ' // Trim(timeStr)
+    If (mype == 0) Then
+        Write(*,'(2X,A)') 'TIMING >>> pine total: ' // Trim(timeStr)
+        Close(97)
+    End If
     Call MPI_Finalize(mpierr)
 
 Contains
@@ -1026,7 +1046,9 @@ Contains
             Read(13) (ki(i), i=1,13)
             Read(13) (RintVal(i), RintKey(i), i=1,Nint)
             Close(13)
-            Write(*,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
+            Write( *,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
+                   /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
+            Write(11,'(/1X,"### Radial integrals from DTM.INT ("," Nint =",I7," ) ###", &
                    /(4X,A4," calculated by ",A4))') Nint,(OpLabels(i),CorrLabels(ki(i)),i=1,13)
             Deallocate(l1)
             ! Insertion sort: sort RintKey ascending, permute RintVal correspondingly.
@@ -1806,8 +1828,8 @@ Contains
         Use wigner, Only : FJ3, FJ6
         Implicit None
         Integer, Intent(In) :: n
-        Integer :: i, isk, id, k, kmin, kmax, is
-        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp
+        Integer :: i, isk, id, k, kmin, kmax, is, im
+        Real(dp) :: f0, tj, w3j, f, f1, f2, al, al0, al1, al2, alp, xm, al_m
         Real(dp), Dimension(3) :: sk0, sk1, sk2
         Character(Len=256) :: strfmt, strfmt2, strfmt3
 
@@ -1913,6 +1935,21 @@ Contains
             End If
             Write( 6,strfmt2) abs(xlamb),al0,al2
             Write(11,strfmt2) abs(xlamb),al0,al2
+            Write(97,'(5(F12.3,","))', advance='no') abs(xlamb),al0,al1,al2,al
+            Do im = 0, Int(Tj0+0.1d0)
+                xm = Real(im, dp)
+                If (Abs(Tj0 - Int(Tj0+0.1d0)) > 0.4d0) xm = xm + 0.5d0
+                If (Tj0 > 0.51d0) Then
+                    al_m = al0 + (3.0d0*xm*xm - Tj0*(Tj0+1.0d0)) / (Tj0*(2.0d0*Tj0-1.0d0)) * al2
+                Else
+                    al_m = al0
+                End If
+                If (im < Int(Tj0+0.1d0)) Then
+                    Write(97,'(F12.3,",")', advance='no') al_m
+                Else
+                    Write(97,'(F12.3)') al_m
+                End If
+            End Do
         End If
     End Subroutine RdcE1
 
@@ -1983,6 +2020,7 @@ Contains
             End If
             Write( 6,strfmt3) Tj0,Jm0,al0
             Write(11,strfmt3) Tj0,Jm0,al0
+            Write(97,'(F12.3,",",F12.3)') abs(xlamb),al0
         End If
     End Subroutine RdcE2
 
