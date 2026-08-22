@@ -51,7 +51,7 @@ Program pine
     Use conf_init, Only : ReadConfInp, ReadConfigurations
     Use determinants, Only : Dinit, Jterm, Gdet, Rspq, CompCD, Rdet
     Use str_fmt, Only : startTimer, stopTimer, FormattedTime, FormattedMemSize
-    Use utils, Only : DetermineRecordLength, CheckRecordLength, CountSubstr, ToUpperString, WriteSkeleton
+    Use utils, Only : DetermineRecordLength, CheckRecordLength, CountSubstr, ToUpperString, WriteSkeleton, CsvReal
     Use wigner, Only : FJ3, FJ6
     Use mpi_f08
 
@@ -1904,12 +1904,20 @@ Contains
             Write( 6,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
             Write(11,strfmt3) Tj0,Jm0,s(n),s0(n),s2(n),s1(n)
         End If
-        If (n == 2) Then
-            alp=(ss(1)+ss(2))/2.0d0
-            al =(s(1)+s(2))/2.0d0
-            al0=(s0(1)+s0(2))/2.0d0
-            al2=(s2(1)+s2(2))/2.0d0
-            al1=(s1(1)-s1(2))
+        If (n == nsign) Then
+            If (nsign == 2) Then
+                alp=(ss(1)+ss(2))/2.0d0
+                al =(s(1)+s(2))/2.0d0
+                al0=(s0(1)+s0(2))/2.0d0
+                al2=(s2(1)+s2(2))/2.0d0
+                al1=(s1(1)-s1(2))
+            Else
+                alp=ss(1)
+                al =s(1)
+                al0=s0(1)
+                al2=s2(1)
+                al1=0.0d0
+            End If
             strfmt = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
             Write( 6,strfmt)
             Write(11,strfmt)
@@ -1935,7 +1943,11 @@ Contains
             End If
             Write( 6,strfmt2) abs(xlamb),al0,al2
             Write(11,strfmt2) abs(xlamb),al0,al2
-            Write(97,'(5(F12.3,","))', advance='no') abs(xlamb),al0,al1,al2,al
+            Write(97,'(A,",")',advance='no') Trim(CsvReal(abs(xlamb),3))
+            Write(97,'(A,",")',advance='no') Trim(CsvReal(al0,3))
+            Write(97,'(A,",")',advance='no') Trim(CsvReal(al1,3))
+            Write(97,'(A,",")',advance='no') Trim(CsvReal(al2,3))
+            Write(97,'(A,",")',advance='no') Trim(CsvReal(al,3))
             Do im = 0, Int(Tj0+0.1d0)
                 xm = Real(im, dp)
                 If (Abs(Tj0 - Int(Tj0+0.1d0)) > 0.4d0) xm = xm + 0.5d0
@@ -1945,9 +1957,9 @@ Contains
                     al_m = al0
                 End If
                 If (im < Int(Tj0+0.1d0)) Then
-                    Write(97,'(F12.3,",")', advance='no') al_m
+                    Write(97,'(A,",")',advance='no') Trim(CsvReal(al_m,3))
                 Else
-                    Write(97,'(F12.3)') al_m
+                    Write(97,'(A)') Trim(CsvReal(al_m,3))
                 End If
             End Do
         End If
@@ -2008,9 +2020,14 @@ Contains
         End If
         Write( 6,strfmt3) Tj0,Jm0,s0(n)
         Write(11,strfmt3) Tj0,Jm0,s0(n)
-        If (n==2) Then
-            alp = (ss(1)+ss(2))/2.0d0
-            al0 = (s0(1)+s0(2))/2.0d0
+        If (n==nsign) Then
+            If (nsign == 2) Then
+                alp = (ss(1)+ss(2))/2.0d0
+                al0 = (s0(1)+s0(2))/2.0d0
+            Else
+                alp = ss(1)
+                al0 = s0(1)
+            End If
             strfmt = '(3X,9("-")/,3X,"In total:",/3X,9("-"))'
             Write( 6,strfmt)
             Write(11,strfmt)
@@ -2020,7 +2037,7 @@ Contains
             End If
             Write( 6,strfmt3) Tj0,Jm0,al0
             Write(11,strfmt3) Tj0,Jm0,al0
-            Write(97,'(F12.3,",",F12.3)') abs(xlamb),al0
+            Write(97,'(A,",",A)') Trim(CsvReal(abs(xlamb),3)), Trim(CsvReal(al0,3))
         End If
     End Subroutine RdcE2
 
