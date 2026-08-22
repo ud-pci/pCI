@@ -10,10 +10,10 @@ system:
 
 # HPC parameters
 hpc:
-    partition: xlarge-mem
+    partition: large-mem
     nodes: 1
     tasks_per_node: 64
-    submit_job: False
+    submit_job: True
 
 # Atomic information
 atom:
@@ -107,11 +107,13 @@ dtm:
             parity: even 
             level_range: 1 1
 
-# Parameters used by pol program
-pol:
+# Parameters used by ine program
+ine:
     parity: even
-    level: 1
-    method: 1
+    N0: 1
+    N2: 1
+    rhs: 2
+    lhs: 2
     field_type: static, dynamic
     wavelength_range: 1000 1000
     step_size: 0

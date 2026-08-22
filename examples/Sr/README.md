@@ -14,23 +14,33 @@ The two-method setup is used to calculate uncertainties by taking the difference
 
 To adapt this example for a different atom, the main parameters to change are:
 
-- `atom.name`, `atom.isotope` — element symbol and mass number
-- `atom.code_method` — list of methods to run (e.g. `[ci+all-order]` for single method)
-- `basis.orbitals.core` / `valence` — core and valence orbital list for the HFD step
-- `add.ref_configs` — reference configurations for even and odd parity
-- `add.basis_set` — active orbital set (e.g. `17spdfg` means orbitals up to n=17, l=4)
-- `add.orbitals.active` — active orbitals and their occupation number ranges
-- `add.excitations` — which excitation levels to include (single, double, triple)
-- `conf.odd.J` / `conf.even.J` — total angular momentum for each parity block
-- `conf.odd.num_energy_levels` / `conf.even.num_energy_levels` — number of levels to compute
+- `atom.name`, `atom.isotope` - element symbol and mass number
+- `atom.code_method` - list of methods to run (e.g. `[ci+all-order]` for single method)
+- `basis.orbitals.core` / `valence` - core and valence orbital list for the HFD step
+- `add.ref_configs` - reference configurations for even and odd parity
+- `add.basis_set` - active orbital set (e.g. `17spdfg` means orbitals up to n=17, l=4)
+- `add.orbitals.active` - active orbitals and their occupation number ranges
+- `add.excitations` - which excitation levels to include (single, double, triple)
+- `conf.odd.J` / `conf.even.J` - total angular momentum for each parity block
+- `conf.odd.num_energy_levels` / `conf.even.num_energy_levels` - number of levels to compute
+
+For the polarizability calculation (ine.py / pine program):
+
+- `ine.parity` - parity of the level to compute the polarizability for
+- `ine.N0`, `ine.N2` - record numbers of the initial (X0) and final (X2) levels in CONF0.XIJ; N0 and N2 are the same for a scalar polarizability, different for a transition polarizability
+- `ine.rhs`, `ine.lhs` - operators for the right- and left-hand sides of the Sternheimer equation: 1 = H_pnc, 2 = E1 length gauge, 3 = H_am (lhs only), 4 = E1 velocity gauge (lhs only), 5 = E2
+- `ine.field_type` - `static` for static polarizability (omega=0), `dynamic` for frequency-dependent, or `static, dynamic` for both
+- `ine.wavelength_range`, `ine.step_size` - wavelength range in nm and step size for dynamic polarizability
+- `ine.tm_dir` - (optional) override the TM directory to copy DTM.INT from; derived automatically from `for_portal` and conf J values if not set
 
 ## Output files
 
 After running, the main results are:
 
-- `pconf.csv` — energy levels for a given parity, one row per level
-- `tm.csv` — transition matrix elements and rates between two parity blocks, one row per transition
-- `FINAL.RES` — final energy levels from CI in an overview format
+- `pconf.csv` - energy levels for a given parity, one row per level
+- `tm.csv` - transition matrix elements and rates between two parity blocks, one row per transition
+- `pine.csv` - polarizabilities from pine, one row per wavelength; columns are wavelength, alpha_0, alpha_1, alpha_2, alpha_tot, and alpha(m) for each m from 0 to J. This example computes the static and dynamic E1 polarizability of the 5s2 1S0 ground state from wavelength=1000 to 1001 nm in steps of 0.5 nm.
+- `FINAL.RES` - final energy levels from CI in an overview format
 
 ## Directory structure
 
@@ -95,5 +105,11 @@ python dtm.py
 # -> creates tm_even0_odd1/, tm_odd0_even1/, etc. in each method directory
 
 # 5. Run DTM (on cluster)
+
+# 6. Set up polarizability directory (after DTM is done)
+python ine.py
+# -> creates ine_5s2_1S0/ with ine.in, ine.qs, CI files, and DTM_RPA.INT (or DTM.INT)
+
+# 7. Run INE (on cluster)
 ```
 
