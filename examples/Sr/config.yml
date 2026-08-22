@@ -115,8 +115,8 @@ ine:
     rhs: 2
     lhs: 2
     field_type: static, dynamic
-    wavelength_range: 1000 1000
-    step_size: 0
+    wavelength_range: 1000 1001
+    step_size: 0.5
     
 # Optional parameters
 optional:
