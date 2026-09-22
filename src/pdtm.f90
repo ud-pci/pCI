@@ -1953,20 +1953,20 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_L', &
-                    Trim(CsvReal(AE1, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AE1, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
                 If (e2 > e1) Then
                     Write(200,'(I0,",",I0,11(",",A))') &
                         n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                         Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
-                        Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                        Trim(CsvReal(AE1V, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                         Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), &
                         Trim(CsvSci((2.02613e18/((2*tj1+1)*(wl*10)**3))*AE1V**2, 4))
                 Else
                     Write(200,'(I0,",",I0,11(",",A))') &
                         n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                         Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
-                        Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                        Trim(CsvReal(AE1V, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                         Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), &
                         Trim(CsvSci((2.02613e18/((2*tj2+1)*(wl*10)**3))*AE1V**2, 4))
                 End If
@@ -1988,7 +1988,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_L', &
-                    Trim(CsvReal(AE1, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AE1, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         ! Print table for E1_V
@@ -2008,7 +2008,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E1_V', &
-                    Trim(CsvReal(AE1V, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AE1V, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
@@ -2029,7 +2029,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E2', &
-                    Trim(CsvReal(AE2, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AE2, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
@@ -2050,7 +2050,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'E3', &
-                    Trim(CsvReal(AE3, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AE3, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
@@ -2070,7 +2070,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M1', &
-                    Trim(CsvReal(G, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(G, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
@@ -2091,7 +2091,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M2', &
-                    Trim(CsvReal(AM2, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AM2, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
@@ -2111,7 +2111,7 @@ Contains
                 Write(200,'(I0,",",I0,11(",",A))') &
                     n1, n2, Trim(AdjustL(strc1(k1))), Trim(AdjustL(strt1(k1))), &
                     Trim(AdjustL(strc2(k2))), Trim(AdjustL(strt2(k2))), 'M3', &
-                    Trim(CsvReal(AM3, 5)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
+                    Trim(CsvReal(AM3, 8)), Trim(CsvReal(-e1, 8)), Trim(CsvReal(-e2, 8)), &
                     Trim(CsvReal(-delEcm, 2)), Trim(CsvReal(wl, 2)), Trim(CsvSci(tr, 4))
             End If
         End If
