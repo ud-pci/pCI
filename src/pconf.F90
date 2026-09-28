@@ -144,10 +144,11 @@ Program pconf
     End If
 
      Call MPI_Bcast(kCSF, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
-     If (kCSF > 0) then
+     If (kCSF > 0) Then
         Call jbasis_init ! broadcasting/allocating for jbasis
         call jbasis(Nc,ncsf,nccj,max_ndcs,mype,npes) ! List of configuration state functions (CSF)
-    End If    
+    End If   
+
 
     If (mype == 0) Then
         Call Wdet('CONF.DET')                          ! writes determinants to file CONF.DET
@@ -191,11 +192,34 @@ Program pconf
         Else
             use_bit_rep = .false.
         End If
-    End If
+
+        Ndemu = Nd
+        Nemu = min(Nemu, Nc)
+        If (Nemu /= Nc) Then
+            Ndemu = 0
+            Do n=1,Nemu
+                Ndemu=Ndemu+Ndc(n)
+            End Do
+            strfmt = '(4x,"(!) Regime Emu: Nemu =",I5,2X"Ndemu =",I11)'
+            Write( 6,strfmt) Nemu,Ndemu
+            Write(11,strfmt) Nemu,Ndemu
+        End If
+    End If    
 
     ! Allocate and broadcast all arrays needed by FormH and Davidson.
     Call AllocateFormHArrays(mype)
     Call InitFormH
+
+    If (Nemu /= Nc) Then
+        If (mype == 0) Then
+            strfmt = '(4X,"calculating Eav...")'
+            Write( 6,strfmt) 
+            Write(11,strfmt) 
+            Call Conf_average
+        End If
+        Call MPI_Bcast(Eav, Nc, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
+    End If
+
     Call calcNd0(Nc1, Nd0)
     If (mype == 0) Call calcMemReqs
 
@@ -314,7 +338,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '9.1'
+        version = '9.2'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -879,7 +903,59 @@ Contains
         write(11,strfmt) Emin,Emax
 
     End Subroutine FormD
-    
+
+    Subroutine Conf_average
+        ! This subroutine evaluates average energies of the configurations (for Emu regime).
+        Use integrals, Only: Hint, Gint 
+        Implicit None
+        Integer  :: ic, i, j, n1, n2, ni, nj, ia, ib
+        Integer  :: qi, qj, g_i, g_j
+        Real(dp) :: fi, f_pair
+
+        Eav=0.d0
+
+        Do ic=Nemu+1,Nc
+            n1=Nc0(ic)+1
+            n2=Nc0(ic)+Nvc(ic)
+            Do i=n1,n2
+                ni=Nip(i)
+                qi=Nq(i)
+                g_i=Jj(ni)+1
+                fi=Real(qi)/g_i ! Fractional occupation per state
+                Do ia=Nf0(ni)+1,Nf0(ni)+g_i
+                    Eav(ic)=Eav(ic)+fi*Hint(ia,ia)
+                End Do
+            End Do
+
+            Do i=n1,n2
+                ni=Nip(i)
+                qi=Nq(i)
+                g_i=Jj(ni)+1
+
+                Do j=n1,n2
+                    nj=Nip(j)
+                    qj=Nq(j)
+                    g_j=Jj(nj)+1
+
+                    If (i == j) Then
+                        If (qi <= 1) Cycle  ! No intra-shell 2e-interaction for <= 1 electron
+                        f_pair = Real(qi*(qi-1))/(g_i*(g_i-1))
+                    Else
+                        f_pair = Real(qi*qj)/(g_i*g_j)
+                    End If
+
+                    Do ia=Nf0(ni)+1,Nf0(ni)+g_i
+                        Do ib=Nf0(nj)+1,Nf0(nj)+g_j
+                            If (ia == ib) Cycle ! Skip self-interaction of identical magnetic state
+                            Eav(ic)=Eav(ic)+0.5d0*f_pair*Gint(ia,ib,ia,ib) !returns Coulomb - Exchange
+                        End Do
+                    End Do
+                End Do
+            End Do
+        End Do
+
+    End Subroutine Conf_average
+
     Subroutine AllocateFormHArrays(mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
@@ -891,6 +967,8 @@ Contains
         Call MPI_Bcast(ncsf, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(nrd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Nemu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ndemu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nd, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ne, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nst, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -928,6 +1006,7 @@ Contains
         If (.not. Allocated(Nvc)) Allocate(Nvc(Nc))
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
+        If (.not. Allocated(Ncd)) Allocate(Ncd(Nd))
         If (.not. Allocated(Jz)) Allocate(Jz(Nst))
         If (.not. Allocated(Nh)) Allocate(Nh(Nst))
         If (.not. Allocated(Diag)) Allocate(Diag(nbas))
@@ -965,6 +1044,10 @@ Contains
             If (.not. Allocated(IntOrdS)) Allocate(IntOrdS(nrd))
         End If
 
+        If (Nemu /= Nc) Then
+            If (.not. Allocated(Eav)) Allocate(Eav(Nc))       
+        End If
+
         Return
     End Subroutine AllocateFormHArrays
 
@@ -976,7 +1059,7 @@ Contains
         memStaticArrays = memStaticArrays + sizeof(Nn)+sizeof(Kk)+sizeof(Ll)+sizeof(Jj)+sizeof(Nf0) &
                         + sizeof(Jt)+sizeof(Njt)+sizeof(Eps)+sizeof(Diag)+sizeof(Ndc)+sizeof(Jz) &
                         + sizeof(Nh)+sizeof(In)+sizeof(Gnt)+(8+type_real)*vaBinSize &
-                        + sizeof(Nvc)+sizeof(Nc0)
+                        + sizeof(Nvc)+sizeof(Nc0)+sizeof(Ncd)
 
     End Subroutine calcMemStaticArrays
 
@@ -1095,6 +1178,7 @@ Contains
         Call MPI_Bcast(Kbrt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Ncd, Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_gaunts_per_partial_wave, Nlx+1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1161,6 +1245,7 @@ Contains
     Subroutine FormH(npes, mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize, FormattedTime
+        Use formj2, Only : F_J2
         Use determinants, Only : calcNd0, Gdet, CompD, Rspq_phase1, Rspq_phase2, &
                                     bits_per_int, bdet1, bdet2, Barr, print_bits, &
                                     convert_bit_rep_to_int_rep, convert_int_rep_to_bit_rep, &
@@ -1174,6 +1259,7 @@ Contains
         Integer :: nn, kk, msg, sender, num_done, an_id, endnd
         Type(MPI_STATUS) :: status
         Integer, Allocatable, Dimension(:) :: idet1, idet2
+        Logical :: skip_emu
         Integer(Kind=int64), Allocatable, Dimension(:) :: cntarray
         Integer(Kind=int64)     :: stot, s1, s2, numzero=0, maxme, maxNumElementsPerCore, mesplit, n8
         Real(kind=type_real)  :: t, tt
@@ -1243,7 +1329,60 @@ Contains
                             Call Gdet(k+1,idet2)
                             iconf2(1:Ne) = Nh(idet2(1:Ne))
                             Call CompD(iconf1,iconf2,icomp)
-                            If (icomp > 2) Then
+                            skip_emu = (n > Ndemu .and. k >= Ndemu)
+                            If (skip_emu) Then
+                                If (icomp == 0) Then
+                                    Do k1=1,kx
+                                        k=k+1
+                                        If (use_bit_rep) Then
+                                            bdet2 = Barr(1:num_ints_bit_rep, k)
+                                            diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                                            If (diff == 0 .or. (diff == 2 .and. abs(Gj) > 1.d-6)) Then
+                                                nn=n
+                                                kk=k                                        
+                                                tt = 0.d0
+                                                If (diff == 0) tt = Eav(ic)
+                                                If (abs(Gj) > 1.d-6) Then 
+                                                    Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                                                    tt = tt + Gj * F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                                End If
+                                                If (tt /= 0_type_real) Then
+                                                    cntarray = cntarray + 1
+                                                    Call IVAccumulatorAdd(iva1, nn)
+                                                    Call IVAccumulatorAdd(iva2, kk)
+                                                    Call RVAccumulatorAdd(rva1, tt)
+                                                Else
+                                                    numzero = numzero + 1
+                                                End If
+                                            End If
+                                        Else
+                                            Call Gdet(k,idet2)
+                                            Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            If (diff == 0 .or. (diff == 2 .and. abs(Gj) > 1.d-6)) Then
+                                                nn=n
+                                                kk=k
+                                                tt = 0.d0
+                                                If (diff == 0) tt = Eav(ic)                                        
+                                                If (abs(Gj) > 1.d-6) Then
+                                                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                                    tt=tt+Gj*F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                                                End If    
+
+                                                If (tt /= 0_type_real) Then
+                                                    cntarray = cntarray + 1
+                                                    Call IVAccumulatorAdd(iva1, nn)
+                                                    Call IVAccumulatorAdd(iva2, kk)
+                                                    Call RVAccumulatorAdd(rva1, tt)
+                                                Else
+                                                    numzero = numzero + 1
+                                                End If
+                                            End If
+                                        End If
+                                    End Do
+                                Else
+                                    k=k+kx
+                                End If
+                            Else If (icomp > 2) Then
                                 k=k+kx
                             Else
                                 Do k1=1,kx
@@ -1514,7 +1653,29 @@ Contains
                                 Call Gdet(k+1,idet2)
                                 iconf2(1:Ne) = Nh(idet2(1:Ne))
                                 Call CompD(iconf1,iconf2,icomp)
-                                If (icomp > 2) Then
+                                skip_emu = (n > Ndemu .and. k >= Ndemu)
+                                If (skip_emu) Then
+                                    If (icomp == 0) Then
+                                        Do k1=1,kx
+                                            k=k+1
+                                            If (use_bit_rep) Then
+                                                bdet2 = Barr(1:num_ints_bit_rep, k)
+                                                diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
+                                            Else
+                                                Call Gdet(k,idet2)
+                                                Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                                            End If
+
+                                            If (diff == 0 .or. (diff == 2 .and. abs(Gj) > 1.d-6)) Then
+                                                cntarray = cntarray + 1
+                                                Call IVAccumulatorAdd(iva1, n)
+                                                Call IVAccumulatorAdd(iva2, k)
+                                            End If
+                                        End Do
+                                    Else
+                                        k=k+kx
+                                    End If
+                                Else If (icomp > 2) Then
                                     k=k+kx
                                 Else
                                     Do k1=1,kx
@@ -1564,22 +1725,35 @@ Contains
             Do n8=1,counter1
                 nn=Hamil%row(n8)
                 kk=Hamil%col(n8)
+
+                skip_emu = (nn > Ndemu .and. kk >= Ndemu)
                 
                 If (use_bit_rep) Then
                     bdet1 = Barr(1:num_ints_bit_rep, nn)
                     bdet2 = Barr(1:num_ints_bit_rep, kk)
                     diff = compare_bit_dets(bdet1, bdet2, num_ints_bit_rep)
-                    Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
-                    Call Gdet(nn,idet1) ! more efficient to call Gdet here to get orbital positions
+                    If (.not. skip_emu .or. abs(Gj) > 1.d-6) Then
+                        Call get_det_indexes(bdet1, bdet2, num_ints_bit_rep, diff, iSign, iIndexes, jIndexes)
+                        Call Gdet(nn,idet1) ! more efficient to call Gdet here to get orbital positions
+                    End If
                 Else
                     Call Gdet(nn,idet1)
                     Call Gdet(kk,idet2)
                     Call Rspq_phase1(idet1, idet2, iSign, diff, iIndexes, jIndexes)
-                    Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    If (.not. skip_emu .or. abs(Gj) > 1.d-6) Then
+                        Call Rspq_phase2(idet1, idet2, iSign, diff, iIndexes, jIndexes)
+                    End If
                 End If
-                
-                If (Kdsig /= 0 .and. diff <= 2) E_k=Diag(kk)
-                t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                If (skip_emu) Then
+                    t = 0.d0
+                    If (diff == 0) t = Eav(Ncd(nn)) ! Look up configuration index for det 'nn'
+                    If (abs(Gj) > 1.d-6) Then
+                        t = t + Gj * F_J2(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                    End If
+                Else
+                    If (Kdsig /= 0) E_k=Diag(kk)
+                    t=Hmltn(idet1, iSign, diff, jIndexes(3), iIndexes(3), jIndexes(2), iIndexes(2))
+                End If
                 Hamil%val(n8)=t
 
                 If (t == 0) numzero=numzero+1
@@ -1734,6 +1908,7 @@ Contains
         If (Allocated(GintHashPos)) Deallocate(GintHashIac, GintHashIbd, GintHashPos)
         If (Allocated(GintSHashPos)) Deallocate(GintSHashIac, GintSHashIbd, GintSHashPos)
         If (Allocated(ISLUT)) Deallocate(ISLUT)
+        If (Allocated(Eav)) Deallocate(Eav)
     End Subroutine DeAllocateFormHArrays
 
     Subroutine AllocateDvdsnArrays(mype)
@@ -3185,23 +3360,23 @@ Contains
 
         If (kCSF > 0) Then
             strfmt = '(" Energy levels for ",16A1," (Nc=",I7," Nd=",I9," nbas=", &
-                        I9,")",/" Interaction: ",A7,"; Effective integrals: ",A3, &
+                        I9," Nemu=",I5,")",/" Interaction: ",A7,"; Effective integrals: ",A3, &
                         "; Symmetry: ",A3,/"  N",9X,"JTOT",12X,"EV",15X,"ET",8X,"DEL(CM**-1)")'
-            Write( 6,strfmt) name,Nc,Nd,nbas,stint(kbrt+1),stpt(ksig+1),stsym(k)
-            Write(11,strfmt) name,Nc,Nd,nbas,stint(kbrt+1),stpt(ksig+1),stsym(k)
+            Write( 6,strfmt) name,Nc,Nd,nbas,Nemu,stint(kbrt+1),stpt(ksig+1),stsym(k)
+            Write(11,strfmt) name,Nc,Nd,nbas,Nemu,stint(kbrt+1),stpt(ksig+1),stsym(k)
         Else If (Ksig*Kdsig == 0) Then
             ! Pure CI: print Nc, Nd, Gj
-            strfmt = '(4X,"Energy levels (",A7," Nc=",I7," Nd=",I9,"); Gj =",F7.4, &
+            strfmt = '(4X,"Energy levels (",A7," Nc=",I7," Nd=",I9," Nemu=",I5,"); Gj =",F7.4, &
                         /4X,"N",6X,"JTOT",12X,"EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),Nc,Nd,Gj
+            Write( 6,strfmt) stecp(ist),Nc,Nd,Nemu,Gj
+            Write(11,strfmt) stecp(ist),Nc,Nd,Nemu,Gj
         Else
             ! CI+all-order/CI+MBPT: print E_0, Kexn, Nc, Nd, Gj
             strfmt = '(4X,"Energy levels ",A7,", Sigma(E =",F10.4,") extrapolation var.", &
-                    I2,/4X,"(Nc=",I7," Nd=",I9,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
+                    I2,/4X,"(Nc=",I7," Nd=",I9," Nemu=",I5,"); Gj =",F7.4,/4X,"N",6X,"JTOT",12X, &
                     "EV",16X,"ET",9X,"DEL(CM**-1)")'
-            Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
-            Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Gj
+            Write( 6,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Nemu,Gj
+            Write(11,strfmt) stecp(ist),E_0,Kexn,Nc,Nd,Nemu,Gj
         End If
 
         If (C_is /= 0.d0) Then
@@ -3675,6 +3850,7 @@ Contains
         If (Allocated(Wpsave)) Deallocate(Wpsave)
         If (Allocated(strcsave)) Deallocate(strcsave)
         If (Allocated(Ndc)) Deallocate(Ndc)
+        If (Allocated(Ncd)) Deallocate(Ncd)
         If (Allocated(Tk)) Deallocate(Tk)
         If (Allocated(Tj)) Deallocate(Tj)
         If (Allocated(ArrB)) Deallocate(ArrB)

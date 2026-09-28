@@ -546,6 +546,7 @@ Contains
         Integer :: nconf, ncsf, nccj, max_ndcs
         Integer :: numzero, iconf, iconf_neq, nci, ndi, jconf, jconf_neq, ncj, ndj, idf
         Integer :: n, k, jc, jc2, ic, m
+        Logical :: skip_emu
         Integer(Kind=int64) :: counter1, counter2
         Integer :: j, mesplit, iconf_local_count
         Integer :: an_id, nnd, num_done, sender, iconf_task
@@ -646,12 +647,15 @@ Contains
                     ncj=ndcs(jconf_neq)
                     if (ncj.eq.0) cycle
                     ndj=ndc(jconf)
+                    skip_emu = (jconf > Nemu)
                     idf=idif(iconf,jconf)
                     if (idf.gt.2) cycle
+                    If (skip_emu .and. idf > 0) Cycle
                     do ic=1,nci
                         jc2=ncj
                         if (iconf.eq.jconf) jc2=ic
                         do jc=1,jc2
+                            If (skip_emu .and. jc /= ic) Cycle
                             ih8=ih8+1
                             n=ic+mdcs(iconf)
                             k=jc+mdcs(jconf)
@@ -793,12 +797,15 @@ Contains
                             ncj=ndcs(jconf_neq)
                             if (ncj.eq.0) cycle
                             ndj=ndc(jconf)
+                            skip_emu = (jconf > Nemu)
                             idf=idif(iconf,jconf)
                             if (idf.gt.2) cycle
+                            If (skip_emu .and. idf > 0) Cycle
                             do ic=1,nci
                                 jc2=ncj
                                 if (iconf.eq.jconf) jc2=ic
                                 do jc=1,jc2
+                                    If (skip_emu .and. jc /= ic) Cycle
                                     ih8=ih8+1
                                     n=ic+mdcs(iconf)
                                     k=jc+mdcs(jconf)
@@ -851,47 +858,25 @@ Contains
                     ncj=ndcs(jconf_neq)
                     if (ncj.eq.0) cycle
                     ndj=ndc(jconf)
+                    skip_emu = (jconf > Nemu)
                     idf=idif(iconf,jconf)
                     if (idf.gt.2) cycle
-                    Call compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
-                    do ic=1,nci
-                        jc2=ncj
-                        if (iconf.eq.jconf) jc2=ic
-                        do jc=1,jc2
+                    If (skip_emu .and. idf > 0) Cycle  
+                    If (skip_emu) Then
+                        Do ic=1,nci
                             val_pos = val_pos + 1
-                            hij = zzc(ic,jc)
+                            hij = Eav(iconf)
                             Hamil%val(val_pos) = hij
-                            if (hij.NE.0.d0) then
+                            If (hij /= 0.d0) Then
                                 n=ic+mdcs(iconf)
-                                k=jc+mdcs(jconf)
-                                if (n.EQ.1.AND.k.EQ.1) Hmin=hij
-                                if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                If (n == 1) Hmin=hij
+                                If (hij < Hmin) Hmin = hij
                                 Hamil%minval = Hmin
-                            else
+                            Else
                                 numzero=numzero+1
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-            If (ih8 > 0 .and. j == 10) Then
-                Call stopTimer(s1, timeStr)
-                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '// trim(timeStr)
-            End If
-        Else If (mype /= 0) Then
-            do m = 1, n_processed
-                iconf = iconf_processed(m)
-                iconf_neq = nc_neq(iconf)
-                nci = ndcs(iconf_neq)
-                if (nci /= 0) Then
-                    ndi = ndc(iconf)
-                    do jconf=1,iconf
-                        jconf_neq=nc_neq(jconf)
-                        ncj=ndcs(jconf_neq)
-                        if (ncj.eq.0) cycle
-                        ndj=ndc(jconf)
-                        idf=idif(iconf,jconf)
-                        if (idf.gt.2) cycle
+                            End If
+                        End Do
+                    Else
                         Call compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
                         do ic=1,nci
                             jc2=ncj
@@ -911,8 +896,66 @@ Contains
                                 end if
                             end do
                         end do
+                    End If
+                end do
+            end do
+            If (ih8 > 0 .and. j == 10) Then
+                Call stopTimer(s1, timeStr)
+                Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', 100, '% done in '// trim(timeStr)
+            End If
+        Else If (mype /= 0) Then
+            do m = 1, n_processed
+                iconf = iconf_processed(m)
+                iconf_neq = nc_neq(iconf)
+                nci = ndcs(iconf_neq)
+                if (nci /= 0) then
+                    ndi = ndc(iconf)
+                    do jconf=1,iconf
+                        jconf_neq=nc_neq(jconf)
+                        ncj=ndcs(jconf_neq)
+                        if (ncj.eq.0) cycle
+                        ndj=ndc(jconf)
+                        skip_emu = (jconf > Nemu)
+                        idf=idif(iconf,jconf)
+                        if (idf.gt.2) cycle
+                        If (skip_emu .and. idf > 0) Cycle  
+                        If (skip_emu) Then
+                            Do ic=1,nci
+                                val_pos = val_pos + 1
+                                hij = Eav(iconf)
+                                Hamil%val(val_pos) = hij
+                                If (hij /= 0.d0) Then
+                                    n=ic+mdcs(iconf)
+                                    If (n == 1) Hmin = hij
+                                    If (hij < Hmin) Hmin = hij
+                                    Hamil%minval = Hmin
+                                Else
+                                    numzero = numzero + 1
+                                End If
+                            End Do
+                        Else
+                            Call compute_zzc_block(iconf, jconf, idf, nci, ndi, ncj, ndj, iconf_neq, jconf_neq, ccj, zzc, buf, idet1, idet2)
+                            do ic=1,nci
+                                jc2=ncj
+                                if (iconf.eq.jconf) jc2=ic
+                                do jc=1,jc2
+                                    val_pos = val_pos + 1
+                                    hij = zzc(ic,jc)
+                                    Hamil%val(val_pos) = hij
+                                    if (hij.NE.0.d0) then
+                                        n=ic+mdcs(iconf)
+                                        k=jc+mdcs(jconf)
+                                        if (n.EQ.1.AND.k.EQ.1) Hmin=hij
+                                        if (n.EQ.k.AND.hij.LT.Hmin) Hmin=hij
+                                        Hamil%minval = Hmin
+                                    else
+                                        numzero=numzero+1
+                                    end if
+                                end do
+                            end do
+                        End If
                     end do
-                End If
+                end if
                 If (ih8 == ih8_max .and. ih8 > 0 .and. val_pos * 10 / ih8 >= int(j, int64) .and. j <= 10) Then
                     Call stopTimer(s1, timeStr)
                     Write(*,'(2X,A,1X,I3,A)') 'FormH_sym calculation stage:', j*10, '% done in '// trim(timeStr)

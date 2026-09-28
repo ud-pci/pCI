@@ -103,6 +103,9 @@ Module conf_init
                 Case('NCPT')
                     Read(val, *) Ncpt
                     Call PrintParamI(key, Ncpt)
+                Case('NEMU')
+                    Read(val, *) Nemu
+                    Call PrintParamI(key, Nemu)
                 Case('CUT0')
                     Read(val, *) Cut0
                     Call PrintParamR(key, Cut0, '(A5,F8.5)')
@@ -229,6 +232,7 @@ Module conf_init
         Ncpt = 0
         Gnuc = 1.d0
         Qnuc = 1.d0
+        Nemu = 100000
 
         Open(unit=10,file='CONF.INP',status='OLD')
         Read(10,'(1X,16A1)') name
@@ -515,7 +519,16 @@ Module conf_init
         Write(11,'(5a1,i6)') (txt(i),i=1,5),Ncpt
         Return
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-    350 If (txt(2) /= ' '   .and.   txt(2) /= '-') goto 700
+    350 If (txt(1) /= 'n'   .and.   txt(1) /= 'N') goto 350
+        If (txt(2) /= 'e'   .and.   txt(2) /= 'E') goto 350
+        If (txt(3) /= 'm'   .and.   txt(3) /= 'M') goto 350
+        If (txt(4) /= 'u'   .and.   txt(4) /= 'U') goto 350
+        Read (string,*) Nemu
+        Write( *,'(5a1,i6)') (txt(i),i=1,5),Nemu
+        Write(11,'(5a1,i6)') (txt(i),i=1,5),Nemu
+        Return
+        ! - - - - - - - - - - - - - - - - - - - - - - - - -
+    360 If (txt(2) /= ' '   .and.   txt(2) /= '-') goto 700
         If (txt(3) /= ' '   .and.   txt(3) /= '-') goto 700
         If (txt(4) /= ' '   .and.   txt(4) /= '-') goto 700
         If (txt(2) == ' '   .and.   txt(3) == ' ') backspace(10)

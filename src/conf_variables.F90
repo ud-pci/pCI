@@ -18,13 +18,13 @@ Module conf_variables
     ! CSF variables
     Integer             :: nconf_neq=0
     Character(Len=1), Dimension(16) :: name
-    Integer, Allocatable, Dimension(:)   :: ndcs, mdc, mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf
+    Integer, Allocatable, Dimension(:)   :: ndcs, mdc, mdcs, iplace_cj, nc_neq, ndc_neq, ni_conf, nf_conf, Ncd
 
     Integer(Kind=Int64), Allocatable, Dimension(:) :: IntOrd
     Integer,  Allocatable, Dimension(:)    :: IntOrdS, Iconverge, iconf1, iconf2, In, Nrnrc
     Integer,  Allocatable, Dimension(:)    :: Iint1, Iint2, Iint3, Iint1S, Iint2S, Iint3S, I_is
     Integer,  Allocatable, Dimension(:)    :: num_gaunts_per_partial_wave ! counts number of gaunt factors calculated in each partial wave
-    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D, GauntLUT
+    Real(dp), Allocatable, Dimension(:)    :: Gnt, Rint1, Tl, Ts, D, GauntLUT, Eav
     Real(dp), Allocatable, Dimension(:,:)  :: W
 
     ! Integral lookup tables and hash tables
