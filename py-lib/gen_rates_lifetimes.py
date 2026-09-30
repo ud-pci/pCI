@@ -567,7 +567,6 @@ def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     # Calculate lifetimes and branching ratios
     lifetimes = []
 
-    # Calculate lifetimes and branching ratios
     for config, rates in tr_rates.items():
         configuration = config.split(' ')[0]
         termJ = config.split(' ')[1]
