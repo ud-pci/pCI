@@ -156,9 +156,17 @@ def format_with_uncertainty(value, unc, n_sig_figs=2):
         return f"{v}({u})"
 
     n_dec   = min(n_dec, 12)
-    val_str = str(_round_half_up(value, n_dec))
     unit    = 10.0 ** (-n_dec)
     u_int   = int(_round_half_up(unc / unit, 0))
+
+    # Rounding can push u_int to an extra digit (e.g. 0.0999 rounds to 100).
+    # Reduce n_dec until u_int fits in n_sig_figs digits.
+    while u_int >= 10 ** n_sig_figs and n_dec > 0:
+        n_dec -= 1
+        unit   = 10.0 ** (-n_dec)
+        u_int  = int(_round_half_up(unc / unit, 0))
+
+    val_str = str(_round_half_up(value, n_dec))
 
     if u_int == 0:
         return str(_round_half_up(value, n_dec))
