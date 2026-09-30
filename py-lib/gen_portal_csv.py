@@ -392,6 +392,44 @@ def _resolve_term_duplicates(rows):
             print(f'  resolve_dup: {conf} {old} -> {t} (S={S:.3f})')
             rows[i][1] = t
 
+def _correct_swapped_pairs(ao_rows, mbpt_groups):
+    # When two levels share strongly mixed configurations,
+    # the two methods may swap which level has which leading configuration.
+    # This re-matches MBPT levels by energy order within each such pair.
+    ao_by_J = {}
+    for r in ao_rows:
+        m = _term_re.match(r[1])
+        if not m:
+            continue
+        J = m.group(3)
+        if J not in ao_by_J:
+            ao_by_J[J] = []
+        ao_by_J[J].append(r)
+    for J, levels in ao_by_J.items():
+        for i, r_a in enumerate(levels):
+            conf2_a = r_a[10]
+            if not conf2_a:
+                continue
+            for r_b in levels[i + 1:]:
+                if r_b[0] != conf2_a:
+                    continue
+                if r_b[10] != r_a[0]:
+                    continue
+                # r_a and r_b reference each other as secondary configuration
+                key_a = (r_a[0], r_a[1])
+                key_b = (r_b[0], r_b[1])
+                if key_a not in mbpt_groups or key_b not in mbpt_groups:
+                    break
+                _, mr_a = mbpt_groups[key_a][0]
+                _, mr_b = mbpt_groups[key_b][0]
+                # AO and MBPT orders should match
+                ao_a_less = r_a[2] > r_b[2]
+                mbpt_a_less = mr_a[2] > mr_b[2]
+                if ao_a_less != mbpt_a_less:
+                    mbpt_groups[key_a][0], mbpt_groups[key_b][0] = mbpt_groups[key_b][0], mbpt_groups[key_a][0]
+                    print(f'  swap_conf_pair: {r_a[0]} {r_a[1]} <-> {r_b[0]} {r_b[1]} J={J}')
+                break
+
 def process_pconf_levels(name, filepath):
     '''
     Read pconf_even.csv / pconf_odd.csv (and optional MBPT variants) from filepath,
@@ -447,6 +485,9 @@ def process_pconf_levels(name, filepath):
 
     mbpt_groups_even = _build_mbpt_groups(mbpt_even)
     mbpt_groups_odd = _build_mbpt_groups(mbpt_odd)
+    if second_order_exists:
+        _correct_swapped_pairs(ao_even, mbpt_groups_even)
+        _correct_swapped_pairs(ao_odd, mbpt_groups_odd)
     mbpt_gs_au = (mbpt_even[0][2] if gs_parity == 'even' else mbpt_odd[0][2]) if second_order_exists else None
 
     def _build_levels(ao_rows, mbpt_groups, parity):
@@ -916,10 +957,20 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
     match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
     os.makedirs(filtered_path, exist_ok=True)
 
-    # Correct MBPT term labels before merging
-    tmap_mbpt = {(r[0].replace('.', ' '), round(r[2], 6)): r[1]
-                 for p in ('even', 'odd')
-                 for r in load_pconf(f'{data_raw_path}/pconf_{p}_MBPT.csv')}
+    # Correct term labels in both methods before merging
+    def _make_tmap(suffix):
+        return {(r[0].replace('.', ' '), round(r[2], 6)): r[1]
+                for p in ('even', 'odd')
+                for r in load_pconf(f'{data_raw_path}/pconf_{p}{suffix}.csv')}
+    tmap_ao   = _make_tmap('')
+    tmap_mbpt = _make_tmap('_MBPT')
+
+    def _fix_terms(df, tmap):
+        for side in ('state_one', 'state_two'):
+            df[f'{side}_term'] = df.apply(
+                lambda r: tmap.get(
+                    (r[f'{side}_configuration'], round(abs(float(r[f'{side}_energy_au'])), 6)),
+                    r[f'{side}_term']), axis=1)
 
     frames = []
     unmatched_frames = []
@@ -930,14 +981,11 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
             print(f'{path_ao} not found, skipping')
             continue
         df_ao = pd.read_csv(path_ao)
+        _fix_terms(df_ao, tmap_ao)
         n_unmatched = 0
         if os.path.isfile(path_mbpt):
             df_mbpt = pd.read_csv(path_mbpt)
-            for side in ('state_one', 'state_two'):
-                df_mbpt[f'{side}_term'] = df_mbpt.apply(
-                    lambda r: tmap_mbpt.get(
-                        (r[f'{side}_configuration'], round(abs(float(r[f'{side}_energy_au'])), 6)),
-                        r[f'{side}_term']), axis=1)
+            _fix_terms(df_mbpt, tmap_mbpt)
             merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
             no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
             n_unmatched = len(no_mbpt)
