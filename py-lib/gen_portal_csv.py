@@ -217,10 +217,22 @@ def read_pconf_csv(path):
     return rows
 
 
+def load_pconf(path):
+    # Read a pconf.csv file, apply fix_term and _resolve_term_duplicates, and return the fixed rows.
+    # Returns an empty list if the file does not exist.
+    if not os.path.isfile(path):
+        return []
+    rows = read_pconf_csv(path)
+    for r in rows:
+        r[1] = fix_term(r[0], r[1], r[4], r[5])
+    _resolve_term_duplicates(rows)
+    return rows
+
+
 def write_pconf_csv(name, parity, ao_rows, level_rows):
     '''
     Write a merged pconf.csv file with uncertainties for one parity.
-    ao_rows: output of read_pconf_csv
+    ao_rows: output of load_pconf
     level_rows: output of _build_levels
     '''
     parity_cap = parity.capitalize()
@@ -407,16 +419,10 @@ def process_pconf_levels(name, filepath):
         print(f'{path_odd_mbpt} not found')
         second_order_exists = False
 
-    ao_even   = read_pconf_csv(path_even)
-    ao_odd    = read_pconf_csv(path_odd)
-    mbpt_even = read_pconf_csv(path_even_mbpt) if second_order_exists else []
-    mbpt_odd  = read_pconf_csv(path_odd_mbpt)  if second_order_exists else []
-
-    # Fix terms in all files before matching
-    for rows in (ao_even, ao_odd, mbpt_even, mbpt_odd):
-        for r in rows:
-            r[1] = fix_term(r[0], r[1], r[4], r[5])
-        _resolve_term_duplicates(rows)
+    ao_even   = load_pconf(path_even)
+    ao_odd    = load_pconf(path_odd)
+    mbpt_even = load_pconf(path_even_mbpt) if second_order_exists else []
+    mbpt_odd  = load_pconf(path_odd_mbpt)  if second_order_exists else []
 
     # Larger energy_au = more tightly bound (valence energy convention in pconf)
     if ao_even[0][2] > ao_odd[0][2]:
@@ -831,9 +837,9 @@ def atom_name_to_filename(atom):
     Convert atom name to filename format.
 
     Examples:
-    - Ba I → Ba1 (neutral)
-    - Ba II or Ba+ → Ba2 (singly ionized)
-    - Ba III or Ba++ → Ba3 (doubly ionized)
+    - Ba I -> Ba1 (neutral)
+    - Ba II or Ba+ -> Ba2 (singly ionized)
+    - Ba III or Ba++ -> Ba3 (doubly ionized)
 
     Args:
         atom: Atom name in format "Element Roman" or "Element Charge"
@@ -850,14 +856,14 @@ def atom_name_to_filename(atom):
     suffix = parts[1]
 
     if '+' in suffix:
-        # Count number of + signs and add 1 (e.g., Ba+ → Ba2, Ba++ → Ba3)
+        # Count number of + signs and add 1 (e.g., Ba+ -> Ba2, Ba++ -> Ba3)
         ionization = suffix.count('+') + 1
         return element + str(ionization)
     elif suffix.isnumeric():
         # Already in numeric format
         return atom.replace(' ', '')
     else:
-        # Roman numeral (e.g., Ba I → Ba1, Ba II → Ba2)
+        # Roman numeral (e.g., Ba I -> Ba1, Ba II -> Ba2)
         ionization = convert_roman_to_num(suffix)
         return element + str(ionization)
 
@@ -909,7 +915,12 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
     ]
     match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
     os.makedirs(filtered_path, exist_ok=True)
-    
+
+    # Correct MBPT term labels before merging
+    tmap_mbpt = {(r[0].replace('.', ' '), round(r[2], 6)): r[1]
+                 for p in ('even', 'odd')
+                 for r in load_pconf(f'{data_raw_path}/pconf_{p}_MBPT.csv')}
+
     frames = []
     unmatched_frames = []
     for label in tm_labels:
@@ -922,6 +933,11 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
         n_unmatched = 0
         if os.path.isfile(path_mbpt):
             df_mbpt = pd.read_csv(path_mbpt)
+            for side in ('state_one', 'state_two'):
+                df_mbpt[f'{side}_term'] = df_mbpt.apply(
+                    lambda r: tmap_mbpt.get(
+                        (r[f'{side}_configuration'], round(abs(float(r[f'{side}_energy_au'])), 6)),
+                        r[f'{side}_term']), axis=1)
             merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
             no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
             n_unmatched = len(no_mbpt)
@@ -987,12 +1003,12 @@ if __name__ == "__main__":
 
             if '+' in suffix:
                 # Convert + notation to Roman numerals for NIST
-                # Ba+ → Ba II, Ba++ → Ba III
+                # Ba+ -> Ba II, Ba++ -> Ba III
                 ionization = suffix.count('+') + 1
                 atom = element + ' ' + convert_num_to_roman(ionization)
             elif suffix.isnumeric():
                 # Convert numeric to Roman numerals for NIST
-                # Ba1 → Ba I, Ba2 → Ba II
+                # Ba1 -> Ba I, Ba2 -> Ba II
                 ionization = int(suffix)
                 atom = element + ' ' + convert_num_to_roman(ionization)
             else:
