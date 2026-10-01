@@ -1064,6 +1064,8 @@ if __name__ == '__main__':
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+            exclusive = get_dict_value(hpc, 'exclusive', default=True)
+            mem = get_dict_value(hpc, 'mem', default=0)
         else:
             print('hpc block was not found in', yml_file)
             submit_job = False
@@ -1179,7 +1181,7 @@ if __name__ == '__main__':
                             dir_name = f'{c_dir_name(c)}/basis'
                             os.chdir(dir_name)
                             run_ao_executables(diagonalize_basis, K_is, c, bin_dir, order, custom, basis_method)
-                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
                             if script_name and submit_job:
                                 run_shell(f'sbatch {script_name}')
                             else:
@@ -1195,7 +1197,7 @@ if __name__ == '__main__':
                             Path(f'{method}/basis').mkdir(parents=True, exist_ok=True)
                             os.chdir(f'{method}/basis')
                             run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
-                            script_name = write_job_script('.', method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
                             if script_name and submit_job:
                                 run_shell(f'sbatch {script_name}')
                             else:
@@ -1205,7 +1207,7 @@ if __name__ == '__main__':
                         Path('basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
                         run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
-                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir)
+                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
                         if script_name and submit_job:
                             run_shell(f'sbatch {script_name}')
                         else:

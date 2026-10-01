@@ -10,14 +10,11 @@ def run_shell(command):
         print(e)
         sys.exit()
         
-def get_dict_value(param_dict, key):
-    """ This function obtains returns the value from a dictionary given a key and returns None if the key doesn't exist """
-    try:
-        return param_dict[key]
-    except KeyError:
-        return None
-    except TypeError:
-        return None
+def get_dict_value(param_dict, key, default=None):
+    """This function retrieves a value from a dictionary with a fallback default."""
+    if not isinstance(param_dict, dict):
+        return default
+    return param_dict.get(key, default)
     
 def convert_params_to_list(param):
     """ Converts a string parameter into a list if it's not already a list"""
