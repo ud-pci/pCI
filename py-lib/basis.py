@@ -698,12 +698,12 @@ def write_bas_wj_in(filename, symbol, Z, AM, NS, NSO, N, kappa, iters, energies,
         f.write('   0.0')
     print('bas_wj.in has been written')
 
-def write_inf_aov(filename, val_N, val_kappa, NSO, nmax, lmax, kval, energies):
+def write_inf_aov(filename, core_N, core_kappa, val_N, val_kappa, nmax, lmax, kval, energies):
     """ Writes inf.aov """
     with open(filename, 'w') as f:
-        f.write(f'{NSO}\n')
-        for i in range(NSO):
-            f.write(f'{val_N[i]} {val_kappa[i]}\n')
+        f.write(f'{len(core_N)}\n')
+        for i in range(len(core_N)):
+            f.write(f'{core_N[i]} {core_kappa[i]}\n')
         f.write(f'{nmax}  {lmax}\n')
         f.write('0   0\n') # internal parameters
         f.write('30\n') # max iterations
@@ -727,13 +727,13 @@ def write_inf_aov(filename, val_N, val_kappa, NSO, nmax, lmax, kval, energies):
     print('inf.aov has been written')
 
 
-def write_inf_vw(filename, val_N, val_kappa, NSO, nmax, lmax, kvw, kval, energies):
+def write_inf_vw(filename, core_N, core_kappa, nmax, lmax, kvw, kval, energies):
     """ Writes inf.vw """
     l_array = ['s', 'p', 'd', 'f']
     with open(filename, 'w') as f:
-        f.write(f'{NSO}\n')
-        for i in range(NSO):
-            f.write(f'{val_N[i]} {val_kappa[i]}\n')
+        f.write(f'{len(core_N)}\n')
+        for i in range(len(core_N)):
+            f.write(f'{core_N[i]} {core_kappa[i]}\n')
         f.write(f'{nmax} {lmax}\n')
         f.write('250\n')
         f.write('4\n')
@@ -777,8 +777,8 @@ def write_ao_inputs(system, K_is, C_is, kvw, basis_method):
         write_bass_inp('BASS.INP', config, NSO, Z, AM, kbrt, vorbs, norbs, K_is, C_is)
     else:
         raise ValueError('basis_method not valid. Expecting "b-splines" or "dirac-fock".')
-    write_inf_aov('inf.aov', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kval, system['basis']['val_energies']['energies'])
-    write_inf_vw('inf.vw', val_N, val_kappa, NSO, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
+    write_inf_aov('inf.aov', core_N, core_kappa, val_N, val_kappa, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kval, system['basis']['val_energies']['energies'])
+    write_inf_vw('inf.vw', core_N, core_kappa, system['basis']['orbitals']['nmax'], system['basis']['orbitals']['lmax'], kvw, kval, system['basis']['val_energies']['energies'])
 
 def generate_batch_qed(bin_dir, kqed, kbrt):
     """ Writes batch.qed """
@@ -1134,7 +1134,8 @@ if __name__ == '__main__':
         # Generate body of bas_wj.in including orbitals, values of kappa, and energy guesses
         N, kappa, iters, energies = gen_lists_kappa(Z, num_core_electrons, core_orbitals, valence_orbitals)
 
-        # Get valence orbitals for all-order calculations
+        # Get core and valence orbitals for all-order calculations
+        core_N, core_kappa = N[:NSO], kappa[:NSO]
         val_N, val_kappa = get_ao_valence(core_orbitals, valence_orbitals, val_aov)
 
         # Write input files to basis directory
