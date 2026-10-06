@@ -1066,6 +1066,7 @@ if __name__ == '__main__':
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
             exclusive = get_dict_value(hpc, 'exclusive', default=True)
             mem = get_dict_value(hpc, 'mem', default=0)
+            email = get_dict_value(hpc, 'email')          
         else:
             print('hpc block was not found in', yml_file)
             submit_job = False
@@ -1075,7 +1076,7 @@ if __name__ == '__main__':
         submit_job = False
 
     # atom parameters
-    name = atom['name']
+    element = atom['name']
     try:
         isotope = atom['isotope']
     except KeyError:
@@ -1111,7 +1112,7 @@ if __name__ == '__main__':
     include_qed = get_dict_value(qed, 'include')
 
     # Get atomic data
-    Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(name, isotope)
+    Z, AM, symbol, cfermi, rnuc, num_electrons = libatomic.get_atomic_data(element, isotope)
 
     # Get orbital information
     NS, NSO, _ = count_total_orbitals(core_orbitals, valence_orbitals)
@@ -1182,7 +1183,7 @@ if __name__ == '__main__':
                             dir_name = f'{c_dir_name(c)}/basis'
                             os.chdir(dir_name)
                             run_ao_executables(diagonalize_basis, K_is, c, bin_dir, order, custom, basis_method)
-                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element)
                             if script_name and submit_job:
                                 run_shell(f'sbatch {script_name}')
                             else:
@@ -1198,7 +1199,7 @@ if __name__ == '__main__':
                             Path(f'{method}/basis').mkdir(parents=True, exist_ok=True)
                             os.chdir(f'{method}/basis')
                             run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
-                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
+                            script_name = write_job_script('.', method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element)
                             if script_name and submit_job:
                                 run_shell(f'sbatch {script_name}')
                             else:
@@ -1208,7 +1209,7 @@ if __name__ == '__main__':
                         Path('basis').mkdir(parents=True, exist_ok=True)
                         os.chdir('basis')
                         run_ao_executables(diagonalize_basis, 0, 0, bin_dir, order, custom, basis_method)
-                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir)
+                        script_name = write_job_script('.', code_method, nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element)
                         if script_name and submit_job:
                             run_shell(f'sbatch {script_name}')
                         else:

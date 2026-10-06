@@ -267,10 +267,26 @@ def move_conf_inp(conf_dir, root_dir, parity, run_codes, include_lsj, write_hij,
         run_shell(f'cp {conf_src} {conf_dir}/CONF.INP')
     if os.path.isfile(add_src):
         run_shell(f'cp {add_src} {conf_dir}/ADD.INP')
-    if os.path.isfile(f'{basis_path}/SGC.CON'):
-        run_shell(f'cp {basis_path}/SGC.CON {conf_dir}')
-    if os.path.isfile(f'{basis_path}/SCRC.CON'):
-        run_shell(f'cp {basis_path}/SCRC.CON {conf_dir}')
+
+    src = os.path.abspath(f'{basis_path}/SGC.CON')
+    dst = os.path.join(conf_dir, 'SGC.CON')
+    if os.path.isfile(src):
+        if os.path.lexists(dst):  # Checks for existing file or symlink
+            os.remove(dst)
+        os.symlink(src, dst)
+
+    src = os.path.abspath(f'{basis_path}/SCRC.CON')
+    dst = os.path.join(conf_dir, 'SCRC.CON')
+    if os.path.isfile(src):
+        if os.path.lexists(dst):  
+            os.remove(dst)
+        os.symlink(src, dst)    
+
+    # if os.path.isfile(f'{basis_path}/SGC.CON'):
+    #     run_shell(f'cp {basis_path}/SGC.CON {conf_dir}')
+    # if os.path.isfile(f'{basis_path}/SCRC.CON'):
+    #     run_shell(f'cp {basis_path}/SCRC.CON {conf_dir}')
+
     if run_codes and os.path.isfile(f'{root_dir}/ci.qs'):
         run_shell(f'cp {root_dir}/ci.qs {conf_dir}')
 
@@ -306,6 +322,9 @@ if __name__ == '__main__':
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+            exclusive = get_dict_value(hpc, 'exclusive', default=True)
+            mem = get_dict_value(hpc, 'mem', default=0)
+            email = get_dict_value(hpc, 'email')
         else:
             print('hpc block was not found in', yml_file)
             submit_job = False
@@ -324,6 +343,8 @@ if __name__ == '__main__':
         K_is_dict = {0: '', 1: 'FS', 2: 'SMS', 3: 'NMS', 4: 'MS'}
 
     atom = get_dict_value(config, 'atom')
+    element = atom['name']
+
     code_method = get_dict_value(atom, 'code_method')
     conf = get_dict_value(config, 'conf')
     for_portal = get_dict_value(system, 'for_portal')
@@ -393,7 +414,8 @@ if __name__ == '__main__':
                 parities.append('odd')
     else:
         if for_portal:
-            j_values = sorted({int(J) for J in [J_even, J_odd]})
+            # j_values = sorted({int(J) for J in [J_even, J_odd]})
+            j_values = [0, 1]
             print(f'Portal mode enabled - generating configurations for J={j_values} for both parities')
             parities = []
 
@@ -433,7 +455,7 @@ if __name__ == '__main__':
     # Create a ci.qs job script if it doesn't exist yet
     if on_hpc:
         print(f'generating new ci.qs in {os.getcwd()} directory')
-    script_name = write_job_script('.', 'ci', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir) if on_hpc else None
+    script_name = write_job_script('.', 'ci', nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element) if on_hpc else None
 
     # Copy ADD.INP and CONF.INP to all directories if gen_dir == True
     if gen_dir:
@@ -465,10 +487,11 @@ if __name__ == '__main__':
                             print('Skipping..')
                             continue
                         move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, K_is, c)
-                        if on_hpc and run_codes:
-                            submit_ci_job(conf_path, script_name, submit_job)
-                        else:
-                            print('run_codes option is only available with HPC access')
+                        if run_codes:
+                            if on_hpc:
+                                submit_ci_job(conf_path, script_name, submit_job)
+                            else:
+                                print('run_codes option is only available with HPC access')
                     os.chdir('../')
                 if K_is_dict[K_is]:
                     os.chdir('../')
@@ -493,10 +516,11 @@ if __name__ == '__main__':
                             conf_path = f'{parity}{J}'
                             if os.path.isfile(f'{root_dir}/CONF{parity}{J}.INP'):
                                 move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0, j_suffix=J, basis_path=method_basis)
-                                if on_hpc and run_codes:
-                                    submit_ci_job(conf_path, script_name, submit_job)
-                                else:
-                                    print('run_codes option is only available with HPC access - please run ci codes manually')
+                                if run_codes:
+                                    if on_hpc: 
+                                        submit_ci_job(conf_path, script_name, submit_job)
+                                    else:
+                                        print('run_codes option is only available with HPC access - please run ci codes manually')
                     if basis_subdir:
                         os.chdir('../')
                 else:
@@ -504,14 +528,15 @@ if __name__ == '__main__':
                         J = get_dict_value(conf[parity], 'J')
                         conf_path = f'{parity}{str(J)[0]}'
                         move_conf_inp(conf_path, root_dir, parity, run_codes, include_lsj, write_hij, 0, 0, basis_path=method_basis)
-                        if on_hpc and run_codes:
-                            submit_ci_job(conf_path, script_name, submit_job)
-                        else:
-                            print('run_codes option is only available with HPC access')
+                        if run_codes:
+                            if on_hpc:
+                                submit_ci_job(conf_path, script_name, submit_job)
+                            else:
+                                print('run_codes option is only available with HPC access')
                 if method is not None:
                     os.chdir('../')
 
     # Cleanup - remove add.in, ADD.INP, CONF.INP and CONF_.INP from root directory
     run_shell('rm add.in ADD*.INP CONF*.INP add*.out BASS.INP')
 
-    print('add script completed')
+    print('ci script completed')

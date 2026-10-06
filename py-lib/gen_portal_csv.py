@@ -1038,6 +1038,7 @@ if __name__ == "__main__":
     if use_config_yml:
         config_yml = input("Input yml-file: ")
         config = read_yaml(config_yml)
+        for_portal = get_dict_value(config['system'],'for_portal')
         atom_name = get_dict_value(config['atom'],'name')
         
         # Parse atom name - keep in Roman numeral format for NIST
@@ -1126,6 +1127,8 @@ if __name__ == "__main__":
     j0, j1 = None, None
     if even_J is not None and odd_J is not None:
         j_values = sorted(set([float(even_J), float(odd_J)]))
+        if for_portal:
+            j_values = [0, 1]
         if len(j_values) >= 2:
             j0, j1 = j_values[0], j_values[1]
             collect_portal_files('ci+all-order', j0, j1, data_raw_path, subdir=basis_dir_name)

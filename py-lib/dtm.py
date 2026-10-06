@@ -46,6 +46,7 @@ If on_hpc is True, a Slurm job script is also written and optionally submitted.
 import yaml
 import os
 import sys
+import subprocess
 from pathlib import Path
 from utils import run_shell, get_dict_value, check_slurm_installed, get_basis_dir_name
 from gen_job_script import write_job_script
@@ -166,17 +167,47 @@ def read_nlv_from_conf(conf_path):
         return None
     return None
 
-def copy_ci_files(src, dtm_dir, conf_prefix='CONF'):
-    """Copy the standard set of CI files from src into dtm_dir."""
-    for fname in ['CONF.INP', 'CONF.DET', 'CONF.XIJ', 'CONFSTR.RES', 'CONF.DAT', 'CONF.INT']:
-        dest = fname.replace('CONF', conf_prefix, 1)
-        run_shell(f'cp {src}/{fname} {dtm_dir}/{dest}')
+
+def link_ci_files(src, dtm_dir, suffix=''):
+    """Softlink CI files from src to dtm_dir, optionally adding a suffix to the stem."""
+
+    files = ['CONF.DET', 'CONF.XIJ', 'CONFSTR.RES']    
+    if not suffix:
+        files.extend(['CONF.INP', 'CONF.DAT', 'CONF.INT'])
+
+    src_path = Path(src).resolve()
+    dtm_path = Path(dtm_dir)
+
+    for fname in files:
+        p = Path(fname)
+        dest_name = f"{p.stem}{suffix}{p.suffix}" 
+        
+        dest_file = dtm_path / dest_name
+        dest_file.unlink(missing_ok=True)  # Remove existing file or broken link to allow overwrite
+        dest_file.symlink_to(src_path / fname)
+
+def submit_sbatch(script: str, dependency_id: str = None) -> str:
+    cmd = ["sbatch", "--parsable"]
+    if dependency_id:
+        cmd.append(f"--dependency=afterok:{dependency_id}")
+    cmd.append(script) 
+        
+    result = subprocess.run(
+        cmd,
+        input=script,
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    return result.stdout.strip()
+
 
 if __name__ == '__main__':
     yml_file = input('Input yml-file: ')
     config = read_yaml(yml_file)
 
     atom = get_dict_value(config, 'atom')
+    element = get_dict_value(atom, 'name')
     code_method = get_dict_value(atom, 'code_method')
     if not isinstance(code_method, list): code_method = [code_method]
 
@@ -199,6 +230,9 @@ if __name__ == '__main__':
             partition = get_dict_value(hpc, 'partition')
             nodes = get_dict_value(hpc, 'nodes')
             tasks_per_node = get_dict_value(hpc, 'tasks_per_node')
+            exclusive = get_dict_value(hpc, 'exclusive', default=True)
+            mem = get_dict_value(hpc, 'mem', default=0)
+            email = get_dict_value(hpc, 'email')
         else:
             print(f'hpc block was not found in {yml_file}')
             submit_job = False
@@ -206,6 +240,7 @@ if __name__ == '__main__':
     else:
         on_hpc = False
         submit_job = False
+
 
     basis = get_dict_value(config, 'basis')
     conf = get_dict_value(config, 'conf')
@@ -310,9 +345,14 @@ if __name__ == '__main__':
                 with open('rpa.in', 'w') as f:
                     f.write('2')
                 run_shell(f'cp rpa.in {dtm_dir}/rpa.in')
-                script_name = write_job_script('.', 'dtm_rpa', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir) if on_hpc else None
-                if script_name:
-                    run_shell(f'cp dtm_rpa.qs {dtm_dir}/dtm_rpa.qs')
+                # script_name = write_job_script('.', 'dtm_rpa', nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element) if on_hpc else None
+                # if script_name:
+                    # run_shell(f'cp dtm_rpa.qs {dtm_dir}/dtm_rpa.qs')
+                script_name1 = write_job_script('.', 'dtm', nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element) if on_hpc else None
+                script_name2 = write_job_script('.', 'rpa', nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element) if on_hpc else None
+
+                if script_name1 and script_name2:
+                    run_shell(f'cp {script_name1} {script_name2} {dtm_dir}')
             else:
                 if dtm_dir == 'tm':
                     levels = f'{from_level_initial} {from_level_final}, {to_level_initial} {to_level_final}'
@@ -330,7 +370,7 @@ if __name__ == '__main__':
                 elif dtm_dir == 'dm_odd':
                     write_dtm_in('DM', f'{from_level_odd} {to_level_odd}', ', '.join(dm_key_list))
                 run_shell(f'cp dtm.in {dtm_dir}/dtm.in')
-                script_name = write_job_script('.', 'dtm', nodes, tasks_per_node, True, 0, partition, pci_version, bin_dir) if on_hpc else None
+                script_name = write_job_script('.', 'dtm', nodes, tasks_per_node, exclusive, mem, partition, pci_version, bin_dir, email=email, element=element) if on_hpc else None
                 if script_name:
                     run_shell(f'cp dtm.qs {dtm_dir}/dtm.qs')
 
@@ -338,22 +378,16 @@ if __name__ == '__main__':
             if dtm_dir == 'tm':
                 from_path = conf_even_path if tm_from_parity == 'even' else conf_odd_path
                 to_path   = conf_even_path if tm_to_parity   == 'even' else conf_odd_path
-                copy_ci_files(from_path, dtm_dir, 'CONF')
-                run_shell(f'cp {to_path}/CONF.INP {dtm_dir}/CONF1.INP')
-                run_shell(f'cp {to_path}/CONF.DET {dtm_dir}/CONF1.DET')
-                run_shell(f'cp {to_path}/CONF.XIJ {dtm_dir}/CONF1.XIJ')
-                run_shell(f'cp {to_path}/CONFSTR.RES {dtm_dir}/CONFSTR1.RES')
+                link_ci_files(from_path, dtm_dir)             
+                link_ci_files(to_path, dtm_dir, suffix='1')
             elif dtm_dir in TM_DIR_PATHS:
                 from_key, to_key = TM_DIR_PATHS[dtm_dir]
-                copy_ci_files(from_key, dtm_dir, 'CONF')
-                run_shell(f'cp {to_key}/CONF.INP {dtm_dir}/CONF1.INP')
-                run_shell(f'cp {to_key}/CONF.DET {dtm_dir}/CONF1.DET')
-                run_shell(f'cp {to_key}/CONF.XIJ {dtm_dir}/CONF1.XIJ')
-                run_shell(f'cp {to_key}/CONFSTR.RES {dtm_dir}/CONFSTR1.RES')
+                link_ci_files(from_key, dtm_dir)             
+                link_ci_files(to_key, dtm_dir, suffix='1')
             elif dtm_dir == 'dm_even':
-                copy_ci_files(conf_even_path, dtm_dir, 'CONF')
+                link_ci_files(conf_even_path, dtm_dir)             
             elif dtm_dir == 'dm_odd':
-                copy_ci_files(conf_odd_path, dtm_dir, 'CONF')
+                link_ci_files(conf_odd_path, dtm_dir)             
 
         # Submit job scripts
         if run_codes:
@@ -378,7 +412,9 @@ if __name__ == '__main__':
                         elif dtm_dir == 'dm_odd':
                             write_dtm_in('DM', f'{from_level_odd} {to_level_odd}', ', '.join(dm_key_list))
                         if submit_job:
-                            run_shell('sbatch dtm_rpa.qs')
+                            # run_shell('sbatch dtm_rpa.qs')
+                            rpa_id = submit_sbatch('rpa.qs')
+                            _ = submit_sbatch('dtm.qs', dependency_id=rpa_id)
                 else:
                     if submit_job:
                         run_shell('sbatch dtm.qs')

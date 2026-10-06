@@ -1,8 +1,13 @@
 import sys
 from subprocess import run, CalledProcessError
 import os
+from pathlib import Path
 
-def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version, bin_dir):
+ROMAN_TO_INT = {
+    "I": "1",   "II": "2",   "III": "3", "IV": "4", "V": "5"
+}
+
+def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, partition, pci_version, bin_dir, email=None, element=None):
     """
     This function writes a SLURM job script and returns the name of the job script.
     """
@@ -33,10 +38,8 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         return None
 
     # Set default job parameters
-    if not num_nodes:
-        num_nodes = 1
-    if not num_procs_per_node:
-        num_procs_per_node = 1
+    num_nodes = num_nodes or 1
+    num_procs_per_node = num_procs_per_node or 1
     if not partition:
         if cluster == 'caviness':
             partition = 'standard'
@@ -58,6 +61,7 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'ci': 'ci.qs',
                  'dtm': 'dtm.qs',
                  'dtm_rpa': 'dtm_rpa.qs',
+                 'rpa': 'rpa.qs',
                  'ine': 'ine.qs'}
 
     is_serial = {'ci+all-order': True,
@@ -69,31 +73,64 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
                  'ci': False,
                  'dtm': False,
                  'dtm_rpa': False,
+                 'rpa': True,
                  'ine': False}
+
+    if code not in filenames:
+        print(f"{code} is not supported")
+        sys.exit()
 
     os.chdir(path)
 
     filename = filenames[code]
-    with open(filename, 'w') as f:
-        f.write('#!/bin/bash -l\n')
-        f.write('\n')
-        if is_serial[code]:
-            f.write('#SBATCH --ntasks=1\n')
+    serial_job = is_serial.get(code, False)
+
+    if element:
+        parts = element.split()
+        if len(parts) == 2:
+            symbol, roman = parts
+            arabic = ROMAN_TO_INT.get(roman.upper(), roman)
+            element_name = f"{symbol}{arabic}"
         else:
-            f.write(f'#SBATCH --nodes={num_nodes}\n')
-            if num_procs_per_node == 1:
+            element_name = element 
+    else:
+        element_name = ""
+
+    jobname = f"{Path(filename).stem}_{element_name}"
+
+    with open(filename, 'w') as f:
+        f.write('#!/bin/bash -l\n\n')
+
+        if serial_job:
+            f.write("#SBATCH --ntasks=1\n")
+            f.write("#SBATCH --cpus-per-task=1\n")
+            if mem:
+                f.write(f"#SBATCH --mem={mem}\n")
+        else:
+            if num_procs_per_node < 2:
                 print('tasks-per-node is set to minimum of 2 for parallel programs')
                 num_procs_per_node = 2
-            f.write(f'#SBATCH --tasks-per-node={num_procs_per_node}\n')
-        if exclusive:
-            f.write('#SBATCH --exclusive=user\n')
-        f.write('#SBATCH --cpus-per-task=1\n')
-        f.write(f'#SBATCH --mem={mem}\n')
-        f.write(f'#SBATCH --job-name={code}\n')
+
+            f.write(f'#SBATCH --nodes={num_nodes}\n')
+            f.write(f'#SBATCH --ntasks-per-node={num_procs_per_node}\n')
+            f.write("#SBATCH --cpus-per-task=1\n")
+
+            if exclusive:
+                f.write('#SBATCH --exclusive\n')
+                f.write(f'#SBATCH --mem=0\n')
+            elif mem:
+                f.write(f'#SBATCH --mem={mem}\n')
+
+        f.write(f'#SBATCH --job-name={jobname}\n')
         f.write(f'#SBATCH --partition={partition}\n')
+
+        if email:
+            f.write(f'#SBATCH --mail-user={email}\n')
+            f.write('#SBATCH --mail-type=END,FAIL\n')
+        
         f.write('#SBATCH --time=05-00:00:00\n')
-        f.write('#SBATCH --export=NONE\n')
-        f.write('\n')
+        f.write('#SBATCH --export=NONE\n\n')
+        
         if pci_version != 'default':
             f.write(f'vpkg_require pci/{pci_version}\n')
         else:
@@ -101,12 +138,11 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
         if cluster == 'darwin':
             f.write('\n')
             f.write('UD_PREFER_MEM_PER_CPU=YES\n')
-            f.write('UD_REQUIRE_MEM_PER_CPU=YES\n')
-        f.write('\n')
-        f.write('. /opt/shared/slurm/templates/libexec/openmpi.sh\n')
-        f.write('\n')
+            f.write('UD_REQUIRE_MEM_PER_CPU=YES\n\n')
 
-        if not is_serial[code]:
+        f.write('. /opt/shared/slurm/templates/libexec/openmpi.sh\n\n')
+
+        if not serial_job:
             f.write('CONF_MAX_BYTES_PER_CPU=$((SLURM_MEM_PER_CPU*1024*1024))\n')
             f.write('export CONF_MAX_BYTES_PER_CPU\n\n')
 
@@ -124,6 +160,10 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write(f'{bin_dir}rpa_dtm\n')
             f.write('cp DTM.INT DTM_RPA.INT\n')
             f.write(f'${{UD_MPIRUN}} {bin_dir}pdtm\n')
+        elif code == 'rpa':
+            f.write(f'{bin_dir}rpa < rpa.in\n')
+            f.write(f'{bin_dir}rpa_dtm\n')
+            f.write('cp DTM.INT DTM_RPA.INT\n')
         elif code == 'ine':
             f.write(f'${{UD_MPIRUN}} {bin_dir}pine\n')
         elif code == 'all-order' or code == 'ci+all-order':
@@ -133,9 +173,6 @@ def write_job_script(path, code, num_nodes, num_procs_per_node, exclusive, mem, 
             f.write(f'{bin_dir}second-ci <inf.vw >out.second.vw\n')
         elif code == 'second-order' or code == 'ci+second-order':
             f.write(f'{bin_dir}second-ci <inf.vw >out.second.vw\n')
-        else:
-            print(f'{code} is not supported')
-            sys.exit()
 
         f.write('\n')
         f.write('mpi_rc=$?\n')
