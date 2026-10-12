@@ -1072,7 +1072,7 @@ Contains
             M=1
             IF (NQ(NI).NE.J+1) M=2
             strfmt = '(I4,1X,I2,A1,I2,"/2"," (",F6.3,")",A1,1X,I1,F13.6,2X,E13.6,2X,E13.6,I6)'
-            WRITE( *,strfmt) NI,N,LET(1),J,QI,LM(M),KP(NI),E,D0,DN,M1
+            WRITE( *,strfmt) NI,N,LET(L),J,QI,LM(M),KP(NI),E,D0,DN,M1
             WRITE(11,strfmt) NI,N,LET(L),J,QI,LM(M),KP(NI),E,D0,DN
         End Do
 
