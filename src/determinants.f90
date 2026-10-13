@@ -139,6 +139,14 @@ Module determinants
 
         Deallocate(idet)
 
+        If (.not. allocated(Ncd)) allocate(Ncd(Nd))
+
+        Do iconf=1,Nc
+            If (Ndc(iconf)>0) Then
+                Ncd(Mdc(iconf)+1:Mdc(iconf)+Ndc(iconf))=iconf
+            End If
+        End Do
+
     End Subroutine Det_Number
 
     Subroutine Det_List(idt)

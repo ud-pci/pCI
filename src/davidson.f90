@@ -584,9 +584,9 @@ Module davidson
         !   2. Each rank computes H*v for its own row range using the local CSR rows of H.
         !      The upper-triangle-only storage means row n touching column k also contributes
         !      a symmetric k->n term, so both col_out(n) and col_out(k) are updated.
-        !   3. Allreduce sums these scatter contributions across ranks so every rank has the
-        !      correct output value for its own rows.
-        !   4. Each rank stores its local slice of the output back into ArrB.
+        !   3. Reduce_scatter sums these scatter contributions across ranks and delivers to
+        !      each rank only the output values for its own rows.
+        !   4. The local slice lands directly in ArrB.
         !
         ! On the first call (kd=1), the diagonal elements of H (shifted by Hamil%minval) are
         ! extracted into Diag for use as the preconditioner in Dvdsn.
@@ -636,9 +636,10 @@ Module davidson
                 End Do
             End Do
 
-            ! Step 3-4: sum scatter contributions across ranks; store local output slice.
-            Call MPI_Allreduce(MPI_IN_PLACE, col_out_cache, Nd, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
-            ArrB(1:nd_local, i2min+iv) = col_out_cache(nd_start+1:nd_end)
+            ! Step 3-4: sum scatter contributions across ranks; each rank receives only its own
+            ! row block (contiguous, in rank order) directly into its local slice of ArrB.
+            Call MPI_Reduce_scatter(col_out_cache, ArrB(1:nd_local, i2min+iv), nd_counts_all, &
+                                    mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
         End Do
 
         ! Each rank already wrote to its own Diag(n-nd_start); no Allreduce needed.
