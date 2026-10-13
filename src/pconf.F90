@@ -3865,7 +3865,15 @@ Contains
         Integer :: is, il, ij
         Character(Len=1) :: strl
 
-        is = Nint(2*S+1)
+        ! Round S and J to the values allowed by the number of electrons:
+        ! even Ne -> integer S and J (2S, 2J even); odd Ne -> half-integer S and J (2S, 2J odd).
+        If (mod(Ne,2) == 0) Then
+          is = 2*Nint(S) + 1
+          ij = Nint(J)
+        Else
+          is = 2*Max(0, Nint(S-0.5_dp)) + 2
+          ij = 2*Max(0, Nint(J-0.5_dp)) + 1
+        End If
         il = Nint(L)
 
         Select Case (il)
@@ -3894,10 +3902,8 @@ Contains
         End Select
 
         If (mod(Ne,2) == 0) Then
-          ij = Nint(J)
           Write(term, '(I1,A,I1)') is, strl, ij
         Else
-          ij = Nint(2*J)  
           If (ij < 10) Then
              Write(term, '(I1,A,I1,A2)') is, strl, ij,'/2'
           Else
