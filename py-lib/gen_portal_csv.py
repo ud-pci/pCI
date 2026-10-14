@@ -492,25 +492,36 @@ def process_pconf_levels(name, filepath):
 
     def _build_levels(ao_rows, mbpt_groups, parity):
         levels = []
-        occurrence = {}
+        # Track how many MBPT entries are consumed per (conf, term) key
+        # across both primary and conf2 matches to prevent double matching.
+        mbpt_used = {}
         for r in ao_rows:
             conf, term, energy_au, energy_cm = r[0], r[1], r[2], r[3]
             J_str = r[6]
+            conf2 = r[10]
             if parity == gs_parity:
                 energy_cm_global = energy_cm
             else:
                 energy_cm_global = round((gs_energy_au - energy_au) * ht_to_cm, 2)
-            key = (conf, term)
-            occ = occurrence.get(key, 0)
-            occurrence[key] = occ + 1
-            group = mbpt_groups.get(key, [])
-            if occ < len(group) and mbpt_gs_au is not None:
-                _, mr = group[occ]
+            unc = '-'
+            if mbpt_gs_au is not None:
                 ao_abs = (gs_energy_au - energy_au) * ht_to_cm
-                mbpt_abs = (mbpt_gs_au - mr[2]) * ht_to_cm
-                unc = round(abs(ao_abs - mbpt_abs))
-            else:
-                unc = '-'
+                # Build candidate MBPT matches from the primary (conf) and conf2 keys.
+                # When AO and MBPT swap leading configs (e.g. AO calls it 5p2 but MBPT calls it 5s.7s),
+                # pick the closer match based on the energy.
+                candidates = []
+                for ckey in ([( conf, term)] +
+                              ([(conf2, term)] if conf2 else [])):
+                    ku = mbpt_used.get(ckey, 0)
+                    cgroup = mbpt_groups.get(ckey, [])
+                    if ku < len(cgroup):
+                        _, mr = cgroup[ku]
+                        mbpt_abs = (mbpt_gs_au - mr[2]) * ht_to_cm
+                        candidates.append((abs(ao_abs - mbpt_abs), ckey, ku, mr))
+                if candidates:
+                    best_diff, best_key, best_ku, best_mr = min(candidates)
+                    mbpt_used[best_key] = best_ku + 1
+                    unc = round(best_diff)
             levels.append([conf, term, energy_au, energy_cm_global, unc, J_str])
         return levels
 
