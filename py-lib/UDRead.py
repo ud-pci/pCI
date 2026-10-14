@@ -61,11 +61,18 @@ def Inverse_Config(config):
     else:  return config
 
 
-def Adjust_Config_Principal(config,val,pos):
-    # correction to configuraion by value "val", ex: '5s4d' --> '5s5d' if val = 1 and pos=2
-    # Used for adjusting principal quantum number (e.g., 2s.7p -> 2s.6p when val=-1, pos=2)
+def Adjust_Config_Principal(config, delta, n):
+    """Shift the principal quantum number of the n-th orbital by delta.
+    n=1 adjusts the first orbital, n=2 the second, etc.
+    Example: Adjust_Config_Principal('2s.7p', -1, 2) -> '2s.6p'
+    
+    Returns config unchanged if the target position is missing or not a number.
+    """
     conf=Sep_Config(config)
-    conf[2*(pos-1)] = str(int(conf[2*(pos-1)])+val)
+    idx = 2*(n-1)
+    if idx >= len(conf) or not conf[idx].isdigit():
+        return config
+    conf[idx] = str(int(conf[idx])+delta)
     return Combine_Config(conf)
 
 
@@ -431,71 +438,119 @@ def IsBeingUsed(j,df_nist,df_ud,corr_config=[],OutAll=False): # return the list 
         return nf,jf,de
 
 
-def StartingConfigs(df_nist):
+def StartingConfigs(df_nist, df_ud):
+    """Build initial tables to track n from NIST data.
+    Each entry tracks (dummy_config, multiplicity) -> n_prev, count.
+    dummy_config replaces the active orbital's n with 1 (e.g. '5s.4f' -> '5s.1f')
+    so all levels in the same series share one tracker entry.
+    n_prev is initialized to (NIST n) - 1 so the first theory level that
+    arrives with n == NIST n is not flagged as a gap.
+
+    We also pre-seed every multiplicity present in the theory data for each
+    dummy_config at the same n_prev. This handles series that exist in theory
+    but are absent from NIST (e.g. Cd1 1F when NIST only lists 3F).
+    """
+    # Collect all multiplicities that appear in the theory data.
+    theory_muls = set()
+    for term in df_ud[:, 2]:
+        m = Extract_Multiplicity(str(term)[:-1])
+        if m != "":
+            theory_muls.add(m)
+
     list_config,list_term,list_number,count=np.array([]),np.array([]),np.array([]),np.array([])
-    for j in range(len(df_nist)): #len(df_ao)-3
-        # mul = int(df_nist[j][1][0])
-        # print(df_nist[j],j)
+    for j in range(len(df_nist)):
         mul = Extract_Multiplicity(df_nist[j][1])
         if mul=="": continue
         config = df_nist[j][0]
         conf=Sep_Config(config)
         dummy_config = Dummy_Config(config)
-        idx_dummy = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==mul))[0]
 
         n = int(conf[-2])-1
-        # Store term and config for comparison
+        idx_dummy = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==mul))[0]
         if len(idx_dummy)==0:
             list_config=np.append(list_config,dummy_config)
             list_term=np.append(list_term,mul)
             list_number=np.append(list_number,n)
             count = np.append(count,0)
-        
+
+        for alt_mul in theory_muls:
+            alt_idx = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==alt_mul))[0]
+            if len(alt_idx)==0:
+                list_config=np.append(list_config,dummy_config)
+                list_term=np.append(list_term,alt_mul)
+                list_number=np.append(list_number,n)
+                count = np.append(count,0)
+
     return list_config,list_term,list_number,count
 
 
-def Correct_Config(jth,config,mul,new_config,list_config,list_term,list_number,count,Final=False):
+def Correct_Config(jth,config,mul,new_config,list_config,list_term,list_number,count,
+                   final=False,assigned_states=None,term=None,j_val=None):
+    """Correct the principal quantum number of a theory config by comparing it
+    to the last seen n for the same series (tracked by dummy_config + mul).
+    Theory sometimes skips an n value (e.g., jumps from n=4 to n=6).
+    When that happens, pull n back to n_prev+1 so levels are assigned in the correct order.
+
+    final=False: tentative correction for pre-checking; tracker is not updated.
+    final=True:  committed correction; tracker is updated so the next level
+                 in the series sees the right n_prev.
+
+    When final=True and assigned_states is provided, the correction is only
+    applied if the candidate config (n_prev+1) is not already taken.
+    This prevents two levels from ending up with the same corrected config.
+    """
 
     conf=Sep_Config(config)
     dummy_config = Dummy_Config(config)
     idx_dummy = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==mul))[0]
 
     n = int(conf[-2])
-    # Store term and config for comparison
+    # If this (dummy_config, mul) series has not been seen before, create an entry.
     if len(idx_dummy)==0:
         list_config=np.append(list_config,dummy_config)
         list_term=np.append(list_term,mul)
         list_number=np.append(list_number,n)
         count = np.append(count,0)
+        idx_dummy = np.array([len(list_config)-1])
 
-    # main correction part
-    idx_dummy = np.where((list_config.astype(str)==dummy_config) & (list_term.astype(int)==mul))[0] # index of dummy config present in list_config
-    if conf[-1]=='s':mul=1
+    # s-orbitals have only one level per n, so treat them as singlets.
+    if conf[-1]=='s': mul=1
     n_prev = list_number[idx_dummy[0]]
 
-    if abs(n_prev-n)>1:
-        n=n-int(abs(n_prev-n)-1)
+    if n - n_prev > 1:
+        # Theory skipped ahead; pull n back to the next expected value.
+        n_candidate = int(n_prev) + 1
+        # For a committed correction, skip if the candidate state is already used
+        # (another level was already assigned with (config, term, J) combination).
+        if final and assigned_states is not None and term is not None and j_val is not None:
+            conf_cand = list(conf)
+            conf_cand[-2] = str(n_candidate)
+            cand_config = Combine_Config(conf_cand)
+            if (cand_config, term, j_val) not in assigned_states:
+                n = n_candidate
+        else:
+            n = n_candidate
 
     conf[-2]=str(n)
     new_config[jth]=Combine_Config(conf)
-    
-    if Final==True:
+
+    if final==True:
+        # count tracks how many J-levels of this (config, mul) term we have seen.
+        # Once we have seen all mul levels (e.g., 3 for a triplet), n_prev advances.
         if count[idx_dummy[0]]!=mul: count[idx_dummy[0]]+=1
-        # re-initian for the next loop
         if count[idx_dummy[0]]==mul:
             list_number[idx_dummy[0]]=n
             count[idx_dummy[0]]=0
-            
         return new_config,list_config,list_term,list_number,count
 
-    else: 
+    else:
         return new_config
 
 
-def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
+def Corrected_Config(df_ud,df_nist,ManCorr=False):
     print("Correcting ud configurations")
     new_config = np.full(len(df_ud),"",dtype=object)
-    list_config,list_term,list_number,count = StartingConfigs(df_nist)
+    list_config,list_term,list_number,count = StartingConfigs(df_nist, df_ud)
 
     # Track assigned (config, term, J) combinations to prevent duplicates
     assigned_states = set()
@@ -514,13 +569,13 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             # jf==1 levels are invisible to the tracker and later levels
             # over-correct (e.g., 4s.6p corrects to 4s.5p when 4s.5p already
             # exists as a jf==1 match).
-            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
+            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,final=True)
             # Restore original config - Correct_Config may have shifted n,
             # but new_config must keep the original for FindJthAll matching.
             new_config[j] = config
         elif jf==0 or jf==2:
             config = config1_ao
-            new_config_check = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=False)
+            new_config_check = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,final=False)
             nf1,jf1,de1 = IsBeingUsed(j,df_nist,df_ud,corr_config=new_config_check)
 
             new_config_check[j] = config2_ao
@@ -531,7 +586,7 @@ def Corrected_Config(df_ud,df_nist,ManCorr=False): # ManCorr : Manual Correction
             elif de1!=0 and de2!=0: config=config1_ao if de1<de2 else config2_ao
             else: config=config1_ao
 
-            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,Final=True)
+            new_config,list_config,list_term,list_number,count = Correct_Config(j,config,mul,new_config,list_config,list_term,list_number,count,final=True,assigned_states=assigned_states,term=term_ao,j_val=j_ao)
 
         # Check if (config, term, J) combination is already assigned
         # If so, revert to original configuration to avoid duplicates.
