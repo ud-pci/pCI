@@ -1002,13 +1002,17 @@ def main():
     parser.add_argument('--br-cutoff', type=float, default=1e-10,
                         help='Branching ratio cutoff; transitions below this are excluded from '
                              '{atom}_transitions.txt and moved to the Zero_BR CSV (default: 1e-10)')
+    parser.add_argument('--only-E1', action='store_true') 
     args = parser.parse_args()
     atom_name = args.atom_name
     br_cutoff = args.br_cutoff
+    only_E1 = args.only_E1
 
     # Check if input files exist
     energies_file = f"{atom_name}_Energies.csv"
     matrix_elements_file = f"{atom_name}_Matrix_Elements_Theory.csv"
+    if only_E1:
+        matrix_elements_file = f"{atom_name}_Matrix_Elements_Theory_only_E1.csv"
 
     if not os.path.exists(energies_file):
         print(f"Error: {energies_file} not found!")

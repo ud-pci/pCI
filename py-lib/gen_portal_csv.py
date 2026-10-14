@@ -663,7 +663,7 @@ def write_energy_csv(name, mapping, min_energy_diff_percent):
 
     print(f'{filename} has been written with {len(portal_df)} levels (min energy diff: {min_energy_diff_percent}%)')
 
-def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L'):
+def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_percent, gauge='L', only_E1=False):
     '''
     Read DATA_Processed/tm.csv and write {element}_Matrix_Elements_Theory.csv.
     All operators (E1, E2, E3, M1, M2, M3) are included. 
@@ -686,6 +686,13 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
 
     # Drop zero matrix elements
     df_tm = df_tm[df_tm['matrix_element_value'] != 0].reset_index(drop=True)
+
+    # Drop non E1 transitions
+    print(f"only E1?: {only_E1}")
+    if only_E1:
+        df_tm = df_tm[df_tm['operator'] == 'E1'].reset_index(drop=True)
+        matrix_element_filename_only_E1 = element + '_Matrix_Elements_Theory_only_E1.csv'
+
     
     matrix_element_filename = element + '_Matrix_Elements_Theory.csv'
 
@@ -798,8 +805,14 @@ def write_matrix_csv(element, mapping, ignore_g, min_unc_per, min_energy_diff_pe
         }
 
     print(f'TOTAL MATRIX ELEMENTS: {len(df)}')
-    df.to_csv(matrix_element_filename, index=False)
-    print(f'{matrix_element_filename} has been written')
+    
+    if not only_E1:
+        df.to_csv(matrix_element_filename, index=False)
+        print(f'{matrix_element_filename} has been written')
+    else:
+        df.to_csv(matrix_element_filename_only_E1, index=False)
+        print(f'{matrix_element_filename_only_E1} has been written')
+
 
 def nist_parity(term):
     ''' 
@@ -1081,6 +1094,9 @@ if __name__ == "__main__":
         ignore_g_value = get_dict_value(portal, 'ignore_g') if portal else None
         ignore_g = ignore_g_value if ignore_g_value is not None else True
 
+        # test runs with E1 transitions only
+        only_E1 = get_dict_value(portal, 'only_E1') if portal else True
+
         # minimum uncertainty as percentage of value
         min_unc_value = get_dict_value(portal, 'min_uncertainty') if portal else None
         if min_unc_value is not None:
@@ -1274,6 +1290,6 @@ if __name__ == "__main__":
     
     if matrix_file_exists:
         print('Writing matrix elements...')
-        write_matrix_csv(name, filtered_mapping, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge)
+        write_matrix_csv(name, filtered_mapping, ignore_g, min_uncertainty, min_energy_diff_percent, gauge=gauge, only_E1=only_E1)
     else:
         print('tm.csv not found; matrix csv file was not generated')
