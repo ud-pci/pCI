@@ -504,25 +504,27 @@ def process_pconf_levels(name, filepath):
             else:
                 energy_cm_global = round((gs_energy_au - energy_au) * ht_to_cm, 2)
             unc = '-'
+            n_mbpt_matched = '-'
             if mbpt_gs_au is not None:
                 ao_abs = (gs_energy_au - energy_au) * ht_to_cm
                 # Build candidate MBPT matches from the primary (conf) and conf2 keys.
                 # When AO and MBPT swap leading configs (e.g. AO calls it 5p2 but MBPT calls it 5s.7s),
                 # pick the closer match based on the energy.
                 candidates = []
-                for ckey in ([( conf, term)] +
+                for ckey in ([(conf, term)] +
                               ([(conf2, term)] if conf2 else [])):
                     ku = mbpt_used.get(ckey, 0)
                     cgroup = mbpt_groups.get(ckey, [])
                     if ku < len(cgroup):
-                        _, mr = cgroup[ku]
+                        n_mr, mr = cgroup[ku]
                         mbpt_abs = (mbpt_gs_au - mr[2]) * ht_to_cm
-                        candidates.append((abs(ao_abs - mbpt_abs), ckey, ku, mr))
+                        candidates.append((abs(ao_abs - mbpt_abs), ckey, ku, n_mr, mr))
                 if candidates:
-                    best_diff, best_key, best_ku, best_mr = min(candidates)
+                    best_diff, best_key, best_ku, best_n_mr, best_mr = min(candidates)
                     mbpt_used[best_key] = best_ku + 1
                     unc = round(best_diff)
-            levels.append([conf, term, energy_au, energy_cm_global, unc, J_str])
+                    n_mbpt_matched = best_n_mr
+            levels.append([conf, term, energy_au, energy_cm_global, unc, J_str, n_mbpt_matched])
         return levels
 
     even_levels = _build_levels(ao_even, mbpt_groups_even, 'even')
@@ -546,10 +548,10 @@ def process_pconf_levels(name, filepath):
         'odd':  [r[6] for r in ao_odd],
     }
 
-    def _write_pconf_comp(ao_rows, mbpt_groups, level_rows, parity):
+    def _write_pconf_comp(ao_rows, mbpt_rows, level_rows, parity):
         csvfile = f'DATA_Filtered/UD/pconf_comp_{parity}.csv'
         os.makedirs(os.path.dirname(csvfile), exist_ok=True)
-        occurrence = {}
+        mbpt_by_n = {n: mr for n, mr in enumerate(mbpt_rows, 1)}
         with open(csvfile, 'w') as f:
             f.write('n_ao,n_mbpt,conf_ao,term_ao,conf_mbpt,term_mbpt,'
                     'energy_cm_ao,energy_cm_mbpt,uncertainty,conf2_ao,conf2_mbpt\n')
@@ -559,18 +561,15 @@ def process_pconf_levels(name, filepath):
                 conf2_ao = r[10]
                 energy_cm_ao = lv[3]
                 unc = lv[4]
-                key = (conf_ao, term_ao)
-                occ = occurrence.get(key, 0)
-                occurrence[key] = occ + 1
-                group = mbpt_groups.get(key, [])
-                if occ < len(group):
-                    n_mbpt, mr    = group[occ]
-                    conf_mbpt     = mr[0]
-                    term_mbpt     = mr[1]
-                    conf2_mbpt    = mr[10]
+                n_mbpt = lv[6]
+                if n_mbpt != '-':
+                    mr = mbpt_by_n[n_mbpt]
+                    conf_mbpt = mr[0]
+                    term_mbpt = mr[1]
+                    conf2_mbpt = mr[10]
                     mbpt_energy_cm = round((mbpt_gs_au - mr[2]) * ht_to_cm, 2)
                 else:
-                    n_mbpt = conf_mbpt = term_mbpt = conf2_mbpt = '-'
+                    conf_mbpt = term_mbpt = conf2_mbpt = '-'
                     mbpt_energy_cm = '-'
                 f.write(','.join([str(n_ao), str(n_mbpt),
                                   conf_ao, term_ao,
@@ -583,8 +582,8 @@ def process_pconf_levels(name, filepath):
     
     write_pconf_csv(name, 'even', ao_even, even_levels)
     write_pconf_csv(name, 'odd',  ao_odd,  odd_levels)
-    _write_pconf_comp(ao_even, mbpt_groups_even, even_levels, 'even')
-    _write_pconf_comp(ao_odd,  mbpt_groups_odd,  odd_levels,  'odd')
+    _write_pconf_comp(ao_even, mbpt_even, even_levels, 'even')
+    _write_pconf_comp(ao_odd,  mbpt_odd,  odd_levels,  'odd')
 
     return (confs, terms, energies_au, energies_cm, uncertainties, theory_J)
 
@@ -978,23 +977,52 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
         'tm_odd'  + s0 + '_odd'  + s1,
         'tm_odd'  + s0 + '_even' + s1,
     ]
-    match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
     os.makedirs(filtered_path, exist_ok=True)
 
-    # Correct term labels in both methods before merging
-    def _make_tmap(suffix):
-        return {(r[0].replace('.', ' '), round(r[2], 6)): r[1]
-                for p in ('even', 'odd')
-                for r in load_pconf(f'{data_raw_path}/pconf_{p}{suffix}.csv')}
-    tmap_ao   = _make_tmap('')
-    tmap_mbpt = _make_tmap('_MBPT')
+    # Build term-fix maps and config-swap normalization from pconf files.
+    def _load_rows(suffix):
+        return [r for p in ('even', 'odd')
+                for r in load_pconf(f'{data_raw_path}/pconf_{p}{suffix}.csv')]
 
-    def _fix_terms(df, tmap):
+    ao_rows   = _load_rows('')
+    mbpt_rows = _load_rows('_MBPT')
+
+    tmap_ao   = {(r[0].replace('.', ' '), round(r[2], 6)): r[1] for r in ao_rows}
+    tmap_mbpt = {(r[0].replace('.', ' '), round(r[2], 6)): r[1] for r in mbpt_rows}
+
+    # conf2_norm: (mbpt_config, round(mbpt_energy_au, 6)) -> ao_config
+    ao_conf2_to_conf = {}
+    for r in ao_rows:
+        if r[10]:
+            c2 = r[10].replace('.', ' ')
+            key = (c2, r[1])  # (conf2, term)
+            if key not in ao_conf2_to_conf:
+                ao_conf2_to_conf[key] = r[0].replace('.', ' ')
+            else:
+                ao_conf2_to_conf[key] = None  # ambiguous; skip
+
+    conf2_norm = {}
+    for r in mbpt_rows:
+        mc  = r[0].replace('.', ' ')
+        mc2 = r[10].replace('.', ' ') if r[10] else ''
+        key = (mc, r[1])
+        canon = ao_conf2_to_conf.get(key)
+        if canon and mc2 == canon:
+            conf2_norm[(mc, round(r[2], 6))] = canon
+
+    def _fix_terms(df, tmap, cmap=None):
         for side in ('state_one', 'state_two'):
             df[f'{side}_term'] = df.apply(
                 lambda r: tmap.get(
                     (r[f'{side}_configuration'], round(abs(float(r[f'{side}_energy_au'])), 6)),
                     r[f'{side}_term']), axis=1)
+            if cmap:
+                df[f'{side}_configuration'] = df.apply(
+                    lambda r: cmap.get(
+                        (r[f'{side}_configuration'], round(abs(float(r[f'{side}_energy_au'])), 6)),
+                        r[f'{side}_configuration']), axis=1)
+
+    match_keys = ['state_one_configuration', 'state_one_term', 'state_two_configuration', 'state_two_term', 'operator']
 
     frames = []
     unmatched_frames = []
@@ -1009,7 +1037,7 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
         n_unmatched = 0
         if os.path.isfile(path_mbpt):
             df_mbpt = pd.read_csv(path_mbpt)
-            _fix_terms(df_mbpt, tmap_mbpt)
+            _fix_terms(df_mbpt, tmap_mbpt, cmap=conf2_norm)
             merged = df_ao.merge(df_mbpt, on=match_keys, suffixes=('', '_mbpt'), how='left')
             no_mbpt = merged[merged['matrix_element_value_mbpt'].isna()]
             n_unmatched = len(no_mbpt)
@@ -1017,18 +1045,26 @@ def combine_tm(j0, j1, data_raw_path, data_processed_path, filtered_path):
                 tag = no_mbpt[match_keys].copy()
                 tag.insert(0, 'tm_file', label)
                 unmatched_frames.append(tag)
-            merged = merged[merged['matrix_element_value_mbpt'].notna()].reset_index(drop=True)
-            merged['matrix_element_uncertainty'] = (
-                merged['matrix_element_value'].abs() - merged['matrix_element_value_mbpt'].abs()
+            # Matched: compute AO-MBPT uncertainty.
+            # Unmatched (no MBPT counterpart after config normalization): keep with None
+            # uncertainty so the level still gets a lifetime (falls back to min_unc_per).
+            matched = merged[merged['matrix_element_value_mbpt'].notna()].reset_index(drop=True)
+            matched['matrix_element_uncertainty'] = (
+                matched['matrix_element_value'].abs() - matched['matrix_element_value_mbpt'].abs()
             ).abs()
-            merged['matrix_element_value'] = merged['matrix_element_value'].abs()
-            mbpt_cols = [c for c in merged.columns if c.endswith('_mbpt')]
-            merged = merged.drop(columns=mbpt_cols)
-            me_idx = merged.columns.get_loc('matrix_element_value') + 1
-            cols = list(merged.columns)
+            matched['matrix_element_value'] = matched['matrix_element_value'].abs()
+            mbpt_cols = [c for c in matched.columns if c.endswith('_mbpt')]
+            matched = matched.drop(columns=mbpt_cols)
+            unmatched_ao = no_mbpt.drop(columns=[c for c in no_mbpt.columns if c.endswith('_mbpt')]).reset_index(drop=True)
+            unmatched_ao['matrix_element_uncertainty'] = None
+            unmatched_ao['matrix_element_value'] = unmatched_ao['matrix_element_value'].abs()
+            me_idx = matched.columns.get_loc('matrix_element_value') + 1
+            cols = list(matched.columns)
             cols.remove('matrix_element_uncertainty')
             cols.insert(me_idx, 'matrix_element_uncertainty')
-            merged = merged[cols]
+            matched = matched[cols]
+            unmatched_ao = unmatched_ao[cols]
+            merged = pd.concat([matched, unmatched_ao], ignore_index=True)
         else:
             print(f'{path_mbpt} not found; no uncertainty for {label}')
             merged = df_ao.copy()
