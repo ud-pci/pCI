@@ -1614,7 +1614,6 @@ Contains
                                                     Trim(AdjustL(counterStr)) // ' elements'
                         Write(*,'(4X,A)') 'Memory: (HamiltonianTotal='// trim(memStr3)//', HamiltonianMaxMemPerCore='// &
                                             trim(memStr2)//')'
-                        Call FormattedMemSize(maxmem_csr, memStr2)
                         Write(*,'(A)') 'SUMMARY - (peak = '// trim(memStr) // ', static = ' // trim(memStr4) & 
                                             // ', davidson = ' // trim(memStr5) // ', Hamiltonian = ' // trim(memStr2) // ')'
                         If (memTotalPerCPU /= 0) Then
