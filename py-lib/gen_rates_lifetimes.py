@@ -472,7 +472,8 @@ def calculate_transition_rates(energies_file, matrix_elements_file, atom_name):
 
     # Create dataframe and save
     tr_df = pd.DataFrame(transition_rates)
-    output_file = f"{atom_name}_Transition_Rates.csv"
+    suffix = "_only_E1" if "_only_E1" in str(matrix_elements_file) else ""
+    output_file = f"{atom_name}_Transition_Rates{suffix}.csv"
     tr_df.to_csv(output_file, index=False)
     print(f"{output_file} has been written with {len(tr_df)} transitions")
 
@@ -495,9 +496,11 @@ def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     print(f"Reading {tr_file}...")
     df = pd.read_csv(tr_file)
 
-    # Open files to write lifetimes and branching ratios
-    filename_lifetimes = atom_name + '_Lifetimes.csv'
-    filename_br_ratios = atom_name + '_Transition_Properties.csv'
+    # Open files to write lifetimes and branching ratios    
+    suffix = "_only_E1" if "_only_E1" in str(tr_file) else ""
+
+    filename_lifetimes = f"{atom_name}_Lifetimes{suffix}.csv"
+    filename_br_ratios = f"{atom_name}_Transition_Properties{suffix}.csv"
 
     lifetimes_df = pd.DataFrame(columns=['state_configuration', 'state_term', 'state_J', 'lifetime', 'lifetime_uncertainty'])
     br_ratios_df = pd.DataFrame(columns=['state_one_configuration', 'state_one_term', 'state_one_J',
@@ -662,7 +665,7 @@ def calculate_lifetimes_and_branching_ratios(tr_file, atom_name):
     return tr_rates, upper_energies, lifetimes
 
 
-def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes_raw=None, br_cutoff=1e-10):
+def add_display_formats(atom_name, suffix, tr_rates=None, upper_energies=None, lifetimes_raw=None, br_cutoff=1e-10):
     """
     Step 3: Overwrite the display columns in the Error_Check CSVs with
     parenthetical uncertainty notation.
@@ -696,14 +699,16 @@ def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes
                        1e9
     """
 
-    tr_file        = f"{atom_name}_Transition_Rates.csv"
-    props_file     = f"{atom_name}_Transition_Properties.csv"
-    lifetimes_file = f"{atom_name}_Lifetimes.csv"
     lifetimes_exp  = f"{atom_name}_Lifetimes_Exp.csv"
     energies_file  = f"{atom_name}_Energies.csv"
-    tr_check_out   = f"{atom_name}_Transition_Rates_Error_Check.csv"
-    tr_check_zero_out = f"{atom_name}_Transition_Rates_Error_Check_Zero_BR.csv"
-    lifetimes_out  = f"{atom_name}_Lifetimes_Error_Check.csv"
+
+    tr_file        = f"{atom_name}_Transition_Rates{suffix}.csv"
+    props_file     = f"{atom_name}_Transition_Properties{suffix}.csv"
+    lifetimes_file = f"{atom_name}_Lifetimes{suffix}.csv"
+
+    tr_check_out   = f"{atom_name}_Transition_Rates_Error_Check{suffix}.csv"
+    tr_check_zero_out = f"{atom_name}_Transition_Rates_Error_Check_Zero_BR{suffix}.csv"
+    lifetimes_out  = f"{atom_name}_Lifetimes_Error_Check{suffix}.csv"
 
     print(f"Reading {tr_file}...")
     tr_df = pd.read_csv(tr_file)
@@ -938,7 +943,7 @@ def add_display_formats(atom_name, tr_rates=None, upper_energies=None, lifetimes
 
     if tr_rates is not None and upper_energies is not None and lifetimes_raw is not None:
         lt_lookup = {(lt[0], lt[1], lt[2]): (lt[3], lt[4]) for lt in lifetimes_raw}
-        transitions_file = f"{atom_name}_transitions.txt"
+        transitions_file = f"{atom_name}_transitions{suffix}.txt"
         with open(transitions_file, 'w') as f:
             for config, rates in sorted(tr_rates.items(), key=lambda kv: upper_energies.get(kv[0], 0.0)):
                 configuration = config.split(' ')[0]
@@ -1010,9 +1015,9 @@ def main():
 
     # Check if input files exist
     energies_file = f"{atom_name}_Energies.csv"
-    matrix_elements_file = f"{atom_name}_Matrix_Elements_Theory.csv"
-    if only_E1:
-        matrix_elements_file = f"{atom_name}_Matrix_Elements_Theory_only_E1.csv"
+    suffix = "_only_E1" if only_E1 else ""
+    matrix_elements_file = f"{atom_name}_Matrix_Elements_Theory{suffix}.csv"
+
 
     if not os.path.exists(energies_file):
         print(f"Error: {energies_file} not found!")
@@ -1035,7 +1040,7 @@ def main():
 
     # Step 3: Add parenthetical uncertainty display formats and write {atom}_transitions.txt
     print("\nStep 3: Adding parenthetical uncertainty display formats...")
-    add_display_formats(atom_name, tr_rates, upper_energies, lifetimes_raw, br_cutoff)
+    add_display_formats(atom_name, suffix, tr_rates, upper_energies, lifetimes_raw, br_cutoff)
 
     print("\n" + "=" * 60)
     print("Processing complete!")
