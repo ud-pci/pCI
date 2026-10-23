@@ -79,6 +79,7 @@ Program conf_pt
     Call BuildGauntLUT
     Call BuildHintLUT
     Call BuildGintHash
+    If (Allocated(Iint2)) Deallocate(Iint2, Iint3)
     If (K_is /= 0) Call BuildISLUT
 
     Call cpu_time(start_time)

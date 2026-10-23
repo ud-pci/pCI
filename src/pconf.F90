@@ -1067,13 +1067,11 @@ Contains
         Implicit None
 
         memFormH = 0_int64
-        memFormH = sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iint2)+sizeof(Iint3)+sizeof(Iarr) &
-            + sizeof(IntOrd)
+        memFormH = sizeof(Rint1)+sizeof(Rint2)+sizeof(Iint1)+sizeof(Iarr)+sizeof(IntOrd)
         if (use_bit_rep) memFormH = memFormH + sizeof(Barr)
         If (K_is /= 0) memFormH = memFormH+sizeof(R_is)+sizeof(I_is)
         If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
-            + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
-            + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
+            + sizeof(Iint1S)+sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
     End Subroutine calcMemFormHArrays
 
     Subroutine calcMemReqs
@@ -1232,6 +1230,10 @@ Contains
             memFormH = memFormH + sizeof(HintSPosLUT)
             Call BuildGintSHash
             memFormH = memFormH + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
+            If (Allocated(Iint2S)) Then
+                memFormH = memFormH - sizeof(Iint2S) - sizeof(Iint3S)
+                Deallocate(Iint2S, Iint3S)
+            End If
         End If
 
         Call BuildGauntLUT
@@ -1240,6 +1242,10 @@ Contains
         memFormH = memFormH + sizeof(HintLUT)
         Call BuildGintHash
         memFormH = memFormH + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd)
+        If (Allocated(Iint2)) Then
+            memFormH = memFormH - sizeof(Iint2) - sizeof(Iint3)
+            Deallocate(Iint2, Iint3)
+        End If
     End subroutine InitFormH
 
     Subroutine FormH(npes, mype)
