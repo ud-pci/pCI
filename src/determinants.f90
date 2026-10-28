@@ -1022,15 +1022,16 @@ Module determinants
         is = 1
         Select Case(ndiffs)
             Case(1)
-                If (num_zero_bits > 0) then
-                    l = iabs(l2(1) - l1(1) - 1)
-                    If (mod(l,2) == 1) is = -is 
-                End If
+                ! single excitation: phase from parity of occupied orbitals between the differing pair
+                l = iabs(l2(1) - l1(1) - 1)
+                If (mod(l,2) == 1) is = -is
             Case(2)
+                ! double excitation: phase from both pairs
                 l = iabs(l2(1) - l1(1) - mod(num_zero_bits,2))
-                If (mod(l,2) == 1) is = -is 
+                If (mod(l,2) == 1) is = -is
                 l = iabs(l2(2) - l1(2) - mod(num_zero_bits,2))
                 If (mod(l,2) == 1) is = -is
+                ! swap so slot 2 = higher, slot 3 = lower orbital (Rspq_phase2 order)
                 temp = det2_indexes(2)
                 det2_indexes(2) = det2_indexes(3)
                 det2_indexes(3) = temp
