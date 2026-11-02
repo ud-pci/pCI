@@ -1,0 +1,3 @@
+Mode = DM
+Levels = 1 5
+Operators = GF, A_hf, B_hf

@@ -1,0 +1,59 @@
+ Fe16+
+ Z  = 26.0
+ Am = 56.0
+ Nso=    4 # number of core orbitals (defines DF operator)
+ Nv =   39 # number of valence & virtual orbitals
+ Ksg=    1 # defines Hamiltonian: 1-DF, 3-DF+Breit
+ Kdg=    0 # diagonalization of Hamiltonian (0=no,1,2=yes)
+ orb= 3s 1 # first orbital for diagonalization
+ Kkin    1 # kinetic balance (0,1,or 2)
+ orb= 5s 1 # first orbital to apply kin.bal.
+ orb= 2p 3 # last frozen orbital
+kout=    0 # detail rate in the output
+kbrt=    2 # 0,1,2 - Coulomb, Gaunt, Breit
+----------------------------------------------------------
+     0.1002     0.2002    -0.2102     0.2104
+
+  1  0.3001
+  2 -0.3101
+  3  0.3101
+  4 -0.3201
+  5  0.3201
+  6  0.4001  3  0.4001
+  7 -0.4101  3 -0.4101
+  8  0.4101  3  0.4101
+  9 -0.4201  3 -0.4201
+ 10  0.4201  3  0.4201
+ 11 -0.4301  3 -0.4301
+ 12  0.4301  3  0.4301
+ 13 -0.5401    -0.3101
+ 14  0.5401     0.3101
+ 
+ 15  0.5001
+ 16 -0.5101
+ 17  0.5101
+ 18 -0.5201
+ 19  0.5201
+ 20 -0.5301
+ 21  0.5301
+ 
+ 22  0.6001
+ 23 -0.6101
+ 24  0.6101
+ 25 -0.6201
+ 26  0.6201
+ 27 -0.6301
+ 28  0.6301
+ 29 -0.6401
+ 30  0.6401
+ 
+ 31  0.7001
+ 32 -0.7101
+ 33  0.7101
+ 34 -0.7201
+ 35  0.7201
+ 36 -0.7301
+ 37  0.7301
+ 38 -0.7401
+ 39  0.7401
+>>>>>>>>>> END <<<<<<<<<<

@@ -1,0 +1,4 @@
+# The root .gitignore skips these file types, but they are test data here
+!*.INP
+!*.RES
+!*.csv

@@ -92,3 +92,12 @@ jobs:
 
       - name: Build lib programs
         run: make -C lib FC=${FC}
+
+      - name: Run regression tests
+        timeout-minutes: 15
+        run: |
+          export PATH=${HOME}/openmpi/bin:${PATH}
+          export LD_LIBRARY_PATH=${HOME}/openmpi/lib:${LD_LIBRARY_PATH}
+          bash tests/small/run.sh 1
+          bash tests/small/run.sh 4
+          CONF_USE_BIT_DET=FALSE bash tests/small/run.sh 4
