@@ -93,15 +93,15 @@ def main():
             sys.exit(f"FAIL: labels differ: '{ref_label}' in reference, '{new_label}' in new results")
 
     # Written this way so that a NaN counts as a failure.
-    failed = False
+    num_agree = len(ref)
     for (label, a, tol), (_, b, _) in zip(ref, new):
         if not abs(a - b) <= tol:
             print(f'{label}: ref = {a:.8g}, new = {b:.8g}, diff = {abs(a - b):.2e}, allowed = {tol:.2e}')
-            failed = True
-    if failed:
-        sys.exit(f'FAIL: results in {new_path} differ from the reference')
+            num_agree -= 1
+    if num_agree != len(ref):
+        sys.exit(f'FAIL: {num_agree}/{len(ref)} values agree in {new_path}')
 
-    print(f'PASS: {len(ref)} values agree')
+    print(f'PASS: {num_agree}/{len(ref)} values agree')
 
 
 if __name__ == '__main__':
