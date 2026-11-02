@@ -1007,6 +1007,7 @@ Contains
         If (.not. Allocated(Nc0)) Allocate(Nc0(Nc))
         If (.not. Allocated(Ndc)) Allocate(Ndc(Nc))
         If (.not. Allocated(Ncd)) Allocate(Ncd(Nd))
+        If (.not. Allocated(Mdc)) Allocate(Mdc(Nc))
         If (.not. Allocated(Jz)) Allocate(Jz(Nst))
         If (.not. Allocated(Nh)) Allocate(Nh(Nst))
         If (.not. Allocated(Diag)) Allocate(Diag(nbas))
@@ -1179,6 +1180,7 @@ Contains
         Call MPI_Bcast(In, Ngaunt, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ndc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Ncd, Nd, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(Mdc, Nc, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Gnt, Ngaunt, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(num_gaunts_per_partial_wave, Nlx+1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Nh, Nst, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1271,6 +1273,8 @@ Contains
         Type(IVAccumulator)   :: iva1, iva2
         Type(RVAccumulator)   :: rva1
         Integer               :: vaGrowBy, ndGrowBy, ndsplit, ndcnt
+        Integer               :: inb, nconf_nb, iconf_cur
+        Integer, Allocatable, Dimension(:) :: iconf_nb, icomp_nb
         Integer, Parameter    :: send_tag = 2001, return_tag = 2002
 
         Call startTimer(stot)
@@ -1286,7 +1290,10 @@ Contains
 
         Allocate(idet1(Ne),idet2(Ne),iconf1(Ne),iconf2(Ne),cntarray(3))
         vaGrowBy = vaBinSize
-        ndGrowBy = 1
+        ndGrowBy = 256 ! max determinants per chunk; chunks never cross a configuration boundary
+
+        Allocate(iconf_nb(Nc), icomp_nb(Nc))
+        iconf_cur = 0 ! configuration whose neighbor list is currently stored
 
         If (mype==0) Then
             Write(counterStr,fmt='(I16)') vaGrowBy
@@ -1321,14 +1328,17 @@ Contains
                     Call Gdet(n,idet1)
                     If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                     iconf1(1:Ne) = Nh(idet1(1:Ne))
-                    k=0
-                    Do ic=1,Nc
+                    If (Ncd(n) /= iconf_cur) Then
+                        iconf_cur = Ncd(n)
+                        Call FormConfNeighbors(iconf_cur, idet2, nconf_nb, iconf_nb, icomp_nb)
+                    End If
+                    Do inb=1,nconf_nb
+                        ic=iconf_nb(inb)
+                        icomp=icomp_nb(inb)
+                        k=Mdc(ic)
                         kx=Ndc(ic)
                         If (k+kx > n) kx=n-k
                         If (kx /= 0) Then
-                            Call Gdet(k+1,idet2)
-                            iconf2(1:Ne) = Nh(idet2(1:Ne))
-                            Call CompD(iconf1,iconf2,icomp)
                             skip_emu = (n > Ndemu .and. k >= Ndemu)
                             If (skip_emu) Then
                                 If (icomp == 0) Then
@@ -1382,8 +1392,6 @@ Contains
                                 Else
                                     k=k+kx
                                 End If
-                            Else If (icomp > 2) Then
-                                k=k+kx
                             Else
                                 Do k1=1,kx
                                     k=k+1
@@ -1496,9 +1504,11 @@ Contains
                 End If
             Else
                 ! Multi-process: distribute work to workers, then coordinate.
+                ! nnd is the first determinant of the next chunk; determinant 1 is done by rank 0 below
+                nnd = 2
                 Do an_id = 1, npes - 1
-                   nnd = ndGrowBy*(an_id-1) + 2
                    Call MPI_SEND( nnd, 1, MPI_INTEGER, an_id, send_tag, MPI_COMM_WORLD, mpierr)
+                   nnd = LastDetInChunk(nnd, ndGrowBy) + 1
                 End Do
 
                 n=1
@@ -1550,9 +1560,9 @@ Contains
                     Call MPI_RECV( cntarray, 3, MPI_INTEGER8, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status, mpierr)
                     sender = status%MPI_SOURCE
 
-                    If (nnd + ndGrowBy <= Nd) Then
-                        nnd = nnd + ndGrowBy
+                    If (nnd <= Nd) Then
                         Call MPI_SEND( nnd, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
+                        nnd = LastDetInChunk(nnd, ndGrowBy) + 1
                     Else
                         msg = -1
                         Call MPI_SEND( msg, 1, MPI_INTEGER, sender, send_tag, MPI_COMM_WORLD, mpierr)
@@ -1568,7 +1578,7 @@ Contains
                     Call FormattedMemSize(statmem, memTotStr)
                     Call FormattedMemSize(memTotalPerCPU, memTotStr2)
 
-                    If (nnd == ndcnt .and. j /= 0) Then
+                    If (nnd > ndcnt .and. j /= 0) Then
                         Call stopTimer(s1, timeStr)
                         Call FormattedMemSize(mem, memStr)
                         Call FormattedMemSize(maxmem, memStr2)
@@ -1635,24 +1645,23 @@ Contains
                 If (nnd == -1) Then
                       Exit
                 Else
-                    If (Nd - nnd < ndGrowBy) Then
-                        endnd = Nd
-                    Else
-                        endnd = nnd+ndGrowBy-1
-                    End If
+                    endnd = LastDetInChunk(nnd, ndGrowBy)
                     cntarray(1)=0
                     Do n=nnd,endnd
                         Call Gdet(n,idet1)
                         If (use_bit_rep) bdet1 = Barr(1:num_ints_bit_rep, n)
                         iconf1(1:Ne) = Nh(idet1(1:Ne))
-                        k=0
-                        Do ic=1,Nc
+                        If (Ncd(n) /= iconf_cur) Then
+                            iconf_cur = Ncd(n)
+                            Call FormConfNeighbors(iconf_cur, idet2, nconf_nb, iconf_nb, icomp_nb)
+                        End If
+                        Do inb=1,nconf_nb
+                            ic=iconf_nb(inb)
+                            icomp=icomp_nb(inb)
+                            k=Mdc(ic)
                             kx=Ndc(ic)
                             If (k+kx > n) kx=n-k
                             If (kx /= 0) Then
-                                Call Gdet(k+1,idet2)
-                                iconf2(1:Ne) = Nh(idet2(1:Ne))
-                                Call CompD(iconf1,iconf2,icomp)
                                 skip_emu = (n > Ndemu .and. k >= Ndemu)
                                 If (skip_emu) Then
                                     If (icomp == 0) Then
@@ -1675,8 +1684,6 @@ Contains
                                     Else
                                         k=k+kx
                                     End If
-                                Else If (icomp > 2) Then
-                                    k=k+kx
                                 Else
                                     Do k1=1,kx
                                         k=k+1
@@ -1767,7 +1774,7 @@ Contains
         Else
             If (npes /= 1) print*, '========== Starting calculation stage of FormH =========='
         End If
-        Deallocate(idet1, idet2, iconf1, iconf2, cntarray)
+        Deallocate(idet1, idet2, iconf1, iconf2, cntarray, iconf_nb, icomp_nb)
 
         ih8=size(Hamil%val, kind=int64)
 
@@ -1824,6 +1831,46 @@ Contains
 
         Return
     End Subroutine FormH
+
+    Subroutine FormConfNeighbors(iconf, idet, nconf_nb, iconf_nb, icomp_nb)
+        ! This subroutine lists configurations ic <= iconf that differ from configuration iconf by at most 2 orbitals.
+        ! All determinants of a configuration give the same CompD result, so the list is formed once per
+        ! configuration instead of once per determinant. iconf1 must hold the orbitals of a determinant of iconf.
+        Use determinants, Only : Gdet, CompD
+        Implicit None
+        Integer, Intent(In)                                 :: iconf
+        Integer, Allocatable, Dimension(:), Intent(InOut)   :: idet
+        Integer, Intent(Out)                                :: nconf_nb
+        Integer, Dimension(:), Intent(InOut)                :: iconf_nb, icomp_nb
+        Integer :: ic, icomp
+
+        nconf_nb = 0
+        Do ic=1,iconf
+            If (Ndc(ic) == 0) Cycle
+            Call Gdet(Mdc(ic)+1, idet)
+            iconf2(1:Ne) = Nh(idet(1:Ne))
+            Call CompD(iconf1, iconf2, icomp)
+            If (icomp <= 2) Then
+                nconf_nb = nconf_nb + 1
+                iconf_nb(nconf_nb) = ic
+                icomp_nb(nconf_nb) = icomp
+            End If
+        End Do
+    End Subroutine FormConfNeighbors
+
+    Integer Function LastDetInChunk(nnd, ndGrowBy)
+        ! This function returns the last determinant of the FormH chunk starting at nnd.
+        ! A chunk holds at most ndGrowBy determinants and never crosses a configuration boundary,
+        ! so a worker forms one neighbor list per chunk.
+        Implicit None
+        Integer, Intent(In) :: nnd, ndGrowBy
+
+        If (nnd > Nd) Then
+            LastDetInChunk = nnd - 1
+        Else
+            LastDetInChunk = min(nnd + ndGrowBy - 1, Mdc(Ncd(nnd)) + Ndc(Ncd(nnd)))
+        End If
+    End Function LastDetInChunk
 
     Real(kind=type_real) function Hmltn(idet, is, nf, i2, i1, j2, j1) 
         ! This function calculates the Hamiltonian matrix element between determinants idet1 and idet2
