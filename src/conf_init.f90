@@ -519,10 +519,10 @@ Module conf_init
         Write(11,'(5a1,i6)') (txt(i),i=1,5),Ncpt
         Return
         ! - - - - - - - - - - - - - - - - - - - - - - - - -
-    350 If (txt(1) /= 'n'   .and.   txt(1) /= 'N') goto 350
-        If (txt(2) /= 'e'   .and.   txt(2) /= 'E') goto 350
-        If (txt(3) /= 'm'   .and.   txt(3) /= 'M') goto 350
-        If (txt(4) /= 'u'   .and.   txt(4) /= 'U') goto 350
+    350 If (txt(1) /= 'n'   .and.   txt(1) /= 'N') goto 360
+        If (txt(2) /= 'e'   .and.   txt(2) /= 'E') goto 360
+        If (txt(3) /= 'm'   .and.   txt(3) /= 'M') goto 360
+        If (txt(4) /= 'u'   .and.   txt(4) /= 'U') goto 360
         Read (string,*) Nemu
         Write( *,'(5a1,i6)') (txt(i),i=1,5),Nemu
         Write(11,'(5a1,i6)') (txt(i),i=1,5),Nemu
