@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - formy.f90, sort.f90, ine.f90, pol.f90, conf_lsj.f90, check_matrices.f90 - removed from codebase; pine supersedes ine/formy/sort
 - pconf v9.1 - new pconf.csv output file containing data from FINAL.RES
 - CMakeLists.txt, INSTALL.md - remove build targets and references to removed programs
+- pconf.F90 - speed up the FormH comparison stage with per-configuration neighbor lists and chunked MPI work distribution
+- conf_init.f90 - fix infinite loop in inpstr that hung bass
+- tests/small - new small Fe16+ regression test of hfd, bass, pbasc, pconf (including Emu regime and integer determinants), and pdtm, compared against reference values
+- tests/compare.py - compare pconf.csv, tm.csv, and pdtm .RES outputs against references with tolerances
+- conf_init.f90, conf_pt.f90, pdtm.f90, integrals.f90, CMakeLists.txt - fix gfortran build errors
+- main.yml - run the regression test in CI, and add a gfortran build and test job
 
 ## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction

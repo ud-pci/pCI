@@ -48,7 +48,10 @@ Basic build
 
 For the LLVM-based Intel compiler, replace ``FC=ifort`` with ``FC=ifx``.
 
-If LAPACK/MKL is not available, ``pconf``, ``ine``, and ``pol`` will be skipped automatically.
+For GNU Fortran, use ``FC=gfortran``.
+OpenMPI must be built with the same compiler as pCI, so use an OpenMPI built with gfortran, such as the one from your Linux distribution.
+
+If LAPACK/MKL is not available, ``pconf`` and ``pine`` will be skipped automatically.
 
 If OpenMPI is not available, omit ``-DMPI_HOME`` and CMake will automatically skip the MPI-parallel programs:
 
@@ -107,6 +110,8 @@ The ``lib/`` directory contains supplementary programs that are built separately
 
    $ cd lib
    $ make install
+
+*These currently require an Intel compiler, since their Makefiles use the Intel-only* ``-r8`` *flag.*
 
 Individual packages can also be built separately:
 
