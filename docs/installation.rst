@@ -83,6 +83,21 @@ Build options
 
    $ FC=ifort cmake -DUSE_SCALAPACK=ON -DMPI_HOME=${OPENMPI_PREFIX} -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
 
+Testing the build
+~~~~~~~~~~~~~~~~~
+
+After ``make install``, run the small regression test from the ``pCI`` directory to check the build:
+
+.. code-block::
+
+   $ bash tests/small/run.sh 4
+
+The argument is the number of MPI ranks (default 1).
+It takes about a minute, compares the results against reference values, and ends with a ``PASS`` or ``FAIL`` line for each comparison.
+It requires OpenMPI, LAPACK/MKL, and Python.
+Executables are taken from ``bin/``; set ``BIN`` to test executables installed elsewhere.
+See ``tests/small/README.md`` for details.
+
 Supplementary programs
 ~~~~~~~~~~~~~~~~~~~~~~
 

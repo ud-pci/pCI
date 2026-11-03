@@ -94,6 +94,17 @@ If CMake still detects Intel MPI after correcting the paths, clear the CMake cac
 rm -rf build/*
 ```
 
+### Testing the build
+After ``make install``, run the small regression test from the ``pCI`` directory to check the build:
+```
+$ bash tests/small/run.sh 4
+```
+The argument is the number of MPI ranks (default 1).
+It takes about a minute, compares the results against reference values, and ends with a ``PASS`` or ``FAIL`` line for each comparison.
+It requires OpenMPI, LAPACK/MKL, and Python.
+Executables are taken from ``bin/``; set ``BIN`` to test executables installed elsewhere.
+See ``tests/small/README.md`` for details.
+
 ## Supplementary programs
 
 The `lib/` directory contains supplementary programs that are built separately using Make. These include the all-order (`allcore-ci`, `valsd-ci`, `sdvw-ci`, `second-ci`), RPA (`rpa`, `rpa_dtm`), and QED (`qed_rot`, `qedpot_conf`, `sgc0`) programs. To compile and install all of them to the `bin/` directory:
