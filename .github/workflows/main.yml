@@ -106,9 +106,6 @@ jobs:
   build-gfortran:
     runs-on: ubuntu-latest
 
-    # Remove once this job has passed reliably.
-    continue-on-error: true
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
