@@ -614,6 +614,15 @@ Module davidson
         End If
 
         Do iv = 0, Nlv-1
+            ! A converged root has a zero correction vector, so its product is zero.
+            ! Iconverge is the same on all ranks, so every rank skips the same collectives.
+            If (ip == 2) Then
+                If (Iconverge(iv+1) == 1) Then
+                    ArrB(1:nd_local, i2min+iv) = Real(0, kind=type_real)
+                    Cycle
+                End If
+            End If
+
             ! Step 1: assemble the full input column on all ranks.
             col_in_cache(nd_start+1:nd_end) = ArrB(1:nd_local, i1min+iv)
             Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
