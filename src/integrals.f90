@@ -6,7 +6,8 @@ Module integrals
 
     Private
 
-    Public :: Rint, Hint, HintS, Gint, GintS, Find_VS, Find_SMS, Gaunt, BuildGauntLUT, BuildHintLUT, BuildHintSLUT, BuildGintHash, BuildGintSHash, BuildISLUT
+    Public :: Rint, Hint, HintS, Gint, GintS, Find_VS, Find_SMS, Gaunt, BuildGauntLUT, BuildHintLUT, &
+              BuildHintSLUT, BuildGintHash, BuildGintSHash, BuildISLUT
 
   Contains
 

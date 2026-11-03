@@ -101,3 +101,37 @@ jobs:
           bash tests/small/run.sh 1
           bash tests/small/run.sh 4
           CONF_USE_BIT_DET=FALSE bash tests/small/run.sh 4
+
+  # lib/ is skipped because its Makefiles use the Intel-only -r8 flag.
+  build-gfortran:
+    runs-on: ubuntu-latest
+
+    # Remove once this job has passed reliably.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gfortran libopenmpi-dev openmpi-bin libopenblas-dev liblapack-dev
+
+      - name: Check compiler version
+        run: gfortran --version
+
+      - name: Build pCI package
+        run: |
+          mkdir -p build
+          cd build
+          FC=gfortran cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(pwd)/../ ..
+          make -j$(nproc)
+          make install
+
+      - name: Run regression tests
+        timeout-minutes: 15
+        run: |
+          bash tests/small/run.sh 1
+          bash tests/small/run.sh 4
+          CONF_USE_BIT_DET=FALSE bash tests/small/run.sh 4

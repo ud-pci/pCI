@@ -145,7 +145,7 @@ Module conf_init
         character(len=10) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
-        Character(len=90), Parameter, Dimension(11) :: skeleton = [ &
+        Character(len=90), Parameter, Dimension(11) :: skeleton = [ Character(len=90) :: &
             'Kl=0      # 0=new, 1=continue (CONF.HIJ+JJJ), 2=new+MBPT, 4=memory check', &
             'Kw=0      # 0=do not write CONF.HIJ, 1=write CONF.HIJ',                    &
             'KLSJ=0    # 0=no LSJ in FINAL.RES, 1=write LSJ',                           &

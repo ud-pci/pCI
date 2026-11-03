@@ -263,7 +263,7 @@ Contains
         character(len=80) :: val
         character(len=80) :: line
         character(len=4), dimension(:), allocatable :: keyList
-        Character(len=90), Parameter, Dimension(7) :: skeleton = [ &
+        Character(len=90), Parameter, Dimension(7) :: skeleton = [ Character(len=90) :: &
             'Mode=       # DM=density matrix, TM=transition matrix, Init=form DTM.INT', &
             'Levels=     # for DM: i j; for TM: i if j jf',                             &
             'Operators=  # comma-separated operator keys (e.g. E1,M1,E2)',              &

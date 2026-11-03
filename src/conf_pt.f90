@@ -1403,7 +1403,7 @@ Contains
         Integer :: err_stat, index_equals, index_hashtag
         Character(Len=10) :: key, key_upper, val
         Character(Len=80) :: line
-        Character(Len=90), Parameter, Dimension(4) :: skeleton = [ &
+        Character(Len=90), Parameter, Dimension(4) :: skeleton = [ Character(len=90) :: &
             'ktf=5   # cutoff power 0-9; include NR configs with weight > max_weight / 2^ktf', &
             'kvar=1  # reordering: 1=all, 2=keep PT block, 3=keep CI space                  ', &
             '',                                                                                 &
