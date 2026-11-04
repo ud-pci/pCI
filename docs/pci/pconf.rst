@@ -94,6 +94,7 @@ In addition to the input files listed above, ``pconf`` also requires the file ``
 	Kw     = (0,1)       - write Hamiltonian matrix to disk
 	KLSJ   = (0,1)       - calculate LSJ decomposition
 	KXIJ   = N           - write CONF.XIJ every N Davidson iterations (default: 10)
+	KRefresh = N         - recompute H*b every N Davidson iterations; 1 recomputes every iteration (default: 20)
 	KWeights = (0,1)     - write configuration weights to CONF.WGT (default: 0)
 	MaxNd0 = N           - maximum number of determinants in initial approximation (default: 3000)
 	kCSF   = (0,1)       - use CSF basis for diagonalization (default: 0)

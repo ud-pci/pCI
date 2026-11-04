@@ -338,7 +338,7 @@ Contains
         Character(Len=64) :: strfmt
         Character(Len=4) :: version
 
-        version = '9.2'
+        version = '9.3'
         Select Case(type_real)
         Case(sp)
             strfmt = '(4X,"Program pconf v'// Trim(AdjustL(version)) //' with single precision")'
@@ -1142,6 +1142,7 @@ Contains
         Integer(Kind=int64) :: count
 
         Call MPI_Bcast(KXIJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KRefresh, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KWeights, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -2016,7 +2017,8 @@ Contains
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B1_loc)+sizeof(B2)+sizeof(Z1)+sizeof(E1)+sizeof(Jt) &
                 + sizeof(Diag) &
-                + 2_int64 * int(Nd,int64) * int(type_real,int64)  ! col_in+col_out peak per Mxmpy call
+                + 2_int64 * int(Nd,int64) * int(type_real,int64) & ! col_in+col_out peak per Mxmpy call
+                + int(nd_local,int64) * int(Nlv,int64) * int(type_real,int64)  ! stored H*b
             If (kLSJ == 1) memDvdsn = memDvdsn + sizeof(xj)+sizeof(xl)+sizeof(xs)
             Call FormattedMemSize(memDvdsn, memStr)
             Write(*,'(A,A,A)') 'Allocating arrays for Davidson procedure requires ',Trim(memStr),' per rank'
@@ -2232,9 +2234,14 @@ Contains
         Real(type_real)  :: crit, ax, x, xx, vmax, pmax
         Real(dp) :: cnx
         Character(Len=16) :: timeStr
+        ! refresh: compute H*b with Mxmpy(1) this iteration instead of using the rotated copy
+        Logical :: refresh
+        ! Residual norm of each level from Dvdsn
+        Real(type_real), Allocatable :: cnorms(:)
 
         ! Initialize parameters and arrays
         Iconverge = 0
+        Allocate(cnorms(Nlv))
         crit=1.d-6
         ax=1.d0
         cnx=1.d0
@@ -2280,11 +2287,16 @@ Contains
         Do it=1,N_it
             If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' =========='
             If (ax > crit) Then
+                strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
                 If (mype == 0) Then
-                    strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
                     Write( 6,strfmt) it,Nlv
                     Write(11,strfmt) it,Nlv
                 End if
+
+                ! H*b is recomputed on the first iteration and every KRefresh iterations,
+                ! to stop round-off from building up.
+                refresh = it == 1 .or. mod(it-1, KRefresh) == 0
+                If (refresh) Call InvalidateHb
 
                 ! Orthonormalization of Nlv probe vectors
                 Call startTimer(s1)
@@ -2302,7 +2314,12 @@ Contains
                 End If
 
                 ! Mxmpy1 + FormP1
-                Call Mxmpy(1, mpi_type_real, mype)
+                If (refresh) Then
+                    Call Mxmpy(1, mpi_type_real, mype)
+                    Call SaveHb
+                Else
+                    Call LoadHb
+                End If
                 Call FormP(1, vmax, mpi_type_real)
                 If (it == 1 .and. K_prj == 1) Call AvgDiag(mpi_type_real, mype)
                 If (mype==0) Then
@@ -2314,8 +2331,27 @@ Contains
                 Call startTimer(s1)
                 cnx=0.d0
                 Do i=1,Nlv
+                    Call Dvdsn(i, cnx, cnorms(i), mpi_type_real, mype)
+                End Do
+
+                ! All levels look converged with stored H*b: recompute it and check again,
+                ! so convergence is only ever accepted with a freshly computed H*b
+                If (.not. refresh .and. cnx <= Crt4) Then
+                    If (mype==0) Write(77,*) 'Converged with stored H*b; recomputing H*b to confirm'
+                    Call Mxmpy(1, mpi_type_real, mype)
+                    Call SaveHb
+                    Call FormP(1, vmax, mpi_type_real)
+                    cnx=0.d0
+                    Do i=1,Nlv
+                        Call Dvdsn(i, cnx, cnorms(i), mpi_type_real, mype)
+                    End Do
+                End If
+
+                Do i=1,Nlv
+                    Call PrintCnorm(i, cnorms(i), mype)
+                End Do
+                Do i=1,Nlv
                     i1=i+Nlv
-                    Call Dvdsn(i, cnx, mpi_type_real, mype)
                     If (Iconverge(i)==0) Then
                         Call Ortn(i1, ifail, mpi_type_real, mype)
                         If (ifail /= 0) Then
@@ -2329,7 +2365,8 @@ Contains
                     Write(77,*) 'Formation of Nlv additional probe vectors took ' // timeStr
                 End If
 
-                If (K_prj == 1) Then
+                ! No new vectors are needed once all levels have converged
+                If (K_prj == 1 .and. cnx > Crt4) Then
                     Call Prj_J(Nlv+1, Nlv, 2*Nlv+1, 1.d-5, mpi_type_real, mype)
                     Call startTimer(s1)
                     Do i=Nlv+1, 2*Nlv
@@ -2407,6 +2444,9 @@ Contains
                         ax_array(i) = xx
                     End Do
 
+                    ! H times the next vectors, from the same rotation FormB applies
+                    Call RotateHb
+
                     Call startTimer(s1)
                     If (KXIJ > 0) Then
                         If (mod(it, KXIJ) == 0) Then
@@ -2457,6 +2497,9 @@ Contains
                 End If
             End If
         End Do
+
+        Call FreeHb
+        Deallocate(cnorms)
 
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)

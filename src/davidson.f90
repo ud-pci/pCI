@@ -13,7 +13,14 @@ Module davidson
     ! Persistent work arrays reused across Davidson iterations to avoid repeated allocation.
     Real(type_real), Allocatable, Save :: col_in_cache(:), col_out_cache(:), C_dvdsn(:)
 
+    ! H times the current eigenvectors (local rows), kept between iterations so it can be
+    ! rotated along with the vectors instead of recomputed by Mxmpy(1).
+    ! hb_valid is true while HB matches ArrB(:,1:Nlv); Ortn then applies its changes to HB too.
+    Real(type_real), Allocatable, Save :: HB(:,:)
+    Logical, Save :: hb_valid = .False.
+
     Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
+    Public :: SaveHb, LoadHb, RotateHb, InvalidateHb, FreeHb, PrintCnorm
 
   Contains
     
@@ -433,7 +440,7 @@ Module davidson
         Deallocate(group_sums, group_counts)
     End Subroutine AvgDiag
 
-    Subroutine Dvdsn(j, cnx, mpi_type_real, mype)
+    Subroutine Dvdsn(j, cnx, cnorm, mpi_type_real, mype)
         ! One Davidson correction step for level j.
         !
         ! The Davidson method iteratively improves eigenvector approximations by adding
@@ -457,12 +464,13 @@ Module davidson
         Implicit None
         Integer, Intent(In) :: j, mype
         Real(dp), Intent(InOut) :: cnx
+        ! Residual norm ||C|| of level j; printed by the caller with PrintCnorm
+        Real(type_real), Intent(Out) :: cnorm
         Type(MPI_Datatype), Intent(In) :: mpi_type_real
 
         Integer :: j1, i, i_global, lr, n01, nz, mpierr
-        Real(type_real) :: val, t, cnorm, s, s_Nd0, s_local
+        Real(type_real) :: val, t, s, s_Nd0, s_local
         Real(type_real), Allocatable :: s_vec(:)
-        character(len=9) :: char
 
         ! C_dvdsn(1:Nd0) holds the residual C for the Z1 region; C_dvdsn(Nd0+1) accumulates
         ! cnorm^2, allowing both to be Allreduced in a single call.
@@ -490,19 +498,7 @@ Module davidson
         cnorm = dsqrt(dabs(C_dvdsn(Nd0+1)))
 
         Iconverge(j)=0
-        char='         '
-        If (cnorm < Crt4) Then
-            If (kdavidson == 1) Then
-                char='Stopped  '
-            Else
-                char='converged'
-            End If
-            Iconverge(j)=1
-        End If
-        If (mype==0) Then
-            Write ( 6,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
-            Write (11,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,char
-        End If
+        If (cnorm < Crt4) Iconverge(j)=1
         If (cnorm > cnx) cnx=Real(cnorm,kind=dp)
         If (Iconverge(j)==1) Then
             ArrB(1:nd_local,J1)=0_type_real
@@ -568,6 +564,26 @@ Module davidson
 
         Return
     End Subroutine Dvdsn
+
+    Subroutine PrintCnorm(j, cnorm, mype)
+        ! Prints the residual norm of level j from Dvdsn.
+        Implicit None
+        Integer, Intent(In) :: j, mype
+        Real(type_real), Intent(In) :: cnorm
+        Character(Len=9) :: tag
+
+        If (mype /= 0) Return
+        tag='         '
+        If (Iconverge(j) == 1) Then
+            If (kdavidson == 1) Then
+                tag='Stopped  '
+            Else
+                tag='converged'
+            End If
+        End If
+        Write ( 6,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,tag
+        Write (11,'(4X,"|| C(",I3,") || = ",F10.7,2X,A9)') j,cnorm,tag
+    End Subroutine PrintCnorm
 
     Subroutine Mxmpy(ip, mpi_type_real, mype)
         ! Multiply the Hamiltonian H by a block of trial vectors: H * ArrB(:, i1min:i1min+Nlv-1)
@@ -723,6 +739,17 @@ Module davidson
                     Call DGEMV('N', nd_local, jm, -1.0_dp, ArrB(1,1), nd_local, &
                                s_arr, 1, 1.0_dp, ArrB(1,j), 1)
                 End Select
+                ! Keep H*b consistent: H is linear, so HB gets the same combination.
+                If (hb_valid .and. j <= Nlv) Then
+                    Select Case(type_real)
+                    Case(sp)
+                        Call SGEMV('N', nd_local, jm, -1.0_sp, HB(1,1), nd_local, &
+                                   s_arr, 1, 1.0_sp, HB(1,j), 1)
+                    Case(dp)
+                        Call DGEMV('N', nd_local, jm, -1.0_dp, HB(1,1), nd_local, &
+                                   s_arr, 1, 1.0_dp, HB(1,j), 1)
+                    End Select
+                End If
             End If
             If (smax1 < ortho) Exit
             If (smax1 > smax2 .or. it > 3) Then
@@ -747,8 +774,73 @@ Module davidson
         End If
         s=1.d0/dsqrt(s)
         ArrB(1:nd_local,j)=ArrB(1:nd_local,j)*s
+        If (hb_valid .and. j <= Nlv) HB(1:nd_local,j)=HB(1:nd_local,j)*s
         Return
     End Subroutine Ortn
+
+    Subroutine SaveHb
+        ! Store H*b from Mxmpy(1), which is in ArrB(:,Nlv+1:2*Nlv), before Dvdsn overwrites it.
+        Implicit None
+
+        If (Allocated(HB)) Then
+            If (size(HB,1) /= nd_local .or. size(HB,2) /= Nlv) Deallocate(HB)
+        End If
+        If (.not. Allocated(HB)) Allocate(HB(nd_local, Nlv))
+        HB(1:nd_local,1:Nlv) = ArrB(1:nd_local,Nlv+1:2*Nlv)
+        hb_valid = .True.
+    End Subroutine SaveHb
+
+    Subroutine LoadHb
+        ! Put the stored H*b where Mxmpy(1) would have written it.
+        Implicit None
+
+        ArrB(1:nd_local,Nlv+1:2*Nlv) = HB(1:nd_local,1:Nlv)
+    End Subroutine LoadHb
+
+    Subroutine RotateHb
+        ! Form H*b for the next iteration's vectors without multiplying by H.
+        ! FormB makes the new vectors as b*P11 + c*P21, where c are the corrections,
+        ! so the same combination of H*b and H*c gives H times the new vectors.
+        ! H*c is in ArrB(:,2*Nlv+1:3*Nlv) from Mxmpy(2); this must run before FormB overwrites it.
+        ! Rows are done in chunks so that only a small scratch block is needed.
+        Implicit None
+        Integer, Parameter :: chunk = 4096
+        Integer :: r0, nr
+        Real(type_real), Allocatable :: tmp(:,:)
+
+        Allocate(tmp(Min(chunk, Max(nd_local,1)), Nlv))
+        Do r0 = 1, nd_local, chunk
+            nr = Min(chunk, nd_local - r0 + 1)
+            Select Case(type_real)
+            Case(sp)
+                Call SGEMM('N','N', nr, Nlv, Nlv, 1.0_sp, HB(r0,1), nd_local, &
+                           P(1,1), 2*Nlv, 0.0_sp, tmp, size(tmp,1))
+                Call SGEMM('N','N', nr, Nlv, Nlv, 1.0_sp, ArrB(r0,2*Nlv+1), nd_local, &
+                           P(Nlv+1,1), 2*Nlv, 1.0_sp, tmp, size(tmp,1))
+            Case(dp)
+                Call DGEMM('N','N', nr, Nlv, Nlv, 1.0_dp, HB(r0,1), nd_local, &
+                           P(1,1), 2*Nlv, 0.0_dp, tmp, size(tmp,1))
+                Call DGEMM('N','N', nr, Nlv, Nlv, 1.0_dp, ArrB(r0,2*Nlv+1), nd_local, &
+                           P(Nlv+1,1), 2*Nlv, 1.0_dp, tmp, size(tmp,1))
+            End Select
+            HB(r0:r0+nr-1,1:Nlv) = tmp(1:nr,1:Nlv)
+        End Do
+        Deallocate(tmp)
+    End Subroutine RotateHb
+
+    Subroutine InvalidateHb
+        ! Mark HB as out of date, so Ortn stops updating it until the next SaveHb.
+        Implicit None
+
+        hb_valid = .False.
+    End Subroutine InvalidateHb
+
+    Subroutine FreeHb
+        Implicit None
+
+        If (Allocated(HB)) Deallocate(HB)
+        hb_valid = .False.
+    End Subroutine FreeHb
 
     Subroutine Prj_J(lin, num, lout, trsd, mpi_type_real, mype)
         ! Filter `num` trial vectors (ArrB columns lin..lin+num-1) to have good J = XJ_av,

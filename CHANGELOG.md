@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tests/compare.py - compare pconf.csv, tm.csv, and pdtm .RES outputs against references with tolerances
 - conf_init.f90, conf_pt.f90, pdtm.f90, integrals.f90, CMakeLists.txt - fix gfortran build errors
 - main.yml - run the regression test in CI, and add a gfortran build and test job
+- pconf v9.3 - Davidson speedups: Mxmpy skips H*v for converged roots, whose correction vectors are zero; Davidson keeps H*b and rotates it with the vectors instead of recomputing it each iteration; new ci.in key KRefresh (default 20) sets how often H*b is recomputed, and convergence is always confirmed with a recomputed H*b
 
 ## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction

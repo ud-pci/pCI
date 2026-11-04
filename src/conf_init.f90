@@ -145,7 +145,7 @@ Module conf_init
         character(len=10) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
-        Character(len=90), Parameter, Dimension(11) :: skeleton = [ Character(len=90) :: &
+        Character(len=90), Parameter, Dimension(12) :: skeleton = [ Character(len=90) :: &
             'Kl=0      # 0=new, 1=continue (CONF.HIJ+JJJ), 2=new+MBPT, 4=memory check', &
             'Kw=0      # 0=do not write CONF.HIJ, 1=write CONF.HIJ',                    &
             'KLSJ=0    # 0=no LSJ in FINAL.RES, 1=write LSJ',                           &
@@ -154,6 +154,7 @@ Module conf_init
             '#Kdsig=   # MBPT energy dependence: 0=auto, 1=manual (default 0)',         &
             '#K_sms=   # SMS: 1=1-e, 2=2-e, 3=both (default 3)',                        &
             '#KXIJ=    # write CONF.XIJ every N Davidson iterations (default 10)',      &
+            '#KRefresh=# recompute H*b every N Davidson iterations (default 20)',      &
             '#KWeights=# 0=do not write CONF.WGT, 1=write (default 0)',                 &
             '#MaxNd0=  # initial Davidson approximation size (default 3000)',           &
             '#kCSF=    # 0=determinant basis, 1=CSF basis (default 0)']
@@ -170,6 +171,7 @@ Module conf_init
         K_sms = 3
         KWeights = 0
         KXIJ = 10
+        KRefresh = 20
         MaxNd0 = 3000
 
         Do
@@ -198,6 +200,8 @@ Module conf_init
                 Read(val, *) K_sms
             Case('KXIJ')
                 Read(val, *) KXIJ
+            Case('KREFRESH')
+                Read(val, *) KRefresh
             Case('KWEIGHTS')
                 Read(val, *) KWeights
             Case('MAXND0')
@@ -208,6 +212,9 @@ Module conf_init
         End Do
 
         Close(99)
+
+        ! Values below 1 mean recompute H*b every iteration
+        If (KRefresh < 1) KRefresh = 1
 
         Write( 6,'(/4X,"Kl = (0-Start,1-Cont.,2-MBPT,3-Add) ",I1)') Kl
         Write( 6,'(/4X,"Kw = (0-do not write CONF.HIJ, 1-write CONF.HIJ) ",I1)') Kw
