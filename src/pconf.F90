@@ -2229,7 +2229,7 @@ Contains
         Integer  :: k1, k, i, n, n1, kx, i1, it, mype, npes, mpierr, ifail, lwork
         Real(kind=type_real), Dimension(4) :: realtmp
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
-        Real(type_real), Allocatable :: col(:), col_pwdvdsn(:,:)
+        Real(type_real), Allocatable :: col(:), vec_full(:,:)
         Integer(Kind=int64) :: start_time, s1
         Real(type_real)  :: crit, ax, x, xx, vmax, pmax
         Real(dp) :: cnx
@@ -2468,15 +2468,17 @@ Contains
                             Call FormB(mpi_type_real, mype)
                             If (mype==0) Call PrintEnergiesDvdsn(it)
                             If (kCSF == 0) Then
-                                Allocate(col_pwdvdsn(Nd, Nlv))
+                                ! Only rank 0 writes CONF.LVL, so only rank 0 holds the full vectors
+                                If (mype == 0) Then
+                                    Allocate(vec_full(Nd, Nlv))
+                                Else
+                                    Allocate(vec_full(1, Nlv))
+                                End If
                                 Do n=1,Nlv
-                                    col_pwdvdsn(nd_start+1:nd_end, n) = ArrB(1:nd_local, n)
-                                    Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
-                                                        col_pwdvdsn(:,n), nd_counts_all, nd_displs_all, &
-                                                        mpi_type_real, MPI_COMM_WORLD, mpierr)
+                                    Call GatherColumnToRoot(n, vec_full(:,n), mpi_type_real)
                                 End Do
-                                If (mype==0) Call PrintWeightsDvdsn(it, col_pwdvdsn)
-                                Deallocate(col_pwdvdsn)
+                                If (mype==0) Call PrintWeightsDvdsn(it, vec_full)
+                                Deallocate(vec_full)
                             End If
                         Else
                             Call FormBskip(mype)
@@ -2831,7 +2833,7 @@ Contains
 
     Subroutine WriteFinalXIJ(mype)
         Use mpi_f08
-        Use davidson, Only : Prj_J
+        Use davidson, Only : Prj_J, GatherColumnToRoot
         Use formj2, Only : J_av
         Implicit None
         Integer :: i, n, ierr, mype, mpierr
@@ -2842,15 +2844,21 @@ Contains
             Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
         End If
 
-        ! Allgatherv assembles each ArrB column on all ranks.
-        Allocate(col(Nd))
+        ! J_av needs each full column on every rank, so determinant mode gathers to all ranks.
+        ! In CSF mode J is known, and only rank 0 needs the column to write it.
+        If (kCSF == 0 .or. mype == 0) Then
+            Allocate(col(Nd))
+        Else
+            Allocate(col(1))
+        End If
         Do n=1,Nlv
-            col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
-            Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
-                                nd_counts_all, nd_displs_all, mpi_type_real, MPI_COMM_WORLD, mpierr)
             If (kCSF == 0) Then
+                col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
+                Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
+                                    nd_counts_all, nd_displs_all, mpi_type_real, MPI_COMM_WORLD, mpierr)
                 Call J_av(col(1), Nd, Tj(n), mpi_type_real, ierr)
             Else
+                Call GatherColumnToRoot(n, col, mpi_type_real)
                 Tj(n) = Jm
             End If
             If (mype==0) Then

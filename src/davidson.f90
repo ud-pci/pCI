@@ -20,7 +20,7 @@ Module davidson
     Logical, Save :: hb_valid = .False.
 
     Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
-    Public :: SaveHb, LoadHb, RotateHb, InvalidateHb, FreeHb, PrintCnorm
+    Public :: SaveHb, LoadHb, RotateHb, InvalidateHb, FreeHb, PrintCnorm, GatherColumnToRoot
 
   Contains
     
@@ -163,7 +163,7 @@ Module davidson
         If (Allocated(B1_tmp)) Deallocate(B1_tmp)
         Nlv=num
 
-        ! Write initial eigenvectors to CONF.XIJ; Allgatherv to reconstruct full columns
+        ! Write initial eigenvectors to CONF.XIJ; full columns are collected on rank 0 only
         If (mype == 0) Then
             Do j=1,Nlv
                 strfmt = '(1X,"E(",I3,") =",F12.6," Jtot =",F10.6)'
@@ -173,17 +173,17 @@ Module davidson
         End If
         If (KXIJ > 0) Then
             Block
-                Real(type_real), Allocatable :: col_gather(:)
-                Integer :: mpierr2
-                Allocate(col_gather(Nd))
+                Real(type_real), Allocatable :: vec_gather(:)
+                If (mype == 0) Then
+                    Allocate(vec_gather(Nd))
+                Else
+                    Allocate(vec_gather(1))
+                End If
                 Do j=1,Nlv
-                    col_gather(nd_start+1:nd_end) = ArrB(1:nd_local, j)
-                    Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
-                                        col_gather, nd_counts_all, nd_displs_all, &
-                                        mpi_type_real, MPI_COMM_WORLD, mpierr2)
-                    If (mype==0) Write(17) E(j),Tj(j),Nd,(col_gather(i),i=1,Nd)
+                    Call GatherColumnToRoot(j, vec_gather, mpi_type_real)
+                    If (mype==0) Write(17) E(j),Tj(j),Nd,(vec_gather(i),i=1,Nd)
                 End Do
-                Deallocate(col_gather)
+                Deallocate(vec_gather)
             End Block
         End If
         If (mype == 0) Then
@@ -198,6 +198,22 @@ Module davidson
         
         Return
     End Subroutine FormB0
+
+    Subroutine GatherColumnToRoot(icol, buf, mpi_type_real)
+        ! Collects column icol of the distributed ArrB into buf on rank 0 only.
+        ! Used where only rank 0 needs the full vector, to write it to a file.
+        ! buf must hold Nd values on rank 0; on other ranks it is not touched.
+        Use mpi_f08
+        Implicit None
+        Integer, Intent(In) :: icol
+        Real(type_real), Intent(InOut) :: buf(:)
+        Type(MPI_Datatype), Intent(In) :: mpi_type_real
+        Integer :: mpierr
+
+        Call MPI_Gatherv(ArrB(1:nd_local, icol), nd_local, mpi_type_real, &
+                         buf, nd_counts_all, nd_displs_all, mpi_type_real, &
+                         0, MPI_COMM_WORLD, mpierr)
+    End Subroutine GatherColumnToRoot
 
     Subroutine FormBskip(mype)
         ! Forms eigenvectors for next Davidson iteration; not written to CONF.XIJ.
@@ -229,9 +245,9 @@ Module davidson
         Implicit None
         Type(MPI_Datatype), Intent(In) :: mpi_type_real
         Integer, Intent(In) :: mype
-        Integer :: i, k, mpierr
+        Integer :: i, k
         Real(type_real) :: t
-        Real(type_real), Allocatable :: col_gather(:)
+        Real(type_real), Allocatable :: vec_gather(:)
 
         Select Case(type_real)
         Case(sp)
@@ -242,7 +258,12 @@ Module davidson
                        P(1,1), 2*Nlv, 0.0_dp, ArrB(1,2*Nlv+1), nd_local)
         End Select
 
-        Allocate(col_gather(Nd))
+        ! Only rank 0 writes the file, so only rank 0 holds the full vector
+        If (mype == 0) Then
+            Allocate(vec_gather(Nd))
+        Else
+            Allocate(vec_gather(1))
+        End If
         If (mype==0) Then
             If (kCSF == 0) Then
                 Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
@@ -254,18 +275,15 @@ Module davidson
         Do k=1,Nlv
             t = -(E(k)+Hamil%minval)
             Tk(k) = t
-            col_gather(nd_start+1:nd_end) = ArrB(1:nd_local, k+2*Nlv)
-            Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
-                                col_gather, nd_counts_all, nd_displs_all, &
-                                mpi_type_real, MPI_COMM_WORLD, mpierr)
-            If (mype==0) Write(17) t,Tj(k),Nd,(col_gather(i),i=1,Nd)
+            Call GatherColumnToRoot(k+2*Nlv, vec_gather, mpi_type_real)
+            If (mype==0) Write(17) t,Tj(k),Nd,(vec_gather(i),i=1,Nd)
         End Do
 
         Do k=1,Nlv
             ArrB(1:nd_local,k) = ArrB(1:nd_local,2*Nlv+k)
         End Do
 
-        Deallocate(col_gather)
+        Deallocate(vec_gather)
         If (mype==0) Then
             Close(unit=17)
             Write ( 6,*) ' FormB: Vectors saved'
@@ -280,9 +298,9 @@ Module davidson
         Type(MPI_Datatype), Intent(In) :: mpi_type_real
         Integer, Intent(In) :: mype
         Integer :: i, k, mpierr
-        Real(type_real), Allocatable :: col_gather(:)
+        Real(type_real), Allocatable :: vec_gather(:)
 
-        Allocate(col_gather(Nd))
+        Allocate(vec_gather(Nd))
         If (mype==0) Then
             If (kCSF == 0) Then
                 Open(unit=17,file='CONF.XIJ',status='UNKNOWN',form='UNFORMATTED')
@@ -291,17 +309,17 @@ Module davidson
             End If
         End If
         Do k=1,Nlv
-            col_gather(nd_start+1:nd_end) = ArrB(1:nd_local, k)
+            vec_gather(nd_start+1:nd_end) = ArrB(1:nd_local, k)
             Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
-                                col_gather, nd_counts_all, nd_displs_all, &
+                                vec_gather, nd_counts_all, nd_displs_all, &
                                 mpi_type_real, MPI_COMM_WORLD, mpierr)
-            If (mype==0) Write(17) Tk(k),Tj(k),Nd,(col_gather(i),i=1,Nd)
+            If (mype==0) Write(17) Tk(k),Tj(k),Nd,(vec_gather(i),i=1,Nd)
         End Do
         If (mype==0) Then
             Close(17)
             Write ( 6,*) ' WriteXIJ: Vectors saved'
         End If
-        Deallocate(col_gather)
+        Deallocate(vec_gather)
     End Subroutine WriteXIJ
 
     Subroutine FormP(kp, vmax, mpi_type_real)
