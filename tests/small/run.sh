@@ -52,6 +52,15 @@ if [ "$clean" -ne 1 ]; then
     exit 1
 fi
 
+# A run passes only if Davidson reports convergence itself,
+# so the check does not rely on the converged column of pconf.csv alone.
+check_converged() {
+    if ! grep -q 'Davidson procedure converged' pconf.out; then
+        echo "FAIL: Davidson did not converge in $1, see $PWD/pconf.out"
+        status=1
+    fi
+}
+
 # CI: one run for each parity.
 status=0
 for dir in even0 odd1; do
@@ -60,6 +69,7 @@ for dir in even0 odd1; do
     step pbasc pbasc.out mpirun --oversubscribe -n "$nprocs" "$BIN/pbasc"
     step pconf pconf.out mpirun --oversubscribe -n "$nprocs" "$BIN/pconf"
     echo "$dir, $nprocs rank(s):"
+    check_converged "$dir"
     python3 "$here/../compare.py" "$here/ref/$dir/pconf.csv" pconf.csv || status=1
 done
 
@@ -102,6 +112,7 @@ for dir in even0 odd1; do
         exit 1
     fi
     echo "${dir}_emu, $nprocs rank(s):"
+    check_converged "${dir}_emu"
     python3 "$here/../compare.py" "$here/ref/${dir}_emu/pconf.csv" pconf.csv || status=1
 done
 

@@ -76,7 +76,7 @@ Program pconf
     Character(Len=255)  :: strfmt
     Character(Len=16)   :: timeStr, memStr1, memStr2
     Integer, Allocatable, Dimension(:,:) :: Iarr_orig
-    Real(dp), Allocatable, Dimension(:) :: xj, xl, xs, ax_array
+    Real(dp), Allocatable, Dimension(:) :: xj, xl, xs
 
     Logical :: use_bit_rep = .false., mem_check_passed = .false., shouldForceBitDet, bitDetEnvSet
     Logical :: hij_exists = .false.
@@ -161,7 +161,8 @@ Program pconf
 
             ! 2. compare total memory of Iarr + Barr vs ArrB
             mem_int = 1_int64*(Ne+num_ints_bit_rep)*Nd
-            mem_bit = IPlv*2_int64*Nd
+            ! 3*Nlv keeps the threshold it had before ArrB grew to IPlv = 5*Nlv
+            mem_bit = 3_int64*Nlv*2_int64*Nd
             mem_check_passed = mem_int <= mem_bit
 
             If (bitDetEnvSet) Then
@@ -1106,12 +1107,14 @@ Contains
     
         ! ArrB, B2, B1_loc distributed: each rank holds ~Nd/npes rows.
         mem = bytesReal * (Nd/npes) * IPlv & ! ArrB (distributed ~Nd/npes rows per rank)
+            + bytesReal * (Nd/npes) * Nlv  & ! stored H*b (distributed)
             + bytesReal * Nlv * 2_int64    & ! Tk,Tj
-            + bytesReal * IPlv * IPlv      & ! P
-            + bytesReal * IPlv * 2_int64   & ! D,E
+            + bytesReal * 9_int64 * Nlv * Nlv & ! P (3Nlv x 3Nlv)
+            + bytesReal * 3_int64 * Nlv * 2_int64 & ! D,E
             + bytesReal * Nd0              & ! B1(Nd0): Z1 accumulator
+            + bytesReal * 3_int64 * Nd0    & ! C_dvdsn(Nd0+1), and Cb_z1, Bb_z1 (Olsen): residual, b and M^-1 b on the Z1 region
             + bytesReal * (Nd/npes)        & ! B1_loc(nd_local): local preconditioner rows
-            + bytesReal * (Nd/npes)        & ! B2 (distributed: nd_local rows only)
+            + bytesReal * (Nd/npes)        & ! B2(nd_local): M^-1 b outside the Z1 region (Olsen correction)
             + bytesReal * Nd0 * Nd0        & ! Z1
             + bytesReal * Nd0              & ! E1
             + bytesReal * Nd * 2_int64     & ! col_in,col_out peak during each Mxmpy call
@@ -1994,8 +1997,8 @@ Contains
         If (.not. Allocated(ArrB)) Allocate(ArrB(nd_local, IPlv))
         If (.not. Allocated(Tk)) Allocate(Tk(Nlv))
         If (.not. Allocated(Tj)) Allocate(Tj(Nlv))
-        If (.not. Allocated(P)) Allocate(P(2*Nlv,2*Nlv))
-        If (.not. Allocated(E)) Allocate(E(2*Nlv))
+        If (.not. Allocated(P)) Allocate(P(3*Nlv,3*Nlv))
+        If (.not. Allocated(E)) Allocate(E(3*Nlv))
         If (.not. Allocated(Iconverge)) Allocate(Iconverge(Nlv))
         If (.not. Allocated(B1)) Allocate(B1(Nd0))
         If (.not. Allocated(B1_loc)) Allocate(B1_loc(nd_local))
@@ -2231,7 +2234,7 @@ Contains
         Real(kind=type_real), Allocatable, Dimension(:) :: W ! work array
         Real(type_real), Allocatable :: col(:), vec_full(:,:)
         Integer(Kind=int64) :: start_time, s1
-        Real(type_real)  :: crit, ax, x, xx, vmax, pmax
+        Real(type_real)  :: x, xx, vmax, pmax
         Real(dp) :: cnx
         Character(Len=16) :: timeStr
         ! refresh: compute H*b with Mxmpy(1) this iteration instead of using the rotated copy
@@ -2242,12 +2245,9 @@ Contains
         ! Initialize parameters and arrays
         Iconverge = 0
         Allocate(cnorms(Nlv))
-        crit=1.d-6
-        ax=1.d0
         cnx=1.d0
         ifail=0
         vmax=0.d0
-        If (.not. Allocated(ax_array)) Allocate(ax_array(Nlv))
 
         ! Start timer for Davidson procedure
         Call startTimer(start_time)
@@ -2269,8 +2269,12 @@ Contains
         ! Write initial approximation to file CONF.XIJ
         Call FormB0(mype, mpi_type_real)
         
+        ! No previous steps yet
+        Call ResetPrevStep
+
         ! Set up work array for diagonalization of energy matrix P during iterative procedure
-        n1 = 2*Nlv
+        ! The subspace is [b c q] (vectors, corrections, previous steps)
+        n1 = 3*Nlv
         Select Case(type_real)
         Case(sp)
             Call SSYEV('V','U',n1,P,n1,E,realtmp,-1,ifail)
@@ -2286,217 +2290,217 @@ Contains
 
         Do it=1,N_it
             If (mype == 0) Write(77,'(A,I3,A)') '========== Iteration ', it , ' =========='
-            If (ax > crit) Then
-                strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
-                If (mype == 0) Then
-                    Write( 6,strfmt) it,Nlv
-                    Write(11,strfmt) it,Nlv
-                End if
+            strfmt = '(1X,"** Davidson iteration ",I3," for ",I3," levels **")'
+            If (mype == 0) Then
+                Write( 6,strfmt) it,Nlv
+                Write(11,strfmt) it,Nlv
+            End if
 
-                ! H*b is recomputed on the first iteration and every KRefresh iterations,
-                ! to stop round-off from building up.
-                refresh = it == 1 .or. mod(it-1, KRefresh) == 0
-                If (refresh) Call InvalidateHb
+            ! H*b is recomputed on the first iteration and every KRefresh iterations,
+            ! to stop round-off from building up.
+            refresh = it == 1 .or. mod(it-1, KRefresh) == 0
+            If (refresh) Call InvalidateHb
 
-                ! Orthonormalization of Nlv probe vectors
+            ! Orthonormalization of Nlv probe vectors
+            Call startTimer(s1)
+            Do i=1,Nlv
+                Call Ortn(i, ifail, mpi_type_real, mype)
+                If (ifail /= 0) Then
+                    If (mype==0) Write(*,*)' Fail of orthogonalization for ',i
+                    Stop
+                End If
+            End Do
+            If (mype==0) Then
+                Call stopTimer(s1, timeStr)
+                Write(77,*) 'Orthonormalization of Nlv probe vectors took ' // timeStr
                 Call startTimer(s1)
-                Do i=1,Nlv
-                    Call Ortn(i, ifail, mpi_type_real, mype)
-                    If (ifail /= 0) Then
-                        If (mype==0) Write(*,*)' Fail of orthogonalization for ',i
-                        Stop
-                    End If
-                End Do
-                If (mype==0) Then
-                    Call stopTimer(s1, timeStr)
-                    Write(77,*) 'Orthonormalization of Nlv probe vectors took ' // timeStr
-                    Call startTimer(s1)
-                End If
+            End If
 
-                ! Mxmpy1 + FormP1
-                If (refresh) Then
-                    Call Mxmpy(1, mpi_type_real, mype)
-                    Call SaveHb
-                Else
-                    Call LoadHb
-                End If
+            ! Mxmpy1 + FormP1
+            If (refresh) Then
+                Call Mxmpy(1, mpi_type_real, mype)
+                Call SaveHb
+                ! H*q is rotated like H*b, so refresh it too (only unconverged levels have q)
+                Call Mxmpy(3, mpi_type_real, mype)
+            Else
+                Call LoadHb
+            End If
+            Call FormP(1, vmax, mpi_type_real)
+            If (it == 1 .and. K_prj == 1) Call AvgDiag(mpi_type_real, mype)
+            If (mype==0) Then
+                Call stopTimer(s1, timeStr)
+                Write(77,*) 'Mxmpy1+FormP1 took ' // timeStr
+            End If
+
+            ! Formation of Nlv additional probe vectors
+            Call startTimer(s1)
+            cnx=0.d0
+            Do i=1,Nlv
+                Call Dvdsn(i, cnx, cnorms(i), mpi_type_real, mype)
+            End Do
+
+            ! All levels look converged with stored H*b: recompute it and check again,
+            ! so convergence is only ever accepted with a freshly computed H*b
+            If (.not. refresh .and. cnx <= Crt4) Then
+                If (mype==0) Write(77,*) 'Converged with stored H*b; recomputing H*b to confirm'
+                Call Mxmpy(1, mpi_type_real, mype)
+                Call SaveHb
                 Call FormP(1, vmax, mpi_type_real)
-                If (it == 1 .and. K_prj == 1) Call AvgDiag(mpi_type_real, mype)
-                If (mype==0) Then
-                    Call stopTimer(s1, timeStr)
-                    Write(77,*) 'Mxmpy1+FormP1 took ' // timeStr
-                End If
-
-                ! Formation of Nlv additional probe vectors
-                Call startTimer(s1)
                 cnx=0.d0
                 Do i=1,Nlv
                     Call Dvdsn(i, cnx, cnorms(i), mpi_type_real, mype)
                 End Do
+            End If
 
-                ! All levels look converged with stored H*b: recompute it and check again,
-                ! so convergence is only ever accepted with a freshly computed H*b
-                If (.not. refresh .and. cnx <= Crt4) Then
-                    If (mype==0) Write(77,*) 'Converged with stored H*b; recomputing H*b to confirm'
-                    Call Mxmpy(1, mpi_type_real, mype)
-                    Call SaveHb
-                    Call FormP(1, vmax, mpi_type_real)
-                    cnx=0.d0
-                    Do i=1,Nlv
-                        Call Dvdsn(i, cnx, cnorms(i), mpi_type_real, mype)
-                    End Do
+            Do i=1,Nlv
+                Call PrintCnorm(i, cnorms(i), mype)
+            End Do
+            Do i=1,Nlv
+                i1=i+Nlv
+                If (Iconverge(i)==0) Then
+                    Call Ortn(i1, ifail, mpi_type_real, mype)
+                    If (ifail /= 0) Then
+                        If (mype==0) Write(*,*)' Fail of orthogonalization for ',i1
+                        Stop
+                    End If
                 End If
+            End Do
+            If (mype==0) Then
+                Call stopTimer(s1, timeStr)
+                Write(77,*) 'Formation of Nlv additional probe vectors took ' // timeStr
+            End If
 
-                Do i=1,Nlv
-                    Call PrintCnorm(i, cnorms(i), mype)
-                End Do
-                Do i=1,Nlv
-                    i1=i+Nlv
-                    If (Iconverge(i)==0) Then
-                        Call Ortn(i1, ifail, mpi_type_real, mype)
+            ! No new vectors are needed once all levels have converged
+            If (K_prj == 1 .and. cnx > Crt4) Then
+                ! Block 4 (H*c) is free here and serves as scratch
+                Call Prj_J(Nlv+1, Nlv, 3*Nlv+1, 1.d-5, mpi_type_real, mype)
+                Call startTimer(s1)
+                Do i=Nlv+1, 2*Nlv
+                    If (Iconverge(i-Nlv)==0) Then
+                        Call Ortn(i, ifail, mpi_type_real, mype)
                         If (ifail /= 0) Then
-                            If (mype==0) Write(*,*)' Fail of orthogonalization for ',i1
-                            Stop
+                            If (mype==0) Write(*,*)' Fail of orthogonalization 2 for ',i1
+                            If (kdavidson==1) Then
+                                Stop
+                            Else
+                                kdavidson=1
+                                If (mype==0) Write(*,*) ' change kdavidson to ', kdavidson
+                                ifail=0
+                                Exit
+                            End If
                         End If
                     End If
                 End Do
                 If (mype==0) Then
                     Call stopTimer(s1, timeStr)
-                    Write(77,*) 'Formation of Nlv additional probe vectors took ' // timeStr
+                    Write(77,*) 'Orthogonalization of Nlv additional probe vectors took ' // timeStr
                 End If
+            End If
 
-                ! No new vectors are needed once all levels have converged
-                If (K_prj == 1 .and. cnx > Crt4) Then
-                    Call Prj_J(Nlv+1, Nlv, 2*Nlv+1, 1.d-5, mpi_type_real, mype)
-                    Call startTimer(s1)
-                    Do i=Nlv+1, 2*Nlv
-                        If (Iconverge(i-Nlv)==0) Then
-                            Call Ortn(i, ifail, mpi_type_real, mype)
-                            If (ifail /= 0) Then
-                                If (mype==0) Write(*,*)' Fail of orthogonalization 2 for ',i1
-                                If (kdavidson==1) Then
-                                    Stop
-                                Else
-                                    kdavidson=1
-                                    If (mype==0) Write(*,*) ' change kdavidson to ', kdavidson
-                                    ifail=0
-                                    Exit
-                                End If
-                            End If
+            If (cnx > Crt4) Then
+                ! Mxmpy2 + FormP2
+                Call startTimer(s1)
+                Call Mxmpy(2, mpi_type_real, mype)
+                Call OrtnPrevStep(mpi_type_real)
+                pmax = P(1,1)
+                Do i=2,Nlv
+                    If (P(i,i) > pmax) pmax = P(i,i)
+                End Do
+                If (pmax > vmax) vmax = pmax
+                Call FormP(2, vmax, mpi_type_real)
+                If (mype==0) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'Mxmpy2+FormP2 took ' // timeStr
+                End If
+                
+                ! Diagonalize P
+                If (mype==0) Call startTimer(s1)
+                Select Case(type_real)
+                Case(sp)
+                    Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                Case(dp)
+                    Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
+                End Select
+                If (mype==0) Then
+                    Call stopTimer(s1, timeStr)
+                    Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
+                End If
+                
+                ! Compute per-level admixture xx = max component of eigenvector in the correction-vector block
+                ! (printed for information only; convergence is decided by the residuals)
+                ! vmax = largest of the Nlv eigenvalues - used in FormP to shift converged levels
+                vmax=-1.d10
+                strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
+                Do i=1,Nlv
+                    xx=0.d0
+                    Do k=1,Nlv
+                        k1=k+Nlv
+                        x=dabs(P(k1,i))
+                        If (xx <= x) Then
+                            xx=x
+                            kx=k
                         End If
                     End Do
+                    If (vmax < E(i)) vmax=E(i)
                     If (mype==0) Then
-                        Call stopTimer(s1, timeStr)
-                        Write(77,*) 'Orthogonalization of Nlv additional probe vectors took ' // timeStr
+                        Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
+                        Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
                     End If
-                End If
+                End Do
 
-                If (cnx > Crt4) Then
-                    ! Mxmpy2 + FormP2
-                    Call startTimer(s1)
-                    Call Mxmpy(2, mpi_type_real, mype)
-                    pmax = P(1,1)
-                    Do i=2,Nlv
-                        If (P(i,i) > pmax) pmax = P(i,i)
-                    End Do
-                    If (pmax > vmax) vmax = pmax
-                    Call FormP(2, vmax, mpi_type_real)
-                    If (mype==0) Then
-                        Call stopTimer(s1, timeStr)
-                        Write(77,*) 'Mxmpy2+FormP2 took ' // timeStr
-                    End If
-                    
-                    ! Diagonalize P
-                    If (mype==0) Call startTimer(s1)
-                    Select Case(type_real)
-                    Case(sp)
-                        Call SSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-                    Case(dp)
-                        Call DSYEV('V','U',n1,P,n1,E,W,lwork,ifail)
-                    End Select
-                    If (mype==0) Then
-                        Call stopTimer(s1, timeStr)
-                        Write(77,*) 'Nlv eigenvectors evaluated in ' // timeStr
-                    End If
-                    
-                    ! Compute per-level admixture xx = max component of eigenvector in the correction-vector block;
-                    ! ax = max over all levels to indicate convergence
-                    ! vmax = largest eigenvector - used in FormP to shift converged levels
-                    ax=0.d0
-                    vmax=-1.d10
-                    strfmt = '(1X,"E(",I3,") =",F14.8,"; admixture of vector ",I3,": ",F10.7)'
-                    Do i=1,Nlv
-                        xx=0.d0
-                        Do k=1,Nlv
-                            k1=k+Nlv
-                            x=dabs(P(k1,i))
-                            If (xx <= x) Then
-                                xx=x
-                                kx=k
+                ! H times the next vectors, from the same rotation NewVectors applies
+                Call RotateHb
+
+                Call startTimer(s1)
+                If (KXIJ > 0) Then
+                    If (mod(it, KXIJ) == 0) Then
+                        ! J_av requires the full eigenvector column on all ranks.
+                        ! Allgatherv assembles full col on all ranks before J_av is called.
+                        Allocate(col(Nd))
+                        Do n=1,Nlv
+                            If (kCSF == 0) Then
+                                col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
+                                Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
+                                                    nd_counts_all, nd_displs_all, &
+                                                    mpi_type_real, MPI_COMM_WORLD, mpierr)
+                                Call J_av(col(1), Nd, Tj(n), mpi_type_real, ierr)
+                            Else
+                                Tj(n) = Jm
                             End If
                         End Do
-                        If (ax < xx) ax=xx
-                        If (vmax < E(i)) vmax=E(i)
-                        If (mype==0) Then
-                            Write( 6,strfmt) i,-(E(i)+Hamil%minval),kx,xx
-                            Write(11,strfmt) i,-(E(i)+Hamil%minval),kx,xx
-                        End If
-                        ax_array(i) = xx
-                    End Do
-
-                    ! H times the next vectors, from the same rotation FormB applies
-                    Call RotateHb
-
-                    Call startTimer(s1)
-                    If (KXIJ > 0) Then
-                        If (mod(it, KXIJ) == 0) Then
-                            ! J_av requires the full eigenvector column on all ranks.
-                            ! Allgatherv assembles full col on all ranks before J_av is called.
-                            Allocate(col(Nd))
-                            Do n=1,Nlv
-                                If (kCSF == 0) Then
-                                    col(nd_start+1:nd_end) = ArrB(1:nd_local, n)
-                                    Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, col, &
-                                                        nd_counts_all, nd_displs_all, &
-                                                        mpi_type_real, MPI_COMM_WORLD, mpierr)
-                                    Call J_av(col(1), Nd, Tj(n), mpi_type_real, ierr)
-                                Else
-                                    Tj(n) = Jm
-                                End If
-                            End Do
-                            Deallocate(col)
-                            Call FormB(mpi_type_real, mype)
-                            If (mype==0) Call PrintEnergiesDvdsn(it)
-                            If (kCSF == 0) Then
-                                ! Only rank 0 writes CONF.LVL, so only rank 0 holds the full vectors
-                                If (mype == 0) Then
-                                    Allocate(vec_full(Nd, Nlv))
-                                Else
-                                    Allocate(vec_full(1, Nlv))
-                                End If
-                                Do n=1,Nlv
-                                    Call GatherColumnToRoot(n, vec_full(:,n), mpi_type_real)
-                                End Do
-                                If (mype==0) Call PrintWeightsDvdsn(it, vec_full)
-                                Deallocate(vec_full)
+                        Deallocate(col)
+                        Call FormB(mpi_type_real, mype)
+                        If (mype==0) Call PrintEnergiesDvdsn(it)
+                        If (kCSF == 0) Then
+                            ! Only rank 0 writes CONF.LVL, so only rank 0 holds the full vectors
+                            If (mype == 0) Then
+                                Allocate(vec_full(Nd, Nlv))
+                            Else
+                                Allocate(vec_full(1, Nlv))
                             End If
-                        Else
-                            Call FormBskip(mype)
+                            Do n=1,Nlv
+                                Call GatherColumnToRoot(n, vec_full(:,n), mpi_type_real)
+                            End Do
+                            If (mype==0) Call PrintWeightsDvdsn(it, vec_full)
+                            Deallocate(vec_full)
                         End If
                     Else
                         Call FormBskip(mype)
                     End If
-                    Call stopTimer(s1, timeStr)
-                    If (mype==0) Write(77,*) 'Formation of next iteration of eigenvectors took ' // timeStr
                 Else
-                    If (mype==0) Then
-                        strfmt = '(" Davidson procedure converged")'
-                        Write( 6,strfmt)
-                        Write(11,strfmt)
-                        If (it == 1) Tk=E(1:Nlv)
-                    End If
-                    Exit
+                    Call FormBskip(mype)
                 End If
+                Call KeepPrevStep
+                Call stopTimer(s1, timeStr)
+                If (mype==0) Write(77,*) 'Formation of next iteration of eigenvectors took ' // timeStr
+            Else
+                If (mype==0) Then
+                    strfmt = '(" Davidson procedure converged")'
+                    Write( 6,strfmt)
+                    Write(11,strfmt)
+                    If (it == 1) Tk=E(1:Nlv)
+                End If
+                Exit
             End If
         End Do
 
@@ -3520,7 +3524,7 @@ Contains
         Implicit None
         Integer :: j, k, j1, j2, j3, ic, i, i1, l, n0, n1, n2, ni, nk, ndk, m1, nspaces, nspacesg, &
                     nconfs, cnt, nspacesterm, maxlenconfig, num_blanks, num_blanks2
-        Real(dp) :: wsum, gfactor, ax_crit, j_crit
+        Real(dp) :: wsum, gfactor, j_crit
         Character(Len=10) :: strn
         Character(Len=30) :: str_s, str_l, str_gf
         Integer, Allocatable, Dimension(:,:) :: Wpsave
@@ -3566,23 +3570,17 @@ Contains
         If (KLSJ == 1) Open(97,file='CONFSTR.RES',status='UNKNOWN')
         Write(96,'(A)') 'n,configuration,term,S,L,J,energy_au,energy_cm,gf,conf%,converged,conf2,conf2%'
 
-        ! Form array of booleans of converged levels
+        ! A level is converged when its residual is below Crt4 (the test in Dvdsn)
         converged = .False.
         Do i=1,Nlv
             If (Iconverge(i) == 1) converged(i) = .True.
         End Do
 
-        ! Set levels with small enough admixtures to also be converged
-        ax_crit = 1e-4
-        Do i=1,Nlv
-            If (ax_array(i) <= ax_crit) converged(i) = .True.
-        End Do 
-
-        ! TODO - set levels where J uncertainty is above some threshold to be not converged
+        ! A level whose J is not a whole or half integer is a mixture of J values, so it is not converged
         j_crit = 1e-4
         Do i=1,Nlv
-            If (Tj(i)-Nint(Tj(i)) > j_crit) converged(i) = .False.
-        End Do 
+            If (abs(2*Tj(i) - Nint(2*Tj(i))) > 2*j_crit) converged(i) = .False.
+        End Do
 
         ! Form matrix of weights of each configuration for each energy level
         W2=0_dp

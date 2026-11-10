@@ -247,8 +247,8 @@ Module conf_init
         Write(11,'(4X,16A1)') name
         Call ReadConfParams
 
-        ! Dimension of ArrB
-        IPlv = 3*Nlv
+        ! Dimension of ArrB: vectors, corrections, previous steps and their H products
+        IPlv = 5*Nlv
 
         Return
     End subroutine ReadConfInp

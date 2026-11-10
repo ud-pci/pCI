@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - main.yml - run the regression test in CI, and add a gfortran build and test job
 - pconf v9.3 - Davidson speedups: Mxmpy skips H*v for converged roots, whose correction vectors are zero; Davidson keeps H*b and rotates it with the vectors instead of recomputing it each iteration; new ci.in key KRefresh (default 20) sets how often H*b is recomputed, and convergence is always confirmed with a recomputed H*b
 - davidson.f90, pconf.F90 - Davidson output (CONF.XIJ, CONF.WFS, CONF.LVL) gathers eigenvectors to rank 0 only instead of to every rank, removing a full-length copy of all levels from every other rank
+- davidson.f90, pconf.F90 - Davidson keeps the previous step of each unconverged level (LOBPCG-style), so the subspace is 3*Nlv instead of 2*Nlv; this removes the zigzag convergence of slow levels and needs no extra H*v per iteration, at the cost of 2*Nlv more distributed vectors (ArrB is now 5*Nlv columns); converged results agree with the previous method to within Crt4
+- pconf.F90 - fix Davidson stopping silently: the loop no longer skips its remaining iterations once all admixtures fall below 1e-6; it runs until every residual is below Crt4 or N_it is reached; an unconverged run ends without "Davidson procedure converged" and its unconverged levels are marked in FINAL.RES and pconf.csv
+- pconf.F90 - fix the converged column of FINAL.RES and pconf.csv: it now follows the residual test only (a level with a small admixture but a residual above Crt4 was reported as converged), and the J check also catches half-integer J and J below the expected value
+- davidson.f90 - Olsen correction for levels that lie mostly outside the initial approximation: the diagonal preconditioner made their corrections nearly parallel to the vectors themselves, so they converged very slowly; levels inside the initial approximation are unchanged
+- tests/small - the test also requires pconf to print "Davidson procedure converged"
 
 ## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction

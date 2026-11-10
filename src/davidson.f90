@@ -12,6 +12,12 @@ Module davidson
 
     ! Persistent work arrays reused across Davidson iterations to avoid repeated allocation.
     Real(type_real), Allocatable, Save :: col_in_cache(:), col_out_cache(:), C_dvdsn(:)
+    ! b and M^-1 b on the Z1 region for the Olsen correction in Dvdsn
+    Real(type_real), Allocatable, Save :: Cb_z1(:), Bb_z1(:)
+    ! Olsen is used for levels with more than this fraction of b outside the Z1 region
+    Real(dp), Parameter :: olsen_weight = 0.5d0
+    ! Olsen is skipped when b is nearly orthogonal to M^-1 b
+    Real(dp), Parameter :: olsen_min = 1.d-3
 
     ! H times the current eigenvectors (local rows), kept between iterations so it can be
     ! rotated along with the vectors instead of recomputed by Mxmpy(1).
@@ -19,15 +25,28 @@ Module davidson
     Real(type_real), Allocatable, Save :: HB(:,:)
     Logical, Save :: hb_valid = .False.
 
+    ! Layout of the ArrB columns during Davidson (b = vectors, c = corrections, q = previous steps):
+    !   1..Nlv          b
+    !   Nlv+1..2Nlv     H*b, overwritten by c in Dvdsn
+    !   2Nlv+1..3Nlv    q
+    !   3Nlv+1..4Nlv    H*c; also scratch for Prj_J, and for the new b in NewVectors
+    !   4Nlv+1..5Nlv    H*q
+    ! The subspace is [b c q], so P is 3Nlv x 3Nlv.
+    ! q is the last step of each unconverged level; keeping it makes the iteration
+    ! conjugate-gradient-like (LOBPCG) instead of steepest descent, which zigzags on slow levels.
+    ! q_active(i) is true when level i has a previous step q in the subspace.
+    Logical, Allocatable, Save :: q_active(:)
+
     Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
     Public :: SaveHb, LoadHb, RotateHb, InvalidateHb, FreeHb, PrintCnorm, GatherColumnToRoot
+    Public :: ResetPrevStep, KeepPrevStep, OrtnPrevStep
 
   Contains
     
     Subroutine Init4(mype, mpi_type_real)
         ! This subroutine constructs the initial approximation 
         ! by selecting configurations specified by parameter Nc4.
-        ! The initial approximation Hamilonian is stored in the 
+        ! The initial approximation Hamiltonian is stored in the 
         ! matrix Z1 and is constructed by selecting the top-left 
         ! block of the full Hamiltonian matrix H.
         Use mpi_f08
@@ -49,7 +68,7 @@ Module davidson
             Write(11,strfmt) Nc1,Nd0
         End If
 
-        ! Construct the Hamilonian in the initial approximation
+        ! Construct the Hamiltonian in the initial approximation
         Diag=0_type_real
         diag_initialized = .False.  ! Reset so Mxmpy will re-fill local Diag on first call
         Z1=0_type_real
@@ -215,24 +234,43 @@ Module davidson
                          0, MPI_COMM_WORLD, mpierr)
     End Subroutine GatherColumnToRoot
 
+    Subroutine NewVectors
+        ! Form the next vectors from the eigenvectors Y of P (first Nlv columns of P):
+        ! new q = c*Y_c + q*Y_q goes to the q block,
+        ! new b = b*Y_b + new q goes to block 4 (H*c is no longer needed after RotateHb).
+        ! The caller copies block 4 into the b block.
+        Implicit None
+
+        Select Case(type_real)
+        Case(sp)
+            Call SGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_sp, ArrB(1,Nlv+1), nd_local, &
+                       P(Nlv+1,1), 3*Nlv, 0.0_sp, ArrB(1,3*Nlv+1), nd_local)
+        Case(dp)
+            Call DGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_dp, ArrB(1,Nlv+1), nd_local, &
+                       P(Nlv+1,1), 3*Nlv, 0.0_dp, ArrB(1,3*Nlv+1), nd_local)
+        End Select
+        ArrB(1:nd_local,2*Nlv+1:3*Nlv) = ArrB(1:nd_local,3*Nlv+1:4*Nlv)
+        Select Case(type_real)
+        Case(sp)
+            Call SGEMM('N','N', nd_local, Nlv, Nlv, 1.0_sp, ArrB(1,1), nd_local, &
+                       P(1,1), 3*Nlv, 1.0_sp, ArrB(1,3*Nlv+1), nd_local)
+        Case(dp)
+            Call DGEMM('N','N', nd_local, Nlv, Nlv, 1.0_dp, ArrB(1,1), nd_local, &
+                       P(1,1), 3*Nlv, 1.0_dp, ArrB(1,3*Nlv+1), nd_local)
+        End Select
+    End Subroutine NewVectors
+
     Subroutine FormBskip(mype)
         ! Forms eigenvectors for next Davidson iteration; not written to CONF.XIJ.
         Implicit None
         Integer, Intent(In) :: mype
         Integer :: k
 
-        Select Case(type_real)
-        Case(sp)
-            Call SGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_sp, ArrB(1,1), nd_local, &
-                       P(1,1), 2*Nlv, 0.0_sp, ArrB(1,2*Nlv+1), nd_local)
-        Case(dp)
-            Call DGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_dp, ArrB(1,1), nd_local, &
-                       P(1,1), 2*Nlv, 0.0_dp, ArrB(1,2*Nlv+1), nd_local)
-        End Select
+        Call NewVectors
 
         Do k=1,Nlv
             Tk(k) = -(E(k)+Hamil%minval)
-            ArrB(1:nd_local,k) = ArrB(1:nd_local,2*Nlv+k)
+            ArrB(1:nd_local,k) = ArrB(1:nd_local,3*Nlv+k)
         End Do
 
         If (mype==0) Write ( 6,*) ' FormBskip: Vectors not saved'
@@ -249,14 +287,7 @@ Module davidson
         Real(type_real) :: t
         Real(type_real), Allocatable :: vec_gather(:)
 
-        Select Case(type_real)
-        Case(sp)
-            Call SGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_sp, ArrB(1,1), nd_local, &
-                       P(1,1), 2*Nlv, 0.0_sp, ArrB(1,2*Nlv+1), nd_local)
-        Case(dp)
-            Call DGEMM('N','N', nd_local, Nlv, 2*Nlv, 1.0_dp, ArrB(1,1), nd_local, &
-                       P(1,1), 2*Nlv, 0.0_dp, ArrB(1,2*Nlv+1), nd_local)
-        End Select
+        Call NewVectors
 
         ! Only rank 0 writes the file, so only rank 0 holds the full vector
         If (mype == 0) Then
@@ -275,12 +306,12 @@ Module davidson
         Do k=1,Nlv
             t = -(E(k)+Hamil%minval)
             Tk(k) = t
-            Call GatherColumnToRoot(k+2*Nlv, vec_gather, mpi_type_real)
+            Call GatherColumnToRoot(k+3*Nlv, vec_gather, mpi_type_real)
             If (mype==0) Write(17) t,Tj(k),Nd,(vec_gather(i),i=1,Nd)
         End Do
 
         Do k=1,Nlv
-            ArrB(1:nd_local,k) = ArrB(1:nd_local,2*Nlv+k)
+            ArrB(1:nd_local,k) = ArrB(1:nd_local,3*Nlv+k)
         End Do
 
         Deallocate(vec_gather)
@@ -324,8 +355,8 @@ Module davidson
 
     Subroutine FormP(kp, vmax, mpi_type_real)
         ! Calculation of upper-left block (Nlv X Nlv) of matrix P for kp=1
-        ! Calculation of other three blocks (2Nlv X 2Nlv) of matrix P for kp=2
-        ! Dot products are accumulated via DGEMM locally, then AllReduced once per call.
+        ! Calculation of the rest of P (3Nlv X 3Nlv, subspace [b c q]) for kp=2
+        ! For kp=2, rows of converged c and unused q are decoupled and shifted above the wanted levels.
         Use mpi_f08
         Implicit None
         Integer, Intent(In) :: kp
@@ -355,36 +386,61 @@ Module davidson
                 End Do
             End Do
             Deallocate(Ptmp)
-        Else                  ! kp=2
-            ! Ptmp(i,k) = ArrB(:,i) * ArrB(:,k+2*Nlv) for i=1...2*Nlv, k=1...Nlv
-            Allocate(Ptmp(2*Nlv, Nlv))
+        Else
+            ! Ptmp(i,k) = ArrB(:,i) * ArrB(:,k+3*Nlv) for i=1...3*Nlv, k=1...2*Nlv,
+            ! i.e. the subspace [b c q] times [H*c H*q]
+            Allocate(Ptmp(3*Nlv, 2*Nlv))
             Ptmp = 0_type_real
             Select Case(type_real)
             Case(sp)
-                Call SGEMM('T','N', 2*Nlv, Nlv, nd_local, 1.0_sp, ArrB(1,1), nd_local, &
-                           ArrB(1,2*Nlv+1), nd_local, 0.0_sp, Ptmp, 2*Nlv)
+                Call SGEMM('T','N', 3*Nlv, 2*Nlv, nd_local, 1.0_sp, ArrB(1,1), nd_local, &
+                           ArrB(1,3*Nlv+1), nd_local, 0.0_sp, Ptmp, 3*Nlv)
             Case(dp)
-                Call DGEMM('T','N', 2*Nlv, Nlv, nd_local, 1.0_dp, ArrB(1,1), nd_local, &
-                           ArrB(1,2*Nlv+1), nd_local, 0.0_dp, Ptmp, 2*Nlv)
+                Call DGEMM('T','N', 3*Nlv, 2*Nlv, nd_local, 1.0_dp, ArrB(1,1), nd_local, &
+                           ArrB(1,3*Nlv+1), nd_local, 0.0_dp, Ptmp, 3*Nlv)
             End Select
-            Call MPI_Allreduce(MPI_IN_PLACE, Ptmp, 2*Nlv*Nlv, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call MPI_Allreduce(MPI_IN_PLACE, Ptmp, 6*Nlv*Nlv, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            ! b-c block
             Do i=1,Nlv
                 Do k=Nlv+1,2*Nlv
                     P(i,k) = Ptmp(i, k-Nlv)
                     P(k,i) = Ptmp(i, k-Nlv)
                 End Do
             End Do
+            ! c-c block
             Do i=Nlv+1,2*Nlv
                 Do k=Nlv+1,i
                     P(i,k) = Ptmp(i, k-Nlv)
                     P(k,i) = Ptmp(i, k-Nlv)
                 End Do
             End Do
-            Do i=1,Nlv                   ! Cleanup for converged levels
+            ! b-q and c-q blocks
+            Do i=1,2*Nlv
+                Do k=2*Nlv+1,3*Nlv
+                    P(i,k) = Ptmp(i, k-Nlv)
+                    P(k,i) = Ptmp(i, k-Nlv)
+                End Do
+            End Do
+            ! q-q block
+            Do i=2*Nlv+1,3*Nlv
+                Do k=2*Nlv+1,i
+                    P(i,k) = Ptmp(i, k-Nlv)
+                    P(k,i) = Ptmp(i, k-Nlv)
+                End Do
+            End Do
+            ! Converged levels have no c, and unused q columns are zero vectors.
+            ! Their rows are decoupled and moved above all wanted eigenvalues.
+            Do i=1,Nlv
                 If (Iconverge(i) == 1) Then
                     i1=i+Nlv
-                    P(i1,1:2*Nlv) = 0_type_real
-                    P(1:2*Nlv,i1) = 0_type_real
+                    P(i1,1:3*Nlv) = 0_type_real
+                    P(1:3*Nlv,i1) = 0_type_real
+                    P(i1,i1) = 2*vmax - P(i,i) + 1.d0
+                End If
+                If (.not. q_active(i)) Then
+                    i1=i+2*Nlv
+                    P(i1,1:3*Nlv) = 0_type_real
+                    P(1:3*Nlv,i1) = 0_type_real
                     P(i1,i1) = 2*vmax - P(i,i) + 1.d0
                 End If
             End Do
@@ -469,11 +525,19 @@ Module davidson
         !      C measures how far the pair (val, ArrB(:,j)) is from satisfying H*x = E*x;
         !      small ||C|| means the level has converged.
         !
-        !   2. Build the correction vector (new trial vector) using a preconditioner.
+        !   2. Build the correction vector (new trial vector) using a preconditioner M^-1.
         !      For determinants in the initial-approximation subspace (rows 1...Nd0), a
         !      projection preconditioner based on Z1 (the diagonalized initial guess) is used.
         !      For all other determinants, a simple diagonal preconditioner 1/(val - Diag(i))
         !      is applied. The correction is stored in ArrB(:,j1) for use by FormP/FormB.
+        !
+        !   3. Olsen correction, only for levels that lie mainly outside the Z1 region:
+        !      correction = M^-1 C - eps * M^-1 b, with eps chosen so that it is orthogonal to b.
+        !      There the diagonal preconditioner is nearly exact on the level's own main
+        !      determinants (val close to their diagonal), so M^-1 C points almost along b;
+        !      Ortn then removes that part and leaves mostly noise, and the level stalls.
+        !      Inside the Z1 region this is not needed: the lowest Nlv Z1 columns, the levels
+        !      themselves, are already left out of the preconditioner.
         !
         ! ArrB is distributed across ranks (each owns rows nd_start+1...nd_end).
         ! B1(1:Nd0) accumulates the Z1-region correction and is replicated on all ranks.
@@ -488,7 +552,7 @@ Module davidson
 
         Integer :: j1, i, i_global, lr, n01, nz, mpierr
         Real(type_real) :: val, t, s, s_Nd0, s_local
-        Real(type_real), Allocatable :: s_vec(:)
+        Real(dp) :: w_out
 
         ! C_dvdsn(1:Nd0) holds the residual C for the Z1 region; C_dvdsn(Nd0+1) accumulates
         ! cnorm^2, allowing both to be Allreduced in a single call.
@@ -532,33 +596,15 @@ Module davidson
         n01=Nlv+1
         If (iabs(Kl4) == 2) n01=1
         nz = Nd0 - n01 + 1
-        If (nz > 0) Then
-            Allocate(s_vec(nz))
-            ! Project residual onto Z1 eigenbasis: s_vec = Z1^T * C
-            Select Case(type_real)
-            Case(sp)
-                Call SGEMV('T', Nd0, nz, 1.0_sp, Z1(1,n01), Nd0, C_dvdsn, 1, 0.0_sp, s_vec, 1)
-            Case(dp)
-                Call DGEMV('T', Nd0, nz, 1.0_dp, Z1(1,n01), Nd0, C_dvdsn, 1, 0.0_dp, s_vec, 1)
-            End Select
-            ! Scale each component by 1/(val - E1); skip near-zero denominators
-            Do i=1,nz
-                t = val - E1(n01+i-1)
-                If (dabs(t) < 1.d-6) Then
-                    s_vec(i) = 0_type_real
-                Else
-                    s_vec(i) = s_vec(i) / t
-                End If
-            End Do
-            ! Transform back to determinant basis and accumulate into B1
-            Select Case(type_real)
-            Case(sp)
-                Call SGEMV('N', Nd0, nz, 1.0_sp, Z1(1,n01), Nd0, s_vec, 1, 1.0_sp, B1, 1)
-            Case(dp)
-                Call DGEMV('N', Nd0, nz, 1.0_dp, Z1(1,n01), Nd0, s_vec, 1, 1.0_dp, B1, 1)
-            End Select
-            Deallocate(s_vec)
-        End If
+        Call PrecondZ1(C_dvdsn(1:Nd0), B1)
+
+        ! Weight of b outside the Z1 region (b is normalized); decides whether Olsen is needed
+        w_out = 0.d0
+        Do lr=1,nd_local
+            If (nd_start+lr > Nd0) w_out = w_out + Real(ArrB(lr,j),dp)**2
+        End Do
+        Call MPI_Allreduce(MPI_IN_PLACE, w_out, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+        If (w_out > olsen_weight) Call OlsenCorrection
 
         ! Normalize the correction vector and store it in ArrB(:,j1).
         ! B1(1:Nd0) is replicated (no Allreduce needed); B1_loc is local and requires Allreduce.
@@ -581,6 +627,82 @@ Module davidson
         End Do
 
         Return
+
+    Contains
+
+        Subroutine PrecondZ1(vin, vout)
+            ! vout += Z1 * diag(1/(val-E1)) * Z1^T * vin over columns n01..Nd0 of Z1.
+            ! Terms with |val-E1| below 1e-6 are dropped.
+            Real(type_real), Intent(In) :: vin(Nd0)
+            Real(type_real), Intent(InOut) :: vout(Nd0)
+            Real(type_real), Allocatable :: s_vec(:)
+            Real(type_real) :: den
+            Integer :: k
+
+            If (nz <= 0) Return
+            Allocate(s_vec(nz))
+            ! Project onto the Z1 eigenbasis: s_vec = Z1^T * vin
+            Select Case(type_real)
+            Case(sp)
+                Call SGEMV('T', Nd0, nz, 1.0_sp, Z1(1,n01), Nd0, vin, 1, 0.0_sp, s_vec, 1)
+            Case(dp)
+                Call DGEMV('T', Nd0, nz, 1.0_dp, Z1(1,n01), Nd0, vin, 1, 0.0_dp, s_vec, 1)
+            End Select
+            ! Scale each component by 1/(val - E1); skip near-zero denominators
+            Do k=1,nz
+                den = val - E1(n01+k-1)
+                If (dabs(den) < 1.d-6) Then
+                    s_vec(k) = 0_type_real
+                Else
+                    s_vec(k) = s_vec(k) / den
+                End If
+            End Do
+            ! Transform back to the determinant basis and accumulate into vout
+            Select Case(type_real)
+            Case(sp)
+                Call SGEMV('N', Nd0, nz, 1.0_sp, Z1(1,n01), Nd0, s_vec, 1, 1.0_sp, vout, 1)
+            Case(dp)
+                Call DGEMV('N', Nd0, nz, 1.0_dp, Z1(1,n01), Nd0, s_vec, 1, 1.0_dp, vout, 1)
+            End Select
+            Deallocate(s_vec)
+        End Subroutine PrecondZ1
+
+        Subroutine OlsenCorrection
+            ! eps = (b . M^-1 C) / (b . M^-1 b);  B1, B1_loc -= eps * M^-1 b.
+            ! M^-1 b is Bb_z1 on the Z1 region (replicated) and B2 on the local rows > Nd0.
+            Real(dp) :: eps, dots(3)
+
+            If (.not. Allocated(Cb_z1)) Allocate(Cb_z1(Nd0), Bb_z1(Nd0))
+            Cb_z1 = 0_type_real
+            Bb_z1 = 0_type_real
+            B2 = 0_type_real
+            Do lr=1,nd_local
+                i_global = nd_start + lr
+                If (i_global <= Nd0) Then
+                    Cb_z1(i_global) = ArrB(lr,j)
+                Else
+                    B2(lr) = ArrB(lr,j)/(val-Diag(lr))
+                End If
+            End Do
+            Call MPI_Allreduce(MPI_IN_PLACE, Cb_z1, Nd0, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call PrecondZ1(Cb_z1, Bb_z1)
+
+            ! The Z1-region parts are replicated, so only the local parts need a reduction
+            dots(1) = Sum(Real(B1_loc(1:nd_local),dp) * Real(ArrB(1:nd_local,j),dp))
+            dots(2) = Sum(Real(B2(1:nd_local),dp) * Real(ArrB(1:nd_local,j),dp))
+            dots(3) = Sum(Real(B2(1:nd_local),dp)**2)
+            Call MPI_Allreduce(MPI_IN_PLACE, dots, 3, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            dots(1) = dots(1) + Sum(Real(Cb_z1,dp) * Real(B1(1:Nd0),dp))
+            dots(2) = dots(2) + Sum(Real(Cb_z1,dp) * Real(Bb_z1,dp))
+            dots(3) = dots(3) + Sum(Real(Bb_z1,dp)**2)
+
+            ! Skip when b is nearly orthogonal to M^-1 b, since eps is then ill-defined
+            If (dabs(dots(2)) <= olsen_min * dsqrt(dots(3))) Return
+            eps = dots(1) / dots(2)
+            B1(1:Nd0) = B1(1:Nd0) - Real(eps,type_real) * Bb_z1
+            B1_loc(1:nd_local) = B1_loc(1:nd_local) - Real(eps,type_real) * B2(1:nd_local)
+        End Subroutine OlsenCorrection
+
     End Subroutine Dvdsn
 
     Subroutine PrintCnorm(j, cnorm, mype)
@@ -605,7 +727,8 @@ Module davidson
 
     Subroutine Mxmpy(ip, mpi_type_real, mype)
         ! Multiply the Hamiltonian H by a block of trial vectors: H * ArrB(:, i1min:i1min+Nlv-1)
-        ! and store the result in ArrB(:, i2min:i2min+Nlv-1). 
+        ! and store the result in ArrB(:, i2min:i2min+Nlv-1).
+        ! ip=1: H*b, ip=2: H*c, ip=3: H*q (see the ArrB layout at the top of the module).
         ! This is the core operation of the Davidson method. 
         ! It applies H to the current trial vectors to build the projected matrix 
         ! P = ArrB^T * H * ArrB, from which improved eigenvalue estimates are obtained.
@@ -630,13 +753,21 @@ Module davidson
         Type(MPI_Datatype) :: mpi_type_real
         Integer, Intent(In) :: ip, mype
 
-        Integer :: iv, k, nlp, n, mpierr, i2min, i1min, kd
+        Integer :: iv, k, n, mpierr, i2min, i1min, kd
         Real(type_real) :: t
         Integer(Kind=int64) :: l8
 
-        nlp = ip*Nlv
-        i2min = 1+nlp
-        i1min = i2min-Nlv
+        Select Case(ip)
+        Case(1)
+            i1min = 1
+            i2min = Nlv+1
+        Case(2)
+            i1min = Nlv+1
+            i2min = 3*Nlv+1
+        Case Default
+            i1min = 2*Nlv+1
+            i2min = 4*Nlv+1
+        End Select
         kd = 0
 
         If (.not. diag_initialized) kd=1
@@ -648,10 +779,17 @@ Module davidson
         End If
 
         Do iv = 0, Nlv-1
-            ! A converged root has a zero correction vector, so its product is zero.
+            ! A converged level has a zero correction vector, so its product is zero.
             ! Iconverge is the same on all ranks, so every rank skips the same collectives.
             If (ip == 2) Then
                 If (Iconverge(iv+1) == 1) Then
+                    ArrB(1:nd_local, i2min+iv) = Real(0, kind=type_real)
+                    Cycle
+                End If
+            End If
+            ! Unused previous steps are zero too.
+            If (ip == 3) Then
+                If (.not. q_active(iv+1)) Then
                     ArrB(1:nd_local, i2min+iv) = Real(0, kind=type_real)
                     Cycle
                 End If
@@ -816,35 +954,153 @@ Module davidson
     End Subroutine LoadHb
 
     Subroutine RotateHb
-        ! Form H*b for the next iteration's vectors without multiplying by H.
-        ! FormB makes the new vectors as b*P11 + c*P21, where c are the corrections,
-        ! so the same combination of H*b and H*c gives H times the new vectors.
-        ! H*c is in ArrB(:,2*Nlv+1:3*Nlv) from Mxmpy(2); this must run before FormB overwrites it.
+        ! Form H*b and H*q for the next iteration's vectors without multiplying by H.
+        ! NewVectors makes q = c*Y_c + q*Y_q and b = b*Y_b + q,
+        ! so the same combinations of H*c, H*q and H*b give H times the new vectors.
+        ! H*c is in block 4 from Mxmpy(2); this must run before NewVectors overwrites it.
         ! Rows are done in chunks so that only a small scratch block is needed.
         Implicit None
         Integer, Parameter :: chunk = 4096
         Integer :: r0, nr
-        Real(type_real), Allocatable :: tmp(:,:)
+        Real(type_real), Allocatable :: hq(:,:), hb_new(:,:)
 
-        Allocate(tmp(Min(chunk, Max(nd_local,1)), Nlv))
+        Allocate(hq(Min(chunk, Max(nd_local,1)), Nlv), hb_new(Min(chunk, Max(nd_local,1)), Nlv))
         Do r0 = 1, nd_local, chunk
             nr = Min(chunk, nd_local - r0 + 1)
+            ! H*q for the next iteration = [H*c H*q] * [Y_c; Y_q]
+            Select Case(type_real)
+            Case(sp)
+                Call SGEMM('N','N', nr, Nlv, 2*Nlv, 1.0_sp, ArrB(r0,3*Nlv+1), nd_local, &
+                           P(Nlv+1,1), 3*Nlv, 0.0_sp, hq, size(hq,1))
+            Case(dp)
+                Call DGEMM('N','N', nr, Nlv, 2*Nlv, 1.0_dp, ArrB(r0,3*Nlv+1), nd_local, &
+                           P(Nlv+1,1), 3*Nlv, 0.0_dp, hq, size(hq,1))
+            End Select
+            ! H*b for the next iteration = H*b * Y_b + the H*q above
+            hb_new(1:nr,1:Nlv) = hq(1:nr,1:Nlv)
             Select Case(type_real)
             Case(sp)
                 Call SGEMM('N','N', nr, Nlv, Nlv, 1.0_sp, HB(r0,1), nd_local, &
-                           P(1,1), 2*Nlv, 0.0_sp, tmp, size(tmp,1))
-                Call SGEMM('N','N', nr, Nlv, Nlv, 1.0_sp, ArrB(r0,2*Nlv+1), nd_local, &
-                           P(Nlv+1,1), 2*Nlv, 1.0_sp, tmp, size(tmp,1))
+                           P(1,1), 3*Nlv, 1.0_sp, hb_new, size(hb_new,1))
             Case(dp)
                 Call DGEMM('N','N', nr, Nlv, Nlv, 1.0_dp, HB(r0,1), nd_local, &
-                           P(1,1), 2*Nlv, 0.0_dp, tmp, size(tmp,1))
-                Call DGEMM('N','N', nr, Nlv, Nlv, 1.0_dp, ArrB(r0,2*Nlv+1), nd_local, &
-                           P(Nlv+1,1), 2*Nlv, 1.0_dp, tmp, size(tmp,1))
+                           P(1,1), 3*Nlv, 1.0_dp, hb_new, size(hb_new,1))
             End Select
-            HB(r0:r0+nr-1,1:Nlv) = tmp(1:nr,1:Nlv)
+            HB(r0:r0+nr-1,1:Nlv) = hb_new(1:nr,1:Nlv)
+            ArrB(r0:r0+nr-1,4*Nlv+1:5*Nlv) = hq(1:nr,1:Nlv)
         End Do
-        Deallocate(tmp)
+        Deallocate(hq, hb_new)
     End Subroutine RotateHb
+
+    Subroutine ResetPrevStep
+        ! Drop all previous steps; the next step is a plain Davidson step.
+        Implicit None
+
+        If (.not. Allocated(q_active)) Allocate(q_active(Nlv))
+        q_active = .False.
+        ArrB(1:nd_local,2*Nlv+1:3*Nlv) = 0_type_real
+        ArrB(1:nd_local,4*Nlv+1:5*Nlv) = 0_type_real
+    End Subroutine ResetPrevStep
+
+    Subroutine KeepPrevStep
+        ! After the new vectors are formed, keep the previous step of unconverged levels only.
+        ! Converged levels get no correction, so their step would only add noise to P.
+        Implicit None
+        Integer :: i
+
+        Do i=1,Nlv
+            q_active(i) = Iconverge(i) == 0
+            If (.not. q_active(i)) Then
+                ArrB(1:nd_local,2*Nlv+i) = 0_type_real
+                ArrB(1:nd_local,4*Nlv+i) = 0_type_real
+            End If
+        End Do
+    End Subroutine KeepPrevStep
+
+    Subroutine OrtnPrevStep(mpi_type_real)
+        ! Orthonormalize each previous step q against b, c and the earlier q,
+        ! applying the same combination to H*q so that it stays H times q.
+        ! Must run after Mxmpy(2), since it needs H*c, and with HB equal to H*b.
+        ! A step that is almost inside the rest of the subspace is dropped:
+        ! it adds nothing new, and normalizing it would magnify round-off in H*q.
+        ! Classical Gram-Schmidt with two passes, as in Ortn.
+        Use mpi_f08
+        Implicit None
+        Type(MPI_Datatype), Intent(In) :: mpi_type_real
+
+        Integer :: i, jq, jh, jm, pass, mpierr
+        Real(type_real) :: s0, s1
+        Real(dp) :: drop_tol
+        Real(type_real), Allocatable :: s_arr(:)
+
+        ! Smallest fraction of a step that must remain after orthogonalization
+        If (type_real == sp) Then
+            drop_tol = 1.d-2
+        Else
+            drop_tol = 1.d-4
+        End If
+
+        Allocate(s_arr(3*Nlv))
+        Do i=1,Nlv
+            If (.not. q_active(i)) Cycle
+            jq = 2*Nlv+i
+            jh = 4*Nlv+i
+            jm = jq-1
+
+            s0 = sum(ArrB(1:nd_local,jq)**2)
+            Call MPI_Allreduce(MPI_IN_PLACE, s0, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+            If (s0 > 0) Then
+                Do pass=1,2
+                    ! Overlaps with b, c and q(1:i-1) in one GEMV + Allreduce
+                    Select Case(type_real)
+                    Case(sp)
+                        Call SGEMV('T', nd_local, jm, 1.0_sp, ArrB(1,1), nd_local, &
+                                   ArrB(1,jq), 1, 0.0_sp, s_arr, 1)
+                    Case(dp)
+                        Call DGEMV('T', nd_local, jm, 1.0_dp, ArrB(1,1), nd_local, &
+                                   ArrB(1,jq), 1, 0.0_dp, s_arr, 1)
+                    End Select
+                    Call MPI_Allreduce(MPI_IN_PLACE, s_arr, jm, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+                    ! q -= [b c q(1:i-1)] * s; H*q -= [H*b H*c H*q(1:i-1)] * s
+                    Select Case(type_real)
+                    Case(sp)
+                        Call SGEMV('N', nd_local, jm, -1.0_sp, ArrB(1,1), nd_local, &
+                                   s_arr, 1, 1.0_sp, ArrB(1,jq), 1)
+                        Call SGEMV('N', nd_local, Nlv, -1.0_sp, HB(1,1), nd_local, &
+                                   s_arr(1), 1, 1.0_sp, ArrB(1,jh), 1)
+                        Call SGEMV('N', nd_local, Nlv, -1.0_sp, ArrB(1,3*Nlv+1), nd_local, &
+                                   s_arr(Nlv+1), 1, 1.0_sp, ArrB(1,jh), 1)
+                        If (i > 1) Call SGEMV('N', nd_local, i-1, -1.0_sp, ArrB(1,4*Nlv+1), nd_local, &
+                                              s_arr(2*Nlv+1), 1, 1.0_sp, ArrB(1,jh), 1)
+                    Case(dp)
+                        Call DGEMV('N', nd_local, jm, -1.0_dp, ArrB(1,1), nd_local, &
+                                   s_arr, 1, 1.0_dp, ArrB(1,jq), 1)
+                        Call DGEMV('N', nd_local, Nlv, -1.0_dp, HB(1,1), nd_local, &
+                                   s_arr(1), 1, 1.0_dp, ArrB(1,jh), 1)
+                        Call DGEMV('N', nd_local, Nlv, -1.0_dp, ArrB(1,3*Nlv+1), nd_local, &
+                                   s_arr(Nlv+1), 1, 1.0_dp, ArrB(1,jh), 1)
+                        If (i > 1) Call DGEMV('N', nd_local, i-1, -1.0_dp, ArrB(1,4*Nlv+1), nd_local, &
+                                              s_arr(2*Nlv+1), 1, 1.0_dp, ArrB(1,jh), 1)
+                    End Select
+                End Do
+            End If
+
+            s1 = sum(ArrB(1:nd_local,jq)**2)
+            Call MPI_Allreduce(MPI_IN_PLACE, s1, 1, mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+
+            If (s0 <= 0 .or. s1 <= (drop_tol**2)*s0) Then
+                q_active(i) = .False.
+                ArrB(1:nd_local,jq) = 0_type_real
+                ArrB(1:nd_local,jh) = 0_type_real
+            Else
+                s1 = 1/Sqrt(s1)
+                ArrB(1:nd_local,jq) = ArrB(1:nd_local,jq)*s1
+                ArrB(1:nd_local,jh) = ArrB(1:nd_local,jh)*s1
+            End If
+        End Do
+        Deallocate(s_arr)
+    End Subroutine OrtnPrevStep
 
     Subroutine InvalidateHb
         ! Mark HB as out of date, so Ortn stops updating it until the next SaveHb.
@@ -913,7 +1169,7 @@ Module davidson
             Allocate(col_in(Nd,num), col_out(Nd,num))
 
             imin=lin
-            imax=lout-1
+            imax=lin+num-1
             Do j=imin,imax
                 i = j - lin + 1
                 col_in(nd_start+1:nd_end, i) = ArrB(1:nd_local, j)
