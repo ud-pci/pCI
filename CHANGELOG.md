@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pconf.F90 - fix the converged column of FINAL.RES and pconf.csv: it now follows the residual test only (a level with a small admixture but a residual above Crt4 was reported as converged), and the J check also catches half-integer J and J below the expected value
 - davidson.f90 - Olsen correction for levels that lie mostly outside the initial approximation: the diagonal preconditioner made their corrections nearly parallel to the vectors themselves, so they converged very slowly; levels inside the initial approximation are unchanged
 - tests/small - the test also requires pconf to print "Davidson procedure converged"
+- hblocks.f90, davidson.f90, pconf.F90 - new ci.in key KHB (Hamiltonian block partitioning, default 1): KHB=1 splits H into 2D blocks across ranks for the Davidson H*v, so each rank holds vector blocks of about Nd/q values (q ~ sqrt(nprocs/4)) instead of two full-length vectors, and each product communicates over groups of ranks instead of all ranks; block pairs with more elements get more ranks; results agree with the row layout to round-off; below 16 ranks, and with KHB=0, the row layout is used as before; the environment variable PCI_MATVEC_TIMING=1 writes the time of each phase of H*v (both layouts) to CONF.PRG
 
 ## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction

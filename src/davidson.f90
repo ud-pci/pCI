@@ -2,6 +2,7 @@ Module davidson
     ! This module contains main subroutines required for the Davidson procedure.
 
     Use conf_variables
+    Use hblocks, Only : h2d_active, BuildH2D, MatvecH2D, MvMark, MvWait, MvCount
 
     Implicit None
 
@@ -39,7 +40,7 @@ Module davidson
 
     Public :: Init4, FormB0, FormB, FormBskip, WriteXIJ, FormP, AvgDiag, Dvdsn, Mxmpy, Ortn, Prj_J
     Public :: SaveHb, LoadHb, RotateHb, InvalidateHb, FreeHb, PrintCnorm, GatherColumnToRoot
-    Public :: ResetPrevStep, KeepPrevStep, OrtnPrevStep
+    Public :: ResetPrevStep, KeepPrevStep, OrtnPrevStep, SetupH2D
 
   Contains
     
@@ -756,6 +757,8 @@ Module davidson
         Integer :: iv, k, n, mpierr, i2min, i1min, kd
         Real(type_real) :: t
         Integer(Kind=int64) :: l8
+        ! Clock for the optional phase timers (PCI_MATVEC_TIMING)
+        Real(dp) :: t0
 
         Select Case(ip)
         Case(1)
@@ -772,7 +775,8 @@ Module davidson
 
         If (.not. diag_initialized) kd=1
 
-        If (.not. Allocated(col_in_cache) .or. size(col_in_cache) /= Nd) Then
+        ! The block-partitioned product (KHB=1) uses its own block-sized buffers
+        If (.not. h2d_active .and. (.not. Allocated(col_in_cache) .or. size(col_in_cache) /= Nd)) Then
             If (Allocated(col_in_cache))  Deallocate(col_in_cache)
             If (Allocated(col_out_cache)) Deallocate(col_out_cache)
             Allocate(col_in_cache(Nd), col_out_cache(Nd))
@@ -795,11 +799,20 @@ Module davidson
                 End If
             End If
 
+            If (h2d_active) Then
+                Call MatvecH2D(ArrB(1:nd_local, i1min+iv), ArrB(1:nd_local, i2min+iv), mpi_type_real)
+                Cycle
+            End If
+
+            Call MvCount
+            Call MvWait(1, t0)
+
             ! Step 1: assemble the full input column on all ranks.
             col_in_cache(nd_start+1:nd_end) = ArrB(1:nd_local, i1min+iv)
             Call MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, &
                                 col_in_cache, nd_counts_all, nd_displs_all, &
                                 mpi_type_real, MPI_COMM_WORLD, mpierr)
+            Call MvMark(2, t0)
 
             ! Step 2: SpMV over local rows. Upper-triangle CSR storage means element (n,k)
             ! with n/=k contributes to both output row n and output row k (symmetric scatter).
@@ -816,17 +829,41 @@ Module davidson
                     If (n /= k) col_out_cache(k) = col_out_cache(k) + t * col_in_cache(n)
                 End Do
             End Do
+            Call MvMark(4, t0)
+            Call MvWait(5, t0)
 
             ! Step 3-4: sum scatter contributions across ranks; each rank receives only its own
             ! row block (contiguous, in rank order) directly into its local slice of ArrB.
             Call MPI_Reduce_scatter(col_out_cache, ArrB(1:nd_local, i2min+iv), nd_counts_all, &
                                     mpi_type_real, MPI_SUM, MPI_COMM_WORLD, mpierr)
+            Call MvMark(7, t0)
         End Do
 
         ! Each rank already wrote to its own Diag(n-nd_start); no Allreduce needed.
         If (kd==1) diag_initialized = .True.
         Return
     End Subroutine Mxmpy
+
+    Subroutine SetupH2D(npes, mype, mpi_type_real)
+        ! Switch H to the block layout of module hblocks (KHB=1); call after Init4.
+        ! Diag is filled here from the row-distributed H, as the first 1D Mxmpy call would do,
+        ! since that H is freed by BuildH2D.
+        Use mpi_f08
+        Implicit None
+        Integer, Intent(In) :: npes, mype
+        Type(MPI_Datatype), Intent(In) :: mpi_type_real
+        Integer :: n
+        Integer(Kind=int64) :: l8
+
+        Do n = nd_start+1, nd_end
+            Do l8 = HamilCSR_rowptr(n-nd_start-1)+1_int64, HamilCSR_rowptr(n-nd_start)
+                If (Hamil%col(l8) == n) Diag(n - nd_start) = Hamil%val(l8) - Hamil%minval
+            End Do
+        End Do
+        diag_initialized = .True.
+
+        Call BuildH2D(npes, mype, mpi_type_real)
+    End Subroutine SetupH2D
 
     Subroutine Ortn(j, ifail, mpi_type_real, mype)
         ! Orthogonalize trial vector j against the j-1 vectors already in the subspace,

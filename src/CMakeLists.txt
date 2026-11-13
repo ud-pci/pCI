@@ -30,7 +30,7 @@ if(MPI_FOUND)
     target_link_libraries(pbasc PUBLIC pci_common)
 
     if (LAPACK_AVAILABLE)
-        add_executable(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 davidson.f90 csf.f90 pconf.F90)
+        add_executable(pconf env_var.f90 matrix_io.f90 vaccumulator.f90 formj2.f90 hblocks.f90 davidson.f90 csf.f90 pconf.F90)
         target_link_libraries(pconf PUBLIC pci_common mkl_sequential)
         if (USE_SCALAPACK)
             target_compile_definitions(pconf PRIVATE USE_SCALAPACK)

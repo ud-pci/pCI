@@ -1080,8 +1080,9 @@ Contains
 
     Subroutine calcMemReqs
         Use str_fmt, Only : FormattedMemSize
+        Use hblocks, Only : H2DBlocks
         Implicit None
-        Integer(Kind=int64) :: mem
+        Integer(Kind=int64) :: mem, mem_mv
         Integer(Kind=int64) :: bytesInteger, bytesDP, bytesReal
         Character(Len=16) :: memStr
     
@@ -1105,6 +1106,10 @@ Contains
         
         memEstimate = memFormH + memStaticArrays
     
+        ! Vectors for H*v: full-length col_in and col_out, or with block partitioning up to four blocks of ~Nd/q
+        mem_mv = bytesReal * Nd * 2_int64
+        If (KHB == 1 .and. H2DBlocks(npes) > 1) mem_mv = bytesReal * 4_int64 * (Nd / H2DBlocks(npes))
+
         ! ArrB, B2, B1_loc distributed: each rank holds ~Nd/npes rows.
         mem = bytesReal * (Nd/npes) * IPlv & ! ArrB (distributed ~Nd/npes rows per rank)
             + bytesReal * (Nd/npes) * Nlv  & ! stored H*b (distributed)
@@ -1117,7 +1122,7 @@ Contains
             + bytesReal * (Nd/npes)        & ! B2(nd_local): M^-1 b outside the Z1 region (Olsen correction)
             + bytesReal * Nd0 * Nd0        & ! Z1
             + bytesReal * Nd0              & ! E1
-            + bytesReal * Nd * 2_int64     & ! col_in,col_out peak during each Mxmpy call
+            + mem_mv                       & ! vectors for H*v in Mxmpy
             + 4_int64 * int(Njd, int64)      ! Jt(Njd) integer array
 
         memDvdsn = mem
@@ -1146,6 +1151,7 @@ Contains
 
         Call MPI_Bcast(KXIJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KRefresh, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
+        Call MPI_Bcast(KHB, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KWeights, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(KLSJ, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
         Call MPI_Bcast(Kv, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -1965,8 +1971,10 @@ Contains
     Subroutine AllocateDvdsnArrays(mype)
         Use mpi_f08
         Use str_fmt, Only : FormattedMemSize
+        Use hblocks, Only : H2DBlocks
         Implicit None
         Integer :: mpierr, mype, npes, r
+        Integer(Kind=int64) :: mem_mv
         Character(Len=16) :: memStr, memTotStr
 
         Call MPI_Bcast(Nd0, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
@@ -2015,12 +2023,16 @@ Contains
             If (.not. Allocated(xs)) Allocate(xs(Nlv))
         End If
 
+        ! Vectors for H*v: full-length col_in and col_out, or with block partitioning up to four blocks of ~Nd/q
+        mem_mv = 2_int64 * int(Nd,int64) * int(type_real,int64)
+        If (KHB == 1 .and. H2DBlocks(npes) > 1) mem_mv = 4_int64 * int(Nd / H2DBlocks(npes),int64) * int(type_real,int64)
+
         If (mype==0) Then
             memDvdsn = 0_int64
             memDvdsn = sizeof(ArrB)+sizeof(Tk)+sizeof(Tj)+sizeof(P)+sizeof(E) &
                 + sizeof(Iconverge)+sizeof(B1)+sizeof(B1_loc)+sizeof(B2)+sizeof(Z1)+sizeof(E1)+sizeof(Jt) &
                 + sizeof(Diag) &
-                + 2_int64 * int(Nd,int64) * int(type_real,int64) & ! col_in+col_out peak per Mxmpy call
+                + mem_mv & ! vectors for H*v in Mxmpy
                 + int(nd_local,int64) * int(Nlv,int64) * int(type_real,int64)  ! stored H*b
             If (kLSJ == 1) memDvdsn = memDvdsn + sizeof(xj)+sizeof(xl)+sizeof(xs)
             Call FormattedMemSize(memDvdsn, memStr)
@@ -2225,6 +2237,7 @@ Contains
         Use mpi_f08
         Use str_fmt, Only : startTimer, stopTimer, FormattedTime
         Use davidson
+        Use hblocks, Only : FreeH2D, MvTimingInit, MvTimingReport, H2DBlocks
         Use formj2, Only : J_av
         Implicit None
         External :: DSYEV, SSYEV
@@ -2260,8 +2273,15 @@ Contains
             Open(77,file='CONF.PRG',status='REPLACE',form='FORMATTED',action='WRITE')
         End If
 
+        ! Optional H*v phase timers (set "export PCI_MATVEC_TIMING=1")
+        Call MvTimingInit
+
         ! Construct initial approximation from Hamiltonian matrix
         Call Init4(mype, mpi_type_real)
+
+        ! With KHB=1, move H into the block layout used by Mxmpy from here on.
+        ! Below 16 ranks there is only one block, so the row layout is kept.
+        If (KHB == 1 .and. H2DBlocks(npes) > 1) Call SetupH2D(npes, mype, mpi_type_real)
 
         ! Diagonalize the initial approximation
         Call DiagInitApprox(mype, npes)
@@ -2510,6 +2530,9 @@ Contains
         ! Write final eigenvalues and eigenvectors to file CONF.XIJ
         Call WriteFinalXIJ(mype)
 
+        ! H*v phase times to CONF.PRG, only with PCI_MATVEC_TIMING (set "export PCI_MATVEC_TIMING=1")
+        Call MvTimingReport(mype, npes)
+
         If (mype == 0) Then
             Call stopTimer(start_time, timeStr)
             Write(*,'(2X,A)') 'TIMING >>> Davidson procedure took '// trim(timeStr) // ' to complete'
@@ -2519,6 +2542,7 @@ Contains
         If (allocated(W)) Deallocate(W)
         If (allocated(Hamil%col)) Deallocate(Hamil%col)
         If (allocated(Hamil%val)) Deallocate(Hamil%val)
+        Call FreeH2D
         If (allocated(Jsq%row)) Deallocate(Jsq%row)
         If (allocated(Jsq%col)) Deallocate(Jsq%col)
         If (allocated(Jsq%val)) Deallocate(Jsq%val)

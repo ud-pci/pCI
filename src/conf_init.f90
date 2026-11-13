@@ -145,7 +145,7 @@ Module conf_init
         character(len=10) :: key, key_upper
         character(len=10) :: val
         character(len=80) :: line
-        Character(len=90), Parameter, Dimension(12) :: skeleton = [ Character(len=90) :: &
+        Character(len=90), Parameter, Dimension(13) :: skeleton = [ Character(len=90) :: &
             'Kl=0      # 0=new, 1=continue (CONF.HIJ+JJJ), 2=new+MBPT, 4=memory check', &
             'Kw=0      # 0=do not write CONF.HIJ, 1=write CONF.HIJ',                    &
             'KLSJ=0    # 0=no LSJ in FINAL.RES, 1=write LSJ',                           &
@@ -157,7 +157,8 @@ Module conf_init
             '#KRefresh=# recompute H*b every N Davidson iterations (default 20)',      &
             '#KWeights=# 0=do not write CONF.WGT, 1=write (default 0)',                 &
             '#MaxNd0=  # initial Davidson approximation size (default 3000)',           &
-            '#kCSF=    # 0=determinant basis, 1=CSF basis (default 0)']
+            '#kCSF=    # 0=determinant basis, 1=CSF basis (default 0)',             &
+            '#KHB=     # 0=split H by rows, 1=into blocks for H*v (default 1)']
 
         Open(unit=99, file='ci.in', status='OLD', iostat=err_stat)
         If (err_stat /= 0) Call WriteSkeleton('ci.in', skeleton)
@@ -173,6 +174,7 @@ Module conf_init
         KXIJ = 10
         KRefresh = 20
         MaxNd0 = 3000
+        KHB = 1
 
         Do
             Read(99, '(A)', iostat=err_stat) line
@@ -208,6 +210,8 @@ Module conf_init
                 Read(val, *) MaxNd0
             Case('KCSF')
                 Read(val, *) kCSF
+            Case('KHB')
+                Read(val, *) KHB
             End Select
         End Do
 

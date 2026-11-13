@@ -98,6 +98,7 @@ In addition to the input files listed above, ``pconf`` also requires the file ``
 	KWeights = (0,1)     - write configuration weights to CONF.WGT (default: 0)
 	MaxNd0 = N           - maximum number of determinants in initial approximation (default: 3000)
 	kCSF   = (0,1)       - use CSF basis for diagonalization (default: 0)
+	KHB    = (0,1)       - Hamiltonian block partitioning in the Davidson procedure (default: 1)
 
 The value of ``Kl`` can take the following values:
 
@@ -138,6 +139,13 @@ The value of ``kCSF`` can take the following values:
 * ``kCSF = 1`` - use a symmetry-adapted CSF (configuration state function) basis
 
 When ``kCSF = 1``, ``pconf`` first constructs the CSF basis by diagonalizing the :math:`J^2` matrix within each relativistic configuration block and selecting eigenstates with the correct total angular momentum. The Hamiltonian is then formed and diagonalized in this CSF basis, which is smaller than the full determinant space and can significantly reduce computation time for large calculations. After diagonalization, the wave functions are transformed back to the determinant basis before writing ``CONF.XIJ``.
+
+The value of ``KHB`` can take the following values:
+
+* ``KHB = 0`` - distribute the Hamiltonian across cores by rows
+* ``KHB = 1`` - distribute the Hamiltonian across cores in blocks (default)
+
+When ``KHB = 1``, each core needs only parts of the vectors in the Davidson procedure, which lowers the memory per core and speeds up large runs. It takes effect from 16 cores up; with fewer cores, the row distribution is used. Both settings give the same results.
 
 Bitstring Determinants
 ~~~~~~~~~~~~~~~~~~~~~~
