@@ -201,7 +201,7 @@ Program pconf
             Do n=1,Nemu
                 Ndemu=Ndemu+Ndc(n)
             End Do
-            strfmt = '(4x,"(!) Regime Emu: Nemu =",I5,2X"Ndemu =",I11)'
+            strfmt = '(4x,"(!) Regime Emu: Nemu =",I5,2X,"Ndemu =",I11)'
             Write( 6,strfmt) Nemu,Ndemu
             Write(11,strfmt) Nemu,Ndemu
         End If
