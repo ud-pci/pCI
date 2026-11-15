@@ -3111,7 +3111,9 @@ Contains
         Real(dp), Allocatable, Dimension(:), Intent(InOut) :: xj, xl, xs
         Real(dp), Allocatable, Dimension(:,:), Intent(In) :: cc
         Integer, Allocatable, Dimension(:) :: idet1, idet2
-        Integer :: ic1, ic2, n1, ndn, n, k, k1n, ndk, k1, icomp
+        Integer :: ic1, ic2, n1, ndn, n, k, k1n, ndk, k1, icomp, iconn, nconn
+        ! Configurations ic2 >= ic1 that can couple to ic1, in increasing order
+        Integer, Allocatable :: conn(:)
         Real(dp) :: ckn, tj, tl, ts
         real(dp), dimension(:,:), allocatable :: plj, pls, p0s, pll, p0l
         real(dp), allocatable :: cc_n(:), cc_k(:)
@@ -3120,30 +3122,38 @@ Contains
         if (.not. allocated(idet2)) Allocate(idet2(Ne))
         if (.not. allocated(iconf1)) Allocate(iconf1(Ne))
         if (.not. allocated(iconf2)) Allocate(iconf2(Ne))
-        Allocate(cc_n(Nlv), cc_k(Nlv))
+        Allocate(cc_n(Nlv), cc_k(Nlv), conn(Nc))
         Do ic1=startnc, endnc
             ndn=Ndc(ic1)
+            If (ndn == 0) Cycle
+
+            ! The screening depends only on the two configurations, so it is done once per pair:
+            ! L, S and J connect only determinants of the same nonrelativistic configuration
+            ! whose relativistic configurations differ by at most 2 orbitals.
+            nconn=0
+            call Gdet(Mdc(ic1)+1,idet1)
+            Do ic2=ic1,Nc
+                If (Ndc(ic2) == 0) Cycle
+                call Gdet(Mdc(ic2)+1,idet2)
+                call CompNRC(idet1,idet2,icomp)
+                if (icomp.GT.0) Cycle
+                call CompC(idet1,idet2,icomp)
+                if (icomp.GT.2) Cycle
+                nconn=nconn+1
+                conn(nconn)=ic2
+            End Do
+
             n=Mdc(ic1)
             Do n1=1,ndn
                 n=n+1
                 call Gdet(n,idet1)
                 cc_n(1:Nlv) = cc(n, 1:Nlv)
-                k=n-1
-                Do ic2=ic1,Nc
+                Do iconn=1,nconn
+                    ic2=conn(iconn)
                     ndk=Ndc(ic2)
                     k1n=1
                     If (ic2.EQ.ic1) k1n=n1
-                    call Gdet(k+1,idet2)
-                    call CompNRC(idet1,idet2,icomp)
-                    if (icomp.GT.0) then
-                        k=k+ndk
-                        Cycle
-                    end if
-                    call CompC(idet1,idet2,icomp)
-                    if (icomp.GT.2) then
-                        k=k+ndk
-                        Cycle
-                    end if
+                    k=Mdc(ic2)+k1n-1
                     Do k1=k1n,ndk
                         k=k+1
                         call Gdet(k,idet2)
@@ -3161,7 +3171,7 @@ Contains
                 End Do
             End Do
         End Do
-        Deallocate(cc_n, cc_k)
+        Deallocate(cc_n, cc_k, conn)
     End Subroutine calcLSJ
 
     Subroutine lsj_det(idet1,idet2,tj,tl,ts,plj,pls,p0s,pll,p0l)
