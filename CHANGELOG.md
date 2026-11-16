@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - tests/small - the test also requires pconf to print "Davidson procedure converged"
 - hblocks.f90, davidson.f90, pconf.F90 - new ci.in key KHB (Hamiltonian block partitioning, default 1): KHB=1 splits H into 2D blocks across ranks for the Davidson H*v, so each rank holds vector blocks of about Nd/q values (q ~ sqrt(nprocs/4)) instead of two full-length vectors, and each product communicates over groups of ranks instead of all ranks; block pairs with more elements get more ranks; results agree with the row layout to round-off; below 16 ranks, and with KHB=0, the row layout is used as before; the environment variable PCI_MATVEC_TIMING=1 writes the time of each phase of H*v (both layouts) to CONF.PRG
 - pconf.F90 - optimize LSJ calculation by screening each pair of configurations once instead of once per determinant
+- pconf.F90 - make the term column one character wider, so terms like 4K11/2 no longer run into the configuration
 
 ## [1.4.0] - 2026-07-31
 - pconf v9.0 - distributed Davidson diagonalization: Hamiltonian and working arrays distributed across all MPI ranks; integral lookups optimized in Hamiltonian construction

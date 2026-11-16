@@ -3568,7 +3568,8 @@ Contains
         Character(Len=512) :: strfmt, strfmt2, strconfig, strconfig2, strsp
         Character(Len=64), Allocatable, Dimension(:,:) :: strcsave
         Character(Len=3) :: strc, strq
-        Character(Len=6) :: strterm, strconverged
+        Character(Len=7) :: strterm
+        Character(Len=6) :: strconverged
         Integer, Dimension(33)  ::  nnn, nqq 
         Character(Len=1), Dimension(33):: lll
         Character(Len=5) :: strgf, strconfadd2
@@ -3758,7 +3759,7 @@ Contains
                     Write(99, '(A)') &
                         '  n' // '   ' // &
                         repeat(' ', max(0, maxlenconfig-3)) // 'conf' // &
-                        '  term' // &
+                        '   term' // &
                         '     E_n (a.u.)' // &
                         '   DEL (cm^-1)' // &
                         '     S' // '     L' // '     J' // &
@@ -3988,7 +3989,7 @@ Contains
 
     End Subroutine PrintWeights
 
-    Character(Len=6) Function term(L, S, J)
+    Character(Len=7) Function term(L, S, J)
         ! This function returns the term, given L, S and J
         Implicit None
         Real(dp), Intent(In) :: L, S, J
@@ -4031,15 +4032,12 @@ Contains
             strl = '>'    
         End Select
 
+        ! I0 so that two-digit multiplicities and J values are written instead of '*'
         If (mod(Ne,2) == 0) Then
-          Write(term, '(I1,A,I1)') is, strl, ij
+          Write(term, '(I0,A,I0)') is, strl, ij
         Else
-          If (ij < 10) Then
-             Write(term, '(I1,A,I1,A2)') is, strl, ij,'/2'
-          Else
-             Write(term, '(I1,A,I2,A2)') is, strl, ij,'/2'
-          EndIf 
-        End If  
+          Write(term, '(I0,A,I0,A2)') is, strl, ij, '/2'
+        End If
 
     End Function term
 
