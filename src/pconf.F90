@@ -1076,6 +1076,11 @@ Contains
         If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
             + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
             + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
+        ! Lookup tables and hashes built in InitFormH (sizeof is zero if not allocated)
+        memFormH = memFormH + sizeof(GauntLUT) + sizeof(HintLUT) &
+            + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd) &
+            + sizeof(ISLUT) + sizeof(HintSPosLUT) &
+            + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
     End Subroutine calcMemFormHArrays
 
     Subroutine calcMemReqs
@@ -1226,7 +1231,6 @@ Contains
             Call MPI_Bcast(R_is, num_is, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(I_is, num_is, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call BuildISLUT
-            memFormH = memFormH + sizeof(ISLUT)
         End If
         If (Ksig /= 0) Then
             Call MPI_Bcast(Scr, 10, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
@@ -1241,17 +1245,12 @@ Contains
             Call MPI_Bcast(Eint2S, NgintS, mpi_type2_real, 0, MPI_COMM_WORLD, mpierr)
             Call MPI_Bcast(IntOrdS, Nx*Nx, MPI_INTEGER, 0, MPI_COMM_WORLD, mpierr)
             Call BuildHintSLUT
-            memFormH = memFormH + sizeof(HintSPosLUT)
             Call BuildGintSHash
-            memFormH = memFormH + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
         End If
 
         Call BuildGauntLUT
-        memFormH = memFormH + sizeof(GauntLUT)
         Call BuildHintLUT
-        memFormH = memFormH + sizeof(HintLUT)
         Call BuildGintHash
-        memFormH = memFormH + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd)
     End subroutine InitFormH
 
     Subroutine FormH(npes, mype)
