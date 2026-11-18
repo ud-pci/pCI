@@ -1076,10 +1076,11 @@ Contains
         If (Ksig /= 0) memFormH = memFormH+sizeof(Rint2S)+sizeof(Dint2S)+sizeof(Eint2S) &
             + sizeof(Iint1S)+sizeof(Iint2S)+sizeof(Iint3S) &
             + sizeof(Rsig)+sizeof(Dsig)+sizeof(Esig)+sizeof(IntOrdS)
-        ! Lookup tables and hashes built in InitFormH (sizeof is zero if not allocated)
+        ! Lookup tables and hashes built in InitFormH; the K_is and Ksig ones exist only with those options
         memFormH = memFormH + sizeof(GauntLUT) + sizeof(HintLUT) &
-            + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd) &
-            + sizeof(ISLUT) + sizeof(HintSPosLUT) &
+            + sizeof(GintHashPos) + sizeof(GintHashIac) + sizeof(GintHashIbd)
+        If (K_is /= 0) memFormH = memFormH + sizeof(ISLUT)
+        If (Ksig /= 0) memFormH = memFormH + sizeof(HintSPosLUT) &
             + sizeof(GintSHashPos) + sizeof(GintSHashIac) + sizeof(GintSHashIbd)
     End Subroutine calcMemFormHArrays
 
